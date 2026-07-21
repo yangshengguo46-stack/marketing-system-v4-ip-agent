@@ -32,6 +32,7 @@ from app.gateway.routers import (
     personal_ip_metrics,
     personal_ip_preflights,
     personal_ip_publish_receipts,
+    personal_ip_retrospectives,
     runs,
     scheduled_tasks,
     skills,
@@ -499,6 +500,7 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
     app.include_router(personal_ip_metrics.router)
     app.include_router(personal_ip_preflights.router)
     app.include_router(personal_ip_publish_receipts.router)
+    app.include_router(personal_ip_retrospectives.router)
 
     # Features API is mounted at /api/features
     app.include_router(features.router)

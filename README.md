@@ -41,6 +41,10 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > refuses to sum cumulative snapshots as daily increments, and reports partial,
 > unavailable and missing account coverage instead of treating missing data as
 > zero.
+> Retrospectives then seal the selected preflight variant, concrete publish
+> receipt and post-level observations into one digest. They expose calibrated
+> versus unscored predictions and remain pending human review; a single result
+> never promotes itself into model training.
 
 ## Official Website
 

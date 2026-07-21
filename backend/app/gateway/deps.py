@@ -171,6 +171,7 @@ if TYPE_CHECKING:
     from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
     from deerflow.persistence.personal_ip_preflights import PersonalIPPreflightRepository
     from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
+    from deerflow.persistence.personal_ip_retrospectives import PersonalIPRetrospectiveRepository
     from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
     from deerflow.persistence.thread_meta.base import ThreadMetaStore
     from deerflow.runtime import RunRecord
@@ -309,6 +310,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
             from deerflow.persistence.personal_ip_preflights import PersonalIPPreflightRepository
             from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
+            from deerflow.persistence.personal_ip_retrospectives import PersonalIPRetrospectiveRepository
             from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
             from deerflow.persistence.scheduled_task_runs import (
                 ScheduledTaskRunRepository,
@@ -321,6 +323,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.personal_ip_metric_repo = PersonalIPMetricRepository(sf)
             app.state.personal_ip_preflight_repo = PersonalIPPreflightRepository(sf)
             app.state.personal_ip_publish_receipt_repo = PersonalIPPublishReceiptRepository(sf)
+            app.state.personal_ip_retrospective_repo = PersonalIPRetrospectiveRepository(sf)
             app.state.personal_ip_subject_repo = PersonalIPSubjectRepository(sf)
         else:
             app.state.scheduled_task_repo = None
@@ -329,6 +332,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.personal_ip_metric_repo = None
             app.state.personal_ip_preflight_repo = None
             app.state.personal_ip_publish_receipt_repo = None
+            app.state.personal_ip_retrospective_repo = None
             app.state.personal_ip_subject_repo = None
 
         # Run event store. The store and the matching ``run_events_config`` are
@@ -470,6 +474,13 @@ def get_personal_ip_publish_receipt_repo(request: Request) -> PersonalIPPublishR
     val = getattr(request.app.state, "personal_ip_publish_receipt_repo", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Personal-IP publish receipt repository not available")
+    return val
+
+
+def get_personal_ip_retrospective_repo(request: Request) -> PersonalIPRetrospectiveRepository:
+    val = getattr(request.app.state, "personal_ip_retrospective_repo", None)
+    if val is None:
+        raise HTTPException(status_code=503, detail="Personal-IP retrospective repository not available")
     return val
 
 

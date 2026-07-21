@@ -114,4 +114,13 @@ cumulative snapshots from daily totals and does not treat unavailable data as
 zero. Post-level observations reference the matching publish receipt, which is
 the bridge to later prediction-versus-actual review.
 
+Seal that review through `POST /api/personal-ip/retrospectives` after the
+publish receipt is confirmed and one or more post-level observations exist.
+The service derives the selected candidate from the immutable publish request,
+finds it in the original provider receipt, snapshots the actual metrics and
+computes an evidence digest. A partial observation remains partial, and a Lite
+candidate without `match_score` remains `unscored`. Every retrospective starts
+as `pending_human_review`; no single post can automatically become a training
+example or rewrite its original prediction.
+
 See `product/volcengine/capabilities.yaml` for the complete routing policy.

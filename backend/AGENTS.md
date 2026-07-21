@@ -1009,6 +1009,19 @@ observed, partial, unavailable and missing account ids so the agent cannot
 silently turn missing permissions or failed collection into zero performance.
 Post observations must reference a publish receipt for the same owner/account.
 
+Migration `0011_personal_ip_retrospectives` and
+`deerflow.persistence.personal_ip_retrospectives` freeze the first complete
+prediction-to-outcome join. Gateway endpoints are under
+`/api/personal-ip/retrospectives`. The source publish receipt must already be
+`published`, must reference a preflight, and must identify a selected variant
+that exists in the sealed provider receipt. Every supplied metric must be a
+same-owner, same-receipt, same-account post observation. Store both the raw
+observation snapshots and a deterministic evidence digest. Partial metric
+coverage stays partial; an absent calibrated `match_score` stays `unscored`.
+All new rows remain `pending_human_review`: this repository is evidence
+settlement, not automatic rubric/model promotion, and it never rewrites the
+preflight.
+
 ### Vision Support
 
 For models with `supports_vision: true`:

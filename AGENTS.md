@@ -104,6 +104,13 @@ IP Agent distribution note:
   Aggregate only additive `window_total`/`delta` fields, take the latest
   observation for an identical account/scope/series/window, exclude cumulative snapshots,
   and expose missing/partial/unavailable account coverage explicitly.
+- Personal-IP retrospective evidence lives in
+  `deerflow.persistence.personal_ip_retrospectives` and migration
+  `0011_personal_ip_retrospectives`. A retrospective must join one published
+  receipt to its original preflight and same-receipt post observations, freeze
+  the selected variant plus outcomes under an evidence digest, and remain
+  `pending_human_review`. Do not auto-promote a retrospective into training or
+  invent a score when HLLM-Lite returned none.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.

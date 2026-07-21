@@ -120,8 +120,16 @@ to a publish receipt for that account. Portfolio aggregation takes only the
 latest refetch for an identical account/scope/series and window, sums a conservative
 additive-field allowlist and reports coverage gaps. Cumulative snapshots stay
 available for post-level retrospectives but are never mislabeled as daily
-increments. Prediction-versus-actual comparison and approved training-example
-promotion remain the next layer; observed metrics do not mutate preflights.
+increments; observed metrics do not mutate preflights.
+
+`personal_ip_retrospectives` implements the immutable comparison evidence
+join. It accepts only a confirmed publish receipt with an original preflight,
+resolves the selected variant from the publish request, verifies every metric
+observation belongs to that post/account, and seals the raw outcome plus a
+digest. Lite predictions without a learned score are explicitly `unscored`,
+and partial metric coverage stays partial. The row is always marked
+`pending_human_review`; the separate evidence-promotion policy remains pending
+and no retrospective automatically enters HLLM training.
 
 ## Minimal patch policy
 
