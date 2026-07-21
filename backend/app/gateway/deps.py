@@ -342,6 +342,15 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.personal_ip_publish_receipt_repo = PersonalIPPublishReceiptRepository(sf)
             app.state.personal_ip_retrospective_repo = PersonalIPRetrospectiveRepository(sf)
             app.state.personal_ip_subject_repo = PersonalIPSubjectRepository(sf)
+            from deerflow.personal_ip.runtime import PersonalIPRuntimeServices, configure_personal_ip_runtime
+
+            configure_personal_ip_runtime(
+                PersonalIPRuntimeServices(
+                    connections=app.state.personal_ip_platform_connection_repo,
+                    metrics=app.state.personal_ip_metric_repo,
+                    publish_receipts=app.state.personal_ip_publish_receipt_repo,
+                )
+            )
         else:
             app.state.scheduled_task_repo = None
             app.state.scheduled_task_run_repo = None
@@ -353,6 +362,9 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.personal_ip_publish_receipt_repo = None
             app.state.personal_ip_retrospective_repo = None
             app.state.personal_ip_subject_repo = None
+            from deerflow.personal_ip.runtime import configure_personal_ip_runtime
+
+            configure_personal_ip_runtime(None)
 
         # Run event store. The store and the matching ``run_events_config`` are
         # both frozen at startup so ``get_run_context`` does not combine a

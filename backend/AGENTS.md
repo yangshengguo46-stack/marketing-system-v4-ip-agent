@@ -1070,6 +1070,15 @@ authentication failure triggers exactly one refresh and one retry; other
 provider failures are not hidden behind refresh. Never put the decrypted
 credential into route responses, tool results, coverage metadata or logs.
 
+Native `deerflow.tools.builtins.personal_ip_tools` provide the agent-facing
+surface: `personal_ip_metrics_aggregate` is portfolio-wide by construction and
+has no account filter; `personal_ip_sync_douyin_post` takes only server-issued
+connection/receipt/idempotency identifiers. `app.gateway.deps` injects the live
+repository instances into the process-local `deerflow.personal_ip.runtime`
+bundle after persistence startup. This direction is app → harness and must not
+be reversed with a harness import from `app.*`. Tool identity comes from
+`resolve_runtime_user_id(runtime)`, and tool JSON errors must stay sanitized.
+
 ### Vision Support
 
 For models with `supports_vision: true`:

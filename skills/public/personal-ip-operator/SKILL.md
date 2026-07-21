@@ -9,11 +9,15 @@ license: MIT
 Treat this as an agent operating an account, not a content-generation app.
 DeerFlow owns planning and execution; the account record is the business truth.
 
-## Establish scope
+## Establish portfolio and operation scope
 
-Before producing work, identify the active account and platform. Reuse facts
-already present in user memory. Ask only for a missing fact that materially
-changes the result.
+Treat the authenticated user's full portfolio as the conversation scope. Never
+bind a conversation, toolset or answer to one account. Compare and aggregate
+all relevant accounts when the request is global. Select an account and
+platform only as the target of a concrete operation such as publishing,
+spending, messaging, computer control or post-level metric collection. Reuse
+facts already present in user memory and ask only for a missing fact that
+materially changes that operation.
 
 Minimum account card:
 
@@ -35,7 +39,7 @@ facts through a Tool/MCP; do not recreate that model in prompts.
 
 ## Work loop
 
-1. Bind the request to one account, platform and objective.
+1. Determine whether the request is portfolio-wide or a concrete account operation; never infer an account restriction for a global request.
 2. Inspect evidence before strategy: prior content, comments, metrics, source
    documents and competitor examples.
 3. Produce the smallest useful plan and label assumptions.
@@ -62,7 +66,7 @@ receipts.
 
 Every completed operation should state:
 
-- active account and platform;
+- portfolio coverage, plus the target account/platform only for account-specific operations;
 - objective and evidence used;
 - decisions made and assumptions left;
 - generated assets and provider receipts;

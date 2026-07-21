@@ -91,6 +91,13 @@ immutable metric ledger. If Douyin reports an expired access token, it uses
 the encrypted refresh token once, rotates the stored grant and retries the
 query once. The request and response contain no token field.
 
+DeerFlow exposes the same server-side flow as the native
+`personal_ip_sync_douyin_post` tool. Portfolio totals are read through
+`personal_ip_metrics_aggregate`, whose schema deliberately contains no account
+filter. This prevents a Feishu or chat conversation from being accidentally
+narrowed to the most recently operated account. Coverage remains explicit, so
+the agent must say which platforms/accounts are missing or unavailable.
+
 The code/ticket are one-use inputs. Access tokens, refresh tokens, the mini-app
 secret and the `code2Session` session key are never returned from these APIs.
 `DELETE /api/personal-ip/platform-connections/{id}` disconnects locally and
