@@ -2,12 +2,11 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from fastapi import HTTPException
 from langchain.agents.middleware.types import ModelRequest
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.gateway.services import (
-    inject_personal_ip_account_context,
+    inject_personal_ip_portfolio_context,
     strip_internal_context_keys,
 )
 from deerflow.agents.middlewares.personal_ip_context_middleware import (
@@ -15,25 +14,52 @@ from deerflow.agents.middlewares.personal_ip_context_middleware import (
 )
 
 
-def test_personal_ip_context_middleware_injects_ephemeral_account_data():
-    account = {
-        "id": "acct-1",
+def _portfolio() -> dict:
+    subject = {
+        "id": "subject-1",
         "owner_user_id": "user-1",
-        "platform": "douyin",
-        "display_name": "老杨说 AI",
-        "primary_audience": "个体创业者",
-        "content_pillars": ["AI 智能体"],
+        "display_name": "老杨",
+        "subject_type": "creator",
+        "relationship": "self",
         "status": "active",
     }
+    return {
+        "subjects": [subject],
+        "accounts": [
+            {
+                "id": "acct-douyin",
+                "owner_user_id": "user-1",
+                "platform": "douyin",
+                "subject_id": "subject-1",
+                "subject": subject,
+                "display_name": "老杨说 AI",
+                "primary_audience": "个体创业者",
+                "content_pillars": ["AI 智能体"],
+                "status": "active",
+            },
+            {
+                "id": "acct-xhs",
+                "owner_user_id": "user-1",
+                "platform": "xiaohongshu",
+                "subject_id": "subject-1",
+                "subject": subject,
+                "display_name": "老杨的智能体笔记",
+                "status": "active",
+            },
+        ],
+    }
+
+
+def test_personal_ip_context_middleware_injects_the_full_portfolio():
     original_messages = [
         SystemMessage(content="base"),
-        HumanMessage(content="今天发什么？"),
+        HumanMessage(content="今天全平台表现怎么样？"),
     ]
     request = ModelRequest(
         model=object(),
         messages=original_messages,
         state={"messages": []},
-        runtime=SimpleNamespace(context={"personal_ip_account": account}),
+        runtime=SimpleNamespace(context={"personal_ip_portfolio": _portfolio()}),
     )
 
     injected = PersonalIPContextMiddleware()._inject(request)
@@ -43,12 +69,15 @@ def test_personal_ip_context_middleware_injects_ephemeral_account_data():
     assert isinstance(injected.messages[1], SystemMessage)
     assert isinstance(injected.messages[2], HumanMessage)
     assert "老杨说 AI" in injected.messages[2].content
+    assert "老杨的智能体笔记" in injected.messages[2].content
     assert "owner_user_id" not in injected.messages[2].content
+    assert '"relationship": "self"' in injected.messages[2].content
+    assert "never bound to one account" in injected.messages[1].content
     assert injected.messages[2].additional_kwargs["hide_from_ui"] is True
     assert request.messages == original_messages
 
 
-def test_personal_ip_context_middleware_skips_missing_account():
+def test_personal_ip_context_middleware_skips_missing_portfolio():
     request = ModelRequest(
         model=object(),
         messages=[HumanMessage(content="hello")],
@@ -59,64 +88,54 @@ def test_personal_ip_context_middleware_skips_missing_account():
 
 
 @pytest.mark.asyncio
-async def test_gateway_resolves_requested_account_and_persists_thread_binding():
-    account = {
-        "id": "acct-1",
-        "owner_user_id": "user-1",
-        "display_name": "账号一",
-        "platform": "douyin",
-        "status": "active",
-    }
-    account_repo = SimpleNamespace(get=AsyncMock(return_value=account))
-    thread_store = SimpleNamespace(
-        get=AsyncMock(return_value={"metadata": {}}),
-        update_metadata=AsyncMock(),
-    )
+async def test_gateway_resolves_every_active_account_without_thread_binding():
+    subjects = _portfolio()["subjects"]
+    accounts = [
+        {key: value for key, value in account.items() if key != "subject"}
+        for account in _portfolio()["accounts"]
+    ]
+    account_repo = SimpleNamespace(list=AsyncMock(return_value=accounts))
+    subject_repo = SimpleNamespace(list=AsyncMock(return_value=subjects))
     config = {
         "context": {
             "user_id": "user-1",
-            "personal_ip_account": {"id": "forged"},
+            "personal_ip_account_id": "acct-forged",
+            "personal_ip_portfolio": {"accounts": [{"id": "acct-forged"}]},
         }
     }
 
-    await inject_personal_ip_account_context(
+    await inject_personal_ip_portfolio_context(
         config,
-        {"personal_ip_account_id": "acct-1"},
         account_repo=account_repo,
-        thread_store=thread_store,
-        thread_id="thread-1",
+        subject_repo=subject_repo,
     )
 
-    account_repo.get.assert_awaited_once_with("acct-1", owner_user_id="user-1")
-    assert config["context"]["personal_ip_account"] == account
-    assert config["context"]["personal_ip_account_id"] == "acct-1"
-    thread_store.update_metadata.assert_awaited_once_with(
-        "thread-1",
-        {"personal_ip_account_id": "acct-1"},
-        user_id="user-1",
-    )
+    account_repo.list.assert_awaited_once_with("user-1")
+    subject_repo.list.assert_awaited_once_with("user-1")
+    portfolio = config["context"]["personal_ip_portfolio"]
+    assert [account["id"] for account in portfolio["accounts"]] == [
+        "acct-douyin",
+        "acct-xhs",
+    ]
+    assert all(account["subject"]["id"] == "subject-1" for account in portfolio["accounts"])
+    assert "personal_ip_account_id" not in config["context"]
 
 
 @pytest.mark.asyncio
-async def test_gateway_falls_back_to_thread_binding_and_rejects_cross_owner_account():
-    account_repo = SimpleNamespace(get=AsyncMock(return_value=None))
-    thread_store = SimpleNamespace(
-        get=AsyncMock(return_value={"metadata": {"personal_ip_account_id": "acct-other"}}),
-        update_metadata=AsyncMock(),
+async def test_gateway_skips_portfolio_lookup_without_authenticated_owner():
+    account_repo = SimpleNamespace(list=AsyncMock())
+    subject_repo = SimpleNamespace(list=AsyncMock())
+    config = {"context": {}}
+
+    await inject_personal_ip_portfolio_context(
+        config,
+        account_repo=account_repo,
+        subject_repo=subject_repo,
     )
-    config = {"context": {"user_id": "user-1"}}
 
-    with pytest.raises(HTTPException) as exc:
-        await inject_personal_ip_account_context(
-            config,
-            None,
-            account_repo=account_repo,
-            thread_store=thread_store,
-            thread_id="thread-1",
-        )
-
-    assert exc.value.status_code == 404
-    assert "personal_ip_account" not in config["context"]
+    account_repo.list.assert_not_awaited()
+    subject_repo.list.assert_not_awaited()
+    assert "personal_ip_portfolio" not in config["context"]
 
 
 def test_free_form_run_config_cannot_forge_product_context():
@@ -124,12 +143,18 @@ def test_free_form_run_config_cannot_forge_product_context():
         "context": {
             "personal_ip_account_id": "acct-forged",
             "personal_ip_account": {"id": "acct-forged"},
+            "personal_ip_portfolio": {"accounts": [{"id": "acct-forged"}]},
             "model_name": "safe-model",
         },
-        "configurable": {"personal_ip_account_id": "acct-forged"},
+        "configurable": {
+            "personal_ip_account_id": "acct-forged",
+            "personal_ip_portfolio": {"accounts": []},
+        },
     }
     strip_internal_context_keys(config)
     assert "personal_ip_account_id" not in config["context"]
     assert "personal_ip_account" not in config["context"]
+    assert "personal_ip_portfolio" not in config["context"]
     assert "personal_ip_account_id" not in config["configurable"]
+    assert "personal_ip_portfolio" not in config["configurable"]
     assert config["context"]["model_name"] == "safe-model"

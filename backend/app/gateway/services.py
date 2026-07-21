@@ -219,10 +219,17 @@ _CONTEXT_INTERNAL_CALLER_KEYS: frozenset[str] = frozenset({"non_interactive"})
 #   ``channel_user_id``  — accepted only from trusted internal ``body.context``.
 _SERVER_OWNED_AUTHZ_CONTEXT_KEYS: frozenset[str] = frozenset({"is_internal", "authz_attributes", "channel_user_id"})
 
-# Product context is resolved from owner-scoped persistence. A caller may send
-# only the account id in ``body.context``; it may never supply the expanded
-# account object through free-form RunnableConfig.
-_SERVER_OWNED_PRODUCT_CONTEXT_KEYS: frozenset[str] = frozenset({"personal_ip_account_id", "personal_ip_account"})
+# Product context is resolved from owner-scoped persistence. The caller may not
+# narrow a conversation to one account or supply an expanded portfolio through
+# free-form RunnableConfig. Target accounts belong to individual operations and
+# their receipts, not to thread state.
+_SERVER_OWNED_PRODUCT_CONTEXT_KEYS: frozenset[str] = frozenset(
+    {
+        "personal_ip_account_id",
+        "personal_ip_account",
+        "personal_ip_portfolio",
+    }
+)
 
 # Keys forwarded from ``body.context`` into ``config['context']`` ONLY (the
 # runtime context that becomes ``ToolRuntime.context`` / ``runtime.context``),
@@ -257,61 +264,33 @@ def strip_internal_context_keys(config: dict[str, Any]) -> None:
                 value.pop(key, None)
 
 
-async def inject_personal_ip_account_context(
+async def inject_personal_ip_portfolio_context(
     config: dict[str, Any],
-    request_context: Mapping[str, Any] | None,
     *,
     account_repo: Any,
-    thread_store: Any,
-    thread_id: str,
+    subject_repo: Any,
 ) -> None:
-    """Resolve and inject the active account from trusted owner-scoped storage.
-
-    The requested id is accepted only from the typed top-level ``body.context``.
-    Existing threads fall back to their persisted binding. The expanded account
-    record is always loaded server-side and never trusted from client config.
-    """
+    """Inject the owner's full active operating portfolio for every thread."""
     runtime_context = config.setdefault("context", {})
     if not isinstance(runtime_context, dict):
         raise TypeError("run context must be a mapping")
     for key in _SERVER_OWNED_PRODUCT_CONTEXT_KEYS:
         runtime_context.pop(key, None)
 
-    requested_id = None
-    if isinstance(request_context, Mapping):
-        raw_requested_id = request_context.get("personal_ip_account_id")
-        if raw_requested_id is not None:
-            if not isinstance(raw_requested_id, str) or not raw_requested_id.strip():
-                raise HTTPException(
-                    status_code=422,
-                    detail="personal_ip_account_id must be a non-empty string",
-                )
-            requested_id = raw_requested_id.strip()
-
     user_id = runtime_context.get("user_id")
     if not isinstance(user_id, str) or not user_id:
         return
-
-    thread = await thread_store.get(thread_id, user_id=user_id)
-    metadata = (thread or {}).get("metadata") or {}
-    if requested_id is None:
-        bound_id = metadata.get("personal_ip_account_id")
-        requested_id = bound_id if isinstance(bound_id, str) and bound_id else None
-    if requested_id is None:
-        return
-
-    account = await account_repo.get(requested_id, owner_user_id=user_id)
-    if account is None or account.get("status") != "active":
-        raise HTTPException(status_code=404, detail="Personal-IP account not found")
-
-    runtime_context["personal_ip_account_id"] = requested_id
-    runtime_context["personal_ip_account"] = account
-    if metadata.get("personal_ip_account_id") != requested_id:
-        await thread_store.update_metadata(
-            thread_id,
-            {"personal_ip_account_id": requested_id},
-            user_id=user_id,
-        )
+    subjects = await subject_repo.list(user_id)
+    accounts = await account_repo.list(user_id)
+    subjects_by_id = {subject["id"]: subject for subject in subjects}
+    enriched_accounts = []
+    for account in accounts:
+        subject = subjects_by_id.get(account.get("subject_id"))
+        enriched_accounts.append({**account, **({"subject": subject} if subject else {})})
+    runtime_context["personal_ip_portfolio"] = {
+        "subjects": subjects,
+        "accounts": enriched_accounts,
+    }
 
 
 def merge_run_context_overrides(config: dict[str, Any], context: Mapping[str, Any] | None, *, internal: bool = False) -> None:
@@ -803,13 +782,12 @@ async def start_run(
             request_context=getattr(body, "context", None),
         )
         account_repo = getattr(request.app.state, "personal_ip_account_repo", None)
-        if account_repo is not None:
-            await inject_personal_ip_account_context(
+        subject_repo = getattr(request.app.state, "personal_ip_subject_repo", None)
+        if account_repo is not None and subject_repo is not None:
+            await inject_personal_ip_portfolio_context(
                 config,
-                getattr(body, "context", None),
                 account_repo=account_repo,
-                thread_store=run_ctx.thread_store,
-                thread_id=thread_id,
+                subject_repo=subject_repo,
             )
 
         stream_modes = normalize_stream_modes(body.stream_mode)

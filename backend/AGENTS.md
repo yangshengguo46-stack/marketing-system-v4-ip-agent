@@ -942,20 +942,24 @@ Automatic conversation summarization when approaching token limits:
 
 See [docs/summarization.md](docs/summarization.md) for details.
 
-### Personal-IP Account Context
+### Personal-IP Operating Portfolio Context
 
-The IP Agent distribution stores creator/brand accounts in
+The IP Agent distribution stores operated people/brands/organizations in
+`deerflow.persistence.personal_ip_subjects` and their platform accounts in
 `deerflow.persistence.personal_ip_accounts`. Gateway routes under
-`/api/personal-ip` provide owner-scoped CRUD and bind an account id to thread
-metadata. Migration `0006_personal_ip_accounts` owns the table.
+`/api/personal-ip` provide owner-scoped CRUD. Migrations
+`0006_personal_ip_accounts` and `0007_personal_ip_subjects` own these tables.
 
-Run admission in `app.gateway.services` removes caller-supplied expanded account
-objects, resolves the selected id against the authenticated owner, and injects
-the trusted record into runtime context. `PersonalIPContextMiddleware` then adds
-an ephemeral model-only account message before skill activation; it must not
-write that expanded record into checkpoint history. Keep the middleware before
-`SkillActivationMiddleware`, and preserve tests for owner isolation, thread
-binding, prompt-injection boundaries, and sync/async model calls.
+A thread is never bound to one account and this feature must not narrow the
+DeerFlow toolset or execution authority. Run admission in
+`app.gateway.services` removes caller-supplied product context, resolves the
+authenticated owner's full active portfolio, and injects it into runtime
+context. `PersonalIPContextMiddleware` adds an ephemeral model-only portfolio
+message before skill activation; it must not write the expanded records into
+checkpoint history. Account ids are operation targets and receipt fields only.
+Keep the middleware before `SkillActivationMiddleware`, and preserve tests for
+owner isolation, cross-account portfolio access, prompt-injection boundaries,
+and sync/async model calls.
 
 ### Vision Support
 

@@ -160,7 +160,8 @@ export const zhCN: Translations = {
     reasoningEffortHighDescription: "全维度逻辑推演 + 多路径验证 + 反推校验",
     searchModels: "搜索模型...",
     surpriseMe: "给我灵感",
-    surpriseMePrompt: "结合当前账号，给我一个今天最值得做的内容动作",
+    surpriseMePrompt:
+      "结合我的全部经营主体和平台数据，给我一个今天最值得做的内容动作",
     followupLoading: "正在生成可能的后续问题...",
     followupConfirmTitle: "发送建议问题？",
     followupConfirmDescription: "当前输入框已有内容，选择发送方式。",
@@ -190,12 +191,12 @@ export const zhCN: Translations = {
       },
       {
         suggestion: "寻找选题",
-        prompt: "围绕[领域]和当前账号受众，给出有证据的选题建议",
+        prompt: "围绕[领域]和相关账号受众，给出有证据的选题建议",
         icon: MicroscopeIcon,
       },
       {
         suggestion: "写短视频脚本",
-        prompt: "把[主题/素材]写成符合当前账号的短视频脚本",
+        prompt: "把[主题/素材]写成符合指定账号的短视频脚本",
         icon: ShapesIcon,
       },
       {
@@ -207,13 +208,13 @@ export const zhCN: Translations = {
     suggestionsCreate: [
       {
         suggestion: "发布计划",
-        prompt: "为当前账号制定一周发布计划，包含目标、内容和验收指标",
+        prompt: "为相关平台账号制定一周发布计划，包含目标、内容和验收指标",
         icon: CompassIcon,
       },
       {
         suggestion: "图片",
         prompt:
-          "用 Seedream 为当前账号生成一张[用途]图片，先给生成计划和预计调用次数",
+          "用 Seedream 为指定账号生成一张[用途]图片，先给生成计划和预计调用次数",
         icon: ImageIcon,
       },
       {
@@ -243,6 +244,7 @@ export const zhCN: Translations = {
     recentChats: "最近的对话",
     demoChats: "演示对话",
     agents: "智能体",
+    personalIP: "经营组合",
     scheduledTasks: "定时任务",
     agentsDisabledTooltip: "功能未启用",
   },

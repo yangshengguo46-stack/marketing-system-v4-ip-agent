@@ -168,6 +168,7 @@ if TYPE_CHECKING:
     from app.gateway.auth.local_provider import LocalAuthProvider
     from app.gateway.auth.repositories.sqlite import SQLiteUserRepository
     from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
+    from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
     from deerflow.persistence.thread_meta.base import ThreadMetaStore
     from deerflow.runtime import RunRecord
 
@@ -302,6 +303,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
         app.state.thread_store = make_thread_store(sf, app.state.store)
         if sf is not None:
             from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
+            from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
             from deerflow.persistence.scheduled_task_runs import (
                 ScheduledTaskRunRepository,
             )
@@ -310,10 +312,12 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.scheduled_task_repo = ScheduledTaskRepository(sf)
             app.state.scheduled_task_run_repo = ScheduledTaskRunRepository(sf)
             app.state.personal_ip_account_repo = PersonalIPAccountRepository(sf)
+            app.state.personal_ip_subject_repo = PersonalIPSubjectRepository(sf)
         else:
             app.state.scheduled_task_repo = None
             app.state.scheduled_task_run_repo = None
             app.state.personal_ip_account_repo = None
+            app.state.personal_ip_subject_repo = None
 
         # Run event store. The store and the matching ``run_events_config`` are
         # both frozen at startup so ``get_run_context`` does not combine a
@@ -426,6 +430,13 @@ def get_personal_ip_account_repo(request: Request) -> PersonalIPAccountRepositor
     val = getattr(request.app.state, "personal_ip_account_repo", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Personal-IP account repository not available")
+    return val
+
+
+def get_personal_ip_subject_repo(request: Request) -> PersonalIPSubjectRepository:
+    val = getattr(request.app.state, "personal_ip_subject_repo", None)
+    if val is None:
+        raise HTTPException(status_code=503, detail="Personal-IP subject repository not available")
     return val
 
 

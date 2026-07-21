@@ -82,7 +82,6 @@ export interface LocalSettings {
     model_name?: string | undefined;
     mode: "flash" | "thinking" | "pro" | "ultra" | undefined;
     reasoning_effort?: "minimal" | "low" | "medium" | "high";
-    personal_ip_account_id?: string;
   };
 }
 

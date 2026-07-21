@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, Index, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from deerflow.persistence.base import Base
@@ -21,6 +21,12 @@ class PersonalIPAccountRow(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     owner_user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    subject_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("personal_ip_subjects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     platform: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     display_name: Mapped[str] = mapped_column(String(128), nullable=False)
     handle: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -41,5 +47,10 @@ class PersonalIPAccountRow(Base):
             "owner_user_id",
             "status",
             "updated_at",
+        ),
+        Index(
+            "ix_personal_ip_accounts_owner_subject",
+            "owner_user_id",
+            "subject_id",
         ),
     )

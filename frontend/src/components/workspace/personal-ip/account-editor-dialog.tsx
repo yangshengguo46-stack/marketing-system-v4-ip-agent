@@ -13,13 +13,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   PersonalIPAccount,
   PersonalIPAccountInput,
+  PersonalIPSubject,
 } from "@/core/personal-ip";
 
 const EMPTY_FORM: PersonalIPAccountInput = {
+  subject_id: null,
   platform: "douyin",
   display_name: "",
   handle: null,
@@ -45,12 +54,14 @@ function splitLines(value: string) {
 export function AccountEditorDialog({
   open,
   account,
+  subjects,
   submitting,
   onOpenChange,
   onSubmit,
 }: {
   open: boolean;
   account?: PersonalIPAccount | null;
+  subjects: PersonalIPSubject[];
   submitting: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: PersonalIPAccountInput) => void;
@@ -63,6 +74,7 @@ export function AccountEditorDialog({
     if (!open) return;
     const next = account
       ? {
+          subject_id: account.subject_id,
           platform: account.platform,
           display_name: account.display_name,
           handle: account.handle,
@@ -119,6 +131,30 @@ export function AccountEditorDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-1.5 text-sm font-medium">
+              经营主体
+              <Select
+                value={form.subject_id ?? "unassigned"}
+                onValueChange={(value) =>
+                  setForm((current) => ({
+                    ...current,
+                    subject_id: value === "unassigned" ? null : value,
+                  }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="选择主体" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">暂不归属</SelectItem>
+                  {subjects.map((subject) => (
+                    <SelectItem key={subject.id} value={subject.id}>
+                      {subject.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
             <label className="space-y-1.5 text-sm font-medium">
               平台
               <Input

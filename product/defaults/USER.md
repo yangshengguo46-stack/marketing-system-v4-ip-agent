@@ -11,23 +11,24 @@ messages or speculative personality labels.
 - Working style:
 - Approval boundaries:
 
-## Accounts
+## Operating portfolio
 
-Add one compact account card per operated account:
+Subjects and accounts are maintained by the native portfolio registry. Keep
+only stable strategy facts here when the user explicitly approves them:
 
 ```yaml
-account_id: example
-platform: douyin
-display_name: ""
-promise_to_audience: ""
-primary_audience: ""
-content_pillars: []
-voice_and_boundaries: []
-business_goal: ""
+subjects:
+  - display_name: ""
+    stable_positioning_facts: []
 ```
+
+- Conversations are global and may compare or aggregate every authorized
+  subject and platform account.
+- An account id is selected only for a concrete external operation and recorded
+  in its receipt; it is never a conversation permission boundary.
 
 ## Provider policy
 
 - Prefer ByteDance/Volcengine capabilities when available.
-- Ask before paid batches, publishing, sending messages or changing accounts.
+- Ask before paid batches, publishing, sending messages or other external-state changes.
 - Keep task IDs and output receipts for generated media.

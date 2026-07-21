@@ -8,6 +8,7 @@ import { getBackendBaseURL } from "@/core/config";
 export type PersonalIPAccount = {
   id: string;
   owner_user_id: string;
+  subject_id: string | null;
   platform: string;
   display_name: string;
   handle: string | null;
@@ -26,6 +27,7 @@ export type PersonalIPAccount = {
 export type PersonalIPAccountInput = Pick<
   PersonalIPAccount,
   | "platform"
+  | "subject_id"
   | "display_name"
   | "handle"
   | "avatar_url"
@@ -112,35 +114,5 @@ export function useDeletePersonalIPAccount() {
       ),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY }),
-  });
-}
-
-export function useBindPersonalIPAccount() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      threadId,
-      accountId,
-    }: {
-      threadId: string;
-      accountId: string | null;
-    }) =>
-      requestJSON<{ thread_id: string; account_id: string | null }>(
-        `/api/personal-ip/threads/${encodeURIComponent(threadId)}/account`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ account_id: accountId }),
-        },
-      ),
-    onSuccess: (_, variables) =>
-      Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ["thread", "metadata", variables.threadId],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["threads", "search"],
-        }),
-      ]),
   });
 }

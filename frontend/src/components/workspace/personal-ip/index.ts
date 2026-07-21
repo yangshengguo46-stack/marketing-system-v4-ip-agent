@@ -1,2 +1,2 @@
 export { AccountEditorDialog } from "./account-editor-dialog";
-export { AccountSelector } from "./account-selector";
+export { SubjectEditorDialog } from "./subject-editor-dialog";

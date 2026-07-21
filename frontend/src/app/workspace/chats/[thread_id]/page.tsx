@@ -24,7 +24,6 @@ import {
   MESSAGE_LIST_DEFAULT_PADDING_BOTTOM,
 } from "@/components/workspace/messages";
 import { ThreadContext } from "@/components/workspace/messages/context";
-import { AccountSelector } from "@/components/workspace/personal-ip";
 import {
   SidecarProvider,
   SidecarTrigger,
@@ -81,18 +80,7 @@ export default function ChatPage() {
     enabled: !isNewThread && !isMock,
     isMock,
   });
-  const boundAccountId =
-    typeof threadMetadata.data?.metadata?.personal_ip_account_id === "string"
-      ? threadMetadata.data.metadata.personal_ip_account_id
-      : undefined;
-  const effectiveContext = useMemo(
-    () => ({
-      ...settings.context,
-      personal_ip_account_id:
-        boundAccountId ?? settings.context.personal_ip_account_id,
-    }),
-    [boundAccountId, settings.context],
-  );
+  const effectiveContext = settings.context;
   const branchThread = useBranchThread();
   const backendTokenUsage = threadTokenUsageToTokenUsage(threadTokenUsage.data);
   const mountedRef = useRef(false);
@@ -292,18 +280,6 @@ export default function ChatPage() {
                 <ThreadTitle threadId={threadId} thread={thread} />
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {!isMock && (
-                  <AccountSelector
-                    value={effectiveContext.personal_ip_account_id}
-                    threadId={isNewThread ? undefined : threadId}
-                    disabled={thread.isLoading}
-                    onChange={(accountId) =>
-                      setSettings("context", {
-                        personal_ip_account_id: accountId,
-                      })
-                    }
-                  />
-                )}
                 {!isNewThread && (
                   <ThreadScheduledTasksLink threadId={threadId} />
                 )}
