@@ -97,6 +97,14 @@ through the shared receipt. HLLM-Lite v0 intentionally returns no
 `match_score`: a score becomes available only after the small ranking model is
 trained and evaluated against observed publishing outcomes.
 
+The Gateway seals a validated service result in
+`personal_ip_preflights` through `/api/personal-ip/preflights`. The row owns the
+model request digest, provider/model/algorithm versions, full structured
+receipt and the local subject/account operation targets. It exposes no update
+path: an operation-key replay returns the existing identical snapshot and a
+different replay is rejected. Deleting or archiving an account later does not
+rewrite historical predictions.
+
 ## Minimal patch policy
 
 Keep upstream model architecture and loss functions unchanged. Product work is

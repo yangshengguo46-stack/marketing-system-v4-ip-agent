@@ -30,6 +30,9 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > replace the DeerFlow runtime or bind conversations to one account.
 > `make hllm-lite` starts today's local Doubao-backed provider; it does not
 > fabricate ranking scores before outcome-trained calibration exists.
+> Audience preflights are stored as immutable, owner-scoped request/receipt
+> snapshots so later publishing outcomes can be compared with what the model
+> actually predicted at the time.
 
 ## Official Website
 

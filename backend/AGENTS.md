@@ -981,6 +981,14 @@ generation. It must leave `match_score` unset until a ranking model has been
 trained and calibrated from observed outcomes; model-authored confidence is not
 a substitute for that evidence.
 
+Migration `0008_personal_ip_preflights` and
+`deerflow.persistence.personal_ip_preflights` store immutable, owner-scoped
+model request/receipt snapshots. Gateway endpoints are under
+`/api/personal-ip/preflights`. A duplicate operation key may return only the
+identical sealed snapshot; it must reject a different request or result, and no
+API may rewrite the prediction. Subject/account ids are validated operation
+targets and do not restrict conversation authority.
+
 ### Vision Support
 
 For models with `supports_vision: true`:

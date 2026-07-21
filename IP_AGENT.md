@@ -91,4 +91,10 @@ Version 0 deliberately leaves `match_score` empty until the small ranking model
 has been trained from real publish outcomes; it never presents an LLM guess as
 a calibrated prediction.
 
+Validated results are sealed through `POST /api/personal-ip/preflights`. The
+snapshot stores the exact model request, provider/model/algorithm versions,
+candidate receipt and concrete target account ids. Reusing the same operation
+key is idempotent only for the byte-equivalent prediction; a different result
+cannot overwrite the original preflight.
+
 See `product/volcengine/capabilities.yaml` for the complete routing policy.

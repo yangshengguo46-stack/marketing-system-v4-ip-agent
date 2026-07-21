@@ -23,6 +23,7 @@ from deerflow.persistence.channel_connections.model import (
 from deerflow.persistence.feedback.model import FeedbackRow
 from deerflow.persistence.models.run_event import RunEventRow
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
+from deerflow.persistence.personal_ip_preflights.model import PersonalIPPreflightRow
 from deerflow.persistence.personal_ip_subjects.model import PersonalIPSubjectRow
 from deerflow.persistence.run.model import RunRow
 from deerflow.persistence.scheduled_task_runs.model import ScheduledTaskRunRow
@@ -37,6 +38,7 @@ __all__ = [
     "ChannelOAuthStateRow",
     "FeedbackRow",
     "PersonalIPAccountRow",
+    "PersonalIPPreflightRow",
     "PersonalIPSubjectRow",
     "RunEventRow",
     "RunRow",

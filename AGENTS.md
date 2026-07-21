@@ -88,6 +88,10 @@ IP Agent distribution note:
 - Personal-IP account data is the product-owned domain boundary. It must remain
   owner-scoped, enter runs through validated server context, and never be trusted
   from a caller-supplied expanded object.
+- Personal-IP preflights are immutable model request/receipt snapshots under
+  `deerflow.persistence.personal_ip_preflights` and migration
+  `0008_personal_ip_preflights`. Account ids are operation targets in the
+  snapshot, never thread authority. Do not add a prediction rewrite endpoint.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.
