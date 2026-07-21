@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init volcengine-install volcengine-doctor
 
 BASH ?= bash
 BACKEND_UV_RUN = cd backend && uv run
@@ -19,6 +19,9 @@ endif
 help:
 	@echo "DeerFlow Development Commands:"
 	@echo "  make setup           - Interactive setup wizard (recommended for new users)"
+	@echo "  make ip-init         - Install the default local personal-IP Agent"
+	@echo "  make volcengine-install - Install the official pinned AI MediaKit CLI"
+	@echo "  make volcengine-doctor  - Check the AI MediaKit installation"
 	@echo "  make doctor          - Check configuration and system requirements"
 	@echo "  make support-bundle  - Create a redacted issue summary, AI draft, and evidence bundle"
 	@echo "  make config          - Generate local config files (aborts if config already exists)"
@@ -52,6 +55,15 @@ help:
 ## Setup & Diagnosis
 setup:
 	@$(BACKEND_UV_RUN) python ../scripts/setup_wizard.py
+
+ip-init:
+	@$(PYTHON) ./scripts/init_ip_agent.py
+
+volcengine-install:
+	@npm install -g @volcengine/mediakit-cli@0.2.0
+
+volcengine-doctor:
+	@MEDIAKIT_SURFACE=skill MEDIAKIT_RUNTIME=deerflow mediakit-cli doctor
 
 doctor:
 	@$(BACKEND_UV_RUN) python ../scripts/doctor.py

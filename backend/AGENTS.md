@@ -942,6 +942,21 @@ Automatic conversation summarization when approaching token limits:
 
 See [docs/summarization.md](docs/summarization.md) for details.
 
+### Personal-IP Account Context
+
+The IP Agent distribution stores creator/brand accounts in
+`deerflow.persistence.personal_ip_accounts`. Gateway routes under
+`/api/personal-ip` provide owner-scoped CRUD and bind an account id to thread
+metadata. Migration `0006_personal_ip_accounts` owns the table.
+
+Run admission in `app.gateway.services` removes caller-supplied expanded account
+objects, resolves the selected id against the authenticated owner, and injects
+the trusted record into runtime context. `PersonalIPContextMiddleware` then adds
+an ephemeral model-only account message before skill activation; it must not
+write that expanded record into checkpoint history. Keep the middleware before
+`SkillActivationMiddleware`, and preserve tests for owner isolation, thread
+binding, prompt-injection boundaries, and sync/async model calls.
+
 ### Vision Support
 
 For models with `supports_vision: true`:

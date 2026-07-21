@@ -284,6 +284,13 @@ def build_middlewares(
 
     middlewares.append(DynamicContextMiddleware(agent_name=agent_name, app_config=resolved_app_config))
 
+    # Inject the server-validated account selected for this thread into every
+    # model request. The middleware keeps account data ephemeral: it is visible
+    # to the current model call but is not appended to checkpoint history.
+    from deerflow.agents.middlewares.personal_ip_context_middleware import PersonalIPContextMiddleware
+
+    middlewares.append(PersonalIPContextMiddleware())
+
     # Deterministically load a full SKILL.md when the user starts the turn with
     # /skill-name. This keeps the base system prompt metadata-only while giving
     # explicit user activation priority over model-side relevance guessing.

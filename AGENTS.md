@@ -62,6 +62,18 @@ servers + skills). Both real files are gitignored and may be edited at runtime v
 Gateway API. Config schema and resolution order are documented in
 [backend/AGENTS.md](backend/AGENTS.md).
 
+IP Agent distribution note:
+- `IP_AGENT.md` is the product setup and capability-routing guide;
+  `THIRD_PARTY_BYTE.md` records copied ByteDance/Volcengine components and pins.
+- `product/defaults/` owns the product agent/owner defaults, while
+  `product/volcengine/capabilities.yaml` is the auditable media routing policy.
+- `scripts/init_ip_agent.py` installs those defaults into a normal DeerFlow
+  workspace. Keep this as a source distribution: integrate upstream DeerFlow
+  changes without replacing native source modules with binary wrappers.
+- Personal-IP account data is the product-owned domain boundary. It must remain
+  owner-scoped, enter runs through validated server context, and never be trusted
+  from a caller-supplied expanded object.
+
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.
   It uses the harness-layer `review_skill_package` tool and contracts in

@@ -92,6 +92,13 @@ Tool-calling AI messages can contain user-visible text as well as `tool_calls`. 
 ### Interaction Ownership
 
 - `src/app/workspace/chats/[thread_id]/page.tsx` owns composer busy-state wiring.
+- The same chat page owns personal-IP account selection. Existing threads prefer
+  the account id persisted in thread metadata; new threads use local settings,
+  and every stream/sidecar/composer receives one derived effective context.
+- `src/core/personal-ip/` owns account API hooks and
+  `src/components/workspace/personal-ip/` owns account selection/editing UI.
+  Never accept or cache an expanded account record as run authority; the Gateway
+  resolves it again for the authenticated owner.
 - `src/app/workspace/chats/[thread_id]/page.tsx` owns branch-from-turn submission and navigation; sidecar `MessageList` instances do not receive the branch action.
 - `src/app/workspace/chats/[thread_id]/page.tsx` gates the Workspace Browser trigger and browser right panel on `/api/features -> browser_control.enabled`; default/failed feature discovery hides the browser control so optional backend installs do not show a dead Live socket.
 - `src/app/workspace/chats/[thread_id]/page.tsx` and `src/app/workspace/agents/[agent_name]/chats/[thread_id]/page.tsx` own active-goal display state for their composer overlays.

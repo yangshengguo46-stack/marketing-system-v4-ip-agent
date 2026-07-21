@@ -539,6 +539,26 @@ def test_build_middlewares_orders_skill_activation_before_policy_and_durable_con
     assert middlewares[activation_idx]._slash_source_owner_token == middlewares[policy_idx]._slash_source_owner_token
 
 
+def test_build_middlewares_injects_personal_ip_context_before_skill_activation(monkeypatch):
+    from deerflow.agents.middlewares.personal_ip_context_middleware import PersonalIPContextMiddleware
+    from deerflow.agents.middlewares.skill_activation_middleware import SkillActivationMiddleware
+
+    app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
+    monkeypatch.setattr(lead_agent_module, "build_lead_runtime_middlewares", lambda *, app_config, lazy_init=True: [])
+    monkeypatch.setattr(lead_agent_module, "_create_summarization_middleware", lambda *, app_config=None: None)
+    monkeypatch.setattr(lead_agent_module, "_create_todo_list_middleware", lambda is_plan_mode: None)
+
+    middlewares = lead_agent_module.build_middlewares(
+        {"configurable": {"is_plan_mode": False, "subagent_enabled": False}},
+        model_name="safe-model",
+        app_config=app_config,
+    )
+
+    account_idx = next(i for i, middleware in enumerate(middlewares) if isinstance(middleware, PersonalIPContextMiddleware))
+    activation_idx = next(i for i, middleware in enumerate(middlewares) if isinstance(middleware, SkillActivationMiddleware))
+    assert account_idx < activation_idx
+
+
 @pytest.mark.parametrize("use_stale_path", [False, True], ids=["restrictive-skill", "stale-active-path"])
 def test_compiled_skill_policy_chain_filters_schema_and_blocks_execution(monkeypatch, use_stale_path):
     from deerflow.agents.middlewares.durable_context_middleware import DurableContextMiddleware

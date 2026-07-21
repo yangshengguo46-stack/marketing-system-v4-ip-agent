@@ -5,21 +5,37 @@ import time
 import requests
 
 MINIMAX_DEFAULT_HOST = "https://api.minimaxi.com"
+VOLCENGINE_ARK_DEFAULT_HOST = "https://ark.cn-beijing.volces.com/api/v3"
+VOLCENGINE_VIDEO_DEFAULT_MODEL = "doubao-seedance-2-0-260128"
 
 
 def _resolve_provider(override_env: str, existing_provider: str, has_existing_creds: bool) -> str:
-    """Pick the provider: <SKILL>_PROVIDER override > existing creds > MiniMax fallback."""
+    """Pick provider: explicit override > Volcengine > upstream fallbacks."""
     override = os.getenv(override_env)
     if override:
         return override.strip().lower()
+    if os.getenv("VOLCENGINE_API_KEY"):
+        return "volcengine"
     if has_existing_creds:
         return existing_provider
     if os.getenv("MINIMAX_API_KEY"):
         return "minimax"
     raise ValueError(
-        f"No credentials found. Set GEMINI_API_KEY for {existing_provider}, "
+        f"No credentials found. Set VOLCENGINE_API_KEY for Volcengine Seedance, "
+        f"GEMINI_API_KEY for {existing_provider}, "
         f"or MINIMAX_API_KEY for minimax (optionally force with {override_env})."
     )
+
+
+def _volcengine_ark_host() -> str:
+    return os.getenv("VOLCENGINE_ARK_BASE_URL", VOLCENGINE_ARK_DEFAULT_HOST).rstrip("/")
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _minimax_host() -> str:
@@ -102,6 +118,113 @@ def _download(url: str, output_file: str) -> None:
     _ensure_output_dir(output_file)
     with open(output_file, "wb") as f:
         f.write(response.content)
+
+
+def _poll_volcengine_task(
+    host: str,
+    auth: str,
+    task_id: str,
+    max_attempts: int = 180,
+    interval: int = 5,
+) -> dict:
+    terminal_failures = {"failed", "expired", "cancelled", "canceled"}
+    for _ in range(max_attempts):
+        response = requests.get(
+            f"{host}/contents/generations/tasks/{task_id}",
+            headers={"Authorization": auth},
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        status = str(payload.get("status", "")).lower()
+        if status in {"succeeded", "success", "completed"}:
+            return payload
+        if status in terminal_failures:
+            error = payload.get("error") or payload.get("message") or "unknown error"
+            raise Exception(f"Volcengine Seedance task {task_id} failed: {error}")
+        time.sleep(interval)
+    raise Exception(
+        f"Volcengine Seedance task {task_id} timed out after {max_attempts} polls"
+    )
+
+
+def _volcengine_video_url(payload: dict) -> str:
+    content = payload.get("content") or {}
+    if isinstance(content, dict) and content.get("video_url"):
+        return content["video_url"]
+    output = payload.get("output") or {}
+    if isinstance(output, dict) and output.get("video_url"):
+        return output["video_url"]
+    if payload.get("video_url"):
+        return payload["video_url"]
+    raise Exception(f"Volcengine Seedance returned no video URL: {payload}")
+
+
+def _generate_video_volcengine(
+    prompt: str,
+    reference_images: list[str],
+    output_file: str,
+    aspect_ratio: str,
+) -> str:
+    api_key = os.getenv("VOLCENGINE_API_KEY")
+    if not api_key:
+        return "VOLCENGINE_API_KEY is not set"
+
+    content: list[dict] = [{"type": "text", "text": prompt}]
+    if len(reference_images) == 1:
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": _to_data_url(reference_images[0])},
+                "role": "first_frame",
+            }
+        )
+    elif reference_images:
+        content.extend(
+            {
+                "type": "image_url",
+                "image_url": {"url": _to_data_url(path)},
+                "role": "reference_image",
+            }
+            for path in reference_images
+        )
+
+    try:
+        duration = int(os.getenv("VOLCENGINE_VIDEO_DURATION", "5"))
+    except ValueError as exc:
+        raise ValueError("VOLCENGINE_VIDEO_DURATION must be an integer") from exc
+    if duration != -1 and not 4 <= duration <= 15:
+        raise ValueError("VOLCENGINE_VIDEO_DURATION must be -1 or between 4 and 15")
+
+    body = {
+        "model": os.getenv("VOLCENGINE_VIDEO_MODEL", VOLCENGINE_VIDEO_DEFAULT_MODEL),
+        "content": content,
+        "resolution": os.getenv("VOLCENGINE_VIDEO_RESOLUTION", "720p"),
+        "ratio": aspect_ratio,
+        "duration": duration,
+        "generate_audio": _env_bool("VOLCENGINE_VIDEO_GENERATE_AUDIO", True),
+        "watermark": _env_bool("VOLCENGINE_VIDEO_WATERMARK", False),
+        "return_last_frame": _env_bool("VOLCENGINE_VIDEO_RETURN_LAST_FRAME", False),
+    }
+    host = _volcengine_ark_host()
+    auth = f"Bearer {api_key}"
+    response = requests.post(
+        f"{host}/contents/generations/tasks",
+        headers={"Authorization": auth, "Content-Type": "application/json"},
+        json=body,
+        timeout=60,
+    )
+    response.raise_for_status()
+    created = response.json()
+    task_id = created.get("id") or created.get("task_id")
+    if not task_id:
+        raise Exception(f"Volcengine Seedance returned no task ID: {created}")
+    completed = _poll_volcengine_task(host, auth, task_id)
+    _download(_volcengine_video_url(completed), output_file)
+    return (
+        f"The video has been generated successfully to {output_file} "
+        f"via Volcengine Seedance (task {task_id})"
+    )
 
 
 def _generate_video_minimax(
@@ -195,18 +318,27 @@ def generate_video(
     provider = _resolve_provider(
         "VIDEO_GENERATION_PROVIDER", "gemini", bool(os.getenv("GEMINI_API_KEY"))
     )
+    if provider in ("volcengine", "volcano", "seedance"):
+        return _generate_video_volcengine(
+            prompt, reference_images, output_file, aspect_ratio
+        )
     if provider == "minimax":
         # MiniMax video uses resolution/duration, not aspect_ratio; aspect_ratio ignored.
         return _generate_video_minimax(prompt, reference_images, output_file)
     if provider in ("gemini", "google"):
         return _generate_video_gemini(prompt, reference_images, output_file)
-    raise ValueError(f"Unknown video provider: {provider!r} (use 'gemini' or 'minimax')")
+    raise ValueError(
+        f"Unknown video provider: {provider!r} "
+        "(use 'volcengine', 'gemini', or 'minimax')"
+    )
 
 
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate videos using Gemini or MiniMax API")
+    parser = argparse.ArgumentParser(
+        description="Generate videos using Volcengine Seedance, Gemini, or MiniMax API"
+    )
     parser.add_argument("--prompt-file", required=True, help="Absolute path to JSON prompt file")
     parser.add_argument("--reference-images", nargs="*", default=[],
                         help="Absolute paths to reference images (space-separated)")

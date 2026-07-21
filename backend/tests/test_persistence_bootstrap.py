@@ -48,7 +48,7 @@ from deerflow.persistence.migrations._helpers import _normalize_default
 asyncio_test = pytest.mark.asyncio
 
 
-HEAD = "0005_run_stop_reason"
+HEAD = "0006_personal_ip_accounts"
 BASELINE = "0001_baseline"
 
 
@@ -137,6 +137,7 @@ async def test_empty_branch_creates_all_and_stamps_head(tmp_path: Path) -> None:
             "runs",
             "threads_meta",
             "feedback",
+            "personal_ip_accounts",
             "users",
             "run_events",
             "channel_connections",
@@ -847,7 +848,7 @@ class TestDecideState:
 # ---------------------------------------------------------------------------
 
 
-def test_head_revision_is_token_usage_revision() -> None:
+def test_head_revision_is_personal_ip_accounts_revision() -> None:
     assert _get_head_revision() == HEAD
 
 

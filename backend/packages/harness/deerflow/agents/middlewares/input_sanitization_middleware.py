@@ -82,6 +82,7 @@ _BLOCKED_TAG_NAMES: frozenset[str] = frozenset(
         "uploaded_files",
         "todo_list_system",
         "durable_context_data",
+        "personal_ip_account",
         "slash_skill_activation",
         "mcp_routing_hints",
         "available-deferred-tools",

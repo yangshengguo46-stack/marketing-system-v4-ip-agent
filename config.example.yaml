@@ -109,10 +109,10 @@ max_recursion_limit: 1000
 
 models:
   # Example: Volcengine (Doubao) model
-  # - name: doubao-seed-1.8
-  #   display_name: Doubao-Seed-1.8
+  # - name: doubao-seed-2.0-pro
+  #   display_name: Doubao-Seed-2.0-Pro
   #   use: deerflow.models.patched_deepseek:PatchedChatDeepSeek
-  #   model: doubao-seed-1-8-251228
+  #   model: doubao-seed-2-0-pro-260215
   #   api_base: https://ark.cn-beijing.volces.com/api/v3
   #   api_key: $VOLCENGINE_API_KEY
   #   timeout: 600.0

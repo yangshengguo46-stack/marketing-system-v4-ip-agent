@@ -5,6 +5,8 @@ import os
 import requests
 
 MINIMAX_DEFAULT_HOST = "https://api.minimaxi.com"
+VOLCENGINE_ARK_DEFAULT_HOST = "https://ark.cn-beijing.volces.com/api/v3"
+VOLCENGINE_IMAGE_DEFAULT_MODEL = "doubao-seedream-5-0-260128"
 # MiniMax image-01 caps the prompt at 1500 characters and rejects longer requests
 # with a generic "invalid params" error, so validate before calling the API.
 MINIMAX_PROMPT_MAX_CHARS = 1500
@@ -29,20 +31,27 @@ def _resolve_provider(override_env: str, existing_provider: str, has_existing_cr
     """Pick the generation provider.
 
     1. Explicit <SKILL>_PROVIDER override wins.
-    2. Otherwise prefer the existing provider when its credentials are present.
-    3. Otherwise fall back to MiniMax when MINIMAX_API_KEY is set.
+    2. Otherwise prefer Volcengine when its unified Ark API key is present.
+    3. Otherwise preserve the upstream provider fallback order.
     """
     override = os.getenv(override_env)
     if override:
         return override.strip().lower()
+    if os.getenv("VOLCENGINE_API_KEY"):
+        return "volcengine"
     if has_existing_creds:
         return existing_provider
     if os.getenv("MINIMAX_API_KEY"):
         return "minimax"
     raise ValueError(
-        f"No credentials found. Set GEMINI_API_KEY for {existing_provider}, "
+        f"No credentials found. Set VOLCENGINE_API_KEY for Volcengine Seedream, "
+        f"GEMINI_API_KEY for {existing_provider}, "
         f"or MINIMAX_API_KEY for minimax (optionally force with {override_env})."
     )
+
+
+def _volcengine_ark_host() -> str:
+    return os.getenv("VOLCENGINE_ARK_BASE_URL", VOLCENGINE_ARK_DEFAULT_HOST).rstrip("/")
 
 
 def _minimax_host() -> str:
@@ -72,6 +81,84 @@ def _to_data_url(image_path: str) -> str:
     with open(image_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode("utf-8")
     return f"data:{_guess_mime(image_path)};base64,{b64}"
+
+
+def _download_image(url: str, output_file: str) -> None:
+    response = requests.get(url, timeout=300)
+    response.raise_for_status()
+    _ensure_output_dir(output_file)
+    with open(output_file, "wb") as f:
+        f.write(response.content)
+
+
+VOLCENGINE_IMAGE_SIZES = {
+    "1:1": "2048x2048",
+    "16:9": "2560x1440",
+    "9:16": "1440x2560",
+    "4:3": "2304x1728",
+    "3:4": "1728x2304",
+    "3:2": "2496x1664",
+    "2:3": "1664x2496",
+    "21:9": "3024x1296",
+    "9:21": "1296x3024",
+}
+
+
+def _generate_image_volcengine(
+    prompt: str, reference_images: list[str], output_file: str, aspect_ratio: str
+) -> str:
+    """Generate or edit an image through Volcengine Ark Seedream.
+
+    Ark uses one synchronous endpoint for text-to-image, reference generation,
+    and image editing.  Keep the output count deterministic here; storyboard
+    batches should call this function once per named asset so every receipt maps
+    to exactly one file.
+    """
+    api_key = os.getenv("VOLCENGINE_API_KEY")
+    if not api_key:
+        return "VOLCENGINE_API_KEY is not set"
+
+    body = {
+        "model": os.getenv("VOLCENGINE_IMAGE_MODEL", VOLCENGINE_IMAGE_DEFAULT_MODEL),
+        "prompt": _minimax_prompt(prompt),
+        "size": os.getenv(
+            "VOLCENGINE_IMAGE_SIZE",
+            VOLCENGINE_IMAGE_SIZES.get(aspect_ratio, "2K"),
+        ),
+        "sequential_image_generation": "disabled",
+        "stream": False,
+        "response_format": "url",
+        "watermark": os.getenv("VOLCENGINE_IMAGE_WATERMARK", "false").lower()
+        in {"1", "true", "yes", "on"},
+    }
+    if reference_images:
+        body["image"] = [_to_data_url(path) for path in reference_images]
+
+    response = requests.post(
+        f"{_volcengine_ark_host()}/images/generations",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json=body,
+        timeout=300,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    images = payload.get("data") or []
+    if not images:
+        raise Exception(f"Volcengine Seedream returned no image data: {payload}")
+
+    first = images[0]
+    if first.get("url"):
+        _download_image(first["url"], output_file)
+    elif first.get("b64_json"):
+        _ensure_output_dir(output_file)
+        with open(output_file, "wb") as f:
+            f.write(base64.b64decode(first["b64_json"]))
+    else:
+        raise Exception(f"Volcengine Seedream returned no downloadable image: {first}")
+    return f"Successfully generated image to {output_file} via Volcengine Seedream"
 
 
 def _ensure_output_dir(output_file: str) -> None:
@@ -202,17 +289,26 @@ def generate_image(
     provider = _resolve_provider(
         "IMAGE_GENERATION_PROVIDER", "gemini", bool(os.getenv("GEMINI_API_KEY"))
     )
+    if provider in ("volcengine", "volcano", "seedream"):
+        return _generate_image_volcengine(
+            prompt, reference_images, output_file, aspect_ratio
+        )
     if provider == "minimax":
         return _generate_image_minimax(prompt, reference_images, output_file, aspect_ratio)
     if provider in ("gemini", "google"):
         return _generate_image_gemini(prompt, reference_images, output_file, aspect_ratio)
-    raise ValueError(f"Unknown image provider: {provider!r} (use 'gemini' or 'minimax')")
+    raise ValueError(
+        f"Unknown image provider: {provider!r} "
+        "(use 'volcengine', 'gemini', or 'minimax')"
+    )
 
 
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate images using Gemini or MiniMax API")
+    parser = argparse.ArgumentParser(
+        description="Generate images using Volcengine Seedream, Gemini, or MiniMax API"
+    )
     parser.add_argument("--prompt-file", required=True, help="Absolute path to JSON prompt file")
     parser.add_argument("--reference-images", nargs="*", default=[],
                         help="Absolute paths to reference images (space-separated)")

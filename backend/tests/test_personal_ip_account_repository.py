@@ -1,0 +1,73 @@
+import pytest
+
+from deerflow.config.database_config import DatabaseConfig
+from deerflow.persistence.engine import close_engine, get_session_factory, init_engine_from_config
+from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
+
+
+@pytest.mark.asyncio
+async def test_personal_ip_account_crud_and_owner_isolation(tmp_path):
+    await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
+    sf = get_session_factory()
+    assert sf is not None
+    repo = PersonalIPAccountRepository(sf)
+
+    created = await repo.create(
+        owner_user_id="user-1",
+        platform="douyin",
+        display_name="老杨说 AI",
+        handle="laoyang-ai",
+        promise_to_audience="把复杂 AI 讲明白",
+        primary_audience="想用 AI 做生意的个体创业者",
+        content_pillars=["AI 智能体", "个人 IP"],
+        voice_and_boundaries=["直接", "不承诺暴富"],
+        business_goal="获得高质量咨询线索",
+        metadata={"positioning_version": 3},
+    )
+
+    assert created["id"].startswith("acct-")
+    assert created["content_pillars"] == ["AI 智能体", "个人 IP"]
+    assert created["metadata"] == {"positioning_version": 3}
+    assert await repo.get(created["id"], owner_user_id="user-2") is None
+    assert await repo.list("user-2") == []
+
+    updated = await repo.update(
+        created["id"],
+        owner_user_id="user-1",
+        updates={
+            "business_goal": "销售本地智能体",
+            "content_pillars": ["本地智能体"],
+            "metadata": {"positioning_version": 4},
+        },
+    )
+    assert updated is not None
+    assert updated["business_goal"] == "销售本地智能体"
+    assert updated["content_pillars"] == ["本地智能体"]
+
+    assert await repo.delete(created["id"], owner_user_id="user-2") is False
+    assert await repo.delete(created["id"], owner_user_id="user-1") is True
+    assert await repo.get(created["id"], owner_user_id="user-1") is None
+    await close_engine()
+
+
+@pytest.mark.asyncio
+async def test_personal_ip_account_list_hides_archived_by_default(tmp_path):
+    await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
+    sf = get_session_factory()
+    assert sf is not None
+    repo = PersonalIPAccountRepository(sf)
+
+    created = await repo.create(
+        owner_user_id="user-1",
+        platform="xiaohongshu",
+        display_name="测试账号",
+    )
+    await repo.update(
+        created["id"],
+        owner_user_id="user-1",
+        updates={"status": "archived"},
+    )
+
+    assert await repo.list("user-1") == []
+    assert len(await repo.list("user-1", include_archived=True)) == 1
+    await close_engine()

@@ -8,8 +8,9 @@ import { I18nProvider } from "@/core/i18n/context";
 import { detectLocaleServer } from "@/core/i18n/server";
 
 export const metadata: Metadata = {
-  title: "DeerFlow",
-  description: "A LangChain-based framework for building super agents.",
+  title: "IP Agent",
+  description:
+    "A local personal-IP agent powered by DeerFlow and the Volcengine stack.",
 };
 
 export default async function RootLayout({

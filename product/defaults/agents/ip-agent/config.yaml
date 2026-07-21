@@ -1,0 +1,14 @@
+name: ip-agent
+description: A local personal-IP operator powered by DeerFlow and the ByteDance/Volcengine stack.
+skills:
+  - personal-ip-operator
+  - volcengine-stack
+  - deep-research
+  - image-generation
+  - video-generation
+  - podcast-generation
+  - byted-mediakit-shared
+  - byted-mediakit-editing
+  - byted-mediakit-video
+  - byted-mediakit-image
+  - byted-mediakit-audio

@@ -24,6 +24,7 @@ import {
   MESSAGE_LIST_DEFAULT_PADDING_BOTTOM,
 } from "@/components/workspace/messages";
 import { ThreadContext } from "@/components/workspace/messages/context";
+import { AccountSelector } from "@/components/workspace/personal-ip";
 import {
   SidecarProvider,
   SidecarTrigger,
@@ -80,6 +81,18 @@ export default function ChatPage() {
     enabled: !isNewThread && !isMock,
     isMock,
   });
+  const boundAccountId =
+    typeof threadMetadata.data?.metadata?.personal_ip_account_id === "string"
+      ? threadMetadata.data.metadata.personal_ip_account_id
+      : undefined;
+  const effectiveContext = useMemo(
+    () => ({
+      ...settings.context,
+      personal_ip_account_id:
+        boundAccountId ?? settings.context.personal_ip_account_id,
+    }),
+    [boundAccountId, settings.context],
+  );
   const branchThread = useBranchThread();
   const backendTokenUsage = threadTokenUsageToTokenUsage(threadTokenUsage.data);
   const mountedRef = useRef(false);
@@ -111,7 +124,7 @@ export default function ChatPage() {
   } = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     displayThreadId: threadId,
-    context: settings.context,
+    context: effectiveContext,
     isMock,
     // onSend only animates the UI; do NOT flip `isNewThread` here — the
     // LangGraph SDK eagerly fetches /history the moment it receives a
@@ -261,7 +274,7 @@ export default function ChatPage() {
     <ThreadContext.Provider value={{ thread, isMock }}>
       <SidecarProvider
         parentThreadId={threadId}
-        context={settings.context}
+        context={effectiveContext}
         isMock={isMock}
       >
         <ChatBox threadId={threadId} browserEnabled={browserEnabled}>
@@ -279,6 +292,18 @@ export default function ChatPage() {
                 <ThreadTitle threadId={threadId} thread={thread} />
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                {!isMock && (
+                  <AccountSelector
+                    value={effectiveContext.personal_ip_account_id}
+                    threadId={isNewThread ? undefined : threadId}
+                    disabled={thread.isLoading}
+                    onChange={(accountId) =>
+                      setSettings("context", {
+                        personal_ip_account_id: accountId,
+                      })
+                    }
+                  />
+                )}
                 {!isNewThread && (
                   <ThreadScheduledTasksLink threadId={threadId} />
                 )}
@@ -392,11 +417,11 @@ export default function ChatPage() {
                             ? "streaming"
                             : "ready"
                       }
-                      context={settings.context}
+                      context={effectiveContext}
                       extraHeader={
                         isWelcomeMode &&
                         !hasGoal &&
-                        !hasTodos && <Welcome mode={settings.context.mode} />
+                        !hasTodos && <Welcome mode={effectiveContext.mode} />
                       }
                       disabled={
                         isMock ||

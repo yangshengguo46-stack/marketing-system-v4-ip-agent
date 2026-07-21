@@ -65,9 +65,9 @@ export const zhCN: Translations = {
 
   // Welcome
   welcome: {
-    greeting: "你好，欢迎回来！",
+    greeting: "今天想经营哪个账号？",
     description:
-      "欢迎使用 🦌 DeerFlow，一个完全开源的超级智能体。通过内置和自定义的 Skills，\nDeerFlow 可以帮你搜索网络、分析数据，还能为你生成幻灯片、\n图片、视频、播客及网页等，几乎可以做任何事情。",
+      "告诉我账号和目标，或者直接丢一个选题、脚本、素材或链接。IP Agent 会完成研究、创作、视频、电脑操作、发布准备和复盘，并保留审批与回执。",
 
     createYourOwnSkill: "创建你自己的 Agent SKill",
     createYourOwnSkillDescription:
@@ -114,7 +114,8 @@ export const zhCN: Translations = {
 
   // Input Box
   inputBox: {
-    placeholder: "今天我能为你做些什么？",
+    placeholder:
+      "告诉我账号、平台和目标，或者直接丢一个选题、脚本、素材或链接…",
     createSkillPrompt:
       "我们一起用 skill-creator 技能来创建一个技能吧。先问问我希望这个技能能做什么。",
     addAttachments: "添加附件",
@@ -158,8 +159,8 @@ export const zhCN: Translations = {
     reasoningEffortHigh: "高",
     reasoningEffortHighDescription: "全维度逻辑推演 + 多路径验证 + 反推校验",
     searchModels: "搜索模型...",
-    surpriseMe: "小惊喜",
-    surpriseMePrompt: "给我一个小惊喜吧",
+    surpriseMe: "给我灵感",
+    surpriseMePrompt: "结合当前账号，给我一个今天最值得做的内容动作",
     followupLoading: "正在生成可能的后续问题...",
     followupConfirmTitle: "发送建议问题？",
     followupConfirmDescription: "当前输入框已有内容，选择发送方式。",
@@ -183,40 +184,42 @@ export const zhCN: Translations = {
     compactFailed: "上下文压缩失败。",
     suggestions: [
       {
-        suggestion: "写作",
-        prompt: "撰写一篇关于[主题]的博客文章",
+        suggestion: "账号体检",
+        prompt: "分析[平台/账号]最近的内容表现，指出最值得先改的一件事",
         icon: PenLineIcon,
       },
       {
-        suggestion: "研究",
-        prompt: "深入浅出的研究一下[主题]，并总结发现。",
+        suggestion: "寻找选题",
+        prompt: "围绕[领域]和当前账号受众，给出有证据的选题建议",
         icon: MicroscopeIcon,
       },
       {
-        suggestion: "收集",
-        prompt: "从[来源]收集数据并创建报告。",
+        suggestion: "写短视频脚本",
+        prompt: "把[主题/素材]写成符合当前账号的短视频脚本",
         icon: ShapesIcon,
       },
       {
-        suggestion: "学习",
-        prompt: "学习关于[主题]并创建教程。",
+        suggestion: "发布复盘",
+        prompt: "根据[内容链接/数据]做发布复盘，区分事实、解释和下一步实验",
         icon: GraduationCapIcon,
       },
     ],
     suggestionsCreate: [
       {
-        suggestion: "网页",
-        prompt: "生成一个关于[主题]的网页",
+        suggestion: "发布计划",
+        prompt: "为当前账号制定一周发布计划，包含目标、内容和验收指标",
         icon: CompassIcon,
       },
       {
         suggestion: "图片",
-        prompt: "生成一个关于[主题]的图片",
+        prompt:
+          "用 Seedream 为当前账号生成一张[用途]图片，先给生成计划和预计调用次数",
         icon: ImageIcon,
       },
       {
         suggestion: "视频",
-        prompt: "生成一个关于[主题]的视频",
+        prompt:
+          "用 Seedance 和 MediaKit 把[主题/脚本]做成视频，先给镜头计划和预计调用次数",
         icon: VideoIcon,
       },
       {
@@ -521,7 +524,7 @@ export const zhCN: Translations = {
 
   // Page titles (document title)
   pages: {
-    appName: "DeerFlow",
+    appName: "IP Agent",
     chats: "对话",
     newChat: "新对话",
     untitled: "未命名",

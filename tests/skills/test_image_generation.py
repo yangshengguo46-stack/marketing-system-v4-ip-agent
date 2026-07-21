@@ -12,8 +12,10 @@ img = load("image-generation")
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    for k in ["GEMINI_API_KEY", "MINIMAX_API_KEY", "IMAGE_GENERATION_PROVIDER",
-              "MINIMAX_API_HOST", "MINIMAX_IMAGE_MODEL"]:
+    for k in ["GEMINI_API_KEY", "MINIMAX_API_KEY", "VOLCENGINE_API_KEY",
+              "IMAGE_GENERATION_PROVIDER", "MINIMAX_API_HOST", "MINIMAX_IMAGE_MODEL",
+              "VOLCENGINE_ARK_BASE_URL", "VOLCENGINE_IMAGE_MODEL",
+              "VOLCENGINE_IMAGE_SIZE", "VOLCENGINE_IMAGE_WATERMARK"]:
         monkeypatch.delenv(k, raising=False)
 
 
@@ -23,15 +25,75 @@ def test_resolve_prefers_gemini(monkeypatch):
     assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True) == "gemini"
 
 
+def test_resolve_prefers_volcengine_over_upstream(monkeypatch):
+    monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
+    monkeypatch.setenv("GEMINI_API_KEY", "g")
+    assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True) == "volcengine"
+
+
 def test_resolve_falls_back_to_minimax(monkeypatch):
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", False) == "minimax"
 
 
 def test_resolve_override_wins(monkeypatch):
+    monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     monkeypatch.setenv("IMAGE_GENERATION_PROVIDER", "MiniMax")
     assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True) == "minimax"
+
+
+def test_volcengine_seedream_full_flow(monkeypatch, tmp_path):
+    monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
+    captured = {}
+
+    def fake_post(url, headers=None, json=None, **kw):
+        captured["url"] = url
+        captured["headers"] = headers
+        captured["json"] = json
+        return FakeResp({"data": [{"url": "https://download/image.jpg"}]})
+
+    def fake_get(url, **kw):
+        assert url == "https://download/image.jpg"
+        return FakeResp(content=b"SEEDREAM")
+
+    monkeypatch.setattr(img.requests, "post", fake_post)
+    monkeypatch.setattr(img.requests, "get", fake_get)
+    prompt_file = tmp_path / "prompt.txt"
+    prompt_file.write_text("统一角色设定的电影分镜", encoding="utf-8")
+    out = tmp_path / "nested" / "frame.jpg"
+
+    msg = img.generate_image(str(prompt_file), [], str(out), "16:9")
+
+    assert out.read_bytes() == b"SEEDREAM"
+    assert captured["url"].endswith("/api/v3/images/generations")
+    assert captured["headers"]["Authorization"] == "Bearer v"
+    assert captured["json"]["model"] == "doubao-seedream-5-0-260128"
+    assert captured["json"]["size"] == "2560x1440"
+    assert captured["json"]["sequential_image_generation"] == "disabled"
+    assert captured["json"]["watermark"] is False
+    assert "Seedream" in msg
+
+
+def test_volcengine_seedream_reference_images(monkeypatch, tmp_path):
+    monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
+    captured = {}
+
+    def fake_post(url, headers=None, json=None, **kw):
+        captured["json"] = json
+        return FakeResp({"data": [{"b64_json": base64.b64encode(b"IMG").decode()}]})
+
+    monkeypatch.setattr(img.requests, "post", fake_post)
+    ref = tmp_path / "actor.png"
+    ref.write_bytes(b"actor")
+    prompt_file = tmp_path / "prompt.txt"
+    prompt_file.write_text("保持人物一致", encoding="utf-8")
+    out = tmp_path / "out.jpg"
+
+    img.generate_image(str(prompt_file), [str(ref)], str(out), "9:16")
+
+    assert captured["json"]["image"][0].startswith("data:image/png;base64,")
+    assert out.read_bytes() == b"IMG"
 
 
 def test_resolve_errors_when_none(monkeypatch):

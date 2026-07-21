@@ -31,3 +31,14 @@ test("falls back when localStorage access is blocked", () => {
   expect(() => saveLocalSettings(DEFAULT_LOCAL_SETTINGS)).not.toThrow();
   expect(() => saveThreadModelName("thread-1", "model-1")).not.toThrow();
 });
+
+test("restores the selected personal-IP account from local settings", () => {
+  rs.stubGlobal("window", {
+    localStorage: {
+      getItem: () =>
+        JSON.stringify({ context: { personal_ip_account_id: "acct-1" } }),
+    },
+  });
+
+  expect(getLocalSettings().context.personal_ip_account_id).toBe("acct-1");
+});

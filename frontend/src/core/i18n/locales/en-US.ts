@@ -65,9 +65,9 @@ export const enUS: Translations = {
 
   // Welcome
   welcome: {
-    greeting: "Hello, again!",
+    greeting: "Which account are we operating today?",
     description:
-      "Welcome to 🦌 DeerFlow, an open source super agent. With built-in and custom skills, DeerFlow helps you search on the web, analyze data, and generate artifacts like slides, web pages and do almost anything.",
+      "Give me an account and an outcome, or drop in a topic, script, asset, or link. IP Agent can research, create, produce video, prepare publishing, and retain approvals and receipts.",
 
     createYourOwnSkill: "Create Your Own Skill",
     createYourOwnSkillDescription:
@@ -115,7 +115,8 @@ export const enUS: Translations = {
 
   // Input Box
   inputBox: {
-    placeholder: "How can I assist you today?",
+    placeholder:
+      "Name the account, platform, and outcome—or drop in a topic, script, asset, or link…",
     createSkillPrompt:
       "We're going to build a new skill step by step with `skill-creator`. To start, what do you want this skill to do?",
     addAttachments: "Add attachments",
@@ -167,8 +168,9 @@ export const enUS: Translations = {
     reasoningEffortHighDescription:
       "Full-dimensional Logic Deduction + Multi-path Verification + Backward Check",
     searchModels: "Search models...",
-    surpriseMe: "Surprise",
-    surpriseMePrompt: "Surprise me",
+    surpriseMe: "Find an opportunity",
+    surpriseMePrompt:
+      "Based on the active account, suggest the single highest-value content action for today",
     followupLoading: "Generating follow-up questions...",
     followupConfirmTitle: "Send suggestion?",
     followupConfirmDescription:
@@ -195,41 +197,47 @@ export const enUS: Translations = {
     compactFailed: "Context compaction failed.",
     suggestions: [
       {
-        suggestion: "Write",
-        prompt: "Write a blog post about the latest trends on [topic]",
+        suggestion: "Audit account",
+        prompt:
+          "Audit the recent content for [platform/account] and identify the first thing to improve",
         icon: PenLineIcon,
       },
       {
-        suggestion: "Research",
+        suggestion: "Find topics",
         prompt:
-          "Conduct a deep dive research on [topic], and summarize the findings.",
+          "Find evidence-backed topic opportunities for the active account in [field]",
         icon: MicroscopeIcon,
       },
       {
-        suggestion: "Collect",
-        prompt: "Collect data from [source] and create a report.",
+        suggestion: "Write script",
+        prompt:
+          "Turn [topic/assets] into a short-video script for the active account",
         icon: ShapesIcon,
       },
       {
-        suggestion: "Learn",
-        prompt: "Learn about [topic] and create a tutorial.",
+        suggestion: "Review post",
+        prompt:
+          "Review [post URL/metrics], separating facts, interpretation, and the next experiment",
         icon: GraduationCapIcon,
       },
     ],
     suggestionsCreate: [
       {
-        suggestion: "Webpage",
-        prompt: "Create a webpage about [topic]",
+        suggestion: "Publish plan",
+        prompt:
+          "Build a one-week publishing plan for the active account with goals and acceptance metrics",
         icon: CompassIcon,
       },
       {
         suggestion: "Image",
-        prompt: "Create an image about [topic]",
+        prompt:
+          "Use Seedream to create a [purpose] image for the active account; show the call plan first",
         icon: ImageIcon,
       },
       {
         suggestion: "Video",
-        prompt: "Create a video about [topic]",
+        prompt:
+          "Use Seedance and MediaKit to turn [topic/script] into a video; show the shot and call plan first",
         icon: VideoIcon,
       },
       {
@@ -542,7 +550,7 @@ export const enUS: Translations = {
 
   // Page titles (document title)
   pages: {
-    appName: "DeerFlow",
+    appName: "IP Agent",
     chats: "Chats",
     newChat: "New chat",
     untitled: "Untitled",

@@ -34,7 +34,7 @@ export async function Header({ className, homeURL, locale }: HeaderProps) {
           rel={isExternalHome ? "noopener noreferrer" : undefined}
           className="font-serif text-xl whitespace-nowrap"
         >
-          DeerFlow
+          IP Agent
         </a>
       </div>
       <nav className="ml-auto hidden items-center gap-5 text-sm font-medium sm:flex md:mr-8 md:gap-8">
@@ -71,7 +71,7 @@ export async function Header({ className, homeURL, locale }: HeaderProps) {
             rel="noopener noreferrer"
           >
             <GitHubLogoIcon className="size-4" />
-            <span className="hidden sm:inline">Star on GitHub</span>
+            <span className="hidden sm:inline">DeerFlow Core</span>
             {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" &&
               env.GITHUB_OAUTH_TOKEN && <StarCounter />}
           </a>

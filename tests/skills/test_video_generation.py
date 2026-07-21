@@ -12,8 +12,12 @@ vid = load("video-generation")
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    for k in ["GEMINI_API_KEY", "MINIMAX_API_KEY", "VIDEO_GENERATION_PROVIDER",
-              "MINIMAX_API_HOST", "MINIMAX_VIDEO_MODEL"]:
+    for k in ["GEMINI_API_KEY", "MINIMAX_API_KEY", "VOLCENGINE_API_KEY",
+              "VIDEO_GENERATION_PROVIDER", "MINIMAX_API_HOST", "MINIMAX_VIDEO_MODEL",
+              "VOLCENGINE_ARK_BASE_URL", "VOLCENGINE_VIDEO_MODEL",
+              "VOLCENGINE_VIDEO_DURATION", "VOLCENGINE_VIDEO_RESOLUTION",
+              "VOLCENGINE_VIDEO_GENERATE_AUDIO", "VOLCENGINE_VIDEO_WATERMARK",
+              "VOLCENGINE_VIDEO_RETURN_LAST_FRAME"]:
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setattr(vid.time, "sleep", lambda *_: None)
 
@@ -22,14 +26,114 @@ def test_resolve_prefers_gemini():
     assert vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", True) == "gemini"
 
 
+def test_resolve_prefers_volcengine(monkeypatch):
+    monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
+    assert vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", True) == "volcengine"
+
+
 def test_resolve_falls_back_to_minimax(monkeypatch):
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     assert vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", False) == "minimax"
 
 
 def test_resolve_override(monkeypatch):
+    monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
     monkeypatch.setenv("VIDEO_GENERATION_PROVIDER", "minimax")
     assert vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", True) == "minimax"
+
+
+def test_volcengine_seedance_full_flow(monkeypatch, tmp_path):
+    monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
+    calls = {"posts": [], "gets": []}
+
+    def fake_post(url, headers=None, json=None, **kw):
+        calls["posts"].append((url, headers, json))
+        return FakeResp({"id": "seedance-task-1"})
+
+    def fake_get(url, headers=None, **kw):
+        calls["gets"].append(url)
+        if url.endswith("/contents/generations/tasks/seedance-task-1"):
+            return FakeResp({
+                "status": "succeeded",
+                "content": {"video_url": "https://download/video.mp4"},
+            })
+        return FakeResp(content=b"SEEDANCE")
+
+    monkeypatch.setattr(vid.requests, "post", fake_post)
+    monkeypatch.setattr(vid.requests, "get", fake_get)
+    prompt_file = tmp_path / "prompt.txt"
+    prompt_file.write_text("竖屏个人IP口播，原生声音", encoding="utf-8")
+    out = tmp_path / "result" / "clip.mp4"
+
+    msg = vid.generate_video(str(prompt_file), [], str(out), "9:16")
+
+    assert out.read_bytes() == b"SEEDANCE"
+    url, headers, body = calls["posts"][0]
+    assert url.endswith("/api/v3/contents/generations/tasks")
+    assert headers["Authorization"] == "Bearer v"
+    assert body["model"] == "doubao-seedance-2-0-260128"
+    assert body["ratio"] == "9:16"
+    assert body["duration"] == 5
+    assert body["generate_audio"] is True
+    assert body["watermark"] is False
+    assert body["content"] == [{"type": "text", "text": "竖屏个人IP口播，原生声音"}]
+    assert "seedance-task-1" in msg
+
+
+def test_volcengine_seedance_single_image_is_first_frame(monkeypatch, tmp_path):
+    monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
+    captured = {}
+
+    def fake_post(url, headers=None, json=None, **kw):
+        captured["json"] = json
+        return FakeResp({"task_id": "T1"})
+
+    def fake_get(url, headers=None, **kw):
+        if url.endswith("/T1"):
+            return FakeResp({"status": "completed", "output": {"video_url": "https://d/v"}})
+        return FakeResp(content=b"V")
+
+    monkeypatch.setattr(vid.requests, "post", fake_post)
+    monkeypatch.setattr(vid.requests, "get", fake_get)
+    ref = tmp_path / "first.jpg"
+    ref.write_bytes(b"frame")
+    prompt_file = tmp_path / "prompt.txt"
+    prompt_file.write_text("人物转身", encoding="utf-8")
+
+    vid.generate_video(str(prompt_file), [str(ref)], str(tmp_path / "out.mp4"), "16:9")
+
+    image_item = captured["json"]["content"][1]
+    assert image_item["role"] == "first_frame"
+    assert image_item["image_url"]["url"].startswith("data:image/jpeg;base64,")
+
+
+def test_volcengine_seedance_multiple_images_are_references(monkeypatch, tmp_path):
+    monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
+    captured = {}
+
+    def fake_post(url, headers=None, json=None, **kw):
+        captured["json"] = json
+        return FakeResp({"id": "T2"})
+
+    def fake_get(url, headers=None, **kw):
+        if url.endswith("/T2"):
+            return FakeResp({"status": "succeeded", "video_url": "https://d/v"})
+        return FakeResp(content=b"V")
+
+    monkeypatch.setattr(vid.requests, "post", fake_post)
+    monkeypatch.setattr(vid.requests, "get", fake_get)
+    refs = []
+    for name in ("actor.png", "scene.png"):
+        path = tmp_path / name
+        path.write_bytes(name.encode())
+        refs.append(str(path))
+    prompt_file = tmp_path / "prompt.txt"
+    prompt_file.write_text("参考人物与场景", encoding="utf-8")
+
+    vid.generate_video(str(prompt_file), refs, str(tmp_path / "out.mp4"), "16:9")
+
+    roles = [item["role"] for item in captured["json"]["content"][1:]]
+    assert roles == ["reference_image", "reference_image"]
 
 
 def test_unknown_provider_raises(monkeypatch, tmp_path):

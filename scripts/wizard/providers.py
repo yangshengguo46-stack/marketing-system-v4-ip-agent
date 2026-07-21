@@ -117,10 +117,13 @@ LLM_PROVIDERS: list[LLMProvider] = [
     LLMProvider(
         name="volcengine",
         display_name="Volcengine Doubao",
-        description="Doubao Seed with thinking support",
+        description="Doubao Seed 2.0 for agent reasoning, vision, and tool use",
         use="deerflow.models.patched_deepseek:PatchedChatDeepSeek",
-        models=["doubao-seed-1-8-251228"],
-        default_model="doubao-seed-1-8-251228",
+        models=[
+            "doubao-seed-2-0-pro-260215",
+            "doubao-seed-2-0-lite-260215",
+        ],
+        default_model="doubao-seed-2-0-pro-260215",
         env_var="VOLCENGINE_API_KEY",
         package="langchain-deepseek",
         extra_config={
@@ -130,6 +133,10 @@ LLM_PROVIDERS: list[LLMProvider] = [
             "supports_vision": True,
             "supports_reasoning_effort": True,
             **OPENAI_COMPAT_THINKING_CONFIG,
+        },
+        model_vision_overrides={
+            "doubao-seed-2-0-pro-260215": True,
+            "doubao-seed-2-0-lite-260215": True,
         },
     ),
     LLMProvider(

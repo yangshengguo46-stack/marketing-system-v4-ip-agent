@@ -1,0 +1,66 @@
+version: 1
+updated_at: "2026-07-21"
+policy:
+  harness: deerflow-local
+  provider_preference: bytedance-volcengine-first
+  paid_batches_require_approval: true
+  receipts_required: true
+
+capabilities:
+  reasoning_and_vision:
+    product: Volcengine Ark
+    integration: deerflow-model-provider
+    credential: VOLCENGINE_API_KEY
+    default_model: doubao-seed-2-0-pro-260215
+  image_generation:
+    product: Doubao Seedream
+    integration: skill:image-generation
+    credential: VOLCENGINE_API_KEY
+    default_model: doubao-seedream-5-0-260128
+  video_generation:
+    product: Doubao Seedance
+    integration: skill:video-generation
+    credential: VOLCENGINE_API_KEY
+    default_model: doubao-seedance-2-0-260128
+  speech:
+    product: Doubao Speech
+    integration: skill:podcast-generation
+    credentials:
+      - VOLCENGINE_TTS_APPID
+      - VOLCENGINE_TTS_ACCESS_TOKEN
+  media_editing_and_understanding:
+    product: AI MediaKit
+    integration:
+      - skill:byted-mediakit-shared
+      - skill:byted-mediakit-editing
+      - skill:byted-mediakit-video
+      - skill:byted-mediakit-image
+      - skill:byted-mediakit-audio
+    credential: MEDIAKIT_API_KEY
+    cli: "@volcengine/mediakit-cli@0.2.0"
+  computer_use:
+    product: UI-TARS / Agent TARS
+    integration: optional-mcp-or-tool
+    default_enabled: false
+  local_context:
+    product: MineContext
+    integration: optional-connector
+    default_enabled: false
+  cloud_agent_runtime:
+    product: AgentKit
+    integration: reference-only
+    reason: DeerFlow remains the local runtime; do not pay for a duplicate harness by default.
+  cloud_data_agent:
+    product: Data Agent
+    integration: excluded
+    reason: Paid/private data product and outside the personal-IP local-agent core.
+
+sources:
+  - https://www.volcengine.com/docs/82379/seedream?lang=zh
+  - https://www.volcengine.com/docs/6561/153106?lang=zh
+  - https://www.volcengine.com/docs/6448?lang=zh
+  - https://www.volcengine.com/docs/86681?lang=zh
+  - https://github.com/bytedance/deer-flow
+  - https://github.com/bytedance/UI-TARS-desktop
+  - https://github.com/volcengine/MineContext
+  - https://github.com/volcengine/mediakit-cli
