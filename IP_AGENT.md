@@ -97,4 +97,11 @@ candidate receipt and concrete target account ids. Reusing the same operation
 key is idempotent only for the byte-equivalent prediction; a different result
 cannot overwrite the original preflight.
 
+Publishing uses `/api/personal-ip/publish-receipts`. Begin the operation before
+calling a platform API, UI-TARS, the native browser or a manual handoff, then
+append every attempt with its platform task/post id and result. Operation and
+idempotency keys cannot be reused for different requests; attempt keys cannot
+be rewritten, and a confirmed publication cannot later be downgraded to a
+failure. The selected account is recorded as this operation's target only.
+
 See `product/volcengine/capabilities.yaml` for the complete routing policy.

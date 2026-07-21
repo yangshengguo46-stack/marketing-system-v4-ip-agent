@@ -33,6 +33,9 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > Audience preflights are stored as immutable, owner-scoped request/receipt
 > snapshots so later publishing outcomes can be compared with what the model
 > actually predicted at the time.
+> Publishing operations use separate idempotent receipts with append-only API,
+> UI-TARS, browser or manual attempts; account ids remain operation targets,
+> not conversation permissions.
 
 ## Official Website
 

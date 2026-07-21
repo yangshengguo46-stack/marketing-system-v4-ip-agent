@@ -105,6 +105,14 @@ path: an operation-key replay returns the existing identical snapshot and a
 different replay is rejected. Deleting or archiving an account later does not
 rewrite historical predictions.
 
+`personal_ip_publish_receipts` links an optional preflight to one concrete
+platform account and execution mechanism (`platform_api`, `ui_tars`, `browser`
+or `manual`). Its initial request is immutable and every executor callback is
+appended as a keyed attempt. Duplicate identical attempts are safe; conflicting
+attempts and terminal-state downgrades are rejected. A confirmed publication
+advances only the preflight lifecycle status—it never changes the sealed model
+input or candidates.
+
 ## Minimal patch policy
 
 Keep upstream model architecture and loss functions unchanged. Product work is

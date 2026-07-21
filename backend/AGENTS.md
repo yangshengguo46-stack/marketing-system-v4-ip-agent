@@ -989,6 +989,13 @@ identical sealed snapshot; it must reject a different request or result, and no
 API may rewrite the prediction. Subject/account ids are validated operation
 targets and do not restrict conversation authority.
 
+Migration `0009_personal_ip_publish_receipts` and
+`deerflow.persistence.personal_ip_publish_receipts` own idempotent publication
+requests plus append-only executor attempts. Gateway endpoints are under
+`/api/personal-ip/publish-receipts`. Derive platform and subject from the
+owner-scoped target account, enforce sealed preflight targets when supplied,
+and never downgrade a confirmed `published` result to `failed` or `unknown`.
+
 ### Vision Support
 
 For models with `supports_vision: true`:

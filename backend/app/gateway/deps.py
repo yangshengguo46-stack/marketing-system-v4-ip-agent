@@ -169,6 +169,7 @@ if TYPE_CHECKING:
     from app.gateway.auth.repositories.sqlite import SQLiteUserRepository
     from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
     from deerflow.persistence.personal_ip_preflights import PersonalIPPreflightRepository
+    from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
     from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
     from deerflow.persistence.thread_meta.base import ThreadMetaStore
     from deerflow.runtime import RunRecord
@@ -305,6 +306,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
         if sf is not None:
             from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
             from deerflow.persistence.personal_ip_preflights import PersonalIPPreflightRepository
+            from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
             from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
             from deerflow.persistence.scheduled_task_runs import (
                 ScheduledTaskRunRepository,
@@ -315,12 +317,14 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.scheduled_task_run_repo = ScheduledTaskRunRepository(sf)
             app.state.personal_ip_account_repo = PersonalIPAccountRepository(sf)
             app.state.personal_ip_preflight_repo = PersonalIPPreflightRepository(sf)
+            app.state.personal_ip_publish_receipt_repo = PersonalIPPublishReceiptRepository(sf)
             app.state.personal_ip_subject_repo = PersonalIPSubjectRepository(sf)
         else:
             app.state.scheduled_task_repo = None
             app.state.scheduled_task_run_repo = None
             app.state.personal_ip_account_repo = None
             app.state.personal_ip_preflight_repo = None
+            app.state.personal_ip_publish_receipt_repo = None
             app.state.personal_ip_subject_repo = None
 
         # Run event store. The store and the matching ``run_events_config`` are
@@ -448,6 +452,13 @@ def get_personal_ip_preflight_repo(request: Request) -> PersonalIPPreflightRepos
     val = getattr(request.app.state, "personal_ip_preflight_repo", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Personal-IP preflight repository not available")
+    return val
+
+
+def get_personal_ip_publish_receipt_repo(request: Request) -> PersonalIPPublishReceiptRepository:
+    val = getattr(request.app.state, "personal_ip_publish_receipt_repo", None)
+    if val is None:
+        raise HTTPException(status_code=503, detail="Personal-IP publish receipt repository not available")
     return val
 
 

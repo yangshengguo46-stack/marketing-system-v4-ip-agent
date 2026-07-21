@@ -92,6 +92,11 @@ IP Agent distribution note:
   `deerflow.persistence.personal_ip_preflights` and migration
   `0008_personal_ip_preflights`. Account ids are operation targets in the
   snapshot, never thread authority. Do not add a prediction rewrite endpoint.
+- Personal-IP publishing receipts live in
+  `deerflow.persistence.personal_ip_publish_receipts` and migration
+  `0009_personal_ip_publish_receipts`. Keep the initial request immutable,
+  attempts append-only and terminal publication status monotonic. API,
+  UI-TARS, browser and manual executors share this one receipt contract.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.
