@@ -37,7 +37,14 @@ capabilities:
       - skill:byted-mediakit-image
       - skill:byted-mediakit-audio
     credential: MEDIAKIT_API_KEY
-    cli: "@volcengine/mediakit-cli@0.2.0"
+    cli_source: third_party/volcengine/mediakit-cli
+    cli_commit: 279e5bb97e97c6875ae2c6891c2c3fa9a43f39c0
+    cli_binary: .deer-flow/bin/mediakit-cli
+    local_ffmpeg:
+      version: 8.1.2
+      binary: .deer-flow/toolchains/ffmpeg/bin/ffmpeg
+      source: https://github.com/FFmpeg/FFmpeg/tree/n8.1.2
+      configure_mode: lgpl-no-gpl-no-nonfree
   computer_use:
     product: UI-TARS / Agent TARS
     integration: optional-mcp-or-tool

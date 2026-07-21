@@ -28,6 +28,7 @@ set -e
 
 REPO_ROOT="$(builtin cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd -P)"
 cd "$REPO_ROOT"
+export PATH="$REPO_ROOT/.deer-flow/toolchains/ffmpeg/bin:$REPO_ROOT/.deer-flow/bin:$PATH"
 
 # ── Load .env ────────────────────────────────────────────────────────────────
 

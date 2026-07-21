@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init volcengine-install volcengine-doctor
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init volcengine-install volcengine-doctor ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 BACKEND_UV_RUN = cd backend && uv run
@@ -20,8 +20,11 @@ help:
 	@echo "DeerFlow Development Commands:"
 	@echo "  make setup           - Interactive setup wizard (recommended for new users)"
 	@echo "  make ip-init         - Install the default local personal-IP Agent"
-	@echo "  make volcengine-install - Install the official pinned AI MediaKit CLI"
-	@echo "  make volcengine-doctor  - Check the AI MediaKit installation"
+	@echo "  make volcengine-install - Build the pinned AI MediaKit CLI from source"
+	@echo "  make volcengine-doctor  - Check the source-built AI MediaKit CLI"
+	@echo "  make ffmpeg-toolchain   - Build pinned project-local FFmpeg with subtitles"
+	@echo "  make mediakit-toolchain - Install a pinned project-local Go toolchain"
+	@echo "  make mediakit-test      - Run the vendored MediaKit Go tests"
 	@echo "  make doctor          - Check configuration and system requirements"
 	@echo "  make support-bundle  - Create a redacted issue summary, AI draft, and evidence bundle"
 	@echo "  make config          - Generate local config files (aborts if config already exists)"
@@ -59,11 +62,23 @@ setup:
 ip-init:
 	@$(PYTHON) ./scripts/init_ip_agent.py
 
-volcengine-install:
-	@npm install -g @volcengine/mediakit-cli@0.2.0
+volcengine-install: ffmpeg-toolchain mediakit-toolchain
+	@$(PYTHON) ./scripts/mediakit_source.py build
 
 volcengine-doctor:
-	@MEDIAKIT_SURFACE=skill MEDIAKIT_RUNTIME=deerflow mediakit-cli doctor
+	@$(PYTHON) ./scripts/mediakit_source.py doctor
+
+mediakit-toolchain:
+	@$(PYTHON) ./scripts/install_go_toolchain.py
+
+ffmpeg-toolchain:
+	@$(PYTHON) ./scripts/install_ffmpeg_toolchain.py
+
+mediakit-build:
+	@$(PYTHON) ./scripts/mediakit_source.py build
+
+mediakit-test:
+	@$(PYTHON) ./scripts/mediakit_source.py test
 
 doctor:
 	@$(BACKEND_UV_RUN) python ../scripts/doctor.py

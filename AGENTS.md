@@ -70,6 +70,12 @@ IP Agent distribution note:
 - `scripts/init_ip_agent.py` installs those defaults into a normal DeerFlow
   workspace. Keep this as a source distribution: integrate upstream DeerFlow
   changes without replacing native source modules with binary wrappers.
+- `third_party/volcengine/mediakit-cli` is the pinned MediaKit Go source.
+  `scripts/mediakit_source.py` builds it into ignored `.deer-flow/bin`; do not
+  reintroduce the upstream prebuilt `mediakit` file or a global npm installer.
+- `scripts/install_ffmpeg_toolchain.py` owns the pinned project-local FFmpeg
+  build. Service launch and MediaKit diagnosis must prefer its `bin` directory;
+  do not silently fall back to a feature-incomplete system FFmpeg.
 - Personal-IP account data is the product-owned domain boundary. It must remain
   owner-scoped, enter runs through validated server context, and never be trusted
   from a caller-supplied expanded object.

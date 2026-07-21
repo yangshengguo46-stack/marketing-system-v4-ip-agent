@@ -30,14 +30,27 @@ make dev
 Choose Volcengine in the setup wizard and place your Ark API key in
 `VOLCENGINE_API_KEY`.
 
-To install the official AI MediaKit CLI used by the bundled Skills:
+To build the pinned AI MediaKit CLI source used by the bundled Skills:
 
 ```bash
 make volcengine-install
+make volcengine-doctor
 ```
 
-Cloud MediaKit uses its own `MEDIAKIT_API_KEY`. Without that key, supported
-editing commands can still fall back to local FFmpeg.
+The repository contains the MediaKit Go source under
+`third_party/volcengine/mediakit-cli`; the incompatible upstream arm64
+executable is not used. The install target prepares two project-local source
+builds without asking the customer to install them by hand:
+
+- checksum-pinned Go builds MediaKit into `.deer-flow/bin`;
+- checksum-pinned FFmpeg 8.1.2 builds into `.deer-flow/toolchains/ffmpeg` with
+  libass, FreeType, Fontconfig, FriBidi, HarfBuzz, OpenH264 and VideoToolbox.
+
+The FFmpeg downloader resumes interrupted transfers and uses the official
+FFmpeg GitHub repository archive, avoiding a hard dependency on ffmpeg.org.
+Both binary directories are added to the service PATH automatically. Cloud
+MediaKit uses its own `MEDIAKIT_API_KEY`; without that key, trim, concat,
+subtitle, mix and probe continue to run locally.
 
 ## Important environment variables
 
