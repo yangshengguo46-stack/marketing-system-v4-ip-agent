@@ -15,11 +15,26 @@ The model never receives the profile path, cookie database, password or other
 credential material. The user completes passwords, QR scans, CAPTCHA, MFA and
 identity checks in the live browser. The agent must not bypass those controls.
 
+This credential boundary is not a business-data restriction. Chromium still
+uses its cookies automatically, and server-side connectors may use encrypted
+tokens internally. After login, the agent may inspect the authenticated creator
+backend in detail: account and content lists, post-level metrics, audience
+analytics, traffic sources, comments, conversions and platform receipts.
+Collection should retain source URL, observation time, pagination/coverage and
+screenshot or raw-field evidence so later analysis can distinguish observation
+from inference. Authentication-secret values stay outside model context;
+authorized operating data belongs in the Personal-IP evidence loop.
+
 The operating portfolio at `/workspace/personal-ip` always shows all eight
 platforms. A platform with no account offers **登录账号**; clicking it creates a
 minimal local account slot and immediately opens the real platform page. Each
 existing account has its own login/open action, so multiple accounts on one
 platform never share a browser profile.
+
+The Live route emits only an `account_authenticated` boolean event when a
+conservative platform URL rule recognizes successful login. The Web UI closes
+the login dialog automatically. This small event does not limit what the agent
+may collect afterward through Browser Control or an official API.
 
 ## Runtime contract
 

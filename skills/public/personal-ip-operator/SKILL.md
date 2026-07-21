@@ -42,6 +42,13 @@ facts through a Tool/MCP; do not recreate that model in prompts.
 1. Determine whether the request is portfolio-wide or a concrete account operation; never infer an account restriction for a global request.
 2. Inspect evidence before strategy: prior content, comments, metrics, source
    documents and competitor examples.
+   After browser login, collect the creator backend as deeply as the requested
+   operation needs: account/content inventories, per-post performance, audience
+   analytics, traffic sources, comments, conversions and platform receipts.
+   Preserve source URL, observed-at time, pagination/coverage and raw
+   screenshot/field evidence. Chromium and server connectors may use credentials
+   internally; their raw cookie/token/password values must not enter model
+   context, while the returned operating data should.
    For performance questions, use the native portfolio inventory, sync and
    aggregate tools; preserve their missing/partial coverage instead of treating
    absent data or a cumulative snapshot as today's total.
@@ -57,7 +64,9 @@ facts through a Tool/MCP; do not recreate that model in prompts.
    `personal_ip_select_browser_account` with the concrete target, then use
    DeerFlow Browser Control and UI-TARS only as needed. Account selection does
    not narrow the rest of the conversation. The user handles password, QR,
-   CAPTCHA, MFA and identity prompts; never request those secrets in chat.
+   CAPTCHA, MFA and identity prompts; never request those secrets in chat. A
+   successful manual login closes its portfolio dialog automatically, while
+   the persistent account profile remains available to later agent collection.
 6. Produce an operation receipt that links decisions, assets and outputs.
 7. After publication, distinguish observations from interpretations. Persist
    stable account facts to memory; keep raw evidence and receipts as artifacts.

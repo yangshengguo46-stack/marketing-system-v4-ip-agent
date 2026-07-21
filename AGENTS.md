@@ -152,7 +152,12 @@ IP Agent distribution note:
   `/workspace/personal-ip` must render all eight entries even before accounts
   exist and open manual login through the account-scoped Live Browser route.
   The user—not the agent—completes QR, CAPTCHA and MFA. Each account uses an
-  owner/account-isolated persistent profile.
+  owner/account-isolated persistent profile. Successful login emits a boolean
+  event and closes the login dialog. This credential boundary must not suppress
+  detailed authorized business-data collection: account/content inventories,
+  metrics, audience analytics, comments and receipts should retain source,
+  observed-at and coverage evidence while raw credential values stay out of
+  model context.
   `personal_ip_select_browser_account` selects only the concrete operation
   target. Browser Control resolves that selection to an owner/account-isolated
   persistent Chromium profile; it never narrows conversation authority or

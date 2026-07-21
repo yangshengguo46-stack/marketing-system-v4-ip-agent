@@ -98,7 +98,9 @@ Tool-calling AI messages can contain user-visible text as well as `tool_calls`. 
   account editing and the manual-login dialog. Account login uses the
   account-scoped Browser Live socket, never a synthetic chat thread. Empty
   platforms create a minimal account slot before opening login; QR, CAPTCHA and
-  MFA remain user actions.
+  MFA remain user actions. An `account_authenticated` stream event closes the
+  login dialog and shows success; it carries no credential or business-data
+  payload. Later detailed collection remains an agent/browser responsibility.
   Never accept or cache an expanded account record as run authority; the Gateway
   resolves it again for the authenticated owner.
 - `src/app/workspace/chats/[thread_id]/page.tsx` owns branch-from-turn submission and navigation; sidecar `MessageList` instances do not receive the branch action.

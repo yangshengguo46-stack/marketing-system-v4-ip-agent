@@ -1106,7 +1106,12 @@ account-scoped WebSocket route under `/api/personal-ip/accounts/{id}/browser`
 is the manual-login surface for the operating portfolio; it must resolve an
 active owner-scoped account before creating the profile path, seeds only the
 registered platform URL and shares the exact same account session key as the
-agent tools.
+agent tools. Conservative host/path rules may emit one
+`account_authenticated` event so the UI can close the login dialog; never use
+cookie or token values for that client event. Chromium and server connectors
+still use credentials internally. After login, Browser Control may extract
+detailed authorized operating data with source/time/pagination/coverage
+evidence for receipts and retrospectives.
 
 ### Vision Support
 

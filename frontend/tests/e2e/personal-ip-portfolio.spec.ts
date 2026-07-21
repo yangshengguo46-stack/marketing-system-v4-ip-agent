@@ -62,10 +62,58 @@ test("portfolio shows all eight platforms and opens manual login", async ({
   const tiktokCard = page
     .locator('[data-slot="card"]')
     .filter({ hasText: "TikTok" });
+  await page.evaluate(() => {
+    const sockets: Array<{
+      onopen: (() => void) | null;
+      onmessage: ((event: { data: string }) => void) | null;
+      onclose: (() => void) | null;
+      readyState: number;
+      emit: (payload: unknown) => void;
+    }> = [];
+    class MockWebSocket {
+      static OPEN = 1;
+      onopen: (() => void) | null = null;
+      onmessage: ((event: { data: string }) => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      readyState = 0;
+
+      constructor() {
+        sockets.push(this);
+        queueMicrotask(() => {
+          this.readyState = MockWebSocket.OPEN;
+          this.onopen?.();
+        });
+      }
+
+      send() {}
+
+      close() {
+        this.readyState = 3;
+        this.onclose?.();
+      }
+
+      emit(payload: unknown) {
+        this.onmessage?.({ data: JSON.stringify(payload) });
+      }
+    }
+    Object.assign(window, {
+      WebSocket: MockWebSocket,
+      __loginSockets: sockets,
+    });
+  });
   await tiktokCard.getByRole("button", { name: "登录账号" }).click();
 
   await expect(page.getByRole("dialog")).toContainText("TikTok · TikTok账号");
   await expect(page.getByRole("dialog")).toContainText(
     "请本人完成扫码、验证码或双重验证",
   );
+
+  await page.evaluate(() => {
+    const sockets = Reflect.get(window, "__loginSockets") as Array<{
+      emit: (payload: unknown) => void;
+    }>;
+    sockets.at(-1)?.emit({ type: "account_authenticated" });
+  });
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });

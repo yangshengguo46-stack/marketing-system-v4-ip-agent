@@ -68,7 +68,11 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > account has an owner-isolated persistent local Chromium profile; official
 > APIs are optional connectors. The operating portfolio always shows all eight
 > platforms: users can create an account slot and open its real login page
-> directly, then complete QR, CAPTCHA or MFA themselves. See
+> directly, then complete QR, CAPTCHA or MFA themselves; recognized success
+> closes the login dialog automatically. Chromium/server connectors use
+> credentials internally without exposing their values to the model, while
+> authorized creator-backend data remains available for detailed evidence
+> collection, receipts and retrospective analysis. See
 > [docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md](docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md).
 
 ## Official Website

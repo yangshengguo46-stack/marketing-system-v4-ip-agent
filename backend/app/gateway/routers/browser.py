@@ -9,7 +9,12 @@ from pydantic import BaseModel, Field
 from app.gateway.authz import require_permission
 from app.gateway.browser_capability import browser_capability
 from deerflow.config.paths import get_paths
-from deerflow.personal_ip.browser_profiles import build_browser_account_target, get_browser_account_target
+from deerflow.personal_ip.browser_profiles import (
+    browser_login_challenge,
+    browser_login_succeeded,
+    build_browser_account_target,
+    get_browser_account_target,
+)
 from deerflow.runtime.user_context import get_effective_user_id, reset_current_user, set_current_user
 
 logger = logging.getLogger(__name__)
@@ -209,6 +214,7 @@ async def browser_stream(
     user_id = str(user.id)
     target = None
     default_seed: str | None = None
+    account_login_platform: str | None = None
     resource_id = thread_id or account_id or "unknown"
 
     if account_id is not None:
@@ -235,6 +241,7 @@ async def browser_stream(
             await websocket.close(code=4404)
             return
         default_seed = target.start_url
+        account_login_platform = target.platform
     else:
         if thread_id is None:
             await websocket.close(code=4404)
@@ -279,6 +286,8 @@ async def browser_stream(
     input_queue: asyncio.Queue[dict] = asyncio.Queue(maxsize=64)
     pending_move: dict | None = None
     pending_wheel: dict | None = None
+    login_challenge_seen = False
+    login_success_reported = False
 
     async def _send_payload(payload: dict) -> None:
         async with send_lock:
@@ -370,6 +379,21 @@ async def browser_stream(
                 },
             )
 
+    async def _report_account_login(url: str | None) -> None:
+        nonlocal login_challenge_seen, login_success_reported
+        if account_login_platform is None or login_success_reported or not url:
+            return
+        if browser_login_challenge(account_login_platform, url):
+            login_challenge_seen = True
+            return
+        if browser_login_succeeded(
+            account_login_platform,
+            url,
+            challenge_seen=login_challenge_seen,
+        ):
+            login_success_reported = True
+            await _send_payload({"type": "account_authenticated"})
+
     async def _poll_location() -> None:
         # The agent drives the same session through its tools (browser_navigate /
         # click / type), which do not flow through this socket's input handler, so
@@ -387,6 +411,7 @@ async def browser_stream(
                     last_url = url
                     await _send_payload({"type": "url", "url": url})
                     await _send_tabs()
+                    await _report_account_login(url)
 
     def _queue_input(event: dict) -> None:
         nonlocal pending_move, pending_wheel
@@ -492,6 +517,8 @@ async def browser_stream(
             return
         await _send_url()
         await _send_tabs()
+        with contextlib.suppress(Exception):
+            await _report_account_login(await session.current_url())
         input_task = asyncio.create_task(_process_inputs())
         reader_task = asyncio.create_task(_read_inputs())
         poll_task = asyncio.create_task(_poll_location())

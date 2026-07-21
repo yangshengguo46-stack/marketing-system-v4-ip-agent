@@ -60,6 +60,7 @@ export function useBrowserStream(
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
   const [liveUrl, setLiveUrl] = useState<string | null>(null);
   const [tabs, setTabs] = useState<BrowserTab[]>([]);
+  const [accountAuthenticated, setAccountAuthenticated] = useState(false);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const socketRef = useRef<WebSocket | null>(null);
   const pendingNavigateRef = useRef<Extract<
@@ -91,6 +92,7 @@ export function useBrowserStream(
 
   useEffect(() => {
     pendingNavigateRef.current = null;
+    setAccountAuthenticated(false);
   }, [sessionId, scope]);
 
   useEffect(() => {
@@ -190,6 +192,8 @@ export function useBrowserStream(
           setTabs(payload.tabs);
         } else if (payload.type === "nav_rejected") {
           onNavRejectedRef.current?.(payload.url, payload.message);
+        } else if (payload.type === "account_authenticated") {
+          setAccountAuthenticated(true);
         }
       } catch (error) {
         console.warn("Ignoring malformed browser stream message", error);
@@ -236,5 +240,12 @@ export function useBrowserStream(
     sendInput({ type: "navigate", url: target });
   }, [enabled, seedUrl, sendInput, status]);
 
-  return { status, frameUrl, liveUrl, tabs, sendInput };
+  return {
+    status,
+    frameUrl,
+    liveUrl,
+    tabs,
+    accountAuthenticated,
+    sendInput,
+  };
 }

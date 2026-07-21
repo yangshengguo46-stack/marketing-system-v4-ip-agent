@@ -29,6 +29,7 @@ export function BrowserViewPanel({
   accountId,
   initialUrl,
   title = "Browser",
+  onAccountAuthenticated,
   onClose,
   className,
 }: {
@@ -36,6 +37,7 @@ export function BrowserViewPanel({
   accountId?: string;
   initialUrl?: string;
   title?: string;
+  onAccountAuthenticated?: () => void;
   onClose?: () => void;
   className?: string;
 }) {
@@ -67,13 +69,14 @@ export function BrowserViewPanel({
     },
     [],
   );
-  const { status, frameUrl, liveUrl, sendInput } = useBrowserStream(
-    sessionId,
-    live,
-    streamSeedUrl,
-    handleNavRejected,
-    accountMode ? "account" : "thread",
-  );
+  const { status, frameUrl, liveUrl, accountAuthenticated, sendInput } =
+    useBrowserStream(
+      sessionId,
+      live,
+      streamSeedUrl,
+      handleNavRejected,
+      accountMode ? "account" : "thread",
+    );
   const panelRef = useRef<HTMLDivElement | null>(null);
   const surfaceRef = useRef<HTMLImageElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -96,6 +99,12 @@ export function BrowserViewPanel({
   useEffect(() => {
     setLastLiveUrl(null);
   }, [sessionId]);
+
+  useEffect(() => {
+    if (accountMode && accountAuthenticated) {
+      onAccountAuthenticated?.();
+    }
+  }, [accountAuthenticated, accountMode, onAccountAuthenticated]);
 
   useEffect(() => {
     if (frame?.url && !urlInput && !liveUrl) {

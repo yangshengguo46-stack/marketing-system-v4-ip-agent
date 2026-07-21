@@ -1,6 +1,7 @@
 "use client";
 
 import { ShieldCheckIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   Dialog,
@@ -47,6 +48,10 @@ export function AccountBrowserLoginDialog({
             initialUrl={platform.startUrl}
             title={`${platform.label}登录`}
             className="min-h-0 overflow-hidden rounded-lg border"
+            onAccountAuthenticated={() => {
+              toast.success(`${platform.label}登录成功`);
+              onOpenChange(false);
+            }}
             onClose={() => onOpenChange(false)}
           />
         )}
