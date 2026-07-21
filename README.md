@@ -19,9 +19,12 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > [!NOTE]
 > **This branch is the IP Agent distribution.** It keeps DeerFlow as the only
 > agent runtime, adds owner-scoped creator/brand accounts, and uses
-> ByteDance/Volcengine models plus AI MediaKit as the default media capability
-> layer. Start with [IP_AGENT.md](IP_AGENT.md); upstream component provenance is
-> recorded in [THIRD_PARTY_BYTE.md](THIRD_PARTY_BYTE.md).
+> ByteDance HLLM-Creator, Volcengine models and AI MediaKit as the default
+> audience/media capability layer. Start with [IP_AGENT.md](IP_AGENT.md); the
+> HLLM boundary is documented in
+> [docs/HLLM_CREATOR_INTEGRATION.md](docs/HLLM_CREATOR_INTEGRATION.md), and
+> upstream component provenance is recorded in
+> [THIRD_PARTY_BYTE.md](THIRD_PARTY_BYTE.md).
 
 ## Official Website
 

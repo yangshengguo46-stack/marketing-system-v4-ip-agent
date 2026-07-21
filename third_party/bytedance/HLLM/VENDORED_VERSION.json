@@ -1,0 +1,8 @@
+{
+  "upstream": "https://github.com/bytedance/HLLM",
+  "commit": "864f17221c04a2d3082d9a072df00616bc7e6dab",
+  "license": "Apache-2.0",
+  "source_mode": "full-upstream-source",
+  "license_sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+  "creator_model_sha256": "351f323a87a7e122acafaf2eb12419c5b393bff9a5d5bfeed560b9045658688a"
+}

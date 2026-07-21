@@ -30,3 +30,13 @@ compiled platform artifact; neither is treated as opaque application logic.
 The distribution calls commercial Volcengine APIs when their credentials are
 configured. Open-source licenses do not include API usage; billing and service
 terms are governed by Volcengine.
+
+The complete ByteDance HLLM source is vendored at
+`third_party/bytedance/HLLM` at commit
+`864f17221c04a2d3082d9a072df00616bc7e6dab` under Apache-2.0. The upstream
+model code is retained intact. `deerflow.personal_ip.hllm_creator` only adapts
+aggregate Personal-IP history to HLLM-Creator's existing parquet contract and
+verifies the source pin. HLLM's published weights are separate model assets;
+the HLLM-Creator directory alone is 75.8 GB and is not silently downloaded by
+the ordinary DeerFlow installer. TinyLlama and Qwen base-weight terms still
+apply when those weights are selected.

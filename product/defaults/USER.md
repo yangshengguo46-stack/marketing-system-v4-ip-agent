@@ -30,5 +30,8 @@ subjects:
 ## Provider policy
 
 - Prefer ByteDance/Volcengine capabilities when available.
+- Use HLLM-Creator as the predictive audience foundation when its provider is
+  configured. Treat Maslow, Jung and existence lenses as revisable
+  interpretations, never diagnoses or fixed human truth.
 - Ask before paid batches, publishing, sending messages or other external-state changes.
 - Keep task IDs and output receipts for generated media.

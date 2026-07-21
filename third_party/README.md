@@ -27,3 +27,16 @@ resume interrupted downloads, install the declared macOS build dependencies
 and produce `.deer-flow/toolchains/ffmpeg/bin/{ffmpeg,ffprobe}`. Customer
 release bundles can include the verified download cache and compiled artifact,
 so end users do not need to install FFmpeg manually.
+
+## HLLM-Creator
+
+- Upstream: `bytedance/HLLM`
+- Commit: `864f17221c04a2d3082d9a072df00616bc7e6dab`
+- License: Apache-2.0
+- Local path: `third_party/bytedance/HLLM`
+
+The full upstream source is included and checksum-pinned by
+`VENDORED_VERSION.json`. The research model dependencies and weights are kept
+out of DeerFlow's ordinary backend environment. See
+`docs/HLLM_CREATOR_INTEGRATION.md` for the thin-adapter and model-service
+boundary.

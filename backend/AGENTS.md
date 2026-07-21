@@ -961,6 +961,16 @@ Keep the middleware before `SkillActivationMiddleware`, and preserve tests for
 owner isolation, cross-account portfolio access, prompt-injection boundaries,
 and sync/async model calls.
 
+ByteDance HLLM-Creator is the audience intelligence foundation, not another
+agent runtime. Its complete source lives under `third_party/bytedance/HLLM` and
+its heavy model environment must remain separate from the Gateway environment.
+`deerflow.personal_ip.hllm_creator` is the thin data boundary: it maps
+chronological content plus aggregate metrics to the unchanged upstream parquet
+contract, labels the result as an aggregate cohort proxy, rejects individual
+viewer identity, and verifies the vendored source pin. Do not use an account or
+cohort embedding to narrow thread authority. See
+`../docs/HLLM_CREATOR_INTEGRATION.md` for the patch and runtime policy.
+
 ### Vision Support
 
 For models with `supports_vision: true`:

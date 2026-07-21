@@ -11,7 +11,11 @@ ByteDance/Volcengine stack as its default capability layer.
 - Doubao Speech through the existing podcast/TTS pipeline.
 - The five official AI MediaKit Skills for editing, video understanding,
   image processing and audio processing.
-- A default `ip-agent` with account-aware approval and receipt rules.
+- HLLM-Creator's complete source plus a privacy-bounded adapter for aggregate
+  audience history, personalized creative generation and later shared-model
+  fine-tuning.
+- A default `ip-agent` with portfolio-wide coordination, approval and receipt
+  rules.
 
 UI-TARS and MineContext remain optional local connectors. AgentKit is not used
 as the runtime because it duplicates DeerFlow in the cloud. Data Agent is not
@@ -65,5 +69,12 @@ VOLCENGINE_TTS_ACCESS_TOKEN=
 
 Generation URLs may expire, so outputs are downloaded immediately. Paid batch
 generation and publishing are approval-gated by the default Agent policy.
+
+HLLM-Creator is not installed into the Gateway Python environment. Its model
+runtime is an optional, separately sized service because the official model
+asset is large and the reproduction training configuration is multi-node GPU.
+The full source is already present in the distribution; see
+`docs/HLLM_CREATOR_INTEGRATION.md` before configuring weights or training. Run
+`make hllm-doctor` to verify the source pin and required upstream files.
 
 See `product/volcengine/capabilities.yaml` for the complete routing policy.

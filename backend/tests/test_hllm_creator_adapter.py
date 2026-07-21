@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+import json
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import pytest
+
+from deerflow.personal_ip.hllm_creator import (
+    HLLM_CREATOR_FIELDS,
+    HLLM_UPSTREAM_COMMIT,
+    HLLMCreatorAdapter,
+    verify_vendored_hllm,
+)
+
+
+def _history_item(index: int) -> dict:
+    return {
+        "content_id": f"video-{index}",
+        "published_at": (datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=index)).isoformat(),
+        "platform": "douyin",
+        "title": f"第 {index} 条内容",
+        "content_type": "short_video",
+        "metrics": {"views": index * 100, "likes": index * 10},
+    }
+
+
+def test_adapter_builds_upstream_parquet_contract_from_aggregate_history() -> None:
+    adapter = HLLMCreatorAdapter(max_history=50)
+
+    row = adapter.build_example(
+        history=[_history_item(index) for index in range(55, 0, -1)],
+        audience_profile={
+            "cohort_label": "关注本地智能体的创作者",
+            "long_term_interest": ["个人 IP", "自动化"],
+            "maslow_projection": "esteem",
+            "jungian_projection": "Ne",
+        },
+        creator_profile={
+            "positioning": "讲清楚本地智能体如何经营个人 IP",
+            "voice": ["直接", "不用术语堆砌"],
+        },
+        target={
+            "content_id": "draft-1",
+            "title": "DeerFlow 与 HLLM-Creator",
+            "description": "解释受众建模和内容预演如何结合。",
+        },
+        expected_creative="让智能体先懂观众，再替你做内容",
+    )
+
+    assert tuple(row) == HLLM_CREATOR_FIELDS
+    assert len(row["title_list"]) == 50
+    assert row["title_list"][0].startswith("第 6 条内容")
+    assert row["title_list"][-1].startswith("第 55 条内容")
+    assert len(row["item_id_list"]) == 50
+    assert all(isinstance(item_id, int) and item_id > 0 for item_id in row["item_id_list"])
+    assert row["response"] == "让智能体先懂观众，再替你做内容"
+    assert "创作者约束" in row["prompt2"]
+    assert json.loads(row["user_profile"])["audience_basis"] == "aggregate_account_cohort"
+
+
+def test_adapter_rejects_individual_viewer_identity() -> None:
+    adapter = HLLMCreatorAdapter()
+
+    with pytest.raises(ValueError, match="individual viewer identity"):
+        adapter.build_example(
+            history=[_history_item(1)],
+            audience_profile={"cohort_label": "潜在客户", "viewer_id": "platform-user-123"},
+            creator_profile={},
+            target={"content_id": "draft-1", "title": "标题", "description": "说明"},
+        )
+
+
+def test_adapter_requires_observed_aggregate_metrics() -> None:
+    adapter = HLLMCreatorAdapter()
+    history = _history_item(1)
+    history["metrics"] = {}
+
+    with pytest.raises(ValueError, match="aggregate metrics"):
+        adapter.build_example(
+            history=[history],
+            audience_profile={"cohort_label": "潜在客户"},
+            creator_profile={},
+            target={"content_id": "draft-1", "title": "标题", "description": "说明"},
+        )
+
+
+def test_vendored_hllm_source_is_pinned_and_complete() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+
+    manifest = verify_vendored_hllm(repo_root)
+
+    assert manifest["commit"] == HLLM_UPSTREAM_COMMIT
+    assert manifest["license"] == "Apache-2.0"
+    assert manifest["source_mode"] == "full-upstream-source"

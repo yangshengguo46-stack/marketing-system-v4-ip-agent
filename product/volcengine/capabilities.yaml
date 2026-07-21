@@ -7,6 +7,15 @@ policy:
   receipts_required: true
 
 capabilities:
+  audience_intelligence:
+    product: ByteDance HLLM-Creator
+    integration: separate-model-provider
+    source: third_party/bytedance/HLLM
+    source_commit: 864f17221c04a2d3082d9a072df00616bc7e6dab
+    adapter: deerflow.personal_ip.hllm_creator
+    input_scope: aggregate-account-cohort
+    individual_viewer_identity: forbidden
+    default_enabled: false
   reasoning_and_vision:
     product: Volcengine Ark
     integration: deerflow-model-provider
@@ -68,6 +77,7 @@ sources:
   - https://www.volcengine.com/docs/6448?lang=zh
   - https://www.volcengine.com/docs/86681?lang=zh
   - https://github.com/bytedance/deer-flow
+  - https://github.com/bytedance/HLLM
   - https://github.com/bytedance/UI-TARS-desktop
   - https://github.com/volcengine/MineContext
   - https://github.com/volcengine/mediakit-cli
