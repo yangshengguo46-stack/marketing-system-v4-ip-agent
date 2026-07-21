@@ -119,6 +119,13 @@ IP Agent distribution note:
   Approval/rejection is terminal, requires explicit authenticated-user
   confirmation and rationale, and is the only path to the approved-evidence
   export contract. Preserve source status/comparison provenance in exports.
+- The first real platform collector is
+  `deerflow.personal_ip.platform_metrics.DouyinVideoMetricCollector`. It calls
+  only Douyin's fixed official video-query URL and emits post-level cumulative
+  snapshots; do not treat them as daily deltas. Never accept/log raw access
+  tokens through a public Gateway route. `make douyin-metrics-smoke` is a
+  developer-only env-based check; production OAuth, encrypted token storage,
+  refresh and revocation remain separate work. See `docs/DOUYIN_METRICS.md`.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.

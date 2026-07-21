@@ -134,4 +134,13 @@ rationale. Only an approved proposal can be exported as
 scored/unscored provenance intact. Export is a candidate for later dataset or
 model versioning, not an automatic live-model update.
 
+The first official platform collector is Douyin video data. With an approved
+enterprise application, `ma.video.bind` and user authorization, it queries the
+fixed official endpoint and records public-video play, like, comment and share
+counters as a post `snapshot` against the publish receipt. Private or missing
+videos become `unavailable`, never zero. Developers with credentials can run
+`make douyin-metrics-smoke`; see `docs/DOUYIN_METRICS.md`. This smoke path does
+not replace the pending production OAuth callback, encrypted per-account token
+storage, refresh and revocation flow.
+
 See `product/volcengine/capabilities.yaml` for the complete routing policy.

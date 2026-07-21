@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init volcengine-install volcengine-doctor hllm-doctor hllm-lite ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init volcengine-install volcengine-doctor hllm-doctor hllm-lite douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 BACKEND_UV_RUN = cd backend && uv run
@@ -24,6 +24,7 @@ help:
 	@echo "  make volcengine-doctor  - Check the source-built AI MediaKit CLI"
 	@echo "  make hllm-doctor        - Verify the pinned full HLLM-Creator source"
 	@echo "  make hllm-lite          - Run the local Doubao-backed audience provider"
+	@echo "  make douyin-metrics-smoke - Query authorized Douyin video metrics"
 	@echo "  make ffmpeg-toolchain   - Build pinned project-local FFmpeg with subtitles"
 	@echo "  make mediakit-toolchain - Install a pinned project-local Go toolchain"
 	@echo "  make mediakit-test      - Run the vendored MediaKit Go tests"
@@ -75,6 +76,9 @@ hllm-doctor:
 
 hllm-lite:
 	@cd backend && uv run uvicorn app.audience_lite.app:app --host 127.0.0.1 --port 9128
+
+douyin-metrics-smoke:
+	@$(BACKEND_UV_RUN) python ../scripts/douyin_metrics_smoke.py
 
 mediakit-toolchain:
 	@$(PYTHON) ./scripts/install_go_toolchain.py

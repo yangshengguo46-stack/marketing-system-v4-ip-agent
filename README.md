@@ -49,6 +49,10 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > different published posts plus an explicit authenticated-user decision.
 > Approved manifests retain partial/scored provenance for downstream training;
 > the agent cannot approve its own proposed pattern.
+> The first real platform collector targets Douyin's official authorized-video
+> API and stores current counters as post snapshots. Private/missing videos are
+> unavailable, not zero; production OAuth storage is still pending. See
+> [docs/DOUYIN_METRICS.md](docs/DOUYIN_METRICS.md).
 
 ## Official Website
 

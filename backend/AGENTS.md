@@ -1036,6 +1036,18 @@ status, comparison state and training-eligibility provenance. Approval creates
 a reviewable training candidate—it does not silently mutate a live model or
 rubric version.
 
+`deerflow.personal_ip.platform_metrics` owns provider-independent metric
+collector output plus the official Douyin implementation. The Douyin adapter
+uses the fixed `https://open.douyin.com/api/apps/v1/video/query/` endpoint,
+`access-token` header, authorized `open_id` and `ma.video.bind` scope. It maps
+public-video counters to a post `snapshot`, classifies provider failures and
+never includes credentials in returned errors/coverage. Private or omitted
+videos are `unavailable`, not observed zeros. The collection service verifies
+owner, account, platform, confirmed publish status and external post id before
+writing through the immutable metric repository. Do not expose a raw-token
+Gateway endpoint; the env-driven smoke script is developer-only until
+per-account OAuth credentials are encrypted, refreshable and revocable.
+
 ### Vision Support
 
 For models with `supports_vision: true`:
