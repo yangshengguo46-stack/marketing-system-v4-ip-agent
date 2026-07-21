@@ -88,3 +88,47 @@ async def test_metric_router_maps_idempotency_conflict(monkeypatch) -> None:
         )
 
     assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_metric_router_collects_with_server_side_connection_without_raw_token(monkeypatch) -> None:
+    repository = SimpleNamespace()
+    service = SimpleNamespace(
+        collect_published_post=AsyncMock(
+            return_value={
+                "id": "metric-1",
+                "account_id": "acct-1",
+                "receipt_id": "publish-1",
+                "source": "platform_api",
+                "metrics": {"views": 900},
+            }
+        )
+    )
+    app = FastAPI()
+    app.state.personal_ip_metric_repo = repository
+    app.include_router(router_module.router)
+
+    async def current_user(_request):
+        return SimpleNamespace(id="user-1")
+
+    monkeypatch.setattr(router_module, "get_current_user_from_request", current_user)
+    monkeypatch.setattr(router_module, "_get_authorized_douyin_service", lambda _request: service)
+    async with httpx.AsyncClient(base_url="http://test", transport=httpx.ASGITransport(app=app)) as client:
+        response = await client.post(
+            "/api/personal-ip/metrics/collect/douyin",
+            json={
+                "connection_id": "platform-conn-1",
+                "publish_receipt_id": "publish-1",
+                "observation_key": "douyin:item-1:2026-07-21T12:00:00Z",
+            },
+        )
+
+    assert response.status_code == 201
+    assert response.json()["metrics"]["views"] == 900
+    assert "token" not in response.text.lower()
+    service.collect_published_post.assert_awaited_once_with(
+        owner_user_id="user-1",
+        connection_id="platform-conn-1",
+        publish_receipt_id="publish-1",
+        observation_key="douyin:item-1:2026-07-21T12:00:00Z",
+    )

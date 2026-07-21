@@ -147,6 +147,9 @@ authorization uses an approved Douyin mini-app: one-use state, permission
 ticket and login code are exchanged server-side; access/refresh tokens are
 encrypted per operated account, refreshable, and wiped on disconnect. No API
 accepts or returns raw tokens, and platform connections never bind a session's
-authority to one account.
+authority to one account. `POST /api/personal-ip/metrics/collect/douyin` takes
+only the connection and publish-receipt ids; the server decrypts credentials,
+retries once after an automatic refresh on expiry, verifies account ownership
+and records the snapshot. Credentials never enter agent context.
 
 See `product/volcengine/capabilities.yaml` for the complete routing policy.

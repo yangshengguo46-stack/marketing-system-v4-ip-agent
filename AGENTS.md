@@ -129,7 +129,10 @@ IP Agent distribution note:
   code, one-use hashed state, server-side exchange and encrypted account-level
   credentials under migration `0013_personal_ip_platform_connections`.
   Connections are operation resources, never thread authority; disconnect
-  wipes the encrypted token row. See `docs/DOUYIN_METRICS.md`.
+  wipes the encrypted token row. Authorized metric collection accepts only a
+  connection id plus publish receipt id, refreshes once after an authentication
+  failure, and keeps all credential material out of the agent context. See
+  `docs/DOUYIN_METRICS.md`.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.

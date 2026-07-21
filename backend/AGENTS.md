@@ -1061,6 +1061,15 @@ domain-separated persisted JWT-secret fallback exists for local first run.
 Platform connections bind operated account ids only and must never narrow a
 thread's portfolio access or tool authority.
 
+`DouyinAuthorizedMetricCollectionService` is the credential-to-evidence
+bridge. `/api/personal-ip/metrics/collect/douyin` accepts only connection,
+publish-receipt and observation keys; the service resolves the owner/account,
+decrypts credentials internally, delegates receipt validation to
+`PersonalIPMetricCollectionService`, and writes the official post snapshot. An
+authentication failure triggers exactly one refresh and one retry; other
+provider failures are not hidden behind refresh. Never put the decrypted
+credential into route responses, tool results, coverage metadata or logs.
+
 ### Vision Support
 
 For models with `supports_vision: true`:

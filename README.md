@@ -53,7 +53,9 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > API and stores current counters as post snapshots. Private/missing videos are
 > unavailable, not zero. Its approved mini-app flow now uses one-use state,
 > server-side code exchange, encrypted per-account credentials, refresh and
-> local disconnect; no Gateway response exposes a token. See
+> local disconnect. Authorized collection accepts only connection/receipt ids,
+> refreshes once on token expiry and never exposes credentials to the agent or
+> a Gateway response. See
 > [docs/DOUYIN_METRICS.md](docs/DOUYIN_METRICS.md).
 
 ## Official Website

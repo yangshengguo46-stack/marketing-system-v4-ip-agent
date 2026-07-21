@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -14,6 +13,7 @@ from app.gateway.deps import (
     get_current_user_from_request,
     get_personal_ip_platform_connection_repo,
 )
+from app.gateway.douyin_oauth import get_douyin_mini_app_oauth_client
 from deerflow.personal_ip.douyin_oauth import DouyinMiniAppOAuthClient, DouyinOAuthError
 
 router = APIRouter(prefix="/api/personal-ip/platform-connections", tags=["personal-ip"])
@@ -48,14 +48,7 @@ def _utc_now() -> datetime:
 
 
 def _get_douyin_oauth_client() -> DouyinMiniAppOAuthClient:
-    app_id = os.environ.get("DOUYIN_MINI_APP_ID", "").strip()
-    app_secret = os.environ.get("DOUYIN_MINI_APP_SECRET", "").strip()
-    if not app_id or not app_secret:
-        raise HTTPException(
-            status_code=503,
-            detail="Douyin mini-app authorization is not configured",
-        )
-    return DouyinMiniAppOAuthClient(app_id=app_id, app_secret=app_secret)
+    return get_douyin_mini_app_oauth_client()
 
 
 async def _current_user_id(request: Request) -> str:

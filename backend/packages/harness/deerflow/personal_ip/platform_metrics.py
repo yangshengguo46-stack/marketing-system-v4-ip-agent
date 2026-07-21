@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 import httpx
 
 from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
+from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
 from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
+from deerflow.personal_ip.douyin_oauth import DouyinMiniAppOAuthClient
 
 _DOUYIN_VIDEO_QUERY_URL = "https://open.douyin.com/api/apps/v1/video/query/"
 _DOUYIN_SCOPE = "ma.video.bind"
@@ -296,3 +298,94 @@ class PersonalIPMetricCollectionService:
             metrics=snapshot.metrics,
             coverage=snapshot.coverage,
         )
+
+
+class DouyinAuthorizedMetricCollectionService:
+    """Resolve encrypted account credentials and retry one expired-token query."""
+
+    def __init__(
+        self,
+        *,
+        connections: PersonalIPPlatformConnectionRepository,
+        metrics: PersonalIPMetricRepository,
+        publish_receipts: PersonalIPPublishReceiptRepository,
+        oauth_client: DouyinMiniAppOAuthClient,
+        http_client: httpx.AsyncClient | None = None,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
+        self._connections = connections
+        self._collector_service = PersonalIPMetricCollectionService(
+            metrics=metrics,
+            publish_receipts=publish_receipts,
+        )
+        self._oauth_client = oauth_client
+        self._http_client = http_client
+        self._clock = clock or (lambda: datetime.now(UTC))
+
+    def _collector(self, *, access_token: str, open_id: str) -> DouyinVideoMetricCollector:
+        return DouyinVideoMetricCollector(
+            access_token=access_token,
+            open_id=open_id,
+            client=self._http_client,
+            clock=self._clock,
+        )
+
+    async def collect_published_post(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        publish_receipt_id: str,
+        observation_key: str,
+    ) -> dict[str, Any]:
+        connection = await self._connections.get(connection_id, owner_user_id=owner_user_id)
+        if connection is None or connection["status"] != "connected":
+            raise ValueError("Personal-IP platform connection not found")
+        if connection["platform"] != "douyin":
+            raise ValueError("platform connection is not a Douyin connection")
+        if _DOUYIN_SCOPE not in connection["scopes"]:
+            raise ValueError("Douyin connection does not grant video-data permission")
+        credentials = await self._connections.get_credentials(
+            connection_id,
+            owner_user_id=owner_user_id,
+        )
+        if credentials is None:
+            raise ValueError("Douyin connection must be authorized again")
+
+        async def _collect(access_token: str) -> dict[str, Any]:
+            return await self._collector_service.collect_published_post(
+                owner_user_id=owner_user_id,
+                account_id=connection["account_id"],
+                publish_receipt_id=publish_receipt_id,
+                observation_key=observation_key,
+                collector=self._collector(
+                    access_token=access_token,
+                    open_id=connection["external_user_id"],
+                ),
+            )
+
+        try:
+            return await _collect(credentials["access_token"])
+        except PlatformMetricCollectionError as exc:
+            if exc.category != "authentication":
+                raise
+
+        grant = await self._oauth_client.refresh(credentials["refresh_token"])
+        now = _utc(self._clock())
+        scopes = grant.scopes or list(connection["scopes"])
+        if _DOUYIN_SCOPE not in scopes:
+            raise ValueError("refreshed Douyin grant has no video-data permission")
+        await self._connections.store_grant(
+            owner_user_id=owner_user_id,
+            account_id=connection["account_id"],
+            platform="douyin",
+            external_user_id=connection["external_user_id"],
+            oauth_open_id=grant.oauth_open_id or connection.get("oauth_open_id"),
+            access_token=grant.access_token,
+            refresh_token=grant.refresh_token,
+            scopes=scopes,
+            access_expires_at=now + timedelta(seconds=grant.expires_in),
+            refresh_expires_at=now + timedelta(seconds=grant.refresh_expires_in),
+            now=now,
+        )
+        return await _collect(grant.access_token)

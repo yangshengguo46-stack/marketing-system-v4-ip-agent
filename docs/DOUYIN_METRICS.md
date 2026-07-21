@@ -70,6 +70,27 @@ OAuth:
    of the state, and encrypts access/refresh tokens at rest. List, refresh and
    disconnect operations return connection metadata only.
 
+After publication has produced a confirmed publish receipt, the agent can
+collect its current counters without ever receiving a credential:
+
+```http
+POST /api/personal-ip/metrics/collect/douyin
+Content-Type: application/json
+
+{
+  "connection_id": "platform-conn-...",
+  "publish_receipt_id": "publish-...",
+  "observation_key": "douyin:item:2026-07-21T12:00:00Z"
+}
+```
+
+The server resolves the connection's operated account and external `openid`,
+decrypts the access token only inside the collection service, verifies the
+receipt belongs to that account, and writes the official response to the
+immutable metric ledger. If Douyin reports an expired access token, it uses
+the encrypted refresh token once, rotates the stored grant and retries the
+query once. The request and response contain no token field.
+
 The code/ticket are one-use inputs. Access tokens, refresh tokens, the mini-app
 secret and the `code2Session` session key are never returned from these APIs.
 `DELETE /api/personal-ip/platform-connections/{id}` disconnects locally and

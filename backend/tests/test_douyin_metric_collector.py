@@ -7,11 +7,15 @@ import httpx
 import pytest
 
 from deerflow.config.database_config import DatabaseConfig
+from deerflow.persistence.channel_connections.sql import ChannelCredentialCipher
 from deerflow.persistence.engine import close_engine, get_session_factory, init_engine_from_config
 from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
 from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
+from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
 from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
+from deerflow.personal_ip.douyin_oauth import DouyinMiniAppOAuthClient
 from deerflow.personal_ip.platform_metrics import (
+    DouyinAuthorizedMetricCollectionService,
     DouyinVideoMetricCollector,
     PersonalIPMetricCollectionService,
     PlatformMetricCollectionError,
@@ -169,4 +173,128 @@ async def test_collection_service_writes_official_snapshot_to_existing_receipt(t
     assert observation["metric_mode"] == "snapshot"
     assert observation["metrics"]["views"] == 300
     assert observation["coverage"]["scope"] == "ma.video.bind"
+    await close_engine()
+
+
+@pytest.mark.asyncio
+async def test_authorized_collection_refreshes_expired_token_server_side_and_retries(tmp_path) -> None:
+    await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
+    sf = get_session_factory()
+    assert sf is not None
+    accounts = PersonalIPAccountRepository(sf)
+    receipts = PersonalIPPublishReceiptRepository(sf)
+    metrics = PersonalIPMetricRepository(sf)
+    connections = PersonalIPPlatformConnectionRepository(
+        sf,
+        cipher=ChannelCredentialCipher.from_key("test-only-credential-key"),
+    )
+    account = await accounts.create(owner_user_id="user-1", platform="douyin", display_name="抖音账号")
+    receipt = await receipts.begin(
+        owner_user_id="user-1",
+        operation_key="publish:authorized-collector",
+        idempotency_key="idem:authorized-collector",
+        account_id=account["id"],
+        preflight_id=None,
+        executor="platform_api",
+        request_payload={"caption": "测试"},
+    )
+    await receipts.record_attempt(
+        receipt["id"],
+        owner_user_id="user-1",
+        attempt_key="published",
+        status="published",
+        result_payload={"item_id": "item-1"},
+        external_post_id="item-1",
+        occurred_at=datetime(2026, 7, 21, 8, 0, tzinfo=UTC),
+    )
+    connection = await connections.store_grant(
+        owner_user_id="user-1",
+        account_id=account["id"],
+        platform="douyin",
+        external_user_id="mini-open-id",
+        oauth_open_id="oauth-open-id",
+        access_token="act.expired",
+        refresh_token="rft.secret",
+        scopes=["ma.video.bind"],
+        access_expires_at=datetime(2026, 7, 20, 8, 0, tzinfo=UTC),
+        refresh_expires_at=datetime(2026, 8, 20, 8, 0, tzinfo=UTC),
+        now=datetime(2026, 7, 1, 8, 0, tzinfo=UTC),
+    )
+    calls: list[str] = []
+
+    def transport(request: httpx.Request) -> httpx.Response:
+        if request.url == httpx.URL("https://open.douyin.com/oauth/refresh_token/"):
+            calls.append("refresh")
+            assert b"refresh_token=rft.secret" in request.content
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "access_token": "act.new",
+                        "refresh_token": "rft.secret",
+                        "open_id": "oauth-open-id",
+                        "error_code": 0,
+                        "expires_in": 1_296_000,
+                        "refresh_expires_in": 2_592_000,
+                        "scope": "ma.video.bind",
+                    },
+                    "message": "success",
+                },
+            )
+        token = request.headers["access-token"]
+        calls.append(token)
+        if token == "act.expired":
+            return httpx.Response(
+                200,
+                json={"err_no": 28001008, "err_msg": "access_token过期", "log_id": "expired-log"},
+            )
+        assert token == "act.new"
+        return httpx.Response(
+            200,
+            json={
+                "err_no": 0,
+                "log_id": "fresh-log",
+                "data": {
+                    "data": {
+                        "list": [
+                            {
+                                "item_id": "item-1",
+                                "create_time": 1784600000,
+                                "statistics": {
+                                    "play_count": 900,
+                                    "digg_count": 50,
+                                    "comment_count": 20,
+                                    "share_count": 8,
+                                },
+                            }
+                        ]
+                    }
+                },
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as http_client:
+        service = DouyinAuthorizedMetricCollectionService(
+            connections=connections,
+            metrics=metrics,
+            publish_receipts=receipts,
+            oauth_client=DouyinMiniAppOAuthClient(
+                app_id="tt-app-id",
+                app_secret="app-secret",
+                client=http_client,
+            ),
+            http_client=http_client,
+            clock=lambda: NOW,
+        )
+        observation = await service.collect_published_post(
+            owner_user_id="user-1",
+            connection_id=connection["id"],
+            publish_receipt_id=receipt["id"],
+            observation_key="douyin:item-1:authorized-refresh",
+        )
+
+    assert calls == ["act.expired", "refresh", "act.new"]
+    assert observation["metrics"]["views"] == 900
+    credentials = await connections.get_credentials(connection["id"], owner_user_id="user-1")
+    assert credentials == {"access_token": "act.new", "refresh_token": "rft.secret"}
     await close_engine()
