@@ -971,6 +971,16 @@ viewer identity, and verifies the vendored source pin. Do not use an account or
 cohort embedding to narrow thread authority. See
 `../docs/HLLM_CREATOR_INTEGRATION.md` for the patch and runtime policy.
 
+`deerflow.personal_ip.audience_provider` is the stable model-service boundary
+for both HLLM-Lite and the future full HLLM-Creator cloud service. Provider
+payloads must contain no local owner/subject/account identifiers, remote
+endpoints require HTTPS, and the response digest must match the deterministic
+request digest before a result can enter the preflight evidence loop.
+`app.audience_lite` implements the current sidecar with Doubao structured
+generation. It must leave `match_score` unset until a ranking model has been
+trained and calibrated from observed outcomes; model-authored confidence is not
+a substitute for that evidence.
+
 ### Vision Support
 
 For models with `supports_vision: true`:

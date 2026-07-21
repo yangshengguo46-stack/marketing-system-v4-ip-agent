@@ -62,6 +62,9 @@ subtitle, mix and probe continue to run locally.
 VOLCENGINE_API_KEY=
 VOLCENGINE_IMAGE_MODEL=doubao-seedream-5-0-260128
 VOLCENGINE_VIDEO_MODEL=doubao-seedance-2-0-260128
+PERSONAL_IP_AUDIENCE_BASE_URL=http://127.0.0.1:9128
+PERSONAL_IP_AUDIENCE_TOKEN=
+PERSONAL_IP_AUDIENCE_MODEL=doubao-seed-2-0-pro-260215
 MEDIAKIT_API_KEY=
 VOLCENGINE_TTS_APPID=
 VOLCENGINE_TTS_ACCESS_TOKEN=
@@ -76,5 +79,16 @@ asset is large and the reproduction training configuration is multi-node GPU.
 The full source is already present in the distribution; see
 `docs/HLLM_CREATOR_INTEGRATION.md` before configuring weights or training. Run
 `make hllm-doctor` to verify the source pin and required upstream files.
+
+The audience provider uses one stable `/v1/preflight` contract. The current
+deployment can run HLLM-Lite; a future GPU-backed HLLM-Creator cloud service
+uses the same request and receipt, so the DeerFlow agent and evidence loop do
+not change when the provider is upgraded.
+
+Start the current lightweight provider with `make hllm-lite`. It calls the
+configured Doubao Ark model to produce audience-conditioned creative variants.
+Version 0 deliberately leaves `match_score` empty until the small ranking model
+has been trained from real publish outcomes; it never presents an LLM guess as
+a calibrated prediction.
 
 See `product/volcengine/capabilities.yaml` for the complete routing policy.

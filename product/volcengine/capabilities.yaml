@@ -15,6 +15,11 @@ capabilities:
     adapter: deerflow.personal_ip.hllm_creator
     input_scope: aggregate-account-cohort
     individual_viewer_identity: forbidden
+    contract: personal-ip-audience-preflight-v1
+    endpoint_env: PERSONAL_IP_AUDIENCE_BASE_URL
+    token_env: PERSONAL_IP_AUDIENCE_TOKEN
+    current_mode: hllm-lite
+    future_mode: hllm-creator-cloud
     default_enabled: false
   reasoning_and_vision:
     product: Volcengine Ark

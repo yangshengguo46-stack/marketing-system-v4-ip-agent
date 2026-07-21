@@ -12,6 +12,18 @@ The complete Apache-2.0 upstream source is pinned under
 model-service process instead of copying the model implementation into
 DeerFlow.
 
+The delivery path has two explicit stages:
+
+- **Now — HLLM-Lite:** Doubao performs semantic understanding and creative
+  generation; a small audience sequence/ranking model learns from aggregate
+  publishing outcomes.
+- **Later — HLLM-Creator Cloud:** when dedicated GPU capacity is economical,
+  deploy the full ByteDance architecture as our product cloud service and
+  fine-tune it on approved Personal-IP examples.
+
+Both stages implement `personal-ip-audience-preflight-v1`; upgrading the model
+does not change DeerFlow, account coordination or evidence receipts.
+
 ```mermaid
 flowchart LR
     D["DeerFlow agent"] --> P["Full owner portfolio"]
@@ -72,14 +84,27 @@ is offered only when compatible GPU capacity is detected; otherwise DeerFlow
 calls a separately deployed HLLM provider. This is still one product and one
 agent—only the heavy numerical runtime is isolated.
 
+`deerflow.personal_ip.audience_provider` owns the stable service boundary. It
+sends only the model-ready aggregate example, requires HTTPS for non-local
+providers, attaches a deterministic idempotency digest, validates match scores
+and rejects a response whose receipt digest does not match the request. Local
+owner, subject and account ids never leave DeerFlow through this contract.
+
+The first service implementation is `app.audience_lite`. Run it locally with
+`make hllm-lite`; it uses the existing `VOLCENGINE_API_KEY`, Ark base URL and
+`PERSONAL_IP_AUDIENCE_MODEL`. It returns multiple structured creative variants
+through the shared receipt. HLLM-Lite v0 intentionally returns no
+`match_score`: a score becomes available only after the small ranking model is
+trained and evaluated against observed publishing outcomes.
+
 ## Minimal patch policy
 
 Keep upstream model architecture and loss functions unchanged. Product work is
 limited to:
 
 1. the aggregate Personal-IP dataset adapter (implemented);
-2. a structured batch/inference service entry point instead of research CLI
-   scripts;
+2. a structured batch/inference service contract instead of research CLI
+   scripts (client contract implemented; model server pending);
 3. explicit device and resource detection instead of hard-coded `cuda:0`;
 4. optional parameter-efficient fine-tuning for a shared Personal-IP model;
 5. dataset, checkpoint and evaluation version receipts.

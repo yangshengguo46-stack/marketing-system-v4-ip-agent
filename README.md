@@ -25,6 +25,11 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > [docs/HLLM_CREATOR_INTEGRATION.md](docs/HLLM_CREATOR_INTEGRATION.md), and
 > upstream component provenance is recorded in
 > [THIRD_PARTY_BYTE.md](THIRD_PARTY_BYTE.md).
+> HLLM-Lite and a future full HLLM-Creator cloud deployment share the same
+> versioned audience-preflight contract, so changing model capacity does not
+> replace the DeerFlow runtime or bind conversations to one account.
+> `make hllm-lite` starts today's local Doubao-backed provider; it does not
+> fabricate ranking scores before outcome-trained calibration exists.
 
 ## Official Website
 
