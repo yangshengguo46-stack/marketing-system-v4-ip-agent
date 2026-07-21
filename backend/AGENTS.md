@@ -996,6 +996,19 @@ requests plus append-only executor attempts. Gateway endpoints are under
 owner-scoped target account, enforce sealed preflight targets when supplied,
 and never downgrade a confirmed `published` result to `failed` or `unknown`.
 
+Migration `0010_personal_ip_metrics` and
+`deerflow.persistence.personal_ip_metrics` store immutable, owner-scoped
+account/post observations from platform APIs, UI-TARS, the native browser or a
+manual import. Gateway endpoints are under `/api/personal-ip/metrics`; the
+aggregate endpoint intentionally has no account filter because every
+conversation coordinates the authenticated owner's full active portfolio.
+For a requested window, deduplicate refetches by account/scope/series/mode/exact
+window and take the latest observation, sum only the explicit additive metric allowlist,
+and never interpret a cumulative `snapshot` as a daily increment. Return
+observed, partial, unavailable and missing account ids so the agent cannot
+silently turn missing permissions or failed collection into zero performance.
+Post observations must reference a publish receipt for the same owner/account.
+
 ### Vision Support
 
 For models with `supports_vision: true`:

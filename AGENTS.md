@@ -97,6 +97,13 @@ IP Agent distribution note:
   `0009_personal_ip_publish_receipts`. Keep the initial request immutable,
   attempts append-only and terminal publication status monotonic. API,
   UI-TARS, browser and manual executors share this one receipt contract.
+- Personal-IP performance observations live in
+  `deerflow.persistence.personal_ip_metrics` and migration
+  `0010_personal_ip_metrics`. The `/api/personal-ip/metrics/aggregate` route is
+  portfolio-wide by design: never add a thread-bound account restriction.
+  Aggregate only additive `window_total`/`delta` fields, take the latest
+  observation for an identical account/scope/series/window, exclude cumulative snapshots,
+  and expose missing/partial/unavailable account coverage explicitly.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.

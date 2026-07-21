@@ -104,4 +104,14 @@ idempotency keys cannot be reused for different requests; attempt keys cannot
 be rewritten, and a confirmed publication cannot later be downgraded to a
 failure. The selected account is recorded as this operation's target only.
 
+Observed performance enters through `POST /api/personal-ip/metrics`. Use
+`window_total` or `delta` only when the collector knows the exact interval;
+store lifetime/cumulative counters as `snapshot`. Query
+`GET /api/personal-ip/metrics/aggregate` with a start and end time to aggregate
+all active accounts. The result reports totals by platform/account plus
+partial, unavailable and missing account coverage. It deliberately excludes
+cumulative snapshots from daily totals and does not treat unavailable data as
+zero. Post-level observations reference the matching publish receipt, which is
+the bridge to later prediction-versus-actual review.
+
 See `product/volcengine/capabilities.yaml` for the complete routing policy.

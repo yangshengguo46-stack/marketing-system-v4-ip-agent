@@ -113,6 +113,16 @@ attempts and terminal-state downgrades are rejected. A confirmed publication
 advances only the preflight lifecycle status—it never changes the sealed model
 input or candidates.
 
+`personal_ip_metric_observations` is the next immutable evidence layer. It
+records account-window totals/deltas or post snapshots, derives platform and
+subject from the owner-scoped account, and requires post observations to link
+to a publish receipt for that account. Portfolio aggregation takes only the
+latest refetch for an identical account/scope/series and window, sums a conservative
+additive-field allowlist and reports coverage gaps. Cumulative snapshots stay
+available for post-level retrospectives but are never mislabeled as daily
+increments. Prediction-versus-actual comparison and approved training-example
+promotion remain the next layer; observed metrics do not mutate preflights.
+
 ## Minimal patch policy
 
 Keep upstream model architecture and loss functions unchanged. Product work is

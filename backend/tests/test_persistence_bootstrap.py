@@ -48,7 +48,7 @@ from deerflow.persistence.migrations._helpers import _normalize_default
 asyncio_test = pytest.mark.asyncio
 
 
-HEAD = "0009_personal_ip_publish_receipts"
+HEAD = "0010_personal_ip_metrics"
 BASELINE = "0001_baseline"
 
 
@@ -138,6 +138,7 @@ async def test_empty_branch_creates_all_and_stamps_head(tmp_path: Path) -> None:
             "threads_meta",
             "feedback",
             "personal_ip_accounts",
+            "personal_ip_metric_observations",
             "personal_ip_preflights",
             "personal_ip_publish_receipts",
             "personal_ip_subjects",
@@ -851,7 +852,7 @@ class TestDecideState:
 # ---------------------------------------------------------------------------
 
 
-def test_head_revision_is_personal_ip_publish_receipts_revision() -> None:
+def test_head_revision_is_personal_ip_metrics_revision() -> None:
     assert _get_head_revision() == HEAD
 
 

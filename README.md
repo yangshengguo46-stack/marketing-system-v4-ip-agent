@@ -36,6 +36,11 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > Publishing operations use separate idempotent receipts with append-only API,
 > UI-TARS, browser or manual attempts; account ids remain operation targets,
 > not conversation permissions.
+> Cross-platform metric observations are owner-scoped and immutable. Daily
+> aggregation uses every active account, deduplicates platform refetches,
+> refuses to sum cumulative snapshots as daily increments, and reports partial,
+> unavailable and missing account coverage instead of treating missing data as
+> zero.
 
 ## Official Website
 

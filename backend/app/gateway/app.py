@@ -29,6 +29,7 @@ from app.gateway.routers import (
     memory,
     models,
     personal_ip_accounts,
+    personal_ip_metrics,
     personal_ip_preflights,
     personal_ip_publish_receipts,
     runs,
@@ -493,8 +494,9 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
     # Models API is mounted at /api/models
     app.include_router(models.router)
 
-    # Personal-IP account CRUD and thread bindings are mounted at /api/personal-ip
+    # Personal-IP portfolio, evidence, publishing and metrics are mounted at /api/personal-ip
     app.include_router(personal_ip_accounts.router)
+    app.include_router(personal_ip_metrics.router)
     app.include_router(personal_ip_preflights.router)
     app.include_router(personal_ip_publish_receipts.router)
 
