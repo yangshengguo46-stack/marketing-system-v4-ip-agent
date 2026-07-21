@@ -149,6 +149,10 @@ IP Agent distribution note:
   infer data before the baseline timestamp.
 - Personal-IP platform operation is browser-first for Douyin, WeChat Channels,
   WeChat Official Accounts, Xiaohongshu, X, Instagram, YouTube and TikTok.
+  `/workspace/personal-ip` must render all eight entries even before accounts
+  exist and open manual login through the account-scoped Live Browser route.
+  The user—not the agent—completes QR, CAPTCHA and MFA. Each account uses an
+  owner/account-isolated persistent profile.
   `personal_ip_select_browser_account` selects only the concrete operation
   target. Browser Control resolves that selection to an owner/account-isolated
   persistent Chromium profile; it never narrows conversation authority or

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from app.gateway.authz import require_permission
 from app.gateway.browser_capability import browser_capability
 from deerflow.config.paths import get_paths
-from deerflow.personal_ip.browser_profiles import get_browser_account_target
+from deerflow.personal_ip.browser_profiles import build_browser_account_target, get_browser_account_target
 from deerflow.runtime.user_context import get_effective_user_id, reset_current_user, set_current_user
 
 logger = logging.getLogger(__name__)
@@ -183,8 +183,13 @@ def _ws_origin_allowed(websocket: WebSocket) -> bool:
     return False
 
 
+@router.websocket("/personal-ip/accounts/{account_id}/browser/stream")
 @router.websocket("/threads/{thread_id}/browser/stream")
-async def browser_stream(websocket: WebSocket, thread_id: str) -> None:
+async def browser_stream(
+    websocket: WebSocket,
+    thread_id: str | None = None,
+    account_id: str | None = None,
+) -> None:
     """Bidirectional live browser stream.
 
     Server → client: JSON ``{"type":"frame","data":"<base64 jpeg>"}`` frames
@@ -201,20 +206,53 @@ async def browser_stream(websocket: WebSocket, thread_id: str) -> None:
         await websocket.close(code=4403)
         return
 
-    thread_store = getattr(websocket.app.state, "thread_store", None)
-    if thread_store is None:
-        # Fail closed: the live stream drives a real browser (cookies,
-        # logged-in pages), so if the ownership store can't be resolved we must
-        # deny rather than let any authenticated caller attach to any thread's
-        # retained session.
-        await websocket.close(code=4404)
-        return
-    # Browser control is stricter than ordinary legacy-thread access: NULL-owner
-    # rows are not shared because a retained page may expose cookies or account
-    # data from a previous authenticated browser session.
-    if not await _browser_thread_owned_by(thread_store, thread_id, str(user.id)):
-        await websocket.close(code=4404)
-        return
+    user_id = str(user.id)
+    target = None
+    default_seed: str | None = None
+    resource_id = thread_id or account_id or "unknown"
+
+    if account_id is not None:
+        # The portfolio login surface is deliberately account-scoped instead of
+        # borrowing a chat thread. Resolve ownership before deriving the profile
+        # directory so callers cannot probe or attach to another user's cookies.
+        account_repo = getattr(websocket.app.state, "personal_ip_account_repo", None)
+        if account_repo is None:
+            await websocket.close(code=4404)
+            return
+        account = await account_repo.get(account_id, owner_user_id=user_id)
+        if account is None or account.get("status") != "active":
+            await websocket.close(code=4404)
+            return
+        try:
+            target = build_browser_account_target(
+                owner_user_id=user_id,
+                account_id=account_id,
+                platform=str(account.get("platform") or ""),
+                display_name=str(account.get("display_name") or account_id),
+                user_data_dir=get_paths().ensure_browser_profile_dir(account_id, user_id=user_id),
+            )
+        except ValueError:
+            await websocket.close(code=4404)
+            return
+        default_seed = target.start_url
+    else:
+        if thread_id is None:
+            await websocket.close(code=4404)
+            return
+        thread_store = getattr(websocket.app.state, "thread_store", None)
+        if thread_store is None:
+            # Fail closed: the live stream drives a real browser (cookies,
+            # logged-in pages), so if the ownership store can't be resolved we
+            # must deny rather than let any caller attach to a retained session.
+            await websocket.close(code=4404)
+            return
+        # Browser control is stricter than ordinary legacy-thread access:
+        # NULL-owner rows are not shared because a retained page may expose
+        # cookies or account data from a previous authenticated browser session.
+        if not await _browser_thread_owned_by(thread_store, thread_id, user_id):
+            await websocket.close(code=4404)
+            return
+        target = get_browser_account_target(owner_user_id=user_id, thread_id=thread_id)
 
     if not _browser_tools_enabled():
         await websocket.close(code=4404)
@@ -279,10 +317,9 @@ async def browser_stream(websocket: WebSocket, thread_id: str) -> None:
         return value.strip() or None if isinstance(value, str) else None
 
     manager = get_browser_session_manager()
-    target = get_browser_account_target(owner_user_id=str(user.id), thread_id=thread_id)
     try:
         session_lease = manager.acquire_session(
-            target.session_key if target is not None else thread_id,
+            target.session_key if target is not None else resource_id,
             headless=_cfg_bool("headless", True),
             timeout_ms=_cfg_int("timeout_ms", 30000),
             viewport={"width": _cfg_int("viewport_width", 1280), "height": _cfg_int("viewport_height", 720)},
@@ -442,7 +479,7 @@ async def browser_stream(websocket: WebSocket, thread_id: str) -> None:
         # a stale browser session from an earlier panel/live attempt; if that
         # page differs from the latest visible browser artifact, align Live with
         # what the user expects instead of requiring an off/on reconnect.
-        seed = websocket.query_params.get("seed")
+        seed = websocket.query_params.get("seed") or default_seed
         if seed and validate_browser_url(seed) is None:
             with contextlib.suppress(Exception):
                 current = await session.current_url()
@@ -462,7 +499,7 @@ async def browser_stream(websocket: WebSocket, thread_id: str) -> None:
     except WebSocketDisconnect:
         pass
     except Exception as exc:
-        logger.exception("browser stream error: thread_id=%s err=%s", thread_id, exc)
+        logger.exception("browser stream error: resource_id=%s err=%s", resource_id, exc)
     finally:
         pump_task.cancel()
         if input_task is not None:

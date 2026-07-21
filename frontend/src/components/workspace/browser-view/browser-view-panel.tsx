@@ -26,16 +26,25 @@ import { type BrowserInputEvent, useBrowserStream } from "./use-browser-stream";
 
 export function BrowserViewPanel({
   threadId,
+  accountId,
+  initialUrl,
+  title = "Browser",
+  onClose,
   className,
 }: {
-  threadId: string;
+  threadId?: string;
+  accountId?: string;
+  initialUrl?: string;
+  title?: string;
+  onClose?: () => void;
   className?: string;
 }) {
+  const accountMode = Boolean(accountId);
+  const sessionId = accountId ?? threadId ?? "missing-browser-session";
   const browserView = useMaybeBrowserView();
-  const frame = browserView?.latestFrame ?? null;
-  const imageUrl = frame
-    ? resolveArtifactURL(frame.screenshot, threadId)
-    : null;
+  const frame = !accountMode ? (browserView?.latestFrame ?? null) : null;
+  const imageUrl =
+    frame && threadId ? resolveArtifactURL(frame.screenshot, threadId) : null;
 
   const [urlInput, setUrlInput] = useState("");
   const [navigating, setNavigating] = useState(false);
@@ -46,7 +55,8 @@ export function BrowserViewPanel({
     url?: string;
   } | null>(null);
 
-  const streamSeedUrl = lastLiveUrl ?? liveFallback?.url ?? frame?.url;
+  const streamSeedUrl =
+    lastLiveUrl ?? liveFallback?.url ?? frame?.url ?? initialUrl;
   const handleNavRejected = useCallback(
     (url: string | undefined, message: string | undefined) => {
       setNavigating(false);
@@ -58,10 +68,11 @@ export function BrowserViewPanel({
     [],
   );
   const { status, frameUrl, liveUrl, sendInput } = useBrowserStream(
-    threadId,
+    sessionId,
     live,
     streamSeedUrl,
     handleNavRejected,
+    accountMode ? "account" : "thread",
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
   const surfaceRef = useRef<HTMLImageElement | null>(null);
@@ -84,7 +95,7 @@ export function BrowserViewPanel({
 
   useEffect(() => {
     setLastLiveUrl(null);
-  }, [threadId]);
+  }, [sessionId]);
 
   useEffect(() => {
     if (frame?.url && !urlInput && !liveUrl) {
@@ -166,6 +177,10 @@ export function BrowserViewPanel({
     }
 
     if (navigating) {
+      return;
+    }
+    if (!threadId) {
+      setLive(true);
       return;
     }
     setNavigating(true);
@@ -339,7 +354,7 @@ export function BrowserViewPanel({
     >
       <header className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
         <MonitorIcon className="size-4 shrink-0" />
-        <span className="shrink-0 text-sm font-medium">Browser</span>
+        <span className="shrink-0 text-sm font-medium">{title}</span>
         <div className="flex shrink-0 items-center">
           <Button
             size="icon-sm"
@@ -397,16 +412,18 @@ export function BrowserViewPanel({
             <Loader2Icon className="text-muted-foreground absolute right-2 size-3.5 animate-spin" />
           )}
         </form>
-        <Button
-          size="sm"
-          variant={live ? "default" : "ghost"}
-          className="shrink-0 gap-1"
-          onClick={() => setLive((prev) => !prev)}
-          title={live ? "Stop live control" : "Take live control"}
-        >
-          <RadioIcon className="size-3.5" />
-          {live ? (status === "open" ? "Live" : "…") : "Live"}
-        </Button>
+        {!accountMode && (
+          <Button
+            size="sm"
+            variant={live ? "default" : "ghost"}
+            className="shrink-0 gap-1"
+            onClick={() => setLive((prev) => !prev)}
+            title={live ? "Stop live control" : "Take live control"}
+          >
+            <RadioIcon className="size-3.5" />
+            {live ? (status === "open" ? "Live" : "…") : "Live"}
+          </Button>
+        )}
         <Button
           size="icon-sm"
           variant="ghost"
@@ -414,6 +431,7 @@ export function BrowserViewPanel({
           onClick={() => {
             setLive(false);
             browserView?.close();
+            onClose?.();
           }}
         >
           <XIcon />

@@ -28,7 +28,7 @@ BROWSER_PLATFORMS: dict[str, BrowserPlatform] = {
 @dataclass(frozen=True, slots=True)
 class BrowserAccountTarget:
     owner_user_id: str
-    thread_id: str
+    thread_id: str | None
     account_id: str
     platform: str
     display_name: str
@@ -41,6 +41,31 @@ _targets: dict[tuple[str, str], BrowserAccountTarget] = {}
 _targets_lock = threading.Lock()
 
 
+def build_browser_account_target(
+    *,
+    owner_user_id: str,
+    account_id: str,
+    platform: str,
+    display_name: str,
+    user_data_dir: Path,
+    thread_id: str | None = None,
+) -> BrowserAccountTarget:
+    """Build the persistent browser target shared by chat and account login UI."""
+    platform_config = BROWSER_PLATFORMS.get(platform)
+    if platform_config is None:
+        raise ValueError("This platform does not have a browser-first connector")
+    return BrowserAccountTarget(
+        owner_user_id=owner_user_id,
+        thread_id=thread_id,
+        account_id=account_id,
+        platform=platform,
+        display_name=display_name,
+        session_key=f"account:{owner_user_id}:{account_id}",
+        user_data_dir=user_data_dir,
+        start_url=platform_config.start_url,
+    )
+
+
 def select_browser_account_target(
     *,
     owner_user_id: str,
@@ -51,18 +76,13 @@ def select_browser_account_target(
     user_data_dir: Path,
 ) -> BrowserAccountTarget:
     """Select one concrete browser target without changing conversation authority."""
-    platform_config = BROWSER_PLATFORMS.get(platform)
-    if platform_config is None:
-        raise ValueError("This platform does not have a browser-first connector")
-    target = BrowserAccountTarget(
+    target = build_browser_account_target(
         owner_user_id=owner_user_id,
         thread_id=thread_id,
         account_id=account_id,
         platform=platform,
         display_name=display_name,
-        session_key=f"account:{owner_user_id}:{account_id}",
         user_data_dir=user_data_dir,
-        start_url=platform_config.start_url,
     )
     with _targets_lock:
         _targets[(owner_user_id, thread_id)] = target

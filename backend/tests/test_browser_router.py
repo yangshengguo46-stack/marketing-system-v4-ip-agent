@@ -40,6 +40,23 @@ def _expect_ws_close(app: FastAPI, code: int, *, headers: dict[str, str] | None 
     assert exc_info.value.code == code
 
 
+def _expect_account_ws_close(
+    app: FastAPI,
+    code: int,
+    *,
+    account_id: str = "acct-douyin",
+    headers: dict[str, str] | None = None,
+) -> None:
+    with TestClient(app) as client:
+        with pytest.raises(WebSocketDisconnect) as exc_info:
+            with client.websocket_connect(
+                f"/api/personal-ip/accounts/{account_id}/browser/stream",
+                headers=headers or {},
+            ):
+                pass
+    assert exc_info.value.code == code
+
+
 def test_browser_stream_closes_4401_when_unauthenticated():
     app = _browser_ws_app()
     with patch.object(browser_router, "_authenticate_ws", AsyncMock(return_value=None)):
@@ -101,6 +118,41 @@ def test_browser_stream_closes_4501_when_browser_runtime_unavailable():
         patch("builtins.__import__", side_effect=fail_browser_runtime_import),
     ):
         _expect_ws_close(app, 4501)
+
+
+def test_account_browser_stream_requires_owned_active_account():
+    account_repo = MagicMock()
+    account_repo.get = AsyncMock(return_value=None)
+    app = _browser_ws_app()
+    app.state.personal_ip_account_repo = account_repo
+
+    with patch.object(browser_router, "_authenticate_ws", AsyncMock(return_value=_user())):
+        _expect_account_ws_close(app, 4404)
+
+    account_repo.get.assert_awaited_once_with("acct-douyin", owner_user_id="browser-user")
+
+
+def test_account_browser_stream_checks_browser_capability_after_account_ownership():
+    account_repo = MagicMock()
+    account_repo.get = AsyncMock(
+        return_value={
+            "id": "acct-douyin",
+            "owner_user_id": "browser-user",
+            "platform": "douyin",
+            "display_name": "老杨说 AI",
+            "status": "active",
+        },
+    )
+    app = _browser_ws_app()
+    app.state.personal_ip_account_repo = account_repo
+
+    with (
+        patch.object(browser_router, "_authenticate_ws", AsyncMock(return_value=_user())),
+        patch.object(browser_router, "_browser_tools_enabled", return_value=False),
+    ):
+        _expect_account_ws_close(app, 4404)
+
+    account_repo.get.assert_awaited_once_with("acct-douyin", owner_user_id="browser-user")
 
 
 def test_browser_navigate_rejects_legacy_null_owner_thread():

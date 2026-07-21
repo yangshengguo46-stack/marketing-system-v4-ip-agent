@@ -47,13 +47,14 @@ function normalizeSeedUrl(url: string | null | undefined): string {
  * navigations no longer tear down and rebuild the socket.
  */
 export function useBrowserStream(
-  threadId: string,
+  sessionId: string,
   enabled: boolean,
   seedUrl?: string,
   onNavRejected?: (
     url: string | undefined,
     message: string | undefined,
   ) => void,
+  scope: "thread" | "account" = "thread",
 ) {
   const [status, setStatus] = useState<BrowserStreamStatus>("idle");
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
@@ -90,7 +91,7 @@ export function useBrowserStream(
 
   useEffect(() => {
     pendingNavigateRef.current = null;
-  }, [threadId]);
+  }, [sessionId, scope]);
 
   useEffect(() => {
     if (enabled) {
@@ -101,7 +102,7 @@ export function useBrowserStream(
     setLiveUrl(null);
     setTabs([]);
     liveUrlRef.current = null;
-  }, [enabled, threadId]);
+  }, [enabled, sessionId, scope]);
 
   useEffect(() => {
     if (!enabled) {
@@ -118,7 +119,9 @@ export function useBrowserStream(
     // "steer to seed" effect below does not fire a duplicate navigate right
     // after open (the server already aligns the page to the connect-time seed).
     liveUrlRef.current = seedRef.current ?? null;
-    const socket = new WebSocket(browserStreamURL(threadId, seedRef.current));
+    const socket = new WebSocket(
+      browserStreamURL(sessionId, seedRef.current, scope),
+    );
     socketRef.current = socket;
 
     const scheduleReconnect = () => {
@@ -213,7 +216,7 @@ export function useBrowserStream(
       socketRef.current = null;
       socket.close();
     };
-  }, [connectionAttempt, enabled, threadId]);
+  }, [connectionAttempt, enabled, scope, sessionId]);
 
   // Steer an already-open stream toward a changed seed in-band instead of
   // rebuilding the socket. Only navigates when the live page differs from the

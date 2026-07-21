@@ -66,7 +66,9 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > Social platform operation is browser-first across Douyin, WeChat Channels,
 > WeChat Official Accounts, Xiaohongshu, X, Instagram, YouTube and TikTok. Each
 > account has an owner-isolated persistent local Chromium profile; official
-> APIs are optional connectors. See
+> APIs are optional connectors. The operating portfolio always shows all eight
+> platforms: users can create an account slot and open its real login page
+> directly, then complete QR, CAPTCHA or MFA themselves. See
 > [docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md](docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md).
 
 ## Official Website
@@ -834,6 +836,12 @@ This is the difference between a chatbot with tool access and an agent with an a
 ### Agentic Browser Control
 
 Reading a page is not the same as *using* one. Alongside the read-only `web_fetch` and `web_capture` tools, DeerFlow ships an optional agentic browser tool group that keeps a live, per-conversation browser session so the agent can actually operate a page — navigate, read the interactive elements, click, type, submit forms, and follow multi-step flows on JavaScript-heavy sites.
+
+The IP Agent operating portfolio also exposes an owner-checked, account-scoped
+Live browser. It uses the same browser engine but does not borrow a conversation
+id: each account opens its registered platform URL with its own persistent
+profile, so closing the window or restarting DeerFlow does not intentionally
+discard the platform login state.
 
 Each action returns a fresh snapshot of the page's interactive elements, each addressed by a stable `[ref]` number, so the agent acts on what it just observed instead of guessing selectors. Outbound URLs are SSRF-screened by default. It is powered by Playwright and shipped as an optional extra so the core install stays lean:
 
