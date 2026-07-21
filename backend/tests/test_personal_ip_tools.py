@@ -10,11 +10,13 @@ from deerflow.personal_ip.runtime import PersonalIPRuntimeServices, configure_pe
 from deerflow.tools.builtins import (
     personal_ip_metrics_aggregate_tool,
     personal_ip_performance_inventory_tool,
+    personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,
 )
 from deerflow.tools.builtins.personal_ip_tools import (
     _personal_ip_metrics_aggregate,
     _personal_ip_performance_inventory,
+    _personal_ip_sync_douyin_portfolio,
     _personal_ip_sync_douyin_post,
 )
 from deerflow.tools.tools import BUILTIN_TOOLS
@@ -102,10 +104,12 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     names = {tool.name for tool in BUILTIN_TOOLS}
     assert personal_ip_metrics_aggregate_tool.name == "personal_ip_metrics_aggregate"
     assert personal_ip_performance_inventory_tool.name == "personal_ip_performance_inventory"
+    assert personal_ip_sync_douyin_portfolio_tool.name == "personal_ip_sync_douyin_portfolio"
     assert personal_ip_sync_douyin_post_tool.name == "personal_ip_sync_douyin_post"
     assert {
         "personal_ip_metrics_aggregate",
         "personal_ip_performance_inventory",
+        "personal_ip_sync_douyin_portfolio",
         "personal_ip_sync_douyin_post",
     } <= names
     schema = personal_ip_metrics_aggregate_tool.tool_call_schema.model_json_schema()
@@ -169,3 +173,91 @@ async def test_performance_inventory_lists_all_connections_and_published_receipt
     assert "must-not-leak" not in result
     connections.list.assert_awaited_once_with("user-1", include_revoked=False)
     receipts.list.assert_awaited_once_with("user-1", limit=50)
+
+
+@pytest.mark.asyncio
+async def test_portfolio_sync_collects_every_connected_douyin_publication_and_isolates_failures(monkeypatch) -> None:
+    connections = SimpleNamespace(
+        list=AsyncMock(
+            return_value=[
+                {"id": "conn-1", "account_id": "acct-1", "platform": "douyin", "status": "connected"},
+                {"id": "conn-2", "account_id": "acct-2", "platform": "douyin", "status": "connected"},
+                {"id": "conn-bili", "account_id": "acct-3", "platform": "bilibili", "status": "connected"},
+            ]
+        )
+    )
+    receipts = SimpleNamespace(
+        list=AsyncMock(
+            return_value=[
+                {"id": "publish-1", "account_id": "acct-1", "platform": "douyin", "status": "published"},
+                {"id": "publish-2", "account_id": "acct-2", "platform": "douyin", "status": "published"},
+                {"id": "publish-no-connection", "account_id": "acct-4", "platform": "douyin", "status": "published"},
+                {"id": "publish-bili", "account_id": "acct-3", "platform": "bilibili", "status": "published"},
+            ]
+        )
+    )
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            connections=connections,
+            metrics=SimpleNamespace(),
+            publish_receipts=receipts,
+        )
+    )
+    collect = AsyncMock(
+        side_effect=[
+            {
+                "id": "metric-1",
+                "account_id": "acct-1",
+                "receipt_id": "publish-1",
+                "status": "observed",
+                "derived_delta": None,
+            },
+            ValueError("provider secret detail must not escape"),
+        ]
+    )
+    monkeypatch.setattr(
+        "deerflow.tools.builtins.personal_ip_tools._authorized_douyin_service",
+        lambda _services: SimpleNamespace(collect_published_post=collect),
+    )
+
+    raw = await _personal_ip_sync_douyin_portfolio(
+        SimpleNamespace(context={"user_id": "user-1"}),
+        collection_key="hourly:2026-07-21T12+08:00",
+        published_limit=500,
+    )
+    payload = json.loads(raw)
+
+    assert payload["status"] == "partial"
+    assert payload["synced_count"] == 1
+    assert payload["baseline_count"] == 1
+    assert payload["delta_count"] == 0
+    assert payload["failed_count"] == 1
+    assert payload["coverage"]["missing_connection_account_ids"] == ["acct-4"]
+    assert payload["coverage"]["possibly_truncated"] is False
+    assert payload["results"] == [
+        {
+            "account_id": "acct-1",
+            "connection_id": "conn-1",
+            "delta_id": None,
+            "metric_id": "metric-1",
+            "publish_receipt_id": "publish-1",
+            "status": "observed",
+        }
+    ]
+    assert payload["failures"] == [
+        {
+            "account_id": "acct-2",
+            "category": "invalid_request",
+            "connection_id": "conn-2",
+            "publish_receipt_id": "publish-2",
+            "retryable": False,
+        }
+    ]
+    assert "secret" not in raw.lower()
+    assert collect.await_count == 2
+    for call in collect.await_args_list:
+        assert call.kwargs["owner_user_id"] == "user-1"
+        assert call.kwargs["observation_key"].startswith("portfolio-douyin:")
+        assert len(call.kwargs["observation_key"]) == len("portfolio-douyin:") + 64
+    connections.list.assert_awaited_once_with("user-1", include_revoked=False)
+    receipts.list.assert_awaited_once_with("user-1", limit=500)

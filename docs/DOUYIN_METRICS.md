@@ -101,6 +101,22 @@ the agent must say which platforms/accounts are missing or unavailable.
 published-receipt ids needed for sync; raw publish requests/attempt results are
 not copied into its tool output.
 
+For recurring collection,
+`personal_ip_sync_douyin_portfolio(collection_key, published_limit)` discovers
+connected Douyin accounts and confirmed publications across the authenticated
+user's portfolio. It generates a hashed per-post observation key, isolates one
+post's failure from the rest of the batch, and returns sanitized observation
+references and coverage only. It never accepts an account filter. When the
+receipt scan reaches `published_limit`, any publication lacks a live
+connection, or an individual sync fails, the result is `partial` rather than a
+false success.
+
+An hourly DeerFlow scheduled task can call the portfolio tool with the current
+local hour as a stable collection key. The run just after midnight becomes the
+day's baseline; later hourly runs produce exact contained deltas. This is a
+collection schedule, not permission scoping: the scheduled conversation still
+has the user's full portfolio authority.
+
 ### Exact-interval deltas, not invented daily totals
 
 The official video query returns cumulative post counters. The first

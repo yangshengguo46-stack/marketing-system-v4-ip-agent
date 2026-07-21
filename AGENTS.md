@@ -134,12 +134,13 @@ IP Agent distribution note:
   failure, and keeps all credential material out of the agent context. See
   `docs/DOUYIN_METRICS.md`.
 - `deerflow.tools.builtins.personal_ip_tools` exposes native whole-portfolio
-  performance inventory, aggregation and encrypted Douyin post sync. Gateway installs the repository
-  bundle through `deerflow.personal_ip.runtime`; this app-to-harness injection
-  preserves the harness import firewall. The aggregate tool intentionally has
-  no account filter. Keep `product/defaults/agents/ip-agent/SOUL.md` and
-  `skills/public/personal-ip-operator/SKILL.md` aligned: conversations cover the
-  full portfolio, while account ids are only concrete operation targets.
+  performance inventory, aggregation, one-post sync and failure-isolated
+  portfolio Douyin sync. Gateway installs the repository bundle through
+  `deerflow.personal_ip.runtime`; this app-to-harness injection preserves the
+  harness import firewall. The aggregate and portfolio-sync tools intentionally
+  have no account filter. Keep `product/defaults/agents/ip-agent/SOUL.md` and
+  `skills/public/personal-ip-operator/SKILL.md` aligned: conversations cover
+  the full portfolio, while account ids are only concrete operation targets.
 - Official Douyin post counters remain immutable cumulative snapshots. From the
   second observation onward, `PersonalIPMetricCollectionService` may derive an
   exact-interval delta from the immediately preceding monotonic snapshot in the
@@ -158,6 +159,10 @@ Skill quality review note:
 Scheduled-task note:
 - The scheduled-task MVP adds a workspace page at `/workspace/scheduled-tasks` plus a background scheduler service gated by `config.yaml -> scheduler.enabled`.
 - Scheduled background runs are intentionally non-interactive: they execute through the normal run lifecycle, but the lead-agent toolset excludes `ask_clarification` when `context.non_interactive=true`. The key is honored only for internally-authenticated callers (the scheduler launch path); client-supplied `context.non_interactive` is dropped.
+- Personal-IP metric schedules should call
+  `personal_ip_sync_douyin_portfolio`, not loop over an account captured in the
+  task prompt. Use a stable hourly `collection_key`; every post failure is
+  isolated and returned with sanitized coverage.
 
 ## Commands: Root vs. Module
 

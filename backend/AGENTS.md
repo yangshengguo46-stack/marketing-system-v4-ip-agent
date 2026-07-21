@@ -1073,11 +1073,15 @@ credential into route responses, tool results, coverage metadata or logs.
 Native `deerflow.tools.builtins.personal_ip_tools` provide the agent-facing
 surface: `personal_ip_metrics_aggregate` is portfolio-wide by construction and
 has no account filter; `personal_ip_sync_douyin_post` takes only server-issued
-connection/receipt/idempotency identifiers. `app.gateway.deps` injects the live
-repository instances into the process-local `deerflow.personal_ip.runtime`
-bundle after persistence startup. This direction is app → harness and must not
-be reversed with a harness import from `app.*`. Tool identity comes from
-`resolve_runtime_user_id(runtime)`, and tool JSON errors must stay sanitized.
+connection/receipt/idempotency identifiers;
+`personal_ip_sync_douyin_portfolio` discovers all eligible connections and
+confirmed receipts server-side and has no account filter. Each post failure
+must be isolated, categorized and sanitized so scheduled collection continues.
+`app.gateway.deps` injects the live repository instances into the process-local
+`deerflow.personal_ip.runtime` bundle after persistence startup. This direction
+is app → harness and must not be reversed with a harness import from `app.*`.
+Tool identity comes from `resolve_runtime_user_id(runtime)`, and tool JSON
+errors must stay sanitized.
 `personal_ip_performance_inventory` is the discovery step and must whitelist
 only sanitized connection and confirmed-publication fields—never forward full
 publish request/attempt payloads into model context.

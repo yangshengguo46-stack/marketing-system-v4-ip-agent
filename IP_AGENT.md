@@ -165,6 +165,10 @@ construct internal HTTP calls:
 - `personal_ip_sync_douyin_post` accepts only a connection id, confirmed
   publish-receipt id and observation idempotency key. Credential resolution,
   refresh and official collection stay server-side.
+- `personal_ip_sync_douyin_portfolio` is the scheduled-task entry point. It
+  discovers all connected Douyin accounts and confirmed publications itself,
+  isolates individual failures and returns only observation references plus
+  explicit coverage. It has no account-filter argument.
 
 Douyin post counters are cumulative snapshots, not daily totals. A first sync
 creates the baseline only. Each later sync derives an exact-interval `delta`
@@ -172,6 +176,14 @@ from the preceding monotonic snapshot; the delta is explicitly `partial`
 because it covers one tracked post rather than proving complete account-wide
 coverage. Portfolio aggregation includes the delta, excludes the cumulative
 snapshots and preserves that partial-coverage warning.
+
+For ongoing collection, create an hourly native DeerFlow scheduled task whose
+prompt calls `personal_ip_sync_douyin_portfolio` with the current local hour as
+the stable `collection_key` and `published_limit=500`. The first run after
+midnight establishes a baseline; later runs create contained deltas. The tool
+reports a partial scan when the receipt limit is reached, an account lacks a
+connection, or one post fails, so the scheduled run never silently claims full
+coverage.
 
 The default IP Agent and `personal-ip-operator` Skill explicitly treat the
 portfolio as conversation scope; an account is selected only for a concrete

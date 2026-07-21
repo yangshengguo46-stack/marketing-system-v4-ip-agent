@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import UTC, datetime
+from hashlib import sha256
 
 from langchain.tools import tool
 
@@ -184,6 +185,172 @@ async def _personal_ip_performance_inventory(
         return _json({"status": "error", "category": "internal", "message": "Performance inventory is unavailable"})
 
 
+def _portfolio_observation_key(
+    *,
+    collection_key: str,
+    connection_id: str,
+    publish_receipt_id: str,
+) -> str:
+    collection = str(collection_key or "").strip()
+    if not collection or len(collection) > 128:
+        raise ValueError("collection_key must contain 1 to 128 characters")
+    digest = sha256(f"{collection}|{connection_id}|{publish_receipt_id}".encode()).hexdigest()
+    return f"portfolio-douyin:{digest}"
+
+
+async def _personal_ip_sync_douyin_portfolio(
+    runtime: Runtime,
+    collection_key: str,
+    published_limit: int = 500,
+) -> str:
+    """Sync every discoverable published Douyin post in the user's portfolio.
+
+    This is the scheduled-task entry point for portfolio performance baselines
+    and interval deltas. It resolves accounts, encrypted connections and
+    confirmed publish receipts server-side, isolates individual post failures,
+    and never sends credentials into model context.
+
+    Args:
+        collection_key: Stable idempotency key for this portfolio collection run.
+        published_limit: Maximum recent publish receipts to inspect, 1-500.
+
+    Returns:
+        Sanitized per-post observation references, counts, failures and explicit
+        scan coverage. A partial result never claims complete portfolio data.
+    """
+    try:
+        limit = int(published_limit)
+        if limit < 1 or limit > 500:
+            raise ValueError("published_limit must be between 1 and 500")
+        normalized_collection_key = str(collection_key or "").strip()
+        if not normalized_collection_key or len(normalized_collection_key) > 128:
+            raise ValueError("collection_key must contain 1 to 128 characters")
+        services = get_personal_ip_runtime()
+        owner_user_id = resolve_runtime_user_id(runtime)
+        observation_service = _authorized_douyin_service(services)
+        connections = await services.connections.list(owner_user_id, include_revoked=False)
+        receipts = await services.publish_receipts.list(owner_user_id, limit=limit)
+        connection_by_account: dict[str, dict] = {}
+        for connection in connections:
+            if connection.get("platform") == "douyin" and connection.get("status") == "connected":
+                connection_by_account.setdefault(str(connection.get("account_id") or ""), connection)
+
+        published = [receipt for receipt in receipts if receipt.get("platform") == "douyin" and receipt.get("status") == "published"]
+        results: list[dict] = []
+        failures: list[dict] = []
+        missing_connection_accounts: set[str] = set()
+        baseline_count = 0
+        delta_count = 0
+        for receipt in published:
+            account_id = str(receipt.get("account_id") or "")
+            publish_receipt_id = str(receipt.get("id") or "")
+            connection = connection_by_account.get(account_id)
+            if connection is None:
+                missing_connection_accounts.add(account_id)
+                continue
+            connection_id = str(connection.get("id") or "")
+            observation_key = _portfolio_observation_key(
+                collection_key=normalized_collection_key,
+                connection_id=connection_id,
+                publish_receipt_id=publish_receipt_id,
+            )
+            try:
+                observation = await observation_service.collect_published_post(
+                    owner_user_id=owner_user_id,
+                    connection_id=connection_id,
+                    publish_receipt_id=publish_receipt_id,
+                    observation_key=observation_key,
+                )
+            except DouyinOAuthError as exc:
+                failures.append(
+                    {
+                        "account_id": account_id,
+                        "connection_id": connection_id,
+                        "publish_receipt_id": publish_receipt_id,
+                        "category": "reauthorization_required" if exc.category == "reauthorization_required" else "provider_unavailable",
+                        "retryable": False,
+                    }
+                )
+                continue
+            except PlatformMetricCollectionError as exc:
+                failures.append(
+                    {
+                        "account_id": account_id,
+                        "connection_id": connection_id,
+                        "publish_receipt_id": publish_receipt_id,
+                        "category": exc.category,
+                        "retryable": exc.retryable,
+                    }
+                )
+                continue
+            except (RuntimeError, ValueError):
+                failures.append(
+                    {
+                        "account_id": account_id,
+                        "connection_id": connection_id,
+                        "publish_receipt_id": publish_receipt_id,
+                        "category": "invalid_request",
+                        "retryable": False,
+                    }
+                )
+                continue
+            except Exception:
+                failures.append(
+                    {
+                        "account_id": account_id,
+                        "connection_id": connection_id,
+                        "publish_receipt_id": publish_receipt_id,
+                        "category": "internal",
+                        "retryable": False,
+                    }
+                )
+                continue
+
+            delta = observation.get("derived_delta")
+            if delta is not None:
+                delta_count += 1
+            elif observation.get("status") != "unavailable":
+                baseline_count += 1
+            results.append(
+                {
+                    "account_id": account_id,
+                    "connection_id": connection_id,
+                    "publish_receipt_id": publish_receipt_id,
+                    "metric_id": observation.get("id"),
+                    "status": observation.get("status"),
+                    "delta_id": delta.get("id") if isinstance(delta, dict) else None,
+                }
+            )
+
+        possibly_truncated = len(receipts) >= limit
+        incomplete = bool(failures or missing_connection_accounts or possibly_truncated)
+        status = "partial" if incomplete else "complete"
+        if not published and not incomplete:
+            status = "unavailable"
+        return _json(
+            {
+                "status": status,
+                "platform": "douyin",
+                "published_receipt_count": len(published),
+                "synced_count": len(results),
+                "baseline_count": baseline_count,
+                "delta_count": delta_count,
+                "failed_count": len(failures),
+                "results": results,
+                "failures": failures,
+                "coverage": {
+                    "receipt_scan_limit": limit,
+                    "possibly_truncated": possibly_truncated,
+                    "missing_connection_account_ids": sorted(missing_connection_accounts),
+                },
+            }
+        )
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Portfolio sync is unavailable"})
+
+
 personal_ip_metrics_aggregate_tool = tool(
     "personal_ip_metrics_aggregate",
     parse_docstring=True,
@@ -198,3 +365,8 @@ personal_ip_performance_inventory_tool = tool(
     "personal_ip_performance_inventory",
     parse_docstring=True,
 )(_personal_ip_performance_inventory)
+
+personal_ip_sync_douyin_portfolio_tool = tool(
+    "personal_ip_sync_douyin_portfolio",
+    parse_docstring=True,
+)(_personal_ip_sync_douyin_portfolio)

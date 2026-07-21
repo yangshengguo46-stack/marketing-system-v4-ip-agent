@@ -55,11 +55,12 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > server-side code exchange, encrypted per-account credentials, refresh and
 > local disconnect. Authorized collection accepts only connection/receipt ids,
 > refreshes once on token expiry and never exposes credentials to the agent or
-> a Gateway response. Native DeerFlow tools now sync a Douyin post and
-> aggregate the authenticated user's complete portfolio without a thread-level
-> account filter. Consecutive cumulative post snapshots produce exact-interval
-> deltas, always marked partial because tracked posts are not proof of complete
-> account coverage. See
+> a Gateway response. Native DeerFlow tools now sync one Douyin post or the
+> discoverable Douyin portfolio and aggregate the authenticated user's complete
+> account set without a thread-level account filter. The portfolio operation
+> isolates post failures for safe scheduled runs. Consecutive cumulative post
+> snapshots produce exact-interval deltas, always marked partial because
+> tracked posts are not proof of complete account coverage. See
 > [docs/DOUYIN_METRICS.md](docs/DOUYIN_METRICS.md).
 
 ## Official Website

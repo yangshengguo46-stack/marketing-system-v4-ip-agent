@@ -45,6 +45,9 @@ facts through a Tool/MCP; do not recreate that model in prompts.
    For performance questions, use the native portfolio inventory, sync and
    aggregate tools; preserve their missing/partial coverage instead of treating
    absent data or a cumulative snapshot as today's total.
+   Use `personal_ip_sync_douyin_portfolio` for recurring or whole-portfolio
+   collection. A scheduled task should pass a stable current-hour collection
+   key; never bake one account id into its prompt.
 3. Produce the smallest useful plan and label assumptions.
 4. Route general research and creation through available Skills. Read
    `volcengine-stack` before any ByteDance media work.
