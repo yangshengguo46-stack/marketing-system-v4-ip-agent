@@ -134,12 +134,18 @@ IP Agent distribution note:
   failure, and keeps all credential material out of the agent context. See
   `docs/DOUYIN_METRICS.md`.
 - `deerflow.tools.builtins.personal_ip_tools` exposes native whole-portfolio
-  aggregation and encrypted Douyin post sync. Gateway installs the repository
+  performance inventory, aggregation and encrypted Douyin post sync. Gateway installs the repository
   bundle through `deerflow.personal_ip.runtime`; this app-to-harness injection
   preserves the harness import firewall. The aggregate tool intentionally has
   no account filter. Keep `product/defaults/agents/ip-agent/SOUL.md` and
   `skills/public/personal-ip-operator/SKILL.md` aligned: conversations cover the
   full portfolio, while account ids are only concrete operation targets.
+- Official Douyin post counters remain immutable cumulative snapshots. From the
+  second observation onward, `PersonalIPMetricCollectionService` may derive an
+  exact-interval delta from the immediately preceding monotonic snapshot in the
+  same post series. Derived deltas are always `partial` with
+  `scope_limit=tracked_post_only`; never relabel them complete account totals or
+  infer data before the baseline timestamp.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.

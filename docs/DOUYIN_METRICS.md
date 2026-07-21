@@ -97,6 +97,25 @@ DeerFlow exposes the same server-side flow as the native
 filter. This prevents a Feishu or chat conversation from being accidentally
 narrowed to the most recently operated account. Coverage remains explicit, so
 the agent must say which platforms/accounts are missing or unavailable.
+`personal_ip_performance_inventory` supplies the sanitized connection and
+published-receipt ids needed for sync; raw publish requests/attempt results are
+not copied into its tool output.
+
+### Exact-interval deltas, not invented daily totals
+
+The official video query returns cumulative post counters. The first
+observation is therefore stored only as a `snapshot`. When a later official
+snapshot exists for the same post series, the service subtracts the preceding
+monotonic counters and writes a separate `delta` with exact start/end times.
+Counter decreases are excluded and recorded as non-monotonic coverage rather
+than becoming negative performance.
+
+Derived post deltas always remain `partial` with
+`scope_limit=tracked_post_only`: even a correct delta for one published post
+does not prove that every post on the account was tracked. Portfolio totals may
+sum these deltas, but the agent must describe them as known tracked-post totals
+and surface missing/partial accounts. A baseline taken after the requested day
+started cannot reconstruct the earlier gap.
 
 The code/ticket are one-use inputs. Access tokens, refresh tokens, the mini-app
 secret and the `code2Session` session key are never returned from these APIs.

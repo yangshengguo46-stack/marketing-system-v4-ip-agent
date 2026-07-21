@@ -1078,6 +1078,16 @@ repository instances into the process-local `deerflow.personal_ip.runtime`
 bundle after persistence startup. This direction is app → harness and must not
 be reversed with a harness import from `app.*`. Tool identity comes from
 `resolve_runtime_user_id(runtime)`, and tool JSON errors must stay sanitized.
+`personal_ip_performance_inventory` is the discovery step and must whitelist
+only sanitized connection and confirmed-publication fields—never forward full
+publish request/attempt payloads into model context.
+
+`PersonalIPMetricCollectionService` assigns official Douyin snapshots a stable
+post series. When a strictly older snapshot exists, it writes a separate exact
+interval `delta` from monotonic counter differences. The delta is always
+`partial` because one tracked post is not account-wide coverage; missing and
+decreasing counters remain coverage metadata. The first snapshot is a baseline
+only and must not be aggregated as a daily total.
 
 ### Vision Support
 

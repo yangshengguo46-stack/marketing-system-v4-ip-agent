@@ -126,6 +126,64 @@ async def _personal_ip_sync_douyin_post(
         return _json({"status": "error", "category": "internal", "message": "Douyin metric collection is unavailable"})
 
 
+async def _personal_ip_performance_inventory(
+    runtime: Runtime,
+    published_limit: int = 100,
+) -> str:
+    """List performance connections and recent published receipts across the portfolio.
+
+    Call this before syncing platform metrics to discover the server-issued
+    connection and publish-receipt ids. It returns sanitized metadata only and
+    never credential, request-body or executor-result material.
+
+    Args:
+        published_limit: Maximum recent published receipts to inspect, 1-500.
+
+    Returns:
+        JSON with every active platform connection and recent confirmed
+        publications across all accounts owned by the authenticated user.
+    """
+    try:
+        limit = int(published_limit)
+        if limit < 1 or limit > 500:
+            raise ValueError("published_limit must be between 1 and 500")
+        services = get_personal_ip_runtime()
+        owner_user_id = resolve_runtime_user_id(runtime)
+        connections = await services.connections.list(owner_user_id, include_revoked=False)
+        receipts = await services.publish_receipts.list(owner_user_id, limit=limit)
+        connection_fields = (
+            "id",
+            "account_id",
+            "platform",
+            "status",
+            "scopes",
+            "access_expires_at",
+            "refresh_expires_at",
+            "last_refreshed_at",
+            "last_error_code",
+            "updated_at",
+        )
+        receipt_fields = (
+            "id",
+            "account_id",
+            "platform",
+            "status",
+            "external_post_id",
+            "published_at",
+        )
+        return _json(
+            {
+                "status": "ok",
+                "connections": [{field: connection.get(field) for field in connection_fields if field in connection} for connection in connections],
+                "published_receipts": [{field: receipt.get(field) for field in receipt_fields if field in receipt} for receipt in receipts if receipt.get("status") == "published"],
+            }
+        )
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Performance inventory is unavailable"})
+
+
 personal_ip_metrics_aggregate_tool = tool(
     "personal_ip_metrics_aggregate",
     parse_docstring=True,
@@ -135,3 +193,8 @@ personal_ip_sync_douyin_post_tool = tool(
     "personal_ip_sync_douyin_post",
     parse_docstring=True,
 )(_personal_ip_sync_douyin_post)
+
+personal_ip_performance_inventory_tool = tool(
+    "personal_ip_performance_inventory",
+    parse_docstring=True,
+)(_personal_ip_performance_inventory)

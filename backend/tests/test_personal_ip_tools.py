@@ -7,9 +7,14 @@ from unittest.mock import AsyncMock
 import pytest
 
 from deerflow.personal_ip.runtime import PersonalIPRuntimeServices, configure_personal_ip_runtime
-from deerflow.tools.builtins import personal_ip_metrics_aggregate_tool, personal_ip_sync_douyin_post_tool
+from deerflow.tools.builtins import (
+    personal_ip_metrics_aggregate_tool,
+    personal_ip_performance_inventory_tool,
+    personal_ip_sync_douyin_post_tool,
+)
 from deerflow.tools.builtins.personal_ip_tools import (
     _personal_ip_metrics_aggregate,
+    _personal_ip_performance_inventory,
     _personal_ip_sync_douyin_post,
 )
 from deerflow.tools.tools import BUILTIN_TOOLS
@@ -96,5 +101,71 @@ async def test_douyin_sync_tool_uses_connection_reference_without_returning_toke
 def test_personal_ip_native_tools_are_available_without_thread_account_binding() -> None:
     names = {tool.name for tool in BUILTIN_TOOLS}
     assert personal_ip_metrics_aggregate_tool.name == "personal_ip_metrics_aggregate"
+    assert personal_ip_performance_inventory_tool.name == "personal_ip_performance_inventory"
     assert personal_ip_sync_douyin_post_tool.name == "personal_ip_sync_douyin_post"
-    assert {"personal_ip_metrics_aggregate", "personal_ip_sync_douyin_post"} <= names
+    assert {
+        "personal_ip_metrics_aggregate",
+        "personal_ip_performance_inventory",
+        "personal_ip_sync_douyin_post",
+    } <= names
+    schema = personal_ip_metrics_aggregate_tool.tool_call_schema.model_json_schema()
+    assert "account_id" not in schema.get("properties", {})
+
+
+@pytest.mark.asyncio
+async def test_performance_inventory_lists_all_connections_and_published_receipts_without_tokens() -> None:
+    connections = SimpleNamespace(
+        list=AsyncMock(
+            return_value=[
+                {
+                    "id": "platform-conn-1",
+                    "account_id": "acct-1",
+                    "platform": "douyin",
+                    "status": "connected",
+                    "scopes": ["ma.video.bind"],
+                }
+            ]
+        )
+    )
+    receipts = SimpleNamespace(
+        list=AsyncMock(
+            return_value=[
+                {
+                    "id": "publish-1",
+                    "account_id": "acct-1",
+                    "platform": "douyin",
+                    "status": "published",
+                    "external_post_id": "item-1",
+                    "published_at": "2026-07-21T08:00:00Z",
+                    "request": {"caption": "must not be copied into inventory"},
+                    "attempts": [{"result": {"access_token": "must-not-leak"}}],
+                },
+                {"id": "publish-planned", "account_id": "acct-2", "platform": "bilibili", "status": "planned"},
+            ]
+        )
+    )
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            connections=connections,
+            metrics=SimpleNamespace(),
+            publish_receipts=receipts,
+        )
+    )
+    result = await _personal_ip_performance_inventory(SimpleNamespace(context={"user_id": "user-1"}), published_limit=50)
+    payload = json.loads(result)
+
+    assert payload["status"] == "ok"
+    assert payload["connections"][0]["id"] == "platform-conn-1"
+    assert payload["published_receipts"] == [
+        {
+            "account_id": "acct-1",
+            "external_post_id": "item-1",
+            "id": "publish-1",
+            "platform": "douyin",
+            "published_at": "2026-07-21T08:00:00Z",
+            "status": "published",
+        }
+    ]
+    assert "must-not-leak" not in result
+    connections.list.assert_awaited_once_with("user-1", include_revoked=False)
+    receipts.list.assert_awaited_once_with("user-1", limit=50)

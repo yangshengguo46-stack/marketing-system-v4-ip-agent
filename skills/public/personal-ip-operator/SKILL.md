@@ -42,6 +42,9 @@ facts through a Tool/MCP; do not recreate that model in prompts.
 1. Determine whether the request is portfolio-wide or a concrete account operation; never infer an account restriction for a global request.
 2. Inspect evidence before strategy: prior content, comments, metrics, source
    documents and competitor examples.
+   For performance questions, use the native portfolio inventory, sync and
+   aggregate tools; preserve their missing/partial coverage instead of treating
+   absent data or a cumulative snapshot as today's total.
 3. Produce the smallest useful plan and label assumptions.
 4. Route general research and creation through available Skills. Read
    `volcengine-stack` before any ByteDance media work.

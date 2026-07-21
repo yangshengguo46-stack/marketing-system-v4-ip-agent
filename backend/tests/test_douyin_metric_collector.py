@@ -298,3 +298,122 @@ async def test_authorized_collection_refreshes_expired_token_server_side_and_ret
     credentials = await connections.get_credentials(connection["id"], owner_user_id="user-1")
     assert credentials == {"access_token": "act.new", "refresh_token": "rft.secret"}
     await close_engine()
+
+
+@pytest.mark.asyncio
+async def test_consecutive_official_snapshots_derive_a_partial_exact_interval_delta(tmp_path) -> None:
+    await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
+    sf = get_session_factory()
+    assert sf is not None
+    accounts = PersonalIPAccountRepository(sf)
+    receipts = PersonalIPPublishReceiptRepository(sf)
+    metrics = PersonalIPMetricRepository(sf)
+    connections = PersonalIPPlatformConnectionRepository(
+        sf,
+        cipher=ChannelCredentialCipher.from_key("test-only-credential-key"),
+    )
+    account = await accounts.create(owner_user_id="user-1", platform="douyin", display_name="抖音账号")
+    receipt = await receipts.begin(
+        owner_user_id="user-1",
+        operation_key="publish:snapshot-delta",
+        idempotency_key="idem:snapshot-delta",
+        account_id=account["id"],
+        preflight_id=None,
+        executor="platform_api",
+        request_payload={"caption": "测试"},
+    )
+    await receipts.record_attempt(
+        receipt["id"],
+        owner_user_id="user-1",
+        attempt_key="published",
+        status="published",
+        result_payload={"item_id": "item-1"},
+        external_post_id="item-1",
+        occurred_at=datetime(2026, 7, 21, 0, 0, tzinfo=UTC),
+    )
+    connection = await connections.store_grant(
+        owner_user_id="user-1",
+        account_id=account["id"],
+        platform="douyin",
+        external_user_id="mini-open-id",
+        oauth_open_id="oauth-open-id",
+        access_token="act.valid",
+        refresh_token="rft.valid",
+        scopes=["ma.video.bind"],
+        access_expires_at=datetime(2026, 8, 1, tzinfo=UTC),
+        refresh_expires_at=datetime(2026, 8, 20, tzinfo=UTC),
+        now=datetime(2026, 7, 1, tzinfo=UTC),
+    )
+    current_metrics = {"play_count": 100, "digg_count": 10, "comment_count": 2, "share_count": 1}
+
+    def transport(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "err_no": 0,
+                "log_id": "snapshot-log",
+                "data": {
+                    "data": {
+                        "list": [
+                            {
+                                "item_id": "item-1",
+                                "create_time": 1784600000,
+                                "statistics": dict(current_metrics),
+                            }
+                        ]
+                    }
+                },
+            },
+        )
+
+    observed_at = datetime(2026, 7, 21, 0, 5, tzinfo=UTC)
+
+    def clock() -> datetime:
+        return observed_at
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as http_client:
+        service = DouyinAuthorizedMetricCollectionService(
+            connections=connections,
+            metrics=metrics,
+            publish_receipts=receipts,
+            oauth_client=DouyinMiniAppOAuthClient(
+                app_id="tt-app-id",
+                app_secret="app-secret",
+                client=http_client,
+            ),
+            http_client=http_client,
+            clock=clock,
+        )
+        baseline = await service.collect_published_post(
+            owner_user_id="user-1",
+            connection_id=connection["id"],
+            publish_receipt_id=receipt["id"],
+            observation_key="douyin:item-1:baseline",
+        )
+        current_metrics.update(play_count=160, digg_count=16, comment_count=5, share_count=3)
+        observed_at = datetime(2026, 7, 21, 12, 5, tzinfo=UTC)
+        current = await service.collect_published_post(
+            owner_user_id="user-1",
+            connection_id=connection["id"],
+            publish_receipt_id=receipt["id"],
+            observation_key="douyin:item-1:current",
+        )
+
+    assert baseline["derived_delta"] is None
+    delta = current["derived_delta"]
+    assert delta is not None
+    assert delta["metric_mode"] == "delta"
+    assert delta["status"] == "partial"
+    assert delta["metrics"] == {"comments": 3, "likes": 6, "shares": 2, "views": 60}
+    assert delta["window_started_at"] == "2026-07-21T00:05:00+00:00"
+    assert delta["window_ended_at"] == "2026-07-21T12:05:00+00:00"
+    assert delta["coverage"]["scope_limit"] == "tracked_post_only"
+
+    aggregate = await metrics.aggregate(
+        owner_user_id="user-1",
+        window_started_at=datetime(2026, 7, 21, 0, 0, tzinfo=UTC),
+        window_ended_at=datetime(2026, 7, 22, 0, 0, tzinfo=UTC),
+    )
+    assert aggregate["totals"]["views"] == 60
+    assert aggregate["coverage"]["partial_account_ids"] == [account["id"]]
+    await close_engine()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -72,6 +73,11 @@ def _utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _iso_datetime(value: str) -> datetime:
+    text = value[:-1] + "+00:00" if value.endswith("Z") else value
+    return _utc(datetime.fromisoformat(text))
 
 
 def _clean_required(value: Any, *, field: str, limit: int) -> str:
@@ -281,13 +287,20 @@ class PersonalIPMetricCollectionService:
         external_post_id = str(receipt.get("external_post_id") or "").strip()
         if not external_post_id:
             raise ValueError("publish receipt has no external post id")
+        series_key = f"post:{collector.platform}:{external_post_id}"
+        prior_observations = await self._metrics.list(
+            owner_user_id,
+            receipt_id=publish_receipt_id,
+            limit=500,
+        )
         snapshots = await collector.collect_video_snapshots([external_post_id])
         if len(snapshots) != 1 or snapshots[0].external_item_id != external_post_id:
             raise PlatformMetricCollectionError("platform collector returned a mismatched post", category="response", retryable=False)
         snapshot = snapshots[0]
-        return await self._metrics.record(
+        current = await self._metrics.record(
             owner_user_id=owner_user_id,
             observation_key=observation_key,
+            series_key=series_key,
             account_id=account_id,
             receipt_id=publish_receipt_id,
             scope="post",
@@ -298,6 +311,54 @@ class PersonalIPMetricCollectionService:
             metrics=snapshot.metrics,
             coverage=snapshot.coverage,
         )
+        previous = next(
+            (observation for observation in prior_observations if observation["metric_mode"] == "snapshot" and observation["series_key"] == series_key and _iso_datetime(observation["observed_at"]) < snapshot.observed_at),
+            None,
+        )
+        if previous is None:
+            return {**current, "derived_delta": None}
+
+        previous_metrics = previous.get("metrics") or {}
+        current_metrics = snapshot.metrics
+        comparable = sorted(set(previous_metrics) & set(current_metrics))
+        deltas: dict[str, int | float] = {}
+        non_monotonic: list[str] = []
+        for metric in comparable:
+            before = previous_metrics[metric]
+            after = current_metrics[metric]
+            if after < before:
+                non_monotonic.append(metric)
+                continue
+            deltas[metric] = after - before
+        missing = sorted((set(previous_metrics) | set(current_metrics)) - set(comparable))
+        delta_status = "partial" if deltas else "unavailable"
+        previous_observed_at = _iso_datetime(previous["observed_at"])
+        delta_key = "derived-delta:" + hashlib.sha256(f"{observation_key}|{previous['id']}".encode()).hexdigest()
+        delta = await self._metrics.record(
+            owner_user_id=owner_user_id,
+            observation_key=delta_key,
+            series_key=series_key,
+            account_id=account_id,
+            receipt_id=publish_receipt_id,
+            scope="post",
+            metric_mode="delta",
+            source="platform_api",
+            status=delta_status,
+            window_started_at=previous_observed_at,
+            window_ended_at=snapshot.observed_at,
+            observed_at=snapshot.observed_at,
+            metrics=deltas,
+            coverage={
+                "derivation": "consecutive_cumulative_snapshot_difference",
+                "scope_limit": "tracked_post_only",
+                "baseline_observation_id": previous["id"],
+                "current_observation_id": current["id"],
+                "missing_metrics": missing,
+                "non_monotonic_metrics": non_monotonic,
+                "complete_account_window": False,
+            },
+        )
+        return {**current, "derived_delta": delta}
 
 
 class DouyinAuthorizedMetricCollectionService:

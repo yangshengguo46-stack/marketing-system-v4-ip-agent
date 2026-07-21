@@ -155,6 +155,9 @@ and records the snapshot. Credentials never enter agent context.
 The same operations are native DeerFlow tools, so the model does not need to
 construct internal HTTP calls:
 
+- `personal_ip_performance_inventory` lists sanitized active connection ids
+  and recent confirmed publish receipts across the whole portfolio. It omits
+  request bodies, executor results and every credential field.
 - `personal_ip_metrics_aggregate` reads the authenticated user's whole active
   portfolio for a time window and has no account-filter argument. Its coverage
   reports missing, partial and unavailable accounts instead of converting them
@@ -162,6 +165,13 @@ construct internal HTTP calls:
 - `personal_ip_sync_douyin_post` accepts only a connection id, confirmed
   publish-receipt id and observation idempotency key. Credential resolution,
   refresh and official collection stay server-side.
+
+Douyin post counters are cumulative snapshots, not daily totals. A first sync
+creates the baseline only. Each later sync derives an exact-interval `delta`
+from the preceding monotonic snapshot; the delta is explicitly `partial`
+because it covers one tracked post rather than proving complete account-wide
+coverage. Portfolio aggregation includes the delta, excludes the cumulative
+snapshots and preserves that partial-coverage warning.
 
 The default IP Agent and `personal-ip-operator` Skill explicitly treat the
 portfolio as conversation scope; an account is selected only for a concrete
