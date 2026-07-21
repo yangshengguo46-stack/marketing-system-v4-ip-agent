@@ -124,8 +124,12 @@ IP Agent distribution note:
   only Douyin's fixed official video-query URL and emits post-level cumulative
   snapshots; do not treat them as daily deltas. Never accept/log raw access
   tokens through a public Gateway route. `make douyin-metrics-smoke` is a
-  developer-only env-based check; production OAuth, encrypted token storage,
-  refresh and revocation remain separate work. See `docs/DOUYIN_METRICS.md`.
+  developer-only env-based check. Production `ma.video.bind` authorization is
+  mini-app based: `tt.showDouyinOpenAuth` permission ticket plus `tt.login`
+  code, one-use hashed state, server-side exchange and encrypted account-level
+  credentials under migration `0013_personal_ip_platform_connections`.
+  Connections are operation resources, never thread authority; disconnect
+  wipes the encrypted token row. See `docs/DOUYIN_METRICS.md`.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.

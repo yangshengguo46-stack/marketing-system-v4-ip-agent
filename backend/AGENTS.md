@@ -1045,8 +1045,21 @@ never includes credentials in returned errors/coverage. Private or omitted
 videos are `unavailable`, not observed zeros. The collection service verifies
 owner, account, platform, confirmed publish status and external post id before
 writing through the immutable metric repository. Do not expose a raw-token
-Gateway endpoint; the env-driven smoke script is developer-only until
-per-account OAuth credentials are encrypted, refreshable and revocable.
+Gateway endpoint; the env-driven smoke script remains developer-only.
+
+Migration `0013_personal_ip_platform_connections` and
+`deerflow.persistence.personal_ip_platform_connections` own production
+account-level authorization metadata, encrypted credentials and one-use OAuth
+state. For `ma.video.bind`, the frontend must use a real Douyin mini-app:
+`tt.showDouyinOpenAuth` supplies the permission ticket and `tt.login` supplies
+the separate code used by `code2Session`. Gateway exchanges both server-side;
+it stores only the state SHA-256 digest, never returns token/secret/session-key
+material, refreshes through the stored refresh token and deletes the encrypted
+credential row on disconnect. `DOUYIN_MINI_APP_SECRET` is server-only.
+`PERSONAL_IP_CREDENTIAL_KEY` should be stable and dedicated in production; the
+domain-separated persisted JWT-secret fallback exists for local first run.
+Platform connections bind operated account ids only and must never narrow a
+thread's portfolio access or tool authority.
 
 ### Vision Support
 

@@ -65,6 +65,9 @@ VOLCENGINE_VIDEO_MODEL=doubao-seedance-2-0-260128
 PERSONAL_IP_AUDIENCE_BASE_URL=http://127.0.0.1:9128
 PERSONAL_IP_AUDIENCE_TOKEN=
 PERSONAL_IP_AUDIENCE_MODEL=doubao-seed-2-0-pro-260215
+DOUYIN_MINI_APP_ID=
+DOUYIN_MINI_APP_SECRET=
+PERSONAL_IP_CREDENTIAL_KEY=
 MEDIAKIT_API_KEY=
 VOLCENGINE_TTS_APPID=
 VOLCENGINE_TTS_ACCESS_TOKEN=
@@ -139,8 +142,11 @@ enterprise application, `ma.video.bind` and user authorization, it queries the
 fixed official endpoint and records public-video play, like, comment and share
 counters as a post `snapshot` against the publish receipt. Private or missing
 videos become `unavailable`, never zero. Developers with credentials can run
-`make douyin-metrics-smoke`; see `docs/DOUYIN_METRICS.md`. This smoke path does
-not replace the pending production OAuth callback, encrypted per-account token
-storage, refresh and revocation flow.
+`make douyin-metrics-smoke`; see `docs/DOUYIN_METRICS.md`. Production
+authorization uses an approved Douyin mini-app: one-use state, permission
+ticket and login code are exchanged server-side; access/refresh tokens are
+encrypted per operated account, refreshable, and wiped on disconnect. No API
+accepts or returns raw tokens, and platform connections never bind a session's
+authority to one account.
 
 See `product/volcengine/capabilities.yaml` for the complete routing policy.

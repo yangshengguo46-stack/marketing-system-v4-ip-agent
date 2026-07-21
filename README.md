@@ -51,7 +51,9 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > the agent cannot approve its own proposed pattern.
 > The first real platform collector targets Douyin's official authorized-video
 > API and stores current counters as post snapshots. Private/missing videos are
-> unavailable, not zero; production OAuth storage is still pending. See
+> unavailable, not zero. Its approved mini-app flow now uses one-use state,
+> server-side code exchange, encrypted per-account credentials, refresh and
+> local disconnect; no Gateway response exposes a token. See
 > [docs/DOUYIN_METRICS.md](docs/DOUYIN_METRICS.md).
 
 ## Official Website

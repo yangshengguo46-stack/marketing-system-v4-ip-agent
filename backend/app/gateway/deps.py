@@ -170,6 +170,7 @@ if TYPE_CHECKING:
     from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
     from deerflow.persistence.personal_ip_evidence_promotions import PersonalIPEvidencePromotionRepository
     from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
+    from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
     from deerflow.persistence.personal_ip_preflights import PersonalIPPreflightRepository
     from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
     from deerflow.persistence.personal_ip_retrospectives import PersonalIPRetrospectiveRepository
@@ -310,6 +311,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
             from deerflow.persistence.personal_ip_evidence_promotions import PersonalIPEvidencePromotionRepository
             from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
+            from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
             from deerflow.persistence.personal_ip_preflights import PersonalIPPreflightRepository
             from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
             from deerflow.persistence.personal_ip_retrospectives import PersonalIPRetrospectiveRepository
@@ -324,6 +326,18 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.personal_ip_account_repo = PersonalIPAccountRepository(sf)
             app.state.personal_ip_evidence_promotion_repo = PersonalIPEvidencePromotionRepository(sf)
             app.state.personal_ip_metric_repo = PersonalIPMetricRepository(sf)
+            from app.gateway.auth.config import get_auth_config
+            from deerflow.persistence.channel_connections.sql import ChannelCredentialCipher
+
+            credential_key = os.environ.get("PERSONAL_IP_CREDENTIAL_KEY", "").strip()
+            if credential_key and len(credential_key) < 32:
+                raise RuntimeError("PERSONAL_IP_CREDENTIAL_KEY must contain at least 32 characters")
+            if not credential_key:
+                credential_key = f"personal-ip-platform-credentials:v1:{get_auth_config().jwt_secret}"
+            app.state.personal_ip_platform_connection_repo = PersonalIPPlatformConnectionRepository(
+                sf,
+                cipher=ChannelCredentialCipher.from_key(credential_key),
+            )
             app.state.personal_ip_preflight_repo = PersonalIPPreflightRepository(sf)
             app.state.personal_ip_publish_receipt_repo = PersonalIPPublishReceiptRepository(sf)
             app.state.personal_ip_retrospective_repo = PersonalIPRetrospectiveRepository(sf)
@@ -334,6 +348,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.personal_ip_account_repo = None
             app.state.personal_ip_evidence_promotion_repo = None
             app.state.personal_ip_metric_repo = None
+            app.state.personal_ip_platform_connection_repo = None
             app.state.personal_ip_preflight_repo = None
             app.state.personal_ip_publish_receipt_repo = None
             app.state.personal_ip_retrospective_repo = None
@@ -464,6 +479,13 @@ def get_personal_ip_metric_repo(request: Request) -> PersonalIPMetricRepository:
     val = getattr(request.app.state, "personal_ip_metric_repo", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Personal-IP metric repository not available")
+    return val
+
+
+def get_personal_ip_platform_connection_repo(request: Request) -> PersonalIPPlatformConnectionRepository:
+    val = getattr(request.app.state, "personal_ip_platform_connection_repo", None)
+    if val is None:
+        raise HTTPException(status_code=503, detail="Personal-IP platform connection repository not available")
     return val
 
 

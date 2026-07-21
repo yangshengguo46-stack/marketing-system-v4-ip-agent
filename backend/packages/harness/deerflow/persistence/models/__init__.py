@@ -25,6 +25,11 @@ from deerflow.persistence.models.run_event import RunEventRow
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
 from deerflow.persistence.personal_ip_evidence_promotions.model import PersonalIPEvidencePromotionRow
 from deerflow.persistence.personal_ip_metrics.model import PersonalIPMetricObservationRow
+from deerflow.persistence.personal_ip_platform_connections.model import (
+    PersonalIPPlatformConnectionRow,
+    PersonalIPPlatformCredentialRow,
+    PersonalIPPlatformOAuthStateRow,
+)
 from deerflow.persistence.personal_ip_preflights.model import PersonalIPPreflightRow
 from deerflow.persistence.personal_ip_publish_receipts.model import PersonalIPPublishReceiptRow
 from deerflow.persistence.personal_ip_retrospectives.model import PersonalIPRetrospectiveRow
@@ -44,6 +49,9 @@ __all__ = [
     "PersonalIPAccountRow",
     "PersonalIPEvidencePromotionRow",
     "PersonalIPMetricObservationRow",
+    "PersonalIPPlatformConnectionRow",
+    "PersonalIPPlatformCredentialRow",
+    "PersonalIPPlatformOAuthStateRow",
     "PersonalIPPreflightRow",
     "PersonalIPPublishReceiptRow",
     "PersonalIPRetrospectiveRow",
