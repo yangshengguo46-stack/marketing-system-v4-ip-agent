@@ -2,6 +2,7 @@ from .clarification_tool import ask_clarification_tool
 from .personal_ip_tools import (
     personal_ip_metrics_aggregate_tool,
     personal_ip_performance_inventory_tool,
+    personal_ip_select_browser_account_tool,
     personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "present_file_tool",
     "personal_ip_metrics_aggregate_tool",
     "personal_ip_performance_inventory_tool",
+    "personal_ip_select_browser_account_tool",
     "personal_ip_sync_douyin_portfolio_tool",
     "personal_ip_sync_douyin_post_tool",
     "review_skill_package",

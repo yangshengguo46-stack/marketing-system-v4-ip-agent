@@ -9,6 +9,8 @@ from hashlib import sha256
 
 from langchain.tools import tool
 
+from deerflow.config.paths import get_paths
+from deerflow.personal_ip.browser_profiles import select_browser_account_target
 from deerflow.personal_ip.douyin_oauth import DouyinMiniAppOAuthClient, DouyinOAuthError
 from deerflow.personal_ip.platform_metrics import (
     DouyinAuthorizedMetricCollectionService,
@@ -183,6 +185,61 @@ async def _personal_ip_performance_inventory(
         return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
     except Exception:
         return _json({"status": "error", "category": "internal", "message": "Performance inventory is unavailable"})
+
+
+async def _personal_ip_select_browser_account(
+    runtime: Runtime,
+    account_id: str,
+) -> str:
+    """Select one account's persistent local browser profile for the next operation.
+
+    Selection changes only the concrete browser target for this thread. It does
+    not restrict the conversation, tools, data access, or portfolio aggregation
+    to this account. Login cookies stay in a user/account-isolated local browser
+    directory; passwords are never accepted by this tool.
+
+    Args:
+        account_id: Server-issued Personal-IP account id to operate now.
+
+    Returns:
+        Sanitized account, platform and creator-center start URL metadata.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.accounts is None:
+            raise RuntimeError("Personal-IP account persistence is not available")
+        owner_user_id = resolve_runtime_user_id(runtime)
+        thread_id = str((runtime.context or {}).get("thread_id") or "").strip()
+        if not thread_id:
+            raise ValueError("browser account selection requires a thread")
+        account = await services.accounts.get(account_id, owner_user_id=owner_user_id)
+        if account is None or account.get("status") != "active":
+            raise ValueError("Personal-IP account not found")
+        paths = get_paths()
+        safe_user_id = paths.prepare_user_dir_for_raw_id(owner_user_id)
+        profile_dir = paths.ensure_browser_profile_dir(account["id"], user_id=safe_user_id)
+        target = select_browser_account_target(
+            owner_user_id=owner_user_id,
+            thread_id=thread_id,
+            account_id=account["id"],
+            platform=account["platform"],
+            display_name=account["display_name"],
+            user_data_dir=profile_dir,
+        )
+        return _json(
+            {
+                "status": "ok",
+                "connection_mode": "browser_profile",
+                "account_id": target.account_id,
+                "platform": target.platform,
+                "display_name": target.display_name,
+                "start_url": target.start_url,
+            }
+        )
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Browser account selection is unavailable"})
 
 
 def _portfolio_observation_key(
@@ -365,6 +422,11 @@ personal_ip_performance_inventory_tool = tool(
     "personal_ip_performance_inventory",
     parse_docstring=True,
 )(_personal_ip_performance_inventory)
+
+personal_ip_select_browser_account_tool = tool(
+    "personal_ip_select_browser_account",
+    parse_docstring=True,
+)(_personal_ip_select_browser_account)
 
 personal_ip_sync_douyin_portfolio_tool = tool(
     "personal_ip_sync_douyin_portfolio",

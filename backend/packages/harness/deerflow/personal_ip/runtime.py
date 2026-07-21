@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
 from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
 from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
 from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
@@ -14,6 +15,7 @@ class PersonalIPRuntimeServices:
     connections: PersonalIPPlatformConnectionRepository
     metrics: PersonalIPMetricRepository
     publish_receipts: PersonalIPPublishReceiptRepository
+    accounts: PersonalIPAccountRepository | None = None
 
 
 _services: PersonalIPRuntimeServices | None = None

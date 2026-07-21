@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from app.gateway.authz import require_permission
 from app.gateway.browser_capability import browser_capability
 from deerflow.config.paths import get_paths
+from deerflow.personal_ip.browser_profiles import get_browser_account_target
 from deerflow.runtime.user_context import get_effective_user_id, reset_current_user, set_current_user
 
 logger = logging.getLogger(__name__)
@@ -95,8 +96,15 @@ async def navigate_browser(thread_id: str, body: BrowserNavigateRequest, request
         raise HTTPException(status_code=400, detail="URL is required")
 
     outputs_path = get_paths().sandbox_outputs_dir(thread_id, user_id=get_effective_user_id())
+    target = get_browser_account_target(owner_user_id=user_id, thread_id=thread_id)
     try:
-        result = await navigate_and_capture(thread_id=thread_id, url=url, outputs_path=outputs_path)
+        result = await navigate_and_capture(
+            thread_id=thread_id,
+            url=url,
+            outputs_path=outputs_path,
+            session_key=target.session_key if target is not None else None,
+            user_data_dir=str(target.user_data_dir) if target is not None else None,
+        )
     except ValueError as exc:
         # SSRF / URL validation failure.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -271,13 +279,15 @@ async def browser_stream(websocket: WebSocket, thread_id: str) -> None:
         return value.strip() or None if isinstance(value, str) else None
 
     manager = get_browser_session_manager()
+    target = get_browser_account_target(owner_user_id=str(user.id), thread_id=thread_id)
     try:
         session_lease = manager.acquire_session(
-            thread_id,
+            target.session_key if target is not None else thread_id,
             headless=_cfg_bool("headless", True),
             timeout_ms=_cfg_int("timeout_ms", 30000),
             viewport={"width": _cfg_int("viewport_width", 1280), "height": _cfg_int("viewport_height", 720)},
             cdp_url=_cfg_str("cdp_url"),
+            user_data_dir=str(target.user_data_dir) if target is not None else None,
             allow_unguarded_cdp=_cfg_bool("allow_unguarded_cdp", False),
             url_guard=validate_browser_url,
         )

@@ -12,6 +12,7 @@ VIRTUAL_PATH_PREFIX = "/mnt/user-data"
 
 _SAFE_THREAD_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
 _SAFE_USER_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
+_SAFE_ACCOUNT_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
 _UNSAFE_USER_ID_CHAR_RE = re.compile(r"[^A-Za-z0-9_\-]")
 _SAFE_USER_ID_DIGEST_HEX_LEN = 16
 
@@ -35,6 +36,13 @@ def _validate_user_id(user_id: str) -> str:
     if not _SAFE_USER_ID_RE.match(user_id):
         raise ValueError(f"Invalid user_id {user_id!r}: only alphanumeric characters, hyphens, and underscores are allowed.")
     return user_id
+
+
+def _validate_account_id(account_id: str) -> str:
+    """Validate an account ID before using it in filesystem paths."""
+    if not _SAFE_ACCOUNT_ID_RE.match(account_id):
+        raise ValueError(f"Invalid account_id {account_id!r}: only alphanumeric characters, hyphens, and underscores are allowed.")
+    return account_id
 
 
 def make_safe_user_id(raw: str) -> str:
@@ -226,6 +234,21 @@ class Paths:
     def user_skills_dir(self, user_id: str) -> Path:
         """Per-user root for that user's custom skills: `{base_dir}/users/{user_id}/skills/`."""
         return self.user_dir(user_id) / "skills"
+
+    def browser_profiles_dir(self, user_id: str) -> Path:
+        """Per-user root for persistent account browser profiles."""
+        return self.user_dir(user_id) / "browser-profiles"
+
+    def browser_profile_dir(self, account_id: str, *, user_id: str) -> Path:
+        """Persistent browser data for one operated account."""
+        return self.browser_profiles_dir(user_id) / _validate_account_id(account_id)
+
+    def ensure_browser_profile_dir(self, account_id: str, *, user_id: str) -> Path:
+        """Create an owner/account-isolated browser profile with private permissions."""
+        directory = self.browser_profile_dir(account_id, user_id=user_id)
+        directory.mkdir(parents=True, exist_ok=True)
+        directory.chmod(0o700)
+        return directory
 
     def user_custom_skills_dir(self, user_id: str) -> Path:
         """Per-user custom skills directory: `{base_dir}/users/{user_id}/skills/custom/`.

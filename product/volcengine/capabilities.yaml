@@ -3,10 +3,30 @@ updated_at: "2026-07-21"
 policy:
   harness: deerflow-local
   provider_preference: bytedance-volcengine-first
+  platform_connection_preference: local-browser-first
+  official_platform_api_required: false
   paid_batches_require_approval: true
   receipts_required: true
 
 capabilities:
+  platform_operations:
+    default_integration: deerflow-browser-control
+    fallback_integration: ui-tars
+    official_api_role: optional-connector
+    login_policy: user-completes-platform-login-and-challenges
+    credential_policy: passwords-never-enter-agent-context
+    session_scope: complete-user-portfolio
+    operation_scope: exact-target-account
+    persistent_profile_scope: owner-plus-account
+    platforms:
+      - douyin
+      - wechat_channels
+      - wechat_official
+      - xiaohongshu
+      - x
+      - instagram
+      - youtube
+      - tiktok
   audience_intelligence:
     product: ByteDance HLLM-Creator
     integration: separate-model-provider

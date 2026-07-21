@@ -346,6 +346,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
 
             configure_personal_ip_runtime(
                 PersonalIPRuntimeServices(
+                    accounts=app.state.personal_ip_account_repo,
                     connections=app.state.personal_ip_platform_connection_repo,
                     metrics=app.state.personal_ip_metric_repo,
                     publish_receipts=app.state.personal_ip_publish_receipt_repo,

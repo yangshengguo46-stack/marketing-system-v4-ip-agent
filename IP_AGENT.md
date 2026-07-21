@@ -189,4 +189,19 @@ The default IP Agent and `personal-ip-operator` Skill explicitly treat the
 portfolio as conversation scope; an account is selected only for a concrete
 operation and receipt.
 
+### Browser-first platform accounts
+
+Douyin, WeChat Channels, WeChat Official Accounts, Xiaohongshu, X, Instagram,
+YouTube and TikTok use local browser login state by default. Call
+`personal_ip_select_browser_account(account_id)` before a concrete platform
+operation. DeerFlow then uses a persistent Chromium profile isolated by
+authenticated user and operated account; switching accounts switches the
+browser target but never changes conversation authority.
+
+Passwords, cookies and the local profile path never enter model context. The
+user completes QR login, CAPTCHA, MFA and identity checks in the live browser.
+Official OAuth/API integrations, including the existing Douyin connector, are
+optional accelerators. See
+[`docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md`](docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md).
+
 See `product/volcengine/capabilities.yaml` for the complete routing policy.

@@ -10,6 +10,7 @@ from deerflow.tools.builtins import (
     ask_clarification_tool,
     personal_ip_metrics_aggregate_tool,
     personal_ip_performance_inventory_tool,
+    personal_ip_select_browser_account_tool,
     personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,
     present_file_tool,
@@ -28,6 +29,7 @@ BUILTIN_TOOLS = [
     review_skill_package,
     personal_ip_metrics_aggregate_tool,
     personal_ip_performance_inventory_tool,
+    personal_ip_select_browser_account_tool,
     personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,
 ]

@@ -53,6 +53,11 @@ facts through a Tool/MCP; do not recreate that model in prompts.
    `volcengine-stack` before any ByteDance media work.
 5. Put irreversible or paid steps behind explicit approval: batch generation,
    publishing, deleting, account changes and sending messages.
+   Platform operation is browser-first: call
+   `personal_ip_select_browser_account` with the concrete target, then use
+   DeerFlow Browser Control and UI-TARS only as needed. Account selection does
+   not narrow the rest of the conversation. The user handles password, QR,
+   CAPTCHA, MFA and identity prompts; never request those secrets in chat.
 6. Produce an operation receipt that links decisions, assets and outputs.
 7. After publication, distinguish observations from interpretations. Persist
    stable account facts to memory; keep raw evidence and receipts as artifacts.

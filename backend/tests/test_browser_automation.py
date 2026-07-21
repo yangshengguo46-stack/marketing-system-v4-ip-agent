@@ -830,6 +830,27 @@ class TestSessionManager:
 
         assert session._cdp_url == "http://127.0.0.1:9222"
 
+    async def test_account_profile_and_cdp_cannot_share_a_browser_session(self, tmp_path):
+        manager = BrowserSessionManager()
+
+        with pytest.raises(RuntimeError, match="cannot be used together"):
+            manager.get_session(
+                "account:user-1:acct-1",
+                cdp_url="http://127.0.0.1:9222",
+                user_data_dir=str(tmp_path / "acct-1"),
+                allow_unguarded_cdp=True,
+            )
+
+    async def test_account_profile_path_is_kept_inside_the_session(self, tmp_path):
+        manager = BrowserSessionManager()
+        fake_loop = MagicMock()
+        profile = str(tmp_path / "acct-1")
+
+        with patch.object(manager, "_ensure_loop", return_value=fake_loop):
+            session = manager.get_session("account:user-1:acct-1", user_data_dir=profile)
+
+        assert session._user_data_dir == profile
+
     async def test_acquire_session_releases_pin_after_scope(self):
         manager = BrowserSessionManager()
         fake_loop = MagicMock()
@@ -913,6 +934,39 @@ def test_resolve_session_always_reads_browser_navigate_config():
     assert captured["viewport"] == {"width": 1920, "height": 1080}
     assert captured["cdp_url"] == "http://127.0.0.1:9222"
     assert captured["allow_unguarded_cdp"] is True
+
+
+def test_resolve_session_uses_selected_account_profile_without_narrowing_runtime(tmp_path):
+    from deerflow.personal_ip.browser_profiles import clear_browser_account_target, select_browser_account_target
+
+    selected = select_browser_account_target(
+        owner_user_id="user-1",
+        thread_id="thread-1",
+        account_id="acct-youtube",
+        platform="youtube",
+        display_name="YouTube 主账号",
+        user_data_dir=tmp_path / "youtube",
+    )
+    captured: dict[str, object] = {}
+
+    class _FakeManager:
+        def get_session(self, session_key, **kwargs):
+            captured.update(kwargs)
+            captured["session_key"] = session_key
+            return MagicMock()
+
+    runtime = _runtime()
+    runtime.context["user_id"] = "user-1"
+    with (
+        patch.object(tools, "_get_tool_config", return_value={}),
+        patch.object(tools, "get_browser_session_manager", return_value=_FakeManager()),
+    ):
+        tools._resolve_session(runtime, "browser_navigate")
+
+    assert captured["session_key"] == selected.session_key
+    assert captured["user_data_dir"] == str(tmp_path / "youtube")
+    assert runtime.context == {"thread_id": "thread-1", "user_id": "user-1"}
+    clear_browser_account_target(owner_user_id="user-1", thread_id="thread-1")
 
 
 def test_reset_manager_singleton():

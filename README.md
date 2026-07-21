@@ -62,6 +62,12 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > snapshots produce exact-interval deltas, always marked partial because
 > tracked posts are not proof of complete account coverage. See
 > [docs/DOUYIN_METRICS.md](docs/DOUYIN_METRICS.md).
+>
+> Social platform operation is browser-first across Douyin, WeChat Channels,
+> WeChat Official Accounts, Xiaohongshu, X, Instagram, YouTube and TikTok. Each
+> account has an owner-isolated persistent local Chromium profile; official
+> APIs are optional connectors. See
+> [docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md](docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md).
 
 ## Official Website
 

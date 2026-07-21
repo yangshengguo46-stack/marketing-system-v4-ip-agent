@@ -265,6 +265,7 @@ class BrowserSession:
         timeout_ms: int,
         viewport: dict[str, int],
         cdp_url: str | None = None,
+        user_data_dir: str | None = None,
         url_guard: Callable[[str], str | None] | None = None,
         on_activity: Callable[[], None] | None = None,
     ) -> None:
@@ -286,6 +287,10 @@ class BrowserSession:
         # launching a private headless instance. The user watches the agent
         # drive their own visible browser, with their real login sessions.
         self._cdp_url = cdp_url
+        # A Personal-IP account can opt into a persistent Chromium profile.
+        # The path is resolved by trusted server-side account selection and is
+        # never accepted from a browser tool argument or returned to the model.
+        self._user_data_dir = user_data_dir
         self._on_activity = on_activity
         self._activity_lock = threading.Lock()
         self._active_refs = 0
@@ -374,6 +379,21 @@ class BrowserSession:
                 self._context = self._browser.contexts[0] if self._browser.contexts else await self._browser.new_context()
                 self._context.set_default_timeout(self._timeout_ms)
                 existing = self._context.pages
+                self._set_active_page(existing[-1] if existing else await self._context.new_page())
+                self._bind_new_page_listener()
+                return self._page
+
+            if self._user_data_dir:
+                if self._context is None:
+                    self._context = await self._playwright.chromium.launch_persistent_context(
+                        self._user_data_dir,
+                        headless=self._headless,
+                        viewport=self._viewport,
+                        device_scale_factor=2,
+                    )
+                    self._context.set_default_timeout(self._timeout_ms)
+                    await self._install_request_guard()
+                existing = [page for page in self._context.pages if not page.is_closed()]
                 self._set_active_page(existing[-1] if existing else await self._context.new_page())
                 self._bind_new_page_listener()
                 return self._page
@@ -832,12 +852,13 @@ class BrowserSession:
 
 
 class BrowserSessionManager:
-    """Process-local registry of per-thread browser sessions.
+    """Process-local registry of bounded browser sessions.
 
-    Sessions are keyed by ``thread_id`` and each owns a headless Chromium
-    process, so a long-running multi-user gateway would otherwise accumulate one
-    browser per thread that ever used the tools (a real memory/FD leak). To bound
-    that, ``get_session`` lazily evicts sessions that have been idle past
+    General browsing is keyed by ``thread_id``. Personal-IP operations may use
+    a user/account key backed by a persistent local Chromium profile. Each live
+    session owns a Chromium process, so a long-running multi-user gateway would
+    otherwise accumulate a real memory/FD leak. To bound that, ``get_session``
+    lazily evicts sessions that have been idle past
     ``idle_timeout_s`` and enforces a ``max_sessions`` cap by closing the
     least-recently-used unpinned session. Active browser operations and Live
     WebSocket leases are reference-counted, so eviction never closes a session
@@ -873,6 +894,7 @@ class BrowserSessionManager:
         timeout_ms: int = 30000,
         viewport: dict[str, int] | None = None,
         cdp_url: str | None = None,
+        user_data_dir: str | None = None,
         allow_unguarded_cdp: bool = False,
         url_guard: Callable[[str], str | None] | None = None,
         pin: bool = False,
@@ -880,6 +902,8 @@ class BrowserSessionManager:
         ensure_browser_worker_compatibility()
         if cdp_url and not allow_unguarded_cdp:
             raise RuntimeError("cdp_url uses a browser context where DeerFlow cannot enforce its SSRF request guard; set allow_unguarded_cdp: true only for an explicitly trusted local Chrome session")
+        if cdp_url and user_data_dir:
+            raise RuntimeError("cdp_url and an account browser profile cannot be used together")
         key = thread_id or "default"
         now = time.monotonic()
         evicted: list[BrowserSession] = []
@@ -898,6 +922,7 @@ class BrowserSessionManager:
                     timeout_ms=timeout_ms,
                     viewport=viewport or {"width": 1280, "height": 720},
                     cdp_url=cdp_url,
+                    user_data_dir=user_data_dir,
                     url_guard=url_guard,
                     on_activity=lambda: self._touch_session(key),
                 )

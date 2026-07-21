@@ -146,6 +146,14 @@ class TestUserThreadDir:
 
 
 class TestUserSandboxDirs:
+    def test_browser_profile_dir_is_user_and_account_scoped(self, paths: Paths):
+        expected = paths.base_dir / "users" / "u1" / "browser-profiles" / "acct-youtube"
+        assert paths.browser_profile_dir("acct-youtube", user_id="u1") == expected
+
+    def test_browser_profile_dir_rejects_path_traversal(self, paths: Paths):
+        with pytest.raises(ValueError, match="Invalid account_id"):
+            paths.browser_profile_dir("../other-account", user_id="u1")
+
     def test_sandbox_work_dir(self, paths: Paths):
         expected = paths.base_dir / "users" / "u1" / "threads" / "t1" / "user-data" / "workspace"
         assert paths.sandbox_work_dir("t1", user_id="u1") == expected

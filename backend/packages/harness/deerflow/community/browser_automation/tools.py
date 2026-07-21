@@ -30,6 +30,8 @@ from deerflow.community.url_safety import validate_public_http_url
 from deerflow.config import get_app_config
 from deerflow.config.paths import VIRTUAL_PATH_PREFIX
 from deerflow.constants import BROWSER_FRAMES_DIRNAME
+from deerflow.personal_ip.browser_profiles import get_browser_account_target
+from deerflow.runtime.user_context import resolve_runtime_user_id
 from deerflow.tools.types import Runtime
 
 from .session import BrowserSession, BrowserSessionManager, PageSnapshot, get_browser_session_manager
@@ -90,16 +92,31 @@ def _as_str(value: object) -> str | None:
 class _SessionLease:
     """Context manager that keeps a process-local browser session pinned."""
 
-    def __init__(self, manager: BrowserSessionManager, thread_id: str | None, session: BrowserSession) -> None:
+    def __init__(self, manager: BrowserSessionManager, session_key: str | None, session: BrowserSession) -> None:
         self._manager = manager
-        self._thread_id = thread_id
+        self._session_key = session_key
         self.session = session
 
     def __enter__(self) -> BrowserSession:
         return self.session
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
-        self._manager.release_session(self._thread_id, self.session)
+        self._manager.release_session(self._session_key, self.session)
+
+
+def _session_target(runtime: Runtime) -> tuple[str | None, str | None]:
+    """Resolve an optional account operation target without changing authority."""
+    thread_id = _thread_id(runtime)
+    if not thread_id:
+        return None, None
+    try:
+        owner_user_id = resolve_runtime_user_id(runtime)
+    except RuntimeError:
+        return thread_id, None
+    target = get_browser_account_target(owner_user_id=owner_user_id, thread_id=thread_id)
+    if target is None:
+        return thread_id, None
+    return target.session_key, str(target.user_data_dir)
 
 
 def _resolve_session(runtime: Runtime, tool_name: str) -> _SessionLease:
@@ -119,18 +136,19 @@ def _resolve_session(runtime: Runtime, tool_name: str) -> _SessionLease:
     height = _as_int(cfg.get("viewport_height"), 720)
     cdp_url = _as_str(cfg.get("cdp_url"))
     manager = get_browser_session_manager()
-    thread_id = _thread_id(runtime)
+    session_key, user_data_dir = _session_target(runtime)
     session = manager.get_session(
-        thread_id,
+        session_key,
         headless=headless,
         timeout_ms=timeout_ms,
         viewport={"width": width, "height": height},
         cdp_url=cdp_url,
+        user_data_dir=user_data_dir,
         allow_unguarded_cdp=_as_bool(cfg.get("allow_unguarded_cdp"), False),
         url_guard=validate_browser_url,
         pin=True,
     )
-    return _SessionLease(manager, thread_id, session)
+    return _SessionLease(manager, session_key, session)
 
 
 def validate_browser_url(url: str, *, tool_name: str = "browser_navigate") -> str | None:
@@ -217,7 +235,14 @@ def _snapshot_command(
     return Command(update=update)
 
 
-async def navigate_and_capture(*, thread_id: str | None, url: str, outputs_path: Path) -> dict:
+async def navigate_and_capture(
+    *,
+    thread_id: str | None,
+    url: str,
+    outputs_path: Path,
+    session_key: str | None = None,
+    user_data_dir: str | None = None,
+) -> dict:
     """Drive the per-thread browser session to *url* and capture a screenshot.
 
     Used by the Gateway browser router so a user can steer the live session from
@@ -233,11 +258,12 @@ async def navigate_and_capture(*, thread_id: str | None, url: str, outputs_path:
     cfg = _get_tool_config("browser_navigate")
     manager = get_browser_session_manager()
     with manager.acquire_session(
-        thread_id,
+        session_key or thread_id,
         headless=_as_bool(cfg.get("headless"), True),
         timeout_ms=_as_int(cfg.get("timeout_ms"), 30000),
         viewport={"width": _as_int(cfg.get("viewport_width"), 1280), "height": _as_int(cfg.get("viewport_height"), 720)},
         cdp_url=_as_str(cfg.get("cdp_url")),
+        user_data_dir=user_data_dir,
         allow_unguarded_cdp=_as_bool(cfg.get("allow_unguarded_cdp"), False),
         url_guard=validate_browser_url,
     ) as session:
@@ -440,7 +466,8 @@ async def browser_close_tool(runtime: Runtime, tool_call_id: Annotated[str, Inje
     """Close the current browser session and free its resources. Call this when done with the browsing flow; a later browser_navigate starts a fresh session."""
     try:
         manager = get_browser_session_manager()
-        closed = await manager.close_session(_thread_id(runtime))
+        session_key, _ = _session_target(runtime)
+        closed = await manager.close_session(session_key)
         msg = "Browser session closed." if closed else "No active browser session to close."
         return _tool_message(msg, tool_call_id)
     except Exception as e:

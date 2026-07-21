@@ -1093,6 +1093,16 @@ interval `delta` from monotonic counter differences. The delta is always
 decreasing counters remain coverage metadata. The first snapshot is a baseline
 only and must not be aggregated as a daily total.
 
+Personal-IP browser-first operation uses
+`deerflow.personal_ip.browser_profiles`. The native selection tool validates
+account ownership and creates a private profile directory through `Paths`; it
+returns no path or credential material. Browser tools resolve the selected
+owner/thread target to a user/account session key and persistent Chromium
+`user_data_dir`. This is an operation target, not authorization: never use it
+to filter portfolio context, metrics, tools or memory. General browsing without
+an account selection remains thread-scoped. A configured CDP browser and a
+persistent account profile are mutually exclusive for one session.
+
 ### Vision Support
 
 For models with `supports_vision: true`:

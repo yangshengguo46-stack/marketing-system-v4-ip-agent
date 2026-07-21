@@ -147,6 +147,13 @@ IP Agent distribution note:
   same post series. Derived deltas are always `partial` with
   `scope_limit=tracked_post_only`; never relabel them complete account totals or
   infer data before the baseline timestamp.
+- Personal-IP platform operation is browser-first for Douyin, WeChat Channels,
+  WeChat Official Accounts, Xiaohongshu, X, Instagram, YouTube and TikTok.
+  `personal_ip_select_browser_account` selects only the concrete operation
+  target. Browser Control resolves that selection to an owner/account-isolated
+  persistent Chromium profile; it never narrows conversation authority or
+  exposes the profile path/cookies/passwords to the model. See
+  `docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md`.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.

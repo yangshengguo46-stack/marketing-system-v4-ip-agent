@@ -10,12 +10,14 @@ from deerflow.personal_ip.runtime import PersonalIPRuntimeServices, configure_pe
 from deerflow.tools.builtins import (
     personal_ip_metrics_aggregate_tool,
     personal_ip_performance_inventory_tool,
+    personal_ip_select_browser_account_tool,
     personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,
 )
 from deerflow.tools.builtins.personal_ip_tools import (
     _personal_ip_metrics_aggregate,
     _personal_ip_performance_inventory,
+    _personal_ip_select_browser_account,
     _personal_ip_sync_douyin_portfolio,
     _personal_ip_sync_douyin_post,
 )
@@ -104,11 +106,13 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     names = {tool.name for tool in BUILTIN_TOOLS}
     assert personal_ip_metrics_aggregate_tool.name == "personal_ip_metrics_aggregate"
     assert personal_ip_performance_inventory_tool.name == "personal_ip_performance_inventory"
+    assert personal_ip_select_browser_account_tool.name == "personal_ip_select_browser_account"
     assert personal_ip_sync_douyin_portfolio_tool.name == "personal_ip_sync_douyin_portfolio"
     assert personal_ip_sync_douyin_post_tool.name == "personal_ip_sync_douyin_post"
     assert {
         "personal_ip_metrics_aggregate",
         "personal_ip_performance_inventory",
+        "personal_ip_select_browser_account",
         "personal_ip_sync_douyin_portfolio",
         "personal_ip_sync_douyin_post",
     } <= names
@@ -261,3 +265,52 @@ async def test_portfolio_sync_collects_every_connected_douyin_publication_and_is
         assert len(call.kwargs["observation_key"]) == len("portfolio-douyin:") + 64
     connections.list.assert_awaited_once_with("user-1", include_revoked=False)
     receipts.list.assert_awaited_once_with("user-1", limit=500)
+
+
+@pytest.mark.asyncio
+async def test_select_browser_account_uses_an_account_scoped_persistent_profile(tmp_path, monkeypatch) -> None:
+    from deerflow.config.paths import Paths
+    from deerflow.personal_ip.browser_profiles import clear_browser_account_target, get_browser_account_target
+
+    accounts = SimpleNamespace(
+        get=AsyncMock(
+            return_value={
+                "id": "acct-youtube",
+                "owner_user_id": "user-1",
+                "platform": "youtube",
+                "display_name": "YouTube 主账号",
+                "status": "active",
+            }
+        )
+    )
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            accounts=accounts,
+            connections=SimpleNamespace(),
+            metrics=SimpleNamespace(),
+            publish_receipts=SimpleNamespace(),
+        )
+    )
+    monkeypatch.setattr("deerflow.tools.builtins.personal_ip_tools.get_paths", lambda: Paths(tmp_path))
+    runtime = SimpleNamespace(context={"user_id": "user-1", "thread_id": "thread-1"})
+    clear_browser_account_target(owner_user_id="user-1", thread_id="thread-1")
+
+    raw = await _personal_ip_select_browser_account(runtime, account_id="acct-youtube")
+    payload = json.loads(raw)
+    target = get_browser_account_target(owner_user_id="user-1", thread_id="thread-1")
+
+    assert payload == {
+        "account_id": "acct-youtube",
+        "connection_mode": "browser_profile",
+        "display_name": "YouTube 主账号",
+        "platform": "youtube",
+        "start_url": "https://studio.youtube.com/",
+        "status": "ok",
+    }
+    assert target is not None
+    assert target.session_key == "account:user-1:acct-youtube"
+    assert target.user_data_dir == tmp_path / "users" / "user-1" / "browser-profiles" / "acct-youtube"
+    assert target.user_data_dir.is_dir()
+    assert "password" not in raw.lower()
+    accounts.get.assert_awaited_once_with("acct-youtube", owner_user_id="user-1")
+    clear_browser_account_target(owner_user_id="user-1", thread_id="thread-1")
