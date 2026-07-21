@@ -131,6 +131,16 @@ and partial metric coverage stays partial. The row is always marked
 `pending_human_review`; the separate evidence-promotion policy remains pending
 and no retrospective automatically enters HLLM training.
 
+`personal_ip_evidence_promotions` is the explicit promotion gate. A proposed
+audience/content/platform pattern or training cohort must cite at least three
+complete retrospectives from distinct publish receipts; repeated horizons of
+one post count once, and partial observations do not satisfy support. The agent
+can assemble the proposal but cannot approve it: a terminal decision stores an
+authenticated-user confirmation, rationale and timestamp. Approved evidence
+exports use `personal-ip-approved-evidence-v1` and retain source completeness
+and score provenance. Converting those approved manifests into a versioned
+HLLM dataset/checkpoint remains a separate controlled model-building action.
+
 ## Minimal patch policy
 
 Keep upstream model architecture and loss functions unchanged. Product work is

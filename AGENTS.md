@@ -111,6 +111,14 @@ IP Agent distribution note:
   the selected variant plus outcomes under an evidence digest, and remain
   `pending_human_review`. Do not auto-promote a retrospective into training or
   invent a score when HLLM-Lite returned none.
+- Personal-IP evidence promotion lives in
+  `deerflow.persistence.personal_ip_evidence_promotions` and migration
+  `0012_personal_ip_evidence_promotions`. A proposal needs at least three
+  complete retrospectives from distinct publish receipts; different horizons
+  of one post count once and partial observations do not satisfy the threshold.
+  Approval/rejection is terminal, requires explicit authenticated-user
+  confirmation and rationale, and is the only path to the approved-evidence
+  export contract. Preserve source status/comparison provenance in exports.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.

@@ -45,6 +45,10 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > receipt and post-level observations into one digest. They expose calibrated
 > versus unscored predictions and remain pending human review; a single result
 > never promotes itself into model training.
+> Evidence promotion requires at least three complete retrospectives from
+> different published posts plus an explicit authenticated-user decision.
+> Approved manifests retain partial/scored provenance for downstream training;
+> the agent cannot approve its own proposed pattern.
 
 ## Official Website
 

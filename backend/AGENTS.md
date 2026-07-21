@@ -1022,6 +1022,20 @@ All new rows remain `pending_human_review`: this repository is evidence
 settlement, not automatic rubric/model promotion, and it never rewrites the
 preflight.
 
+Migration `0012_personal_ip_evidence_promotions` and
+`deerflow.persistence.personal_ip_evidence_promotions` own cross-sample pattern
+proposals and terminal user decisions. Gateway endpoints are under
+`/api/personal-ip/evidence-promotions`. `minimum_support` is always at least
+three and counts distinct publish receipts whose retrospective status is
+`measured`; several horizons for one publication count once and partial rows
+never satisfy the threshold. An agent may prepare a proposal, but approval or
+rejection requires `confirmed_by_user=true`, stores authenticated user id,
+rationale and timestamp, and cannot be reversed. Only approved proposals can
+export `personal-ip-approved-evidence-v1`; exports must retain every source's
+status, comparison state and training-eligibility provenance. Approval creates
+a reviewable training candidate—it does not silently mutate a live model or
+rubric version.
+
 ### Vision Support
 
 For models with `supports_vision: true`:

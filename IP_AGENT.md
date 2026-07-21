@@ -123,4 +123,15 @@ candidate without `match_score` remains `unscored`. Every retrospective starts
 as `pending_human_review`; no single post can automatically become a training
 example or rewrite its original prediction.
 
+Cross-sample rules are proposed through
+`POST /api/personal-ip/evidence-promotions`. At least three complete
+retrospectives from three different published posts must support the claim;
+multiple observation horizons for one post count only once and partial data
+does not fill the quota. The agent may assemble the candidate, but the terminal
+decision endpoint requires an explicit authenticated-user confirmation and
+rationale. Only an approved proposal can be exported as
+`personal-ip-approved-evidence-v1`, with each source's complete/partial and
+scored/unscored provenance intact. Export is a candidate for later dataset or
+model versioning, not an automatic live-model update.
+
 See `product/volcengine/capabilities.yaml` for the complete routing policy.
