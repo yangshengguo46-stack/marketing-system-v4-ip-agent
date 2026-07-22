@@ -30,6 +30,7 @@ from deerflow.persistence.personal_ip_platform_connections.model import (
     PersonalIPPlatformCredentialRow,
     PersonalIPPlatformOAuthStateRow,
 )
+from deerflow.persistence.personal_ip_platform_observations.model import PersonalIPPlatformObservationRow
 from deerflow.persistence.personal_ip_preflights.model import PersonalIPPreflightRow
 from deerflow.persistence.personal_ip_publish_receipts.model import PersonalIPPublishReceiptRow
 from deerflow.persistence.personal_ip_retrospectives.model import PersonalIPRetrospectiveRow
@@ -52,6 +53,7 @@ __all__ = [
     "PersonalIPPlatformConnectionRow",
     "PersonalIPPlatformCredentialRow",
     "PersonalIPPlatformOAuthStateRow",
+    "PersonalIPPlatformObservationRow",
     "PersonalIPPreflightRow",
     "PersonalIPPublishReceiptRow",
     "PersonalIPRetrospectiveRow",

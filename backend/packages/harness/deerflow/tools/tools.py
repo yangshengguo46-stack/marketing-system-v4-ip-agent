@@ -8,8 +8,10 @@ from deerflow.reflection import resolve_variable
 from deerflow.sandbox.security import is_host_bash_allowed
 from deerflow.tools.builtins import (
     ask_clarification_tool,
+    personal_ip_collect_douyin_browser_page_tool,
     personal_ip_metrics_aggregate_tool,
     personal_ip_performance_inventory_tool,
+    personal_ip_record_browser_observation_tool,
     personal_ip_select_browser_account_tool,
     personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,
@@ -27,8 +29,10 @@ BUILTIN_TOOLS = [
     present_file_tool,
     ask_clarification_tool,
     review_skill_package,
+    personal_ip_collect_douyin_browser_page_tool,
     personal_ip_metrics_aggregate_tool,
     personal_ip_performance_inventory_tool,
+    personal_ip_record_browser_observation_tool,
     personal_ip_select_browser_account_tool,
     personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,

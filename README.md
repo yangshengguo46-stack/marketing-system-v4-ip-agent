@@ -24,7 +24,9 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > HLLM boundary is documented in
 > [docs/HLLM_CREATOR_INTEGRATION.md](docs/HLLM_CREATOR_INTEGRATION.md), and
 > upstream component provenance is recorded in
-> [THIRD_PARTY_BYTE.md](THIRD_PARTY_BYTE.md).
+> [THIRD_PARTY_BYTE.md](THIRD_PARTY_BYTE.md). Real product completion and the
+> remaining delivery gates are tracked in
+> [docs/IP_AGENT_PRODUCT_LEDGER.md](docs/IP_AGENT_PRODUCT_LEDGER.md).
 > HLLM-Lite and a future full HLLM-Creator cloud deployment share the same
 > versioned audience-preflight contract, so changing model capacity does not
 > replace the DeerFlow runtime or bind conversations to one account.

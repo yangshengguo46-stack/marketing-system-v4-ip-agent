@@ -319,6 +319,41 @@ async def test_live_frame_returns_base64_jpeg_screenshot():
 
 
 @pytest.mark.asyncio
+async def test_business_page_extraction_reads_visible_dom_without_browser_credentials():
+    session = BrowserSession(
+        MagicMock(),
+        headless=True,
+        timeout_ms=1000,
+        viewport={"width": 1000, "height": 500},
+    )
+    page = MagicMock()
+    page.evaluate = AsyncMock(
+        return_value={
+            "url": "https://creator.douyin.com/creator-micro/home?tab=data",
+            "title": "抖音创作者中心",
+            "visible_text": "昨日播放 1200",
+            "text_truncated": False,
+            "headings": ["核心数据"],
+            "tables": [{"rows": [["播放", "1200"]]}],
+            "data_blocks": ["昨日播放 1200"],
+            "links": [{"text": "作品数据", "href": "https://creator.douyin.com/creator-micro/data/video"}],
+        }
+    )
+    session._ensure_page = AsyncMock(return_value=page)
+
+    extracted = await session._extract_business_page(max_chars=60000, max_rows=500)
+
+    assert extracted["visible_text"] == "昨日播放 1200"
+    assert extracted["tables"][0]["rows"][0] == ["播放", "1200"]
+    _, limits = page.evaluate.await_args.args
+    assert limits == {"maxChars": 60000, "maxRows": 500}
+    evaluated_script = page.evaluate.await_args.args[0]
+    assert "document.cookie" not in evaluated_script
+    assert "localStorage" not in evaluated_script
+    assert "sessionStorage" not in evaluated_script
+
+
+@pytest.mark.asyncio
 async def test_input_dispatch_does_not_wait_for_live_frame():
     session = BrowserSession(
         MagicMock(),

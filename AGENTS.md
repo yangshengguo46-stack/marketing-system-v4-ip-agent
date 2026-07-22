@@ -65,6 +65,9 @@ Gateway API. Config schema and resolution order are documented in
 IP Agent distribution note:
 - `IP_AGENT.md` is the product setup and capability-routing guide;
   `THIRD_PARTY_BYTE.md` records copied ByteDance/Volcengine components and pins.
+- `docs/IP_AGENT_PRODUCT_LEDGER.md` is the delivery source of truth. Update its
+  acceptance gates and weighted score only when a real product path is added,
+  removed or verified; do not equate schemas or mocked tests with completion.
 - `product/defaults/` owns the product agent/owner defaults, while
   `product/volcengine/capabilities.yaml` is the auditable media routing policy.
 - `scripts/init_ip_agent.py` installs those defaults into a normal DeerFlow
@@ -163,6 +166,17 @@ IP Agent distribution note:
   persistent Chromium profile; it never narrows conversation authority or
   exposes the profile path/cookies/passwords to the model. See
   `docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md`.
+- Detailed creator-backend evidence lives in
+  `deerflow.persistence.personal_ip_platform_observations` and migration
+  `0014_personal_ip_platform_observations`. Preserve the immutable
+  `personal-ip-platform-observation-v1` contract and recursively reject raw
+  credential fields/values. Business records should remain detailed and carry
+  source URL, observed time, coverage and evidence; source URL queries and
+  fragments must not be persisted. `personal_ip_record_browser_observation`
+  is the native sealing tool after Browser Control reads an authorized page.
+  `deerflow.personal_ip.browser_collection` and
+  `personal_ip_collect_douyin_browser_page` provide the first direct rendered-DOM
+  collector while reusing the same persistent account browser session.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.

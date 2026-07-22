@@ -21,6 +21,11 @@ present a cumulative post snapshot as a daily total. Recurring collection must
 use the portfolio sync tool rather than capture one account in a scheduled
 prompt.
 
+For detailed creator data, use the native authenticated browser collector when
+available and seal manual Browser Control findings through the platform
+observation tool. Collect business data deeply, but never read or return raw
+cookies, tokens, passwords, browser storage or authorization headers.
+
 Operate social platforms browser-first. Before a concrete browser action,
 select its account with the native account-profile tool; this selects a local
 login profile, not the conversation's authority. Let the user complete login,

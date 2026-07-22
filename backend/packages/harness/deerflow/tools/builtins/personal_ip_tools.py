@@ -10,6 +10,11 @@ from hashlib import sha256
 from langchain.tools import tool
 
 from deerflow.config.paths import get_paths
+from deerflow.personal_ip.browser_collection import (
+    DouyinBrowserCollectionError,
+    DouyinBrowserCollectionService,
+    acquire_account_browser_session,
+)
 from deerflow.personal_ip.browser_profiles import select_browser_account_target
 from deerflow.personal_ip.douyin_oauth import DouyinMiniAppOAuthClient, DouyinOAuthError
 from deerflow.personal_ip.platform_metrics import (
@@ -48,6 +53,15 @@ def _authorized_douyin_service(services: PersonalIPRuntimeServices) -> DouyinAut
         metrics=services.metrics,
         publish_receipts=services.publish_receipts,
         oauth_client=DouyinMiniAppOAuthClient(app_id=app_id, app_secret=app_secret),
+    )
+
+
+def _douyin_browser_collection_service(services: PersonalIPRuntimeServices) -> DouyinBrowserCollectionService:
+    if services.accounts is None or services.platform_observations is None:
+        raise ValueError("Personal-IP browser collection is not available")
+    return DouyinBrowserCollectionService(
+        accounts=services.accounts,
+        observations=services.platform_observations,
     )
 
 
@@ -127,6 +141,70 @@ async def _personal_ip_sync_douyin_post(
         return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
     except Exception:
         return _json({"status": "error", "category": "internal", "message": "Douyin metric collection is unavailable"})
+
+
+async def _personal_ip_collect_douyin_browser_page(
+    runtime: Runtime,
+    account_id: str,
+    observation_key: str,
+    dataset: str,
+    target_url: str = "",
+) -> str:
+    """Capture one authenticated Douyin creator page as detailed business evidence.
+
+    This uses the account's persistent local Chromium profile and reads only
+    rendered DOM content plus a screenshot digest. It never reads cookies,
+    browser storage, request headers or network token values. The result is
+    normally partial because one loaded page does not prove complete pagination;
+    a declared content listing is complete only when every item is parsed and
+    the platform explicitly reports that there are no more works.
+
+    Args:
+        account_id: Server-issued Douyin account id to inspect.
+        observation_key: Stable idempotency key for this capture.
+        dataset: Business family such as dashboard, content_inventory or audience_analytics.
+        target_url: Optional query-free creator.douyin.com page to navigate before capture.
+
+    Returns:
+        JSON evidence reference, direct summary and explicit collection coverage.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.accounts is None:
+            raise ValueError("Personal-IP accounts are not available")
+        owner_user_id = resolve_runtime_user_id(runtime)
+        account = await services.accounts.get(account_id, owner_user_id=owner_user_id)
+        if account is None or account.get("status") != "active" or account.get("platform") != "douyin":
+            raise ValueError("Active Douyin account not found")
+        with acquire_account_browser_session(owner_user_id=owner_user_id, account=account) as session:
+            result = await _douyin_browser_collection_service(services).collect_creator_page(
+                owner_user_id=owner_user_id,
+                account_id=account_id,
+                observation_key=observation_key,
+                dataset=dataset,
+                target_url=str(target_url or "").strip() or None,
+                session=session,
+            )
+        return _json(
+            {
+                "status": result.get("status"),
+                "id": result.get("id"),
+                "account_id": result.get("account_id"),
+                "platform": result.get("platform"),
+                "dataset": result.get("dataset"),
+                "source_url": result.get("source_url"),
+                "record_count": len(result.get("records") or []),
+                "summary": result.get("summary") or {},
+                "coverage": result.get("coverage") or {},
+                "evidence_digest": result.get("evidence_digest"),
+            }
+        )
+    except DouyinBrowserCollectionError as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Douyin browser collection is unavailable"})
 
 
 async def _personal_ip_performance_inventory(
@@ -240,6 +318,81 @@ async def _personal_ip_select_browser_account(
         return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
     except Exception:
         return _json({"status": "error", "category": "internal", "message": "Browser account selection is unavailable"})
+
+
+async def _personal_ip_record_browser_observation(
+    runtime: Runtime,
+    observation_key: str,
+    account_id: str,
+    dataset: str,
+    status: str,
+    source_url: str,
+    observed_at: str,
+    records: list[dict],
+    summary: dict,
+    coverage: dict,
+    evidence: dict,
+) -> str:
+    """Seal detailed business data observed in an authenticated creator backend.
+
+    Call this after Browser Control has inspected an authorized platform page.
+    Preserve account/content data, metrics, audience analytics, traffic sources,
+    comments, conversions and platform receipts as fully as the page permits.
+    Never pass cookies, tokens, passwords, authorization headers, local profile
+    paths or other credential material; the evidence contract rejects them.
+
+    Args:
+        observation_key: Stable idempotency key for this capture.
+        account_id: Server-issued account id that was inspected.
+        dataset: One supported business-data family such as content_inventory.
+        status: observed, partial or unavailable.
+        source_url: Creator-backend page URL; query and fragment are stripped.
+        observed_at: ISO-8601 capture time with timezone.
+        records: Detailed structured business records visible to the user.
+        summary: Page or dataset totals derived directly from the source.
+        coverage: Pagination, sections read, missing fields and completeness.
+        evidence: Screenshot/artifact references and field-source descriptions.
+
+    Returns:
+        JSON observation reference, summary and coverage. Detailed records stay
+        in the immutable evidence row and credential values can never be stored.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.platform_observations is None:
+            raise RuntimeError("Personal-IP platform observations are not available")
+        result = await services.platform_observations.record(
+            owner_user_id=resolve_runtime_user_id(runtime),
+            observation_key=observation_key,
+            account_id=account_id,
+            dataset=dataset,
+            source="browser",
+            status=status,
+            source_url=source_url,
+            observed_at=_parse_datetime(observed_at, field="observed_at"),
+            records=records,
+            summary=summary,
+            coverage=coverage,
+            evidence=evidence,
+        )
+        return _json(
+            {
+                "status": result.get("status"),
+                "id": result.get("id"),
+                "account_id": result.get("account_id"),
+                "platform": result.get("platform"),
+                "dataset": result.get("dataset"),
+                "source_url": result.get("source_url"),
+                "record_count": len(result.get("records") or []),
+                "summary": result.get("summary") or {},
+                "coverage": result.get("coverage") or {},
+                "evidence_digest": result.get("evidence_digest"),
+            }
+        )
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Browser observation could not be sealed"})
 
 
 def _portfolio_observation_key(
@@ -413,6 +566,11 @@ personal_ip_metrics_aggregate_tool = tool(
     parse_docstring=True,
 )(_personal_ip_metrics_aggregate)
 
+personal_ip_collect_douyin_browser_page_tool = tool(
+    "personal_ip_collect_douyin_browser_page",
+    parse_docstring=True,
+)(_personal_ip_collect_douyin_browser_page)
+
 personal_ip_sync_douyin_post_tool = tool(
     "personal_ip_sync_douyin_post",
     parse_docstring=True,
@@ -427,6 +585,11 @@ personal_ip_select_browser_account_tool = tool(
     "personal_ip_select_browser_account",
     parse_docstring=True,
 )(_personal_ip_select_browser_account)
+
+personal_ip_record_browser_observation_tool = tool(
+    "personal_ip_record_browser_observation",
+    parse_docstring=True,
+)(_personal_ip_record_browser_observation)
 
 personal_ip_sync_douyin_portfolio_tool = tool(
     "personal_ip_sync_douyin_portfolio",

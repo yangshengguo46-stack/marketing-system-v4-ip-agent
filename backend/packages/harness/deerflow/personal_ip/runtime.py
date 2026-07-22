@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
 from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
 from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
+from deerflow.persistence.personal_ip_platform_observations import PersonalIPPlatformObservationRepository
 from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
 
 
@@ -16,6 +17,7 @@ class PersonalIPRuntimeServices:
     metrics: PersonalIPMetricRepository
     publish_receipts: PersonalIPPublishReceiptRepository
     accounts: PersonalIPAccountRepository | None = None
+    platform_observations: PersonalIPPlatformObservationRepository | None = None
 
 
 _services: PersonalIPRuntimeServices | None = None

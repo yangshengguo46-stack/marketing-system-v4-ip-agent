@@ -1061,6 +1061,25 @@ domain-separated persisted JWT-secret fallback exists for local first run.
 Platform connections bind operated account ids only and must never narrow a
 thread's portfolio access or tool authority.
 
+Migration `0014_personal_ip_platform_observations` and
+`deerflow.persistence.personal_ip_platform_observations` store detailed
+creator-backend business evidence separately from additive metrics. The
+immutable `personal-ip-platform-observation-v1` row retains records, direct
+summaries, collection coverage and capture references while recursively
+rejecting credential fields and raw Bearer/JWT/token values at both the API and
+repository boundaries. Strip source URL queries/fragments, derive platform and
+subject from the owner-scoped account, and do not discard legitimate business
+records merely to reduce model context. Browser Control seals its findings via
+`personal_ip_record_browser_observation`.
+`deerflow.personal_ip.browser_collection` owns the first direct collector. Its
+Douyin path reuses the account-scoped BrowserSession, permits navigation only
+to query-free `creator.douyin.com` URLs, extracts rendered DOM content and a
+full-page screenshot digest, and labels one-page output partial unless a
+declared content count is fully parsed and the platform reports no more items. Keep
+the DOM extractor free of browser-storage, cookie, request-header and network
+response access. The Gateway endpoint and
+`personal_ip_collect_douyin_browser_page` native tool must share this service.
+
 `DouyinAuthorizedMetricCollectionService` is the credential-to-evidence
 bridge. `/api/personal-ip/metrics/collect/douyin` accepts only connection,
 publish-receipt and observation keys; the service resolves the owner/account,

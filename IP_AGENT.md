@@ -189,6 +189,27 @@ The default IP Agent and `personal-ip-operator` Skill explicitly treat the
 portfolio as conversation scope; an account is selected only for a concrete
 operation and receipt.
 
+Detailed authenticated creator-backend data uses the immutable
+`personal-ip-platform-observation-v1` contract at
+`/api/personal-ip/platform-observations`. It stores account/content inventory,
+content metrics, audience analytics, traffic sources, comments, conversions,
+platform receipts or dashboard evidence with source URL, observed time,
+pagination/coverage and capture references. Source URL query/fragment data is
+discarded, and nested cookie, token, password, Authorization, secret and API-key
+fields are rejected before persistence. After Browser Control reads a page, the
+native `personal_ip_record_browser_observation` tool seals the detailed result
+without reducing the conversation to that account.
+
+Douyin also has a direct browser collector at
+`POST /api/personal-ip/platform-observations/collect/browser/douyin` and the
+native `personal_ip_collect_douyin_browser_page` tool. It reuses the same
+persistent account profile as manual login, captures only rendered DOM business
+content plus a full-page screenshot digest, and records the result as partial
+single-page coverage unless a declared content listing is fully parsed and the
+page explicitly says there are no more works. A real persisted-login acceptance run has captured both
+the creator dashboard and content inventory with per-post metrics; no cookies,
+browser storage or request headers are read by the extractor.
+
 ### Browser-first platform accounts
 
 Douyin, WeChat Channels, WeChat Official Accounts, Xiaohongshu, X, Instagram,

@@ -55,6 +55,11 @@ facts through a Tool/MCP; do not recreate that model in prompts.
    Use `personal_ip_sync_douyin_portfolio` for recurring or whole-portfolio
    collection. A scheduled task should pass a stable current-hour collection
    key; never bake one account id into its prompt.
+   For detailed Douyin creator-backend evidence, call
+   `personal_ip_collect_douyin_browser_page` with the exact target account,
+   stable observation key and dataset. It returns an immutable evidence
+   reference plus summary/coverage; use `personal_ip_record_browser_observation`
+   after manual Browser Control extraction on pages not yet handled directly.
 3. Produce the smallest useful plan and label assumptions.
 4. Route general research and creation through available Skills. Read
    `volcengine-stack` before any ByteDance media work.

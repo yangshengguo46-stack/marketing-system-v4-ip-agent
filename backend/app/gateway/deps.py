@@ -171,6 +171,7 @@ if TYPE_CHECKING:
     from deerflow.persistence.personal_ip_evidence_promotions import PersonalIPEvidencePromotionRepository
     from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
     from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
+    from deerflow.persistence.personal_ip_platform_observations import PersonalIPPlatformObservationRepository
     from deerflow.persistence.personal_ip_preflights import PersonalIPPreflightRepository
     from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
     from deerflow.persistence.personal_ip_retrospectives import PersonalIPRetrospectiveRepository
@@ -312,6 +313,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             from deerflow.persistence.personal_ip_evidence_promotions import PersonalIPEvidencePromotionRepository
             from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
             from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
+            from deerflow.persistence.personal_ip_platform_observations import PersonalIPPlatformObservationRepository
             from deerflow.persistence.personal_ip_preflights import PersonalIPPreflightRepository
             from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
             from deerflow.persistence.personal_ip_retrospectives import PersonalIPRetrospectiveRepository
@@ -326,6 +328,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.personal_ip_account_repo = PersonalIPAccountRepository(sf)
             app.state.personal_ip_evidence_promotion_repo = PersonalIPEvidencePromotionRepository(sf)
             app.state.personal_ip_metric_repo = PersonalIPMetricRepository(sf)
+            app.state.personal_ip_platform_observation_repo = PersonalIPPlatformObservationRepository(sf)
             from app.gateway.auth.config import get_auth_config
             from deerflow.persistence.channel_connections.sql import ChannelCredentialCipher
 
@@ -350,6 +353,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
                     connections=app.state.personal_ip_platform_connection_repo,
                     metrics=app.state.personal_ip_metric_repo,
                     publish_receipts=app.state.personal_ip_publish_receipt_repo,
+                    platform_observations=app.state.personal_ip_platform_observation_repo,
                 )
             )
         else:
@@ -358,6 +362,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.personal_ip_account_repo = None
             app.state.personal_ip_evidence_promotion_repo = None
             app.state.personal_ip_metric_repo = None
+            app.state.personal_ip_platform_observation_repo = None
             app.state.personal_ip_platform_connection_repo = None
             app.state.personal_ip_preflight_repo = None
             app.state.personal_ip_publish_receipt_repo = None
@@ -499,6 +504,13 @@ def get_personal_ip_platform_connection_repo(request: Request) -> PersonalIPPlat
     val = getattr(request.app.state, "personal_ip_platform_connection_repo", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Personal-IP platform connection repository not available")
+    return val
+
+
+def get_personal_ip_platform_observation_repo(request: Request) -> PersonalIPPlatformObservationRepository:
+    val = getattr(request.app.state, "personal_ip_platform_observation_repo", None)
+    if val is None:
+        raise HTTPException(status_code=503, detail="Personal-IP platform observation repository not available")
     return val
 
 

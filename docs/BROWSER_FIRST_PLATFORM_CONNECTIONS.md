@@ -25,6 +25,24 @@ screenshot or raw-field evidence so later analysis can distinguish observation
 from inference. Authentication-secret values stay outside model context;
 authorized operating data belongs in the Personal-IP evidence loop.
 
+The durable boundary is `personal-ip-platform-observation-v1`. Each immutable
+row identifies its owner, exact operated account, platform, dataset, source,
+status and observation time; detailed records, direct summaries, coverage and
+evidence remain separate fields. Creator-page query strings and fragments are
+not retained. Credential-like keys and raw Bearer/JWT/token values are rejected
+recursively, including if they are nested inside a captured record. Browser
+Control can seal its authorized findings through the native
+`personal_ip_record_browser_observation` tool.
+
+For Douyin, `personal_ip_collect_douyin_browser_page` automates the first
+collection path. It reuses the account session, optionally navigates only to a
+query-free `https://creator.douyin.com/...` URL, extracts rendered page text,
+headings, tables/grids, metric cards and sanitized links, then seals the page
+with explicit pagination coverage and a screenshot SHA-256 digest. A content
+inventory becomes complete only when its declared count matches the parsed
+items and the page reports that no more works remain. It never
+accesses browser storage, credential headers or network response bodies.
+
 The operating portfolio at `/workspace/personal-ip` always shows all eight
 platforms. A platform with no account offers **登录账号**; clicking it creates a
 minimal local account slot and immediately opens the real platform page. Each

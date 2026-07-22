@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -8,15 +9,19 @@ import pytest
 
 from deerflow.personal_ip.runtime import PersonalIPRuntimeServices, configure_personal_ip_runtime
 from deerflow.tools.builtins import (
+    personal_ip_collect_douyin_browser_page_tool,
     personal_ip_metrics_aggregate_tool,
     personal_ip_performance_inventory_tool,
+    personal_ip_record_browser_observation_tool,
     personal_ip_select_browser_account_tool,
     personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,
 )
 from deerflow.tools.builtins.personal_ip_tools import (
+    _personal_ip_collect_douyin_browser_page,
     _personal_ip_metrics_aggregate,
     _personal_ip_performance_inventory,
+    _personal_ip_record_browser_observation,
     _personal_ip_select_browser_account,
     _personal_ip_sync_douyin_portfolio,
     _personal_ip_sync_douyin_post,
@@ -105,19 +110,156 @@ async def test_douyin_sync_tool_uses_connection_reference_without_returning_toke
 def test_personal_ip_native_tools_are_available_without_thread_account_binding() -> None:
     names = {tool.name for tool in BUILTIN_TOOLS}
     assert personal_ip_metrics_aggregate_tool.name == "personal_ip_metrics_aggregate"
+    assert personal_ip_collect_douyin_browser_page_tool.name == "personal_ip_collect_douyin_browser_page"
     assert personal_ip_performance_inventory_tool.name == "personal_ip_performance_inventory"
+    assert personal_ip_record_browser_observation_tool.name == "personal_ip_record_browser_observation"
     assert personal_ip_select_browser_account_tool.name == "personal_ip_select_browser_account"
     assert personal_ip_sync_douyin_portfolio_tool.name == "personal_ip_sync_douyin_portfolio"
     assert personal_ip_sync_douyin_post_tool.name == "personal_ip_sync_douyin_post"
     assert {
         "personal_ip_metrics_aggregate",
+        "personal_ip_collect_douyin_browser_page",
         "personal_ip_performance_inventory",
+        "personal_ip_record_browser_observation",
         "personal_ip_select_browser_account",
         "personal_ip_sync_douyin_portfolio",
         "personal_ip_sync_douyin_post",
     } <= names
     schema = personal_ip_metrics_aggregate_tool.tool_call_schema.model_json_schema()
     assert "account_id" not in schema.get("properties", {})
+
+
+@pytest.mark.asyncio
+async def test_collect_douyin_browser_page_tool_uses_account_profile_and_returns_evidence_reference(monkeypatch) -> None:
+    accounts = SimpleNamespace(
+        get=AsyncMock(
+            return_value={
+                "id": "acct-1",
+                "platform": "douyin",
+                "display_name": "抖音号",
+                "status": "active",
+            }
+        )
+    )
+    observations = SimpleNamespace()
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            accounts=accounts,
+            connections=SimpleNamespace(),
+            metrics=SimpleNamespace(),
+            publish_receipts=SimpleNamespace(),
+            platform_observations=observations,
+        )
+    )
+    collect = AsyncMock(
+        return_value={
+            "id": "platform-observation-1",
+            "account_id": "acct-1",
+            "platform": "douyin",
+            "dataset": "dashboard",
+            "status": "partial",
+            "source_url": "https://creator.douyin.com/creator-micro/home",
+            "records": [{"visible_text": "昨日播放 1200"}],
+            "summary": {"visible_text_characters": 11},
+            "coverage": {"pages_scanned": 1},
+            "evidence_digest": "b" * 64,
+        }
+    )
+    monkeypatch.setattr(
+        "deerflow.tools.builtins.personal_ip_tools._douyin_browser_collection_service",
+        lambda _services: SimpleNamespace(collect_creator_page=collect),
+    )
+    session = SimpleNamespace()
+
+    @contextmanager
+    def acquire(**kwargs):
+        assert kwargs["owner_user_id"] == "user-1"
+        assert kwargs["account"]["id"] == "acct-1"
+        yield session
+
+    monkeypatch.setattr("deerflow.tools.builtins.personal_ip_tools.acquire_account_browser_session", acquire)
+
+    raw = await _personal_ip_collect_douyin_browser_page(
+        SimpleNamespace(context={"user_id": "user-1"}),
+        account_id="acct-1",
+        observation_key="douyin:dashboard:2026-07-21T12",
+        dataset="dashboard",
+        target_url="",
+    )
+    payload = json.loads(raw)
+
+    assert payload["status"] == "partial"
+    assert payload["record_count"] == 1
+    assert payload["evidence_digest"] == "b" * 64
+    assert "visible_text" not in payload
+    collect.assert_awaited_once_with(
+        owner_user_id="user-1",
+        account_id="acct-1",
+        observation_key="douyin:dashboard:2026-07-21T12",
+        dataset="dashboard",
+        target_url=None,
+        session=session,
+    )
+
+
+@pytest.mark.asyncio
+async def test_record_browser_observation_tool_seals_detailed_business_data_without_credentials() -> None:
+    observations = SimpleNamespace(
+        record=AsyncMock(
+            return_value={
+                "id": "platform-observation-1",
+                "account_id": "acct-1",
+                "platform": "douyin",
+                "dataset": "content_inventory",
+                "status": "partial",
+                "source_url": "https://creator.douyin.com/creator-micro/data/video",
+                "records": [{"title": "第一条", "metrics": {"views": 1200}}],
+                "summary": {"content_count": 1},
+                "coverage": {"pages_scanned": 1, "has_more": True},
+                "evidence_digest": "a" * 64,
+            }
+        )
+    )
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            connections=SimpleNamespace(),
+            metrics=SimpleNamespace(),
+            publish_receipts=SimpleNamespace(),
+            platform_observations=observations,
+        )
+    )
+
+    raw = await _personal_ip_record_browser_observation(
+        SimpleNamespace(context={"user_id": "user-1"}),
+        observation_key="douyin:content:2026-07-21T12",
+        account_id="acct-1",
+        dataset="content_inventory",
+        status="partial",
+        source_url="https://creator.douyin.com/creator-micro/data/video",
+        observed_at="2026-07-21T12:00:00+08:00",
+        records=[{"title": "第一条", "metrics": {"views": 1200}}],
+        summary={"content_count": 1},
+        coverage={"pages_scanned": 1, "has_more": True},
+        evidence={"capture_refs": ["artifact://browser/capture.png"]},
+    )
+    payload = json.loads(raw)
+
+    assert payload == {
+        "account_id": "acct-1",
+        "coverage": {"has_more": True, "pages_scanned": 1},
+        "dataset": "content_inventory",
+        "evidence_digest": "a" * 64,
+        "id": "platform-observation-1",
+        "platform": "douyin",
+        "record_count": 1,
+        "source_url": "https://creator.douyin.com/creator-micro/data/video",
+        "status": "partial",
+        "summary": {"content_count": 1},
+    }
+    kwargs = observations.record.await_args.kwargs
+    assert kwargs["owner_user_id"] == "user-1"
+    assert kwargs["source"] == "browser"
+    assert kwargs["records"][0]["metrics"]["views"] == 1200
 
 
 @pytest.mark.asyncio

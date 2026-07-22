@@ -74,6 +74,95 @@ _SNAPSHOT_JS = r"""
 """
 
 
+# Extract only rendered DOM business content. This deliberately has no access
+# to browser storage, cookies, request headers or network response bodies.
+_BUSINESS_PAGE_EVIDENCE_JS = r"""
+({ maxChars, maxRows }) => {
+  const clean = (value, limit = 1000) => {
+    const text = String(value || "").replace(/\s+/g, " ").trim();
+    return text.length > limit ? text.slice(0, limit) + "…" : text;
+  };
+  const visible = (el) => {
+    if (!(el instanceof Element)) return false;
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    return rect.width > 0 && rect.height > 0 &&
+      style.visibility !== "hidden" && style.display !== "none";
+  };
+  const uniqueTexts = (selector, limit, textLimit = 500) => {
+    const values = [];
+    const seen = new Set();
+    for (const el of document.querySelectorAll(selector)) {
+      if (!visible(el)) continue;
+      const text = clean(el.innerText, textLimit);
+      if (!text || seen.has(text)) continue;
+      seen.add(text);
+      values.push(text);
+      if (values.length >= limit) break;
+    }
+    return values;
+  };
+
+  const bodyText = String(document.body?.innerText || "").trim();
+  const tables = [];
+  let rowsRead = 0;
+  for (const table of document.querySelectorAll("table, [role=table], [role=grid]")) {
+    if (!visible(table) || rowsRead >= maxRows) continue;
+    const rows = [];
+    for (const row of table.querySelectorAll("tr, [role=row]")) {
+      if (!visible(row) || rowsRead >= maxRows) continue;
+      const cells = [];
+      for (const cell of row.querySelectorAll("th, td, [role=columnheader], [role=cell], [role=gridcell]")) {
+        if (!visible(cell)) continue;
+        const text = clean(cell.innerText, 500);
+        if (text) cells.push(text);
+      }
+      if (cells.length) {
+        rows.push(cells);
+        rowsRead += 1;
+      }
+    }
+    if (rows.length) tables.push({ rows });
+    if (tables.length >= 30) break;
+  }
+
+  const links = [];
+  const seenLinks = new Set();
+  for (const link of document.querySelectorAll("a[href]")) {
+    if (!visible(link)) continue;
+    const text = clean(link.innerText || link.getAttribute("aria-label"), 300);
+    let href = "";
+    try {
+      const parsed = new URL(link.href, location.href);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        href = parsed.origin + parsed.pathname;
+      }
+    } catch (_) {}
+    const key = text + "|" + href;
+    if ((!text && !href) || seenLinks.has(key)) continue;
+    seenLinks.add(key);
+    links.push({ text, href });
+    if (links.length >= 200) break;
+  }
+
+  return {
+    url: location.origin + location.pathname,
+    title: clean(document.title, 500),
+    visible_text: bodyText.slice(0, maxChars),
+    text_truncated: bodyText.length > maxChars,
+    headings: uniqueTexts("h1, h2, h3, [role=heading]", 100, 500),
+    tables,
+    data_blocks: uniqueTexts(
+      "[class*=stat], [class*=metric], [class*=summary], [class*=data-card], [class*=overview-card]",
+      200,
+      1000
+    ),
+    links,
+  };
+}
+"""
+
+
 _WHEEL_SCROLL_JS = r"""
 ({ x, y, dx, dy }) => {
   const root = document.scrollingElement || document.documentElement;
@@ -554,6 +643,16 @@ class BrowserSession:
         text = await page.inner_text("body")
         return text[:max_chars]
 
+    async def _extract_business_page(self, *, max_chars: int, max_rows: int) -> dict[str, Any]:
+        page = await self._ensure_page()
+        return await page.evaluate(
+            _BUSINESS_PAGE_EVIDENCE_JS,
+            {
+                "maxChars": max(1_000, min(int(max_chars), 200_000)),
+                "maxRows": max(1, min(int(max_rows), 2_000)),
+            },
+        )
+
     async def _screenshot_bytes(self, full_page: bool) -> bytes:
         page = await self._ensure_page()
         return await page.screenshot(full_page=full_page, type="png")
@@ -807,6 +906,11 @@ class BrowserSession:
     async def get_text(self, max_chars: int = 8000) -> str:
         with self._activity():
             return await self._loop.run(self._get_text(max_chars))
+
+    async def extract_business_page(self, *, max_chars: int = 60_000, max_rows: int = 500) -> dict[str, Any]:
+        """Read rendered business data without reading browser credentials."""
+        with self._activity():
+            return await self._loop.run(self._extract_business_page(max_chars=max_chars, max_rows=max_rows))
 
     async def screenshot_bytes(self, full_page: bool = False) -> bytes:
         with self._activity():
