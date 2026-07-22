@@ -245,6 +245,7 @@ export const zhCN: Translations = {
     demoChats: "演示对话",
     agents: "智能体",
     personalIP: "经营组合",
+    videoWorkbench: "视频工作台",
     scheduledTasks: "定时任务",
     agentsDisabledTooltip: "功能未启用",
   },

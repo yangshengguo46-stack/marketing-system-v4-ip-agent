@@ -1157,6 +1157,13 @@ declared inputs and outputs are re-hashed. Native
 `personal_ip_begin_video_production`,
 `personal_ip_record_video_production_event` and
 `personal_ip_read_video_production` are the DeerFlow execution surface.
+`deerflow.personal_ip.video_workbench.build_video_workbench_read_model` folds
+that same immutable event list into the owner-scoped Gateway
+`GET /api/personal-ip/video-productions/{production_id}/workbench` response.
+It is a projection only: do not persist it, add a second lifecycle, or infer
+provider success from UI state. Candidate approval may be reflected from a
+matching `review_recorded` receipt, while all execution and recovery remains in
+the native begin/event/read tools.
 
 `PersonalIPMetricCollectionService` assigns official Douyin snapshots a stable
 post series. When a strictly older snapshot exists, it writes a separate exact

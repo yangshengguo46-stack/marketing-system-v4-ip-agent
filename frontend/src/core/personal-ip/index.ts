@@ -3,4 +3,5 @@ export * from "./cockpit";
 export * from "./connections";
 export * from "./platforms";
 export * from "./subjects";
+export * from "./video-productions";
 export * from "./workflow";

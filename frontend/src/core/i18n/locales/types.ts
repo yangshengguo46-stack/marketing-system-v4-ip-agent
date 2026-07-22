@@ -185,6 +185,7 @@ export interface Translations {
     demoChats: string;
     agents: string;
     personalIP: string;
+    videoWorkbench: string;
     scheduledTasks: string;
     agentsDisabledTooltip: string;
     channels: string;

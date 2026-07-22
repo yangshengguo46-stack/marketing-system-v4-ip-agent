@@ -118,6 +118,14 @@ Tool-calling AI messages can contain user-visible text as well as `tool_calls`. 
   resolves it again for the authenticated owner. Keep this page a thin status
   and account surface: DeerFlow conversation tools create and advance business
   or video workflows instead of duplicating them as form-heavy applications.
+  `/workspace/personal-ip/video` is the dedicated read-oriented video
+  workbench. `core/personal-ip/video-productions.ts` owns its list/read-model
+  queries and confirmation mutation. The page must display evidence from the
+  immutable production ledger—including provider/model/task ids, cost state,
+  failures, retries, artifact hashes and QA—without exposing credentials or
+  inventing client state. Only candidate selection, real paid calls and real
+  publishing are meaningful confirmations; evidence promotion stays automatic.
+  Recovery actions send the user back to DeerFlow and its native video tools.
 - `src/app/workspace/chats/[thread_id]/page.tsx` owns branch-from-turn submission and navigation; sidecar `MessageList` instances do not receive the branch action.
 - `src/app/workspace/chats/[thread_id]/page.tsx` gates the Workspace Browser trigger and browser right panel on `/api/features -> browser_control.enabled`; default/failed feature discovery hides the browser control so optional backend installs do not show a dead Live socket.
 - `src/app/workspace/chats/[thread_id]/page.tsx` and `src/app/workspace/agents/[agent_name]/chats/[thread_id]/page.tsx` own active-goal display state for their composer overlays.

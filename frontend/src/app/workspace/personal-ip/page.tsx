@@ -13,6 +13,7 @@ import {
   ShieldCheckIcon,
   UserRoundIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -76,11 +77,11 @@ const OPERATING_STAGE_DETAILS = {
   },
   retrospective: {
     icon: RefreshCcwIcon,
-    description: "预测和结果对照，等待人工复核",
+    description: "预测和结果对照，自动判断证据完整度",
   },
   evidence: {
     icon: ShieldCheckIcon,
-    description: "跨样本证据经确认后进入长期模型",
+    description: "跨样本证据满足策略后自动晋级",
   },
 } as const;
 
@@ -385,6 +386,12 @@ export default function PersonalIPPortfolioPage() {
                     {cockpit?.video.blocked_production_ids.length} 个受阻
                   </Badge>
                 )}
+                <Button size="sm" asChild>
+                  <Link href="/workspace/personal-ip/video">
+                    打开视频工作台
+                    <ClapperboardIcon />
+                  </Link>
+                </Button>
               </div>
             </div>
             <Card>

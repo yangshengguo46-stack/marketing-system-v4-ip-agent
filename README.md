@@ -107,6 +107,13 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > toolchain, re-hashes every successful output and requires probe/spec/full-
 > decode QA before delivery. `make video-e2e-paid-checkpoints` only writes the
 > real provider commands; it never submits a paid call.
+> The dedicated `/workspace/personal-ip/video` workbench is a read-oriented
+> view over that same immutable ledger. It exposes projects, stages, assets,
+> shots, retries, candidates, consistency, timeline, delivery QA and receipt
+> evidence without introducing another video runtime or state machine. DeerFlow
+> conversations still create and advance productions; the workbench writes only
+> meaningful candidate-selection, paid-call or real-publish confirmations. See
+> [docs/VIDEO_WORKBENCH.md](docs/VIDEO_WORKBENCH.md).
 
 ## Official Website
 

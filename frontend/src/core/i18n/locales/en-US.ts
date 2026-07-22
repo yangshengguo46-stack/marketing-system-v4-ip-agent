@@ -262,6 +262,7 @@ export const enUS: Translations = {
     demoChats: "Demo chats",
     agents: "Agents",
     personalIP: "Portfolio",
+    videoWorkbench: "Video workbench",
     scheduledTasks: "Scheduled tasks",
     agentsDisabledTooltip: "Feature not enabled",
   },

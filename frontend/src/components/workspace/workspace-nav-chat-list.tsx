@@ -4,6 +4,7 @@ import {
   BotIcon,
   BriefcaseBusinessIcon,
   CalendarClock,
+  ClapperboardIcon,
   MessagesSquare,
 } from "lucide-react";
 import Link from "next/link";
@@ -32,7 +33,7 @@ export function WorkspaceNavChatList() {
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton
-            isActive={pathname.startsWith("/workspace/personal-ip")}
+            isActive={pathname === "/workspace/personal-ip"}
             asChild
           >
             <Link
@@ -41,6 +42,20 @@ export function WorkspaceNavChatList() {
             >
               <BriefcaseBusinessIcon />
               <span>{t.sidebar.personalIP}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            isActive={pathname.startsWith("/workspace/personal-ip/video")}
+            asChild
+          >
+            <Link
+              className="text-muted-foreground"
+              href="/workspace/personal-ip/video"
+            >
+              <ClapperboardIcon />
+              <span>{t.sidebar.videoWorkbench}</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
