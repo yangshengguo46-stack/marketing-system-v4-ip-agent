@@ -89,3 +89,37 @@ async def test_video_production_router_rejects_unknown_event_type(monkeypatch) -
 
     assert response.status_code == 422
     repository.append_event.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_video_production_router_returns_ledger_derived_workbench(monkeypatch) -> None:
+    repository = SimpleNamespace(
+        get=AsyncMock(
+            return_value={
+                "id": "video-production-1",
+                "title": "本地回执验收",
+                "status": "running",
+                "current_stage": "blueprint",
+                "source_kind": "script",
+                "source": {"script": "test"},
+                "delivery_spec": {},
+                "provider_policy": {},
+                "budget": {},
+                "events": [],
+            }
+        )
+    )
+    app = FastAPI()
+    app.state.personal_ip_video_production_repo = repository
+    app.include_router(router_module.router)
+
+    async def current_user(_request):
+        return SimpleNamespace(id="user-1")
+
+    monkeypatch.setattr(router_module, "get_current_user_from_request", current_user)
+    async with httpx.AsyncClient(base_url="http://test", transport=httpx.ASGITransport(app=app)) as client:
+        response = await client.get("/api/personal-ip/video-productions/video-production-1/workbench")
+
+    assert response.status_code == 200
+    assert response.json()["contract_version"] == "personal-ip-video-workbench-v1"
+    repository.get.assert_awaited_once_with("video-production-1", owner_user_id="user-1")

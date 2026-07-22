@@ -233,6 +233,12 @@ IP Agent distribution note:
   output refs. `scripts/personal_ip_video_e2e.py` is the credential-free local
   acceptance/resume path; it must keep paid providers simulated unless the
   active user session explicitly approves the generated paid checkpoints.
+  `deerflow.personal_ip.video_workbench` and Gateway
+  `GET /api/personal-ip/video-productions/{production_id}/workbench` are a pure,
+  owner-scoped read model over that same production and event stream. Keep the
+  frontend workbench read-oriented: it may record only meaningful confirmation
+  events through the existing event endpoint, and must never create a parallel
+  video runtime, mutable projection table or chat-derived recovery state.
 - `deerflow.personal_ip.operating_cockpit` is the owner-scoped read model that
   joins the six-stage operating loop and nine-stage video line. The Gateway
   route and native `personal_ip_operating_cockpit` tool must use the same

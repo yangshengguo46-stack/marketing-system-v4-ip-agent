@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.gateway.deps import get_current_user_from_request, get_personal_ip_video_production_repo
+from deerflow.personal_ip.video_workbench import build_video_workbench_read_model
 
 router = APIRouter(prefix="/api/personal-ip/video-productions", tags=["personal-ip"])
 
@@ -148,3 +149,14 @@ async def get_personal_ip_video_production(production_id: str, request: Request)
     if production is None:
         raise HTTPException(status_code=404, detail="Personal-IP video production not found")
     return production
+
+
+@router.get("/{production_id}/workbench")
+async def get_personal_ip_video_workbench(production_id: str, request: Request) -> dict[str, Any]:
+    production = await get_personal_ip_video_production_repo(request).get(
+        production_id,
+        owner_user_id=await _current_user_id(request),
+    )
+    if production is None:
+        raise HTTPException(status_code=404, detail="Personal-IP video production not found")
+    return build_video_workbench_read_model(production)
