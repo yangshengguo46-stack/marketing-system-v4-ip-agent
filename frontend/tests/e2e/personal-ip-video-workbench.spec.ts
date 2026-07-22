@@ -116,6 +116,12 @@ const makeWorkbench = (confirmed = false) => ({
       id: "asset-01",
       status: "succeeded",
       latest_event: null,
+      version: 3,
+      source_sha256: "b".repeat(64),
+      generation_route: "seedream_character_board",
+      projection_mode: "exterior_orbit",
+      coverage: { tier: "shot_required", view_ids: ["front"] },
+      lineage: { source_version: 2 },
       artifacts: [
         {
           ref: "file:///tmp/video-e2e/asset.png",
@@ -131,6 +137,16 @@ const makeWorkbench = (confirmed = false) => ({
   shots: [
     {
       id: "shot-01",
+      spec: {
+        order: 1,
+        title: "回执卡推进",
+        duration_seconds: 2,
+        first_frame: "回执卡位于画面中央。",
+        last_frame: "校验标记完成点亮。",
+        motion: "缓慢推近一次。",
+        preserve_elements: ["卡片身份", "画幅"],
+        change_elements: ["景别"],
+      },
       task_ids: ["event-4", "event-5"],
       candidate_ids: ["shot-01:candidate-2"],
       selected_candidate_id: confirmed ? "shot-01:candidate-2" : null,
@@ -147,12 +163,42 @@ const makeWorkbench = (confirmed = false) => ({
       consistency: {
         checks: { aspect_ratio: true, reference_asset_present: true },
       },
+      quality: {
+        technical_gate_passed: true,
+        internal_cut_gate_passed: true,
+        first_frame_anchor_score: 0.94,
+      },
       review: null,
       artifacts: RETRY_TASK.artifacts,
       task_ids: ["event-5"],
       event_ids: ["event-5", "event-6"],
     },
   ],
+  continuity: {
+    bridges: [
+      {
+        bridge_id: "intro-to-shot-01",
+        from_shot_id: "intro",
+        to_shot_id: "shot-01",
+        inherited_state_sha256: "e".repeat(64),
+        preserve_facts: ["卡片身份"],
+        cut_kind: "straight_cut",
+        axis_relation: "same_axis",
+      },
+    ],
+    recovery_scopes: [
+      {
+        event_id: "event-4",
+        event_key: "shot-01:attempt-1",
+        entity_id: "shot-01",
+        source: "shot_execution_drift",
+        categories: ["provider_timeout"],
+        affected_shot_ids: ["shot-01"],
+        affected_asset_ids: [],
+        retryable: true,
+      },
+    ],
+  },
   confirmations: [
     ...(!confirmed
       ? [
@@ -179,12 +225,23 @@ const makeWorkbench = (confirmed = false) => ({
   ],
   timeline: {
     events: [],
+    fps: 25,
+    duration_sec: 2,
     tracks: [
       {
         type: "video",
         entity_id: "timeline-final-v1",
         status: "succeeded",
         artifacts: RETRY_TASK.artifacts,
+        clips: [
+          {
+            id: "clip-shot-01",
+            shot_id: "shot-01",
+            start_sec: 0,
+            duration_sec: 2,
+            source_sha256: "c".repeat(64),
+          },
+        ],
         event_id: "event-9",
       },
       {
@@ -192,6 +249,7 @@ const makeWorkbench = (confirmed = false) => ({
         entity_id: "voice-01",
         status: "succeeded",
         artifacts: [],
+        clips: [],
         event_id: "event-8",
       },
     ],
@@ -268,6 +326,25 @@ test("video workbench exposes ledger evidence, recovery, and candidate confirmat
   await expect(page.locator("body")).not.toContainText("X-Amz-Credential");
   await expect(page.locator("body")).not.toContainText("user:secret");
 
+  await page.getByRole("tab", { name: "资产" }).click();
+  await expect(page.getByText("v3")).toBeVisible();
+  await expect(page.getByText("shot_required")).toBeVisible();
+
+  await page.getByRole("tab", { name: "分镜" }).click();
+  await expect(page.getByText("回执卡位于画面中央。")).toBeVisible();
+  await expect(page.getByText("校验标记完成点亮。")).toBeVisible();
+  await expect(page.getByText("局部恢复范围")).toBeVisible();
+  await expect(page.getByText("跨镜状态 · intro → shot-01")).toBeVisible();
+  if (screenshotDirectory) {
+    await page
+      .getByText("跨镜状态 · intro → shot-01")
+      .scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: `${screenshotDirectory}/video-workbench-storyboard-1440x900.png`,
+      fullPage: true,
+    });
+  }
+
   await page.getByRole("tab", { name: "任务与重试" }).click();
   await expect(page.getByText("volcengine-simulated").first()).toBeVisible();
   await expect(page.getByText("seedance-2.0").first()).toBeVisible();
@@ -279,6 +356,7 @@ test("video workbench exposes ledger evidence, recovery, and candidate confirmat
   await page.getByRole("tab", { name: "候选与一致性" }).click();
   await expect(page.getByText("shot-01:candidate-2")).toBeVisible();
   await expect(page.getByText("aspect_ratio")).toBeVisible();
+  await expect(page.getByText("first_frame_anchor_score")).toBeVisible();
   await page.getByRole("button", { name: "确认选用" }).click();
   await expect.poll(() => confirmed).toBe(true);
   expect(reviewBody).toMatchObject({
@@ -289,6 +367,10 @@ test("video workbench exposes ledger evidence, recovery, and candidate confirmat
     provider: "human-workbench",
   });
   await expect(page.getByText("已选片")).toBeVisible();
+
+  await page.getByRole("tab", { name: "配音与时间线" }).click();
+  await expect(page.getByText("25 fps")).toBeVisible();
+  await expect(page.getByText("clip-shot-01")).toBeVisible();
 
   await page.getByRole("tab", { name: "交付 QA" }).click();
   await expect(page.getByText("真实发布确认")).toBeVisible();

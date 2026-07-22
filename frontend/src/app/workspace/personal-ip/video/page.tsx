@@ -484,6 +484,25 @@ function TaskCard({
                 {task.failure.message}
               </p>
             )}
+            {(Boolean(task.failure.source) ||
+              (task.failure.affected_shot_ids?.length ?? 0) > 0 ||
+              (task.failure.affected_asset_ids?.length ?? 0) > 0) && (
+              <div className="text-muted-foreground mt-2 flex flex-wrap gap-2 text-[11px]">
+                {task.failure.source && (
+                  <Badge variant="outline">来源 {task.failure.source}</Badge>
+                )}
+                {task.failure.affected_shot_ids?.map((shotId) => (
+                  <Badge key={shotId} variant="outline">
+                    仅恢复 {shotId}
+                  </Badge>
+                ))}
+                {task.failure.affected_asset_ids?.map((assetId) => (
+                  <Badge key={assetId} variant="outline">
+                    资产 {assetId}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {task.artifacts.length > 0 && (
@@ -611,6 +630,41 @@ function AssetsTab({ workbench }: { workbench: PersonalIPVideoWorkbench }) {
             </p>
           </CardHeader>
           <CardContent className="px-4">
+            <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
+              <EvidenceField
+                label="版本"
+                value={asset.version == null ? "未登记" : `v${asset.version}`}
+              />
+              <EvidenceField
+                label="覆盖"
+                value={
+                  typeof asset.coverage?.tier === "string"
+                    ? asset.coverage.tier
+                    : "未登记"
+                }
+              />
+              <EvidenceField
+                label="生成路线"
+                value={asset.generation_route ?? "未登记"}
+              />
+              <EvidenceField
+                label="投影"
+                value={asset.projection_mode ?? "未登记"}
+              />
+            </div>
+            {asset.source_sha256 && (
+              <div className="bg-muted/35 mb-3 rounded-lg border px-3 py-2">
+                <p className="text-muted-foreground text-[10px] uppercase">
+                  source sha256
+                </p>
+                <code
+                  className="mt-1 block truncate text-[10px]"
+                  title={asset.source_sha256}
+                >
+                  {asset.source_sha256}
+                </code>
+              </div>
+            )}
             <ArtifactList artifacts={asset.artifacts} compact />
           </CardContent>
         </Card>
@@ -634,33 +688,131 @@ function StoryboardTab({ workbench }: { workbench: PersonalIPVideoWorkbench }) {
       {workbench.storyboard.artifacts.length > 0 && (
         <ArtifactList artifacts={workbench.storyboard.artifacts} compact />
       )}
+      {workbench.continuity.recovery_scopes.length > 0 && (
+        <div className="border-destructive/25 bg-destructive/[0.04] rounded-xl border p-4">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <RefreshCcwIcon className="size-4 text-amber-600" /> 局部恢复范围
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {workbench.continuity.recovery_scopes.map((scope) => (
+              <Badge key={scope.event_id} variant="outline">
+                {scope.source ?? (scope.categories.join(" / ") || "未分类")} ·{" "}
+                {scope.affected_shot_ids.join("、") || scope.entity_id}
+              </Badge>
+            ))}
+          </div>
+          <p className="text-muted-foreground mt-2 text-xs">
+            恢复动作回到受影响镜头或资产；失败回执仍留在不可变账本中。
+          </p>
+        </div>
+      )}
       {workbench.shots.length === 0 ? (
         <EmptyPanel>分镜已可封存，但尚未解析出镜头实体。</EmptyPanel>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {workbench.shots.map((shot, index) => (
-            <Card key={shot.id} className="gap-3 py-4">
-              <CardHeader className="px-4">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-sm">
-                    镜头 {String(index + 1).padStart(2, "0")}
-                  </CardTitle>
-                  <VideoIcon className="text-muted-foreground size-4" />
-                </div>
-                <code className="text-muted-foreground text-[11px]">
-                  {shot.id}
-                </code>
-              </CardHeader>
-              <CardContent className="grid grid-cols-3 gap-2 px-4 text-center">
-                <EvidenceField label="任务" value={shot.task_ids.length} />
-                <EvidenceField label="候选" value={shot.candidate_ids.length} />
-                <EvidenceField
-                  label="选片"
-                  value={shot.selected_candidate_id ? "已选" : "待定"}
-                />
-              </CardContent>
-            </Card>
-          ))}
+        <div
+          className={cn(
+            "grid gap-3",
+            workbench.shots.length > 1 && "md:grid-cols-2 xl:grid-cols-3",
+          )}
+        >
+          {workbench.shots.map((shot, index) => {
+            const spec = shot.spec ?? {};
+            const bridge = workbench.continuity.bridges.find(
+              (item) => item.to_shot_id === shot.id,
+            );
+            return (
+              <Card key={shot.id} className="gap-3 py-4">
+                <CardHeader className="px-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-sm">
+                      镜头 {String(spec.order ?? index + 1).padStart(2, "0")}
+                    </CardTitle>
+                    <VideoIcon className="text-muted-foreground size-4" />
+                  </div>
+                  <code className="text-muted-foreground text-[11px]">
+                    {shot.id}
+                  </code>
+                  {spec.title && (
+                    <p className="text-sm font-medium">{spec.title}</p>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-3 px-4">
+                  {Boolean(spec.first_frame ?? spec.last_frame) && (
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
+                      <div className="bg-muted/40 rounded-lg border p-3">
+                        <p className="text-muted-foreground text-[10px] uppercase">
+                          首帧
+                        </p>
+                        <p className="mt-1 text-xs leading-5">
+                          {spec.first_frame ?? "未登记"}
+                        </p>
+                      </div>
+                      <ArrowLeftIcon className="text-muted-foreground mt-6 size-4 rotate-180" />
+                      <div className="bg-muted/40 rounded-lg border p-3">
+                        <p className="text-muted-foreground text-[10px] uppercase">
+                          尾帧
+                        </p>
+                        <p className="mt-1 text-xs leading-5">
+                          {spec.last_frame ?? "未登记"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {spec.motion && (
+                    <div className="rounded-lg border px-3 py-2 text-xs">
+                      <span className="text-muted-foreground">动作 · </span>
+                      {spec.motion}
+                    </div>
+                  )}
+                  {((spec.preserve_elements?.length ?? 0) > 0 ||
+                    (spec.change_elements?.length ?? 0) > 0) && (
+                    <div className="flex flex-wrap gap-2">
+                      {spec.preserve_elements?.map((item) => (
+                        <Badge key={`keep:${item}`} variant="outline">
+                          保持 {item}
+                        </Badge>
+                      ))}
+                      {spec.change_elements?.map((item) => (
+                        <Badge key={`change:${item}`} variant="secondary">
+                          变化 {item}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  {bridge && (
+                    <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/[0.05] px-3 py-2 text-xs">
+                      <p className="font-medium">
+                        跨镜状态 · {bridge.from_shot_id} → {bridge.to_shot_id}
+                      </p>
+                      <p className="text-muted-foreground mt-1">
+                        {bridge.cut_kind ?? "连续剪辑"} ·{" "}
+                        {bridge.axis_relation ?? "轴线未登记"}
+                      </p>
+                      {bridge.inherited_state_sha256 && (
+                        <code
+                          className="text-muted-foreground mt-1 block truncate text-[10px]"
+                          title={bridge.inherited_state_sha256}
+                        >
+                          {bridge.inherited_state_sha256}
+                        </code>
+                      )}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <EvidenceField label="任务" value={shot.task_ids.length} />
+                    <EvidenceField
+                      label="候选"
+                      value={shot.candidate_ids.length}
+                    />
+                    <EvidenceField
+                      label="选片"
+                      value={shot.selected_candidate_id ? "已选" : "待定"}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
@@ -723,6 +875,12 @@ function CandidatesTab({
               checks && typeof checks === "object"
                 ? Object.entries(checks)
                 : [];
+            const qualityEntries = candidate.quality
+              ? Object.entries(candidate.quality).filter(
+                  ([, value]) =>
+                    typeof value === "boolean" || typeof value === "number",
+                )
+              : [];
             return (
               <Card
                 key={candidate.id}
@@ -752,6 +910,28 @@ function CandidatesTab({
                       <Badge variant="outline">候选</Badge>
                     )}
                   </div>
+                  {qualityEntries.length > 0 && (
+                    <div>
+                      <p className="text-muted-foreground mb-2 text-[11px] font-medium uppercase">
+                        自动 QA
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {qualityEntries.map(([key, value]) => (
+                          <EvidenceField
+                            key={key}
+                            label={key}
+                            value={
+                              typeof value === "boolean"
+                                ? value
+                                  ? "PASS"
+                                  : "FAIL"
+                                : String(value)
+                            }
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <ArtifactList artifacts={candidate.artifacts} compact />
@@ -808,9 +988,21 @@ function TimelineTab({ workbench }: { workbench: PersonalIPVideoWorkbench }) {
     <div className="space-y-5">
       <Card className="gap-4">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Layers3Icon className="size-4" /> 时间线轨道
-          </CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Layers3Icon className="size-4" /> 时间线轨道
+            </CardTitle>
+            <div className="flex gap-2">
+              {workbench.timeline.fps != null && (
+                <Badge variant="outline">{workbench.timeline.fps} fps</Badge>
+              )}
+              {workbench.timeline.duration_sec != null && (
+                <Badge variant="outline">
+                  {workbench.timeline.duration_sec}s
+                </Badge>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {workbench.timeline.tracks.length === 0 ? (
@@ -842,15 +1034,51 @@ function TimelineTab({ workbench }: { workbench: PersonalIPVideoWorkbench }) {
                       ) : (
                         tracks.map((track) => (
                           <div
-                            key={track.event_id}
-                            className="bg-primary/[0.06] min-w-40 rounded-lg border px-3 py-2"
+                            key={`${track.event_id}:${track.id}`}
+                            className="bg-primary/[0.04] min-w-40 flex-1 rounded-lg border px-3 py-2"
                           >
                             <p className="truncate text-xs font-medium">
-                              {track.entity_id}
+                              {track.id ?? track.entity_id}
                             </p>
                             <p className="text-muted-foreground mt-1 text-[10px]">
-                              {track.status} · {track.artifacts.length} 个产物
+                              {track.status} ·{" "}
+                              {track.clips.length || track.artifacts.length}{" "}
+                              个片段
                             </p>
+                            {track.clips.length > 0 && (
+                              <div className="mt-2 flex min-h-12 gap-1">
+                                {track.clips.map((clip, clipIndex) => (
+                                  <div
+                                    key={`${clip.id}:${clipIndex}`}
+                                    className="bg-primary/10 min-w-24 rounded-md border px-2 py-1.5"
+                                    style={{
+                                      flexGrow: Math.max(
+                                        clip.duration_sec ?? 1,
+                                        1,
+                                      ),
+                                    }}
+                                  >
+                                    <p className="truncate text-[10px] font-medium">
+                                      {clip.id ??
+                                        clip.shot_id ??
+                                        `clip ${clipIndex + 1}`}
+                                    </p>
+                                    <p className="text-muted-foreground mt-0.5 text-[9px] tabular-nums">
+                                      {clip.start_sec ?? 0}s ·{" "}
+                                      {clip.duration_sec ?? "—"}s
+                                    </p>
+                                    {clip.source_sha256 && (
+                                      <code
+                                        className="text-muted-foreground mt-0.5 block truncate text-[8px]"
+                                        title={clip.source_sha256}
+                                      >
+                                        {clip.source_sha256}
+                                      </code>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))
                       )}

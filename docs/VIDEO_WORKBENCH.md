@@ -31,16 +31,25 @@ response groups the same receipts into the nine stages, blueprint, assets,
 storyboard, shots, tasks, candidates, consistency, timeline, delivery QA and
 raw event detail.
 
+Optional rich fields are deliberately tolerant: old events continue to render,
+while newer events can include asset lineage, structured storyboard shots,
+continuity bridges, failure scope, automated QA or normalized timeline tracks.
+The projection never computes approval, retries work or fills absent evidence.
+
 ## UI boundary
 
 The workbench provides:
 
 - a searchable production list and nine-stage status rail;
 - script/idea and immutable delivery/provider/budget context;
-- character, scene and prop assets with artifact hashes;
-- storyboard, per-shot tasks, failure categories, attempts and `retry_of`;
-- candidate comparison, selection state and consistency checks;
-- voice/finishing tracks, exact-output delivery QA and raw receipts;
+- character, scene and prop assets with version, source hash, lineage,
+  camera-coverage and generation-route evidence when recorded;
+- storyboard first/last-frame semantics, motion, preserve/change constraints,
+  per-shot tasks, failure categories, attempts and `retry_of`;
+- candidate comparison, selection state, automated QA, adjacent-shot state
+  bridges and exact local recovery scope;
+- voice/finishing tracks, clip timing/source hash, exact-output delivery QA and
+  raw receipts;
 - provider, model, provider task id and known/estimated/unknown cost state;
 - a recovery instruction that returns execution to DeerFlow instead of
   rebuilding state in chat.
@@ -90,6 +99,21 @@ Reference paths inspected:
 - `front/src/pages/aiStudio/chapter/components/ChapterStudioVideoReadinessPanel.tsx`
 - `front/src/pages/aiStudio/editor/VideoEditor.tsx`
 - `front/src/pages/aiStudio/projectFlowStats.ts`
+
+## Read-only legacy Video Studio audit
+
+The user's existing `/Users/yangyucheng/projects/video-studio` worktree was
+audited at HEAD `37ad124` while it contained unrelated uncommitted and untracked
+work. It remained strictly read-only. The audit covered the three workbench UI
+variants, `src/main.tsx`, their tests, asset/timeline/shot/QA algorithms,
+`workflow_routes.py`, director/media route tests and research note
+`docs/research/17-asset-first-storyboard-native-production.md`.
+
+Only concepts and ledger-compatible field names were adapted. No old source
+file, CSS skin, mutable project store, Evidence Runtime, WorkGraph state
+machine, account/session binding, credential surface or provider executor was
+copied. The decision-by-decision matrix is in
+`docs/handoffs/VIDEO_WORKBENCH.md`.
 
 ## Verification
 

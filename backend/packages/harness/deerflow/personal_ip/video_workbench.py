@@ -45,6 +45,14 @@ def _as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
 
 
+def _string_list(value: Any) -> list[str]:
+    return [item for item in _as_list(value) if isinstance(item, str) and item.strip()]
+
+
+def _first_value(*values: Any) -> Any:
+    return next((value for value in values if value is not None), None)
+
+
 def _safe_ref(value: str) -> str:
     """Strip URL credentials, queries and fragments from read-model evidence."""
 
@@ -220,17 +228,34 @@ def _assets(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for event in events:
         if event.get("entity_type") in _ASSET_ENTITY_TYPES and str(event.get("event_type") or "").startswith("asset_"):
             grouped[(str(event["entity_type"]), str(event.get("entity_id") or ""))].append(event)
-    return [
-        {
-            "entity_type": entity_type,
-            "id": entity_id,
-            "status": entity_events[-1].get("status"),
-            "latest_event": entity_events[-1],
-            "artifacts": _collect_artifacts(entity_events),
-            "event_ids": [event.get("id") for event in entity_events],
-        }
-        for (entity_type, entity_id), entity_events in grouped.items()
-    ]
+    result: list[dict[str, Any]] = []
+    for (entity_type, entity_id), entity_events in grouped.items():
+        latest_event = entity_events[-1]
+        payload = _as_dict(latest_event.get("payload"))
+        parameters = _as_dict(payload.get("parameters"))
+        artifacts = _collect_artifacts(entity_events)
+        source_sha256 = _first_value(
+            payload.get("source_sha256"),
+            payload.get("content_sha256"),
+            artifacts[-1].get("sha256") if artifacts else None,
+        )
+        result.append(
+            {
+                "entity_type": entity_type,
+                "id": entity_id,
+                "status": latest_event.get("status"),
+                "latest_event": latest_event,
+                "version": _first_value(payload.get("asset_version"), payload.get("version"), parameters.get("asset_version")),
+                "source_sha256": source_sha256,
+                "generation_route": _first_value(payload.get("generation_route"), parameters.get("generation_route")),
+                "projection_mode": _first_value(payload.get("projection_mode"), parameters.get("projection_mode")),
+                "coverage": _as_dict(payload.get("coverage")) or None,
+                "lineage": _as_dict(payload.get("lineage")) or None,
+                "artifacts": artifacts,
+                "event_ids": [event.get("id") for event in entity_events],
+            }
+        )
+    return result
 
 
 def _candidates(events: list[dict[str, Any]], tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -245,6 +270,12 @@ def _candidates(events: list[dict[str, Any]], tasks: list[dict[str, Any]]) -> li
         review_events = [event for event in candidate_events if event.get("event_type") in {"review_requested", "review_recorded"}]
         approved_selection_reviews = [event for event in review_events if event.get("event_type") == "review_recorded" and _as_dict(event.get("payload")).get("review_kind") == "candidate_selection" and event.get("status") == "approved"]
         candidate_tasks = [task for task in tasks if task.get("entity_type") == "candidate" and task.get("entity_id") == candidate_id]
+        consistency_payload = _as_dict(consistency_events[-1].get("payload")) if consistency_events else {}
+        quality = _first_value(
+            consistency_payload.get("automated_qa"),
+            consistency_payload.get("qa"),
+            consistency_payload.get("quality"),
+        )
         result.append(
             {
                 "id": candidate_id,
@@ -252,7 +283,8 @@ def _candidates(events: list[dict[str, Any]], tasks: list[dict[str, Any]]) -> li
                 "status": candidate_events[-1].get("status"),
                 "selected": bool(selection_events or approved_selection_reviews),
                 "selection": (selection_events or approved_selection_reviews)[-1] if selection_events or approved_selection_reviews else None,
-                "consistency": _as_dict(consistency_events[-1].get("payload")) if consistency_events else None,
+                "consistency": consistency_payload or None,
+                "quality": _as_dict(quality) or None,
                 "review": review_events[-1] if review_events else None,
                 "artifacts": _collect_artifacts(candidate_events),
                 "task_ids": [task.get("id") for task in candidate_tasks],
@@ -264,6 +296,7 @@ def _candidates(events: list[dict[str, Any]], tasks: list[dict[str, Any]]) -> li
 
 def _shots(events: list[dict[str, Any]], tasks: list[dict[str, Any]], candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
     shot_ids: list[str] = []
+    specs: dict[str, dict[str, Any]] = {}
     for event in events:
         candidate = _shot_id(event)
         if candidate and candidate not in shot_ids:
@@ -272,9 +305,24 @@ def _shots(events: list[dict[str, Any]], tasks: list[dict[str, Any]], candidates
             for shot in _as_list(_as_dict(event.get("payload")).get("shots")):
                 if isinstance(shot, dict) and isinstance(shot.get("id"), str) and shot["id"] not in shot_ids:
                     shot_ids.append(shot["id"])
+                if isinstance(shot, dict) and isinstance(shot.get("id"), str):
+                    specs[shot["id"]] = {
+                        "order": shot.get("order"),
+                        "title": _first_value(shot.get("title"), shot.get("narrative_purpose"), shot.get("description")),
+                        "scene_id": shot.get("scene_id"),
+                        "duration_seconds": _first_value(shot.get("duration_seconds"), shot.get("duration_sec")),
+                        "first_frame": shot.get("first_frame"),
+                        "last_frame": shot.get("last_frame"),
+                        "motion": shot.get("motion"),
+                        "preserve_elements": _string_list(shot.get("preserve_elements")),
+                        "change_elements": _string_list(shot.get("change_elements")),
+                        "dialogue": shot.get("dialogue"),
+                        "camera": _safe_value(shot.get("camera")),
+                    }
     return [
         {
             "id": shot_id,
+            "spec": specs.get(shot_id, {}),
             "task_ids": [task.get("id") for task in tasks if task.get("shot_id") == shot_id],
             "candidate_ids": [candidate["id"] for candidate in candidates if candidate.get("shot_id") == shot_id],
             "selected_candidate_id": next(
@@ -284,6 +332,122 @@ def _shots(events: list[dict[str, Any]], tasks: list[dict[str, Any]], candidates
         }
         for shot_id in shot_ids
     ]
+
+
+def _continuity(events: list[dict[str, Any]], tasks: list[dict[str, Any]]) -> dict[str, Any]:
+    bridges: list[dict[str, Any]] = []
+    for event in events:
+        if event.get("event_type") != "consistency_checked":
+            continue
+        payload = _as_dict(event.get("payload"))
+        nested = _as_dict(payload.get("continuity"))
+        bridge = _first_value(
+            payload.get("bridge"),
+            payload.get("shot_state_bridge"),
+            payload.get("continuity_bridge"),
+            nested.get("bridge"),
+        )
+        if not isinstance(bridge, dict):
+            continue
+        bridges.append(
+            {
+                **bridge,
+                "event_id": event.get("id"),
+                "event_key": event.get("event_key"),
+                "candidate_id": event.get("entity_id") if event.get("entity_type") == "candidate" else None,
+            }
+        )
+
+    recovery_scopes: list[dict[str, Any]] = []
+    for task in tasks:
+        failure = _as_dict(task.get("failure"))
+        if not failure:
+            continue
+        categories = _string_list(failure.get("categories"))
+        category = failure.get("category")
+        if isinstance(category, str) and category and category not in categories:
+            categories.insert(0, category)
+        recovery_scopes.append(
+            {
+                "event_id": task.get("id"),
+                "event_key": task.get("event_key"),
+                "entity_id": task.get("entity_id"),
+                "source": failure.get("source"),
+                "categories": categories,
+                "affected_shot_ids": _string_list(failure.get("affected_shot_ids")),
+                "affected_asset_ids": _string_list(failure.get("affected_asset_ids")),
+                "retryable": failure.get("retryable"),
+            }
+        )
+    return {"bridges": bridges, "recovery_scopes": recovery_scopes}
+
+
+def _timeline(finishing_events: list[dict[str, Any]]) -> dict[str, Any]:
+    timeline_entities = [event for event in finishing_events if event.get("entity_type") in {"audio", "timeline"}]
+    tracks: list[dict[str, Any]] = []
+    fps: Any = None
+    duration_sec: Any = None
+    for event in timeline_entities:
+        payload = _as_dict(event.get("payload"))
+        timeline_payload = _as_dict(payload.get("timeline"))
+        if timeline_payload:
+            fps = _first_value(timeline_payload.get("fps"), fps)
+            duration_sec = _first_value(
+                timeline_payload.get("duration_sec"),
+                timeline_payload.get("duration_seconds"),
+                duration_sec,
+            )
+        raw_tracks = _as_list(timeline_payload.get("tracks"))
+        if not raw_tracks:
+            tracks.append(
+                {
+                    "id": event.get("entity_id"),
+                    "type": "audio" if event.get("entity_type") == "audio" else "video",
+                    "entity_id": event.get("entity_id"),
+                    "status": event.get("status"),
+                    "artifacts": _event_artifacts(event),
+                    "clips": [],
+                    "event_id": event.get("id"),
+                }
+            )
+            continue
+        for index, raw_track in enumerate(raw_tracks):
+            if not isinstance(raw_track, dict):
+                continue
+            raw_type = str(_first_value(raw_track.get("type"), raw_track.get("kind"), "video")).lower()
+            clips: list[dict[str, Any]] = []
+            for raw_clip in _as_list(raw_track.get("clips")):
+                if not isinstance(raw_clip, dict):
+                    continue
+                clips.append(
+                    {
+                        "id": _first_value(raw_clip.get("id"), raw_clip.get("name"), raw_clip.get("shot_id")),
+                        "shot_id": raw_clip.get("shot_id"),
+                        "start_sec": _first_value(raw_clip.get("start_sec"), raw_clip.get("timeline_start_sec")),
+                        "duration_sec": _first_value(raw_clip.get("duration_sec"), raw_clip.get("duration_seconds")),
+                        "source_in_sec": raw_clip.get("source_in_sec"),
+                        "source_sha256": _first_value(raw_clip.get("source_sha256"), raw_clip.get("sha256")),
+                        "selected_candidate_id": raw_clip.get("selected_candidate_id"),
+                        "artifact": _artifact(raw_clip.get("artifact")),
+                    }
+                )
+            tracks.append(
+                {
+                    "id": _first_value(raw_track.get("id"), raw_track.get("name"), f"track-{index + 1}"),
+                    "type": "audio" if "audio" in raw_type or raw_type in {"voice", "sfx", "bgm"} else "video",
+                    "entity_id": event.get("entity_id"),
+                    "status": event.get("status"),
+                    "artifacts": _event_artifacts(event),
+                    "clips": clips,
+                    "event_id": event.get("id"),
+                }
+            )
+    return {
+        "events": finishing_events,
+        "fps": fps,
+        "duration_sec": duration_sec,
+        "tracks": tracks,
+    }
 
 
 def _confirmations(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -339,7 +503,6 @@ def build_video_workbench_read_model(production: dict[str, Any]) -> dict[str, An
     if not isinstance(storyboard_shot_count, int):
         storyboard_shot_count = len(storyboard_shots)
     finishing_events = [event for event in events if event.get("stage") == "finishing"]
-    timeline_entities = [event for event in finishing_events if event.get("entity_type") in {"audio", "timeline"}]
     return {
         "contract_version": VIDEO_WORKBENCH_CONTRACT_VERSION,
         "production": production_summary,
@@ -355,20 +518,9 @@ def build_video_workbench_read_model(production: dict[str, Any]) -> dict[str, An
         "shots": _shots(events, tasks, candidates),
         "tasks": tasks,
         "candidates": candidates,
+        "continuity": _continuity(events, tasks),
         "confirmations": _confirmations(events),
-        "timeline": {
-            "events": finishing_events,
-            "tracks": [
-                {
-                    "type": "audio" if event.get("entity_type") == "audio" else "video",
-                    "entity_id": event.get("entity_id"),
-                    "status": event.get("status"),
-                    "artifacts": _event_artifacts(event),
-                    "event_id": event.get("id"),
-                }
-                for event in timeline_entities
-            ],
-        },
+        "timeline": _timeline(finishing_events),
         "delivery": {
             "qa_events": qa_events,
             "delivery_events": delivery_events,

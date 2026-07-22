@@ -270,3 +270,166 @@ def test_video_workbench_never_exposes_credential_bearing_urls() -> None:
     assert workbench["tasks"][0]["artifacts"][0]["ref"] == safe_ref
     assert workbench["tasks"][0]["artifacts"][0]["source_ref"] == safe_ref
     assert workbench["events"][0]["payload"]["outputs"][0]["ref"] == safe_ref
+
+
+def test_video_workbench_projects_asset_versions_shot_semantics_and_timeline_clips() -> None:
+    production = {
+        "id": "video-production-1",
+        "status": "blocked",
+        "current_stage": "finishing",
+        "source_kind": "script",
+        "source": {"script": "A two-shot continuity test."},
+        "delivery_spec": {"aspect_ratio": "16:9", "duration_seconds": 8},
+        "provider_policy": {},
+        "budget": {},
+        "events": [
+            _event(
+                1,
+                "asset_generation_completed",
+                entity_type="character",
+                entity_id="mira",
+                payload={
+                    "asset_version": 3,
+                    "source_sha256": "1" * 64,
+                    "generation_route": "seedream_character_board",
+                    "projection_mode": "exterior_orbit",
+                    "coverage": {"tier": "shot_required", "view_ids": ["front"]},
+                    "lineage": {"source_version": 2, "replaces_event_id": "event-old"},
+                    "outputs": [{"ref": "file:///tmp/mira-v3.png", "sha256": "1" * 64}],
+                },
+            ),
+            _event(
+                2,
+                "storyboard_sealed",
+                payload={
+                    "shots": [
+                        {
+                            "id": "shot-01",
+                            "order": 1,
+                            "title": "Inspect parcel",
+                            "scene_id": "workshop",
+                            "duration_seconds": 4,
+                            "first_frame": "Hands rest on the parcel.",
+                            "last_frame": "Gaze settles on the seal.",
+                            "motion": "One gaze shift.",
+                            "preserve_elements": ["identity", "hands_contact"],
+                            "change_elements": ["gaze_direction"],
+                        },
+                        {
+                            "id": "shot-02",
+                            "order": 2,
+                            "title": "Close-up",
+                            "duration_seconds": 4,
+                            "first_frame": "The prior terminal state continues.",
+                            "last_frame": "The seal fills frame.",
+                            "motion": "Slow push in.",
+                            "preserve_elements": ["identity", "parcel_state"],
+                            "change_elements": ["shot_size"],
+                        },
+                    ]
+                },
+            ),
+            _event(
+                3,
+                "shot_generation_failed",
+                status="failed",
+                entity_type="shot",
+                entity_id="shot-02",
+                payload={
+                    "parameters": {"attempt": 1},
+                    "failure": {
+                        "category": "identity_drift",
+                        "source": "shot_execution_drift",
+                        "retryable": True,
+                        "affected_shot_ids": ["shot-02"],
+                        "affected_asset_ids": [],
+                    },
+                },
+            ),
+            _event(
+                4,
+                "shot_generation_completed",
+                entity_type="candidate",
+                entity_id="shot-02:candidate-2",
+                payload={
+                    "parameters": {"attempt": 2, "retry_of": "event-key-3"},
+                    "outputs": [{"ref": "file:///tmp/shot-02.mp4", "sha256": "2" * 64}],
+                },
+            ),
+            _event(
+                5,
+                "consistency_checked",
+                entity_type="candidate",
+                entity_id="shot-02:candidate-2",
+                payload={
+                    "checks": {"identity_lock": True, "whole_shot_playback": True},
+                    "automated_qa": {
+                        "technical_gate_passed": True,
+                        "internal_cut_gate_passed": True,
+                        "first_frame_anchor_score": 0.94,
+                    },
+                    "bridge": {
+                        "bridge_id": "shot-01-to-shot-02",
+                        "from_shot_id": "shot-01",
+                        "to_shot_id": "shot-02",
+                        "inherited_state_sha256": "3" * 64,
+                        "preserve_facts": ["hands_contact", "parcel_state"],
+                        "cut_kind": "canonical_camera_cut",
+                        "axis_relation": "approved_canonical_view_change",
+                    },
+                },
+            ),
+            _event(
+                6,
+                "media_processing_completed",
+                entity_type="timeline",
+                entity_id="timeline-v2",
+                payload={
+                    "timeline": {
+                        "fps": 24,
+                        "duration_sec": 8,
+                        "tracks": [
+                            {
+                                "id": "V1",
+                                "type": "video",
+                                "clips": [
+                                    {
+                                        "id": "clip-shot-02",
+                                        "shot_id": "shot-02",
+                                        "start_sec": 4,
+                                        "duration_sec": 4,
+                                        "source_sha256": "2" * 64,
+                                        "artifact": {"ref": "file:///tmp/shot-02.mp4", "sha256": "2" * 64},
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                },
+            ),
+        ],
+    }
+
+    workbench = build_video_workbench_read_model(production)
+
+    assert workbench["assets"][0]["version"] == 3
+    assert workbench["assets"][0]["source_sha256"] == "1" * 64
+    assert workbench["assets"][0]["coverage"]["tier"] == "shot_required"
+    assert workbench["shots"][0]["spec"]["first_frame"] == "Hands rest on the parcel."
+    assert workbench["shots"][1]["spec"]["preserve_elements"] == ["identity", "parcel_state"]
+    assert workbench["candidates"][0]["quality"]["first_frame_anchor_score"] == 0.94
+    assert workbench["continuity"]["bridges"][0]["from_shot_id"] == "shot-01"
+    assert workbench["continuity"]["bridges"][0]["inherited_state_sha256"] == "3" * 64
+    assert workbench["continuity"]["recovery_scopes"][0] == {
+        "event_id": "event-3",
+        "event_key": "event-key-3",
+        "entity_id": "shot-02",
+        "source": "shot_execution_drift",
+        "categories": ["identity_drift"],
+        "affected_shot_ids": ["shot-02"],
+        "affected_asset_ids": [],
+        "retryable": True,
+    }
+    assert workbench["timeline"]["fps"] == 24
+    assert workbench["timeline"]["duration_sec"] == 8
+    assert workbench["timeline"]["tracks"][0]["clips"][0]["source_sha256"] == "2" * 64

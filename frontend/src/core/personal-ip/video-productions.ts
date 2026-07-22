@@ -99,6 +99,10 @@ export type VideoWorkbenchTask = {
     category?: string;
     message?: string;
     retryable?: boolean;
+    source?: string;
+    categories?: string[];
+    affected_shot_ids?: string[];
+    affected_asset_ids?: string[];
   } | null;
   input_refs: string[];
   output_refs: string[];
@@ -137,6 +141,12 @@ export type PersonalIPVideoWorkbench = {
     entity_type: "character" | "scene" | "prop";
     id: string;
     status?: string;
+    version?: number | string | null;
+    source_sha256?: string | null;
+    generation_route?: string | null;
+    projection_mode?: string | null;
+    coverage?: Record<string, unknown> | null;
+    lineage?: Record<string, unknown> | null;
     latest_event?: VideoProductionEvent | null;
     artifacts: VideoArtifact[];
     event_ids: string[];
@@ -148,6 +158,19 @@ export type PersonalIPVideoWorkbench = {
   };
   shots: Array<{
     id: string;
+    spec: {
+      order?: number | null;
+      title?: string | null;
+      scene_id?: string | null;
+      duration_seconds?: number | null;
+      first_frame?: string | null;
+      last_frame?: string | null;
+      motion?: string | null;
+      preserve_elements?: string[];
+      change_elements?: string[];
+      dialogue?: string | null;
+      camera?: unknown;
+    };
     task_ids: string[];
     candidate_ids: string[];
     selected_candidate_id?: string | null;
@@ -160,19 +183,58 @@ export type PersonalIPVideoWorkbench = {
     selected: boolean;
     selection?: VideoProductionEvent | null;
     consistency?: Record<string, unknown> | null;
+    quality?: Record<string, unknown> | null;
     review?: VideoProductionEvent | null;
     artifacts: VideoArtifact[];
     task_ids: string[];
     event_ids: string[];
   }>;
+  continuity: {
+    bridges: Array<{
+      event_id?: string;
+      event_key?: string;
+      candidate_id?: string | null;
+      bridge_id?: string;
+      from_shot_id?: string;
+      to_shot_id?: string;
+      inherited_state_sha256?: string;
+      preserve_facts?: unknown[];
+      cut_kind?: string;
+      axis_relation?: string;
+      [key: string]: unknown;
+    }>;
+    recovery_scopes: Array<{
+      event_id?: string;
+      event_key?: string;
+      entity_id?: string;
+      source?: string | null;
+      categories: string[];
+      affected_shot_ids: string[];
+      affected_asset_ids: string[];
+      retryable?: boolean | null;
+    }>;
+  };
   confirmations: VideoWorkbenchConfirmation[];
   timeline: {
     events: VideoProductionEvent[];
+    fps?: number | null;
+    duration_sec?: number | null;
     tracks: Array<{
+      id?: string;
       type: "audio" | "video";
       entity_id?: string;
       status?: string;
       artifacts: VideoArtifact[];
+      clips: Array<{
+        id?: string | null;
+        shot_id?: string | null;
+        start_sec?: number | null;
+        duration_sec?: number | null;
+        source_in_sec?: number | null;
+        source_sha256?: string | null;
+        selected_candidate_id?: string | null;
+        artifact?: VideoArtifact | null;
+      }>;
       event_id?: string;
     }>;
   };
