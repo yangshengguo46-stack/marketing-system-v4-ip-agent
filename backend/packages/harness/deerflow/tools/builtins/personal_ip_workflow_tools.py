@@ -12,7 +12,7 @@ from langchain.tools import tool
 from deerflow.config.paths import get_paths
 from deerflow.personal_ip.audience_provider import AudiencePreflightRequest, HLLMCreatorHTTPProvider
 from deerflow.personal_ip.browser_profiles import get_browser_account_target, select_browser_account_target
-from deerflow.personal_ip.browser_publishing import verify_browser_publication_evidence
+from deerflow.personal_ip.browser_publishing import normalize_publication_url, verify_browser_publication_evidence
 from deerflow.personal_ip.hllm_creator import HLLMCreatorAdapter
 from deerflow.personal_ip.runtime import get_personal_ip_runtime
 from deerflow.runtime.user_context import resolve_runtime_user_id
@@ -38,6 +38,56 @@ def _parse_datetime(value: str, *, field: str) -> datetime:
 
 def _optional_datetime(value: str, *, field: str) -> datetime | None:
     return _parse_datetime(value, field=field) if str(value or "").strip() else None
+
+
+def _attempt_with_key(receipt: dict, attempt_key: str) -> dict | None:
+    return next(
+        (item for item in receipt.get("attempts") or [] if item.get("attempt_key") == attempt_key),
+        None,
+    )
+
+
+def _browser_handoff_payload(*, account_id: str, start_url: str) -> dict:
+    return {
+        "handoff": "deerflow_browser",
+        "selected_account_id": account_id,
+        "start_url": start_url,
+    }
+
+
+def _browser_result_replay_matches(
+    *,
+    receipt: dict,
+    existing_attempt: dict,
+    status: str,
+    evidence: dict,
+    occurred_at: str,
+    external_post_id: str,
+    external_url: str,
+) -> bool:
+    if existing_attempt.get("status") != status:
+        return False
+    post_id = str(external_post_id or "").strip() or None
+    if existing_attempt.get("external_post_id") != post_id:
+        return False
+    raw_url = str(external_url or "").strip()
+    normalized_url = normalize_publication_url(raw_url, platform=receipt["platform"]) if raw_url else None
+    if existing_attempt.get("external_url") != normalized_url:
+        return False
+    supplied_result = dict(evidence)
+    if status == "published":
+        supplied_result.pop("browser_proof", None)
+        existing_result = dict(existing_attempt.get("result") or {})
+        if not isinstance(existing_result.pop("browser_proof", None), dict):
+            return False
+    else:
+        existing_result = existing_attempt.get("result")
+    if existing_result != supplied_result:
+        return False
+    supplied_time = _optional_datetime(occurred_at, field="occurred_at")
+    if supplied_time is not None and existing_attempt.get("occurred_at") != supplied_time.isoformat():
+        return False
+    return True
 
 
 def _audience_preflight_provider() -> HLLMCreatorHTTPProvider:
@@ -158,13 +208,15 @@ async def _personal_ip_begin_publish_receipt(
         idempotency_key: Stable executor idempotency key.
         account_id: Exact owner-scoped platform account to publish through.
         preflight_id: Optional preflight id; pass an empty string when absent.
-        executor: platform_api, ui_tars, browser or manual.
+        executor: platform_api, ui_tars or manual. Browser must use prepare.
         request: Exact caption/media/options and selected variant snapshot.
 
     Returns:
         JSON planned publication receipt and its immutable request digest.
     """
     try:
+        if str(executor or "").strip() == "browser":
+            raise ValueError("browser receipts must use personal_ip_prepare_browser_publish")
         services = get_personal_ip_runtime()
         result = await services.publish_receipts.begin(
             owner_user_id=resolve_runtime_user_id(runtime),
@@ -220,6 +272,15 @@ async def _personal_ip_prepare_browser_publish(
         account = await services.accounts.get(account_id, owner_user_id=owner_user_id)
         if account is None or account.get("status") != "active":
             raise ValueError("Personal-IP publish target account not found")
+        receipt = await services.publish_receipts.begin(
+            owner_user_id=owner_user_id,
+            operation_key=operation_key,
+            idempotency_key=idempotency_key,
+            account_id=account["id"],
+            preflight_id=str(preflight_id or "").strip() or None,
+            executor="browser",
+            request_payload=request,
+        )
         paths = get_paths()
         safe_user_id = paths.prepare_user_dir_for_raw_id(owner_user_id)
         target = select_browser_account_target(
@@ -230,36 +291,23 @@ async def _personal_ip_prepare_browser_publish(
             display_name=account["display_name"],
             user_data_dir=paths.ensure_browser_profile_dir(account["id"], user_id=safe_user_id),
         )
-        receipt = await services.publish_receipts.begin(
-            owner_user_id=owner_user_id,
-            operation_key=operation_key,
-            idempotency_key=idempotency_key,
-            account_id=account["id"],
-            preflight_id=str(preflight_id or "").strip() or None,
-            executor="browser",
-            request_payload=request,
-        )
-        existing_attempt = next(
-            (item for item in receipt.get("attempts") or [] if item.get("attempt_key") == pending_attempt_key),
-            None,
-        )
+        handoff_payload = _browser_handoff_payload(account_id=target.account_id, start_url=target.start_url)
+        existing_attempt = _attempt_with_key(receipt, pending_attempt_key)
         if existing_attempt is None:
-            if receipt.get("status") != "planned":
+            if receipt.get("status") not in {"planned", "failed", "unknown"}:
                 raise ValueError("browser publish receipt already entered execution with a different attempt key")
             receipt = await services.publish_receipts.record_attempt(
                 receipt["id"],
                 owner_user_id=owner_user_id,
                 attempt_key=pending_attempt_key,
                 status="pending",
-                result_payload={
-                    "handoff": "deerflow_browser",
-                    "selected_account_id": target.account_id,
-                    "start_url": target.start_url,
-                },
-                occurred_at=_parse_datetime(receipt["created_at"], field="created_at"),
+                result_payload=handoff_payload,
+                occurred_at=(_parse_datetime(receipt["created_at"], field="created_at") if not (receipt.get("attempts") or []) else None),
             )
             if receipt is None:
                 raise RuntimeError("Publish receipt disappeared during browser handoff")
+        elif existing_attempt.get("status") != "pending" or existing_attempt.get("result") != handoff_payload:
+            raise ValueError("pending_attempt_key already records a different browser handoff")
         return _json(
             {
                 "operation_status": "ok",
@@ -330,10 +378,27 @@ async def _personal_ip_finish_browser_publish(
             return _json({"status": "error", "category": "not_found", "message": "Publish receipt not found"})
         if receipt.get("executor") != "browser":
             raise ValueError("publish receipt is not assigned to the browser executor")
+        existing_attempt = _attempt_with_key(receipt, attempt_key)
+        if existing_attempt is not None:
+            if not _browser_result_replay_matches(
+                receipt=receipt,
+                existing_attempt=existing_attempt,
+                status=status,
+                evidence=evidence,
+                occurred_at=occurred_at,
+                external_post_id=external_post_id,
+                external_url=external_url,
+            ):
+                raise ValueError("attempt_key already records a different browser result")
+            return _json({"operation_status": "ok", **receipt})
         thread_id = str((runtime.context or {}).get("thread_id") or "").strip()
+        if not thread_id:
+            raise ValueError("browser publication requires a thread")
         target = get_browser_account_target(owner_user_id=owner_user_id, thread_id=thread_id)
         if target is None or target.account_id != receipt.get("account_id"):
             raise ValueError("selected browser account does not match the publish receipt")
+        if target.platform != receipt.get("platform"):
+            raise ValueError("selected browser platform does not match the publish receipt")
         result_payload = dict(evidence)
         if status == "published":
             observed = await _observe_selected_browser(runtime)
@@ -374,11 +439,11 @@ async def _personal_ip_record_publish_attempt(
     external_post_id: str,
     external_url: str,
 ) -> str:
-    """Append the evidence from one real publication execution attempt.
+    """Append evidence from one real non-browser publication attempt.
 
     Record pending before handing control to a provider when possible, then
     append a new published, failed or unknown attempt from observed evidence.
-    Never call a browser action successful merely because a click returned.
+    Browser receipts must use the composite prepare/finish tools.
 
     Args:
         receipt_id: Planned publication receipt id.
@@ -394,9 +459,15 @@ async def _personal_ip_record_publish_attempt(
     """
     try:
         services = get_personal_ip_runtime()
+        owner_user_id = resolve_runtime_user_id(runtime)
+        existing = await services.publish_receipts.get(receipt_id, owner_user_id=owner_user_id)
+        if existing is None:
+            return _json({"status": "error", "category": "not_found", "message": "Publish receipt not found"})
+        if existing.get("executor") == "browser":
+            raise ValueError("browser receipts must use personal_ip_finish_browser_publish")
         receipt = await services.publish_receipts.record_attempt(
             receipt_id,
-            owner_user_id=resolve_runtime_user_id(runtime),
+            owner_user_id=owner_user_id,
             attempt_key=attempt_key,
             status=status,
             result_payload=result,

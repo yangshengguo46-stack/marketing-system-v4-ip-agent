@@ -13,6 +13,9 @@ test:
 test-blocking-io:
 	PYTHONPATH=. PYTHONIOENCODING=utf-8 PYTHONUTF8=1 uv run pytest tests/blocking_io -q --tb=short
 
+personal-ip-publish-acceptance:
+	PYTHONPATH=. PYTHONIOENCODING=utf-8 PYTHONUTF8=1 uv run pytest tests/test_personal_ip_browser_publishing.py tests/test_personal_ip_publish_receipt_repository.py tests/test_personal_ip_publish_receipt_router.py tests/test_personal_ip_publish_recovery_e2e.py tests/test_personal_ip_workflow_tools.py -q --tb=short
+
 lint:
 	uvx ruff check .
 	uvx ruff format --check .

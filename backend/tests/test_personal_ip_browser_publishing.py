@@ -25,18 +25,89 @@ def test_browser_publication_requires_visible_selected_platform_proof() -> None:
 
 
 @pytest.mark.parametrize(
-    ("platform", "url"),
+    ("platform", "url", "normalized"),
     [
-        ("wechat_channels", "https://channels.weixin.qq.com/platform/post/1"),
-        ("wechat_official", "https://mp.weixin.qq.com/s/abc"),
-        ("xiaohongshu", "https://www.xiaohongshu.com/explore/abc"),
-        ("x", "https://x.com/example/status/1"),
-        ("instagram", "https://www.instagram.com/p/abc/"),
-        ("youtube", "https://youtu.be/abc"),
-        ("tiktok", "https://www.tiktok.com/@example/video/1"),
+        ("douyin", "https://www.douyin.com/video/712345?share_token=secret#comments", "https://www.douyin.com/video/712345"),
+        (
+            "wechat_channels",
+            "https://channels.weixin.qq.com/web/pages/feed?feedId=feed-1&exportkey=secret#comments",
+            "https://channels.weixin.qq.com/web/pages/feed?feedId=feed-1",
+        ),
+        ("wechat_official", "https://mp.weixin.qq.com/s/article-1?scene=1", "https://mp.weixin.qq.com/s/article-1"),
+        ("xiaohongshu", "https://www.xiaohongshu.com/explore/note-1?xsec_token=secret", "https://www.xiaohongshu.com/explore/note-1"),
+        ("x", "https://x.com/example/status/1001?s=20", "https://x.com/example/status/1001"),
+        ("instagram", "https://www.instagram.com/p/post-1/?igsh=secret", "https://www.instagram.com/p/post-1"),
+        ("youtube", "https://www.youtube.com/watch?v=video-1&utm_source=creator", "https://www.youtube.com/watch?v=video-1"),
+        ("tiktok", "https://www.tiktok.com/@example/video/2001?is_from_webapp=1", "https://www.tiktok.com/@example/video/2001"),
     ],
 )
-def test_all_portfolio_platforms_have_publication_host_rules(platform: str, url: str) -> None:
+def test_all_portfolio_platforms_have_public_post_rules(platform: str, url: str, normalized: str) -> None:
+    assert platform_publication_url_allowed(platform, url)
+    proof = verify_browser_publication_evidence(
+        platform=platform,
+        observed_url=url,
+        page_title="公开帖子",
+        visible_text=f"公开帖子 {normalized}",
+        external_url=url,
+        external_post_id=None,
+    )
+    assert proof["observed_url"] == normalized
+
+
+@pytest.mark.parametrize(
+    ("platform", "url"),
+    [
+        ("douyin", "https://creator.douyin.com/creator-micro/content/manage"),
+        ("wechat_channels", "https://channels.weixin.qq.com/platform/post/list"),
+        ("wechat_official", "https://mp.weixin.qq.com/cgi-bin/home"),
+        ("xiaohongshu", "https://creator.xiaohongshu.com/creator/home"),
+        ("x", "https://x.com/home"),
+        ("instagram", "https://www.instagram.com/"),
+        ("youtube", "https://studio.youtube.com/channel/channel-1"),
+        ("tiktok", "https://www.tiktok.com/tiktokstudio/content"),
+    ],
+)
+def test_creator_pages_are_not_publication_proof(platform: str, url: str) -> None:
+    assert not platform_publication_url_allowed(platform, url)
+    with pytest.raises(ValueError, match="public post|selected platform"):
+        verify_browser_publication_evidence(
+            platform=platform,
+            observed_url=url,
+            page_title="创作者后台",
+            visible_text="post-1",
+            external_url=None,
+            external_post_id="post-1",
+        )
+
+
+def test_post_id_does_not_match_an_unrelated_url_substring() -> None:
+    with pytest.raises(ValueError, match="post id is not visible"):
+        verify_browser_publication_evidence(
+            platform="youtube",
+            observed_url="https://www.youtube.com/watch?v=video-12&utm_source=video-1",
+            page_title="公开帖子",
+            visible_text="公开帖子",
+            external_url=None,
+            external_post_id="video-1",
+        )
+
+
+@pytest.mark.parametrize(
+    ("platform", "url"),
+    [
+        ("douyin", "https://www.douyin.com/note/note-2"),
+        ("wechat_channels", "https://weixin.qq.com/sph/feed-2"),
+        ("wechat_official", "https://mp.weixin.qq.com/s?__biz=biz-1&mid=10&idx=1&sn=signature"),
+        ("xiaohongshu", "https://www.xiaohongshu.com/discovery/item/note-2"),
+        ("x", "https://twitter.com/i/web/status/1002"),
+        ("instagram", "https://www.instagram.com/tv/post-2"),
+        ("youtube", "https://youtu.be/video-2"),
+        ("youtube", "https://www.youtube.com/shorts/video-3"),
+        ("youtube", "https://www.youtube.com/live/video-4"),
+        ("tiktok", "https://www.tiktok.com/@creator/photo/2002"),
+    ],
+)
+def test_supported_publication_url_variants(platform: str, url: str) -> None:
     assert platform_publication_url_allowed(platform, url)
 
 

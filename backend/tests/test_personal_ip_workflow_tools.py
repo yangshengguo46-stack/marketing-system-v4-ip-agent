@@ -296,7 +296,7 @@ async def test_native_workflow_tools_preserve_owner_scope_and_append_only_sequen
             idempotency_key="idem:draft-1",
             account_id="acct-1",
             preflight_id="preflight-1",
-            executor="browser",
+            executor="platform_api",
             request={"variant_id": "variant-1", "caption": "候选文案"},
         )
     )
@@ -361,3 +361,49 @@ async def test_native_workflow_tools_preserve_owner_scope_and_append_only_sequen
         retrospective_ids=["retro-1", "retro-2", "retro-3"],
         minimum_support=3,
     )
+
+
+@pytest.mark.asyncio
+async def test_generic_publish_tools_reject_browser_receipt_bypass() -> None:
+    publish_receipts = SimpleNamespace(
+        begin=AsyncMock(),
+        get=AsyncMock(return_value={"id": "publish-1", "executor": "browser"}),
+        record_attempt=AsyncMock(),
+    )
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            connections=SimpleNamespace(),
+            metrics=SimpleNamespace(),
+            publish_receipts=publish_receipts,
+        )
+    )
+    runtime = SimpleNamespace(context={"user_id": "user-1"})
+
+    created = json.loads(
+        await _personal_ip_begin_publish_receipt(
+            runtime,
+            operation_key="publish:draft-1",
+            idempotency_key="idem:draft-1",
+            account_id="acct-1",
+            preflight_id="",
+            executor="browser",
+            request={"caption": "候选文案"},
+        )
+    )
+    attempted = json.loads(
+        await _personal_ip_record_publish_attempt(
+            runtime,
+            receipt_id="publish-1",
+            attempt_key="attempt-1",
+            status="published",
+            result={"confirmation": "未经 live proof"},
+            occurred_at="",
+            external_post_id="post-1",
+            external_url="",
+        )
+    )
+
+    assert "must use personal_ip_prepare_browser_publish" in created["message"]
+    assert "must use personal_ip_finish_browser_publish" in attempted["message"]
+    publish_receipts.begin.assert_not_awaited()
+    publish_receipts.record_attempt.assert_not_awaited()
