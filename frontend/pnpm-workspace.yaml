@@ -1,5 +1,13 @@
 packages: []
+# pnpm 11 defaults strictDepBuilds to true, which turns the explicitly ignored
+# native build scripts below into a hard install error. Preserve the pnpm 10
+# behavior while keeping the denylist explicit and auditable.
+strictDepBuilds: false
 ignoredBuiltDependencies:
   - esbuild
   - sharp
   - unrs-resolver
+allowBuilds:
+  esbuild: false
+  sharp: false
+  unrs-resolver: false

@@ -71,6 +71,16 @@ def test_source_package_rejects_tracked_runtime_secret(tmp_path) -> None:
         build_source_package(root, tmp_path / "bad.tar.gz")
 
 
+def test_source_package_rejects_tracked_environment_variant(tmp_path) -> None:
+    root = _source_repo(tmp_path)
+    (root / ".env.local").write_text("SECRET=tracked\n", encoding="utf-8")
+    _git(root, "add", "-f", ".env.local")
+    _git(root, "commit", "-m", "bad local environment")
+
+    with pytest.raises(RuntimeError, match="forbidden"):
+        build_source_package(root, tmp_path / "bad-env-variant.tar.gz")
+
+
 def test_source_package_rejects_dirty_tracked_tree(tmp_path) -> None:
     root = _source_repo(tmp_path)
     (root / "IP_AGENT.md").write_text("changed\n", encoding="utf-8")

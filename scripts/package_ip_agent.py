@@ -28,12 +28,15 @@ REQUIRED_PACKAGE_PATHS = (
     "backend/uv.lock",
     "frontend/package.json",
     "frontend/pnpm-lock.yaml",
+    "frontend/pnpm-workspace.yaml",
     "product/defaults/USER.md",
     "product/defaults/agents/ip-agent/SOUL.md",
     "product/defaults/agents/ip-agent/config.yaml",
     "product/volcengine/capabilities.yaml",
     "scripts/doctor.py",
+    "scripts/clean_install_ip_agent.py",
     "scripts/init_ip_agent.py",
+    "scripts/install_dev_hooks.py",
     "scripts/install_ffmpeg_toolchain.py",
     "scripts/install_go_toolchain.py",
     "scripts/mediakit_source.py",
@@ -49,11 +52,20 @@ FORBIDDEN_PARTS = {
     ".deer-flow",
     ".env",
     ".git",
+    ".playwright-mcp",
     ".pytest_cache",
     ".ruff_cache",
     ".venv",
     "node_modules",
     "__pycache__",
+}
+RUNTIME_ROOT_FILES = {
+    ".env",
+    "config.yaml",
+    "config.yml",
+    "configure.yml",
+    "extensions_config.json",
+    "mcp_config.json",
 }
 
 
@@ -108,6 +120,10 @@ def _assert_credential_free_path(relative: str) -> None:
     path = _safe_archive_path(relative)
     if any(part in FORBIDDEN_PARTS for part in path.parts):
         raise RuntimeError(f"forbidden local/runtime path in source package: {relative}")
+    if path.name.startswith(".env.") and path.name != ".env.example":
+        raise RuntimeError(f"forbidden local/runtime path in source package: {relative}")
+    if len(path.parts) == 1 and path.name in RUNTIME_ROOT_FILES:
+        raise RuntimeError(f"runtime config must not enter source package: {relative}")
     if path.name == "config.yaml" and str(path) != "product/defaults/agents/ip-agent/config.yaml":
         raise RuntimeError(f"runtime config must not enter source package: {relative}")
 
@@ -128,7 +144,8 @@ def _manifest(
         "file_count": len(files),
         "files": files,
         "required_paths": list(REQUIRED_PACKAGE_PATHS),
-        "install": ["cp .env.example .env", "make setup", "make ip-init", "make install", "make doctor"],
+        "install": ["make config", "make ip-init", "make install", "make doctor"],
+        "clean_install_acceptance": ["python3 scripts/clean_install_ip_agent.py"],
         "optional_media_install": ["make volcengine-install", "make volcengine-doctor"],
     }
 

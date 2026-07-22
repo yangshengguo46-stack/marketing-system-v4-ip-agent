@@ -1,8 +1,9 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify personal-ip-publish-acceptance video-e2e-local video-e2e-paid-checkpoints volcengine-install volcengine-doctor hllm-doctor hllm-lite douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify ip-clean-install personal-ip-publish-acceptance video-e2e-local video-e2e-paid-checkpoints volcengine-install volcengine-doctor hllm-doctor hllm-lite douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
+PNPM ?= pnpm
 BACKEND_UV_RUN = cd backend && uv run
 VIDEO_E2E_DIR ?= .deer-flow/acceptance/video-e2e
 VIDEO_E2E_FINISHER ?= auto
@@ -27,6 +28,7 @@ help:
 	@echo "  make personal-ip-publish-acceptance - Run local-only eight-platform publish recovery checks"
 	@echo "  make video-e2e-local - Run/resume the free local video delivery acceptance"
 	@echo "  make video-e2e-paid-checkpoints - Write paid media commands without running them"
+	@echo "  make ip-clean-install - Validate the source archive in a credential-free clean room"
 	@echo "  make volcengine-install - Build the pinned AI MediaKit CLI from source"
 	@echo "  make volcengine-doctor  - Check the source-built AI MediaKit CLI"
 	@echo "  make hllm-doctor        - Verify the pinned full HLLM-Creator source"
@@ -42,7 +44,7 @@ help:
 	@echo "  make check           - Check if all required tools are installed"
 	@echo "  make detect-thread-boundaries - Inventory async/thread boundary points"
 	@echo "  make detect-blocking-io        - Inventory blocking IO that may block the backend event loop"
-	@echo "  make install         - Install all dependencies (frontend + backend + pre-commit hooks)"
+	@echo "  make install         - Install dependencies (Git checkouts also get pre-commit hooks)"
 	@echo "  make setup-sandbox   - Pre-pull sandbox container image (recommended)"
 	@echo "  make dev             - Start all services in development mode (with hot-reloading)"
 	@echo "  make dev-daemon      - Start dev services in background (daemon mode)"
@@ -87,6 +89,9 @@ video-e2e-local:
 
 video-e2e-paid-checkpoints:
 	@$(BACKEND_UV_RUN) python ../scripts/personal_ip_video_e2e.py paid-checkpoints --work-dir "$(abspath $(VIDEO_E2E_DIR))"
+
+ip-clean-install:
+	@$(PYTHON) ./scripts/clean_install_ip_agent.py
 
 volcengine-install: ffmpeg-toolchain mediakit-toolchain
 	@$(PYTHON) ./scripts/mediakit_source.py build
@@ -142,10 +147,9 @@ install:
 	@echo "Installing backend dependencies..."
 	@cd backend && uv sync
 	@echo "Installing frontend dependencies..."
-	@cd frontend && pnpm install
-	@echo "Installing pre-commit hooks..."
-	@uv tool install pre-commit
-	@pre-commit install --overwrite
+	@cd frontend && $(PNPM) install
+	@echo "Installing repository-only developer hooks..."
+	@$(PYTHON) ./scripts/install_dev_hooks.py
 	@echo "✓ All dependencies installed"
 	@echo ""
 	@echo "=========================================="
