@@ -109,7 +109,16 @@ may collect afterward through Browser Control or an official API.
    product's explicit approval. Browser publication uses
    `personal_ip_prepare_browser_publish` before submission and
    `personal_ip_finish_browser_publish` afterward; success is sealed only when
-   the selected live browser visibly opens the declared platform post URL/id.
+   the selected live browser visibly opens a post-specific public URL for the
+   declared platform. Creator dashboards, home pages and same-host lists are
+   not success evidence. `failed`/`unknown` receipts may start a new pending
+   attempt; exact finish callback replays return the stored result without
+   requiring the browser page again, while conflicting replays are rejected.
+
+Run `make personal-ip-publish-acceptance` from the repository root for the
+local-only eight-platform proof and recovery matrix. It uses temporary SQLite
+state and mocked browser observations; it cannot submit content or change a
+platform account.
 
 Closing an in-memory browser session releases Chromium resources but preserves
 the account profile and its login state. Deleting an account does not silently

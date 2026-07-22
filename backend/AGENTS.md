@@ -94,6 +94,7 @@ make dev                # Run Gateway API with reload (port 8001)
 make gateway            # Run Gateway API only (port 8001)
 make test               # Run all backend tests
 make test-blocking-io   # Run strict Blockbuster runtime gate on tests/blocking_io/
+make personal-ip-publish-acceptance  # Local-only eight-platform browser publish/recovery gate
 make lint               # Lint with ruff
 make format             # Format code with ruff
 make migrate-rev MSG="..."  # Autogenerate a new alembic revision (see Schema Migrations section)
@@ -1176,6 +1177,14 @@ owner/account profile, freezes the request and appends the pending handoff;
 finish requires that same live browser to show the declared platform post
 URL/id before it can append `published`. Persist only the normalized public URL,
 page title and visible-text digest, never query credentials or raw page secrets.
+Public proof is route-specific for all eight platforms: creator dashboards,
+home pages and same-host content lists do not qualify. A receipt in `failed` or
+`unknown` may be prepared again with a new pending attempt key. Exact finish
+callback replays return the stored receipt before acquiring a browser, which
+recovers a lost response after the page/session has gone away; a reused key
+with different status, evidence, time or public identity remains a conflict.
+`make personal-ip-publish-acceptance` runs this matrix with temporary SQLite
+state and mocked browser observations only; it never contacts a platform.
 
 ### Vision Support
 

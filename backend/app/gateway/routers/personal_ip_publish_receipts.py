@@ -65,6 +65,8 @@ async def begin_personal_ip_publish(
     request: Request,
 ) -> dict[str, Any]:
     try:
+        if body.executor == "browser":
+            raise ValueError("browser receipts must use personal_ip_prepare_browser_publish")
         return await get_personal_ip_publish_receipt_repo(request).begin(
             owner_user_id=await _current_user_id(request),
             operation_key=body.operation_key,
@@ -85,9 +87,16 @@ async def record_personal_ip_publish_attempt(
     request: Request,
 ) -> dict[str, Any]:
     try:
-        receipt = await get_personal_ip_publish_receipt_repo(request).record_attempt(
+        repository = get_personal_ip_publish_receipt_repo(request)
+        owner_user_id = await _current_user_id(request)
+        existing = await repository.get(receipt_id, owner_user_id=owner_user_id)
+        if existing is None:
+            raise HTTPException(status_code=404, detail="Personal-IP publish receipt not found")
+        if existing.get("executor") == "browser":
+            raise ValueError("browser receipts must use personal_ip_finish_browser_publish")
+        receipt = await repository.record_attempt(
             receipt_id,
-            owner_user_id=await _current_user_id(request),
+            owner_user_id=owner_user_id,
             attempt_key=body.attempt_key,
             status=body.status,
             result_payload=body.result_payload,

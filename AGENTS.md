@@ -100,6 +100,12 @@ IP Agent distribution note:
   `0009_personal_ip_publish_receipts`. Keep the initial request immutable,
   attempts append-only and terminal publication status monotonic. API,
   UI-TARS, browser and manual executors share this one receipt contract.
+  Browser proof must identify a post-specific public URL on the selected one
+  of eight platforms; a creator dashboard, home page or same-host list is not
+  success evidence. Prepare may append a new pending handoff after `failed` or
+  `unknown`; an identical finish callback replays without requiring the live
+  page again, while a conflicting callback remains rejected. Run
+  `make personal-ip-publish-acceptance` for the local-only recovery matrix.
 - Personal-IP performance observations live in
   `deerflow.persistence.personal_ip_metrics` and migration
   `0010_personal_ip_metrics`. The `/api/personal-ip/metrics/aggregate` route is
@@ -251,6 +257,7 @@ Run `make help` for the full list.
 # Backend (see backend/AGENTS.md for the full set)
 cd backend && make dev        # Gateway API with reload (port 8001)
 cd backend && make test       # Backend test suite
+cd backend && make personal-ip-publish-acceptance  # Local-only publish/recovery gate
 cd backend && make lint       # ruff check
 cd backend && make format     # ruff format
 

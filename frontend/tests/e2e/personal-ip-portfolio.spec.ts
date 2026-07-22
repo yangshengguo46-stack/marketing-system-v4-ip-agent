@@ -29,6 +29,61 @@ test("portfolio shows all eight platforms and opens manual login", async ({
   await page.route("**/api/personal-ip/subjects", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
   );
+  await page.route("**/api/personal-ip/cockpit", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        contract_version: "personal-ip-operating-cockpit-v1",
+        generated_at: "2026-07-22T00:00:00Z",
+        portfolio: {
+          subject_count: 0,
+          account_count: accounts.length,
+          platform_count: 0,
+          platforms: [],
+        },
+        stages: Object.fromEntries(
+          [
+            "modeling",
+            "preflight",
+            "publishing",
+            "performance",
+            "retrospective",
+            "evidence",
+          ].map((id) => [id, { state: "empty", total: 0, pending: 0 }]),
+        ),
+        queues: {
+          accounts_needing_model_input: [],
+          preflights_awaiting_publish: [],
+          published_receipts_awaiting_metrics: [],
+          published_receipts_awaiting_retrospective: [],
+        },
+        recent: {},
+        video: {
+          contract_version: "personal-ip-video-production-v1",
+          production_count: 0,
+          active_count: 0,
+          completed_count: 0,
+          blocked_production_ids: [],
+          awaiting_review_production_ids: [],
+          stages: Object.fromEntries(
+            [
+              "intake",
+              "blueprint",
+              "assets",
+              "storyboard",
+              "generation",
+              "consistency",
+              "selection",
+              "finishing",
+              "delivery",
+            ].map((id) => [id, 0]),
+          ),
+          recent: [],
+        },
+        coverage: { history_limit: 100, possibly_truncated: [] },
+      },
+    }),
+  );
   await page.route("**/api/personal-ip/accounts", async (route) => {
     if (route.request().method() === "POST") {
       const input = route.request().postDataJSON() as Record<string, unknown>;
@@ -59,9 +114,11 @@ test("portfolio shows all eight platforms and opens manual login", async ({
     ).toBeVisible();
   }
 
-  const tiktokCard = page
-    .locator('[data-slot="card"]')
-    .filter({ hasText: "TikTok" });
+  const tiktokCard = page.locator('[data-slot="card"]').filter({
+    has: page
+      .locator('[data-slot="card-title"]')
+      .getByText("TikTok", { exact: true }),
+  });
   await page.evaluate(() => {
     const sockets: Array<{
       onopen: (() => void) | null;

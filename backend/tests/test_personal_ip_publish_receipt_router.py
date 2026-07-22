@@ -14,6 +14,7 @@ from app.gateway.routers import personal_ip_publish_receipts as router_module
 async def test_publish_router_begins_operation_and_appends_attempt(monkeypatch) -> None:
     repository = SimpleNamespace(
         begin=AsyncMock(return_value={"id": "publish-1", "status": "planned"}),
+        get=AsyncMock(return_value={"id": "publish-1", "executor": "platform_api"}),
         record_attempt=AsyncMock(return_value={"id": "publish-1", "status": "published"}),
     )
     app = FastAPI()
@@ -56,6 +57,48 @@ async def test_publish_router_begins_operation_and_appends_attempt(monkeypatch) 
     attempt_kwargs = repository.record_attempt.await_args.kwargs
     assert attempt_kwargs["status"] == "published"
     assert attempt_kwargs["occurred_at"].isoformat() == "2026-07-21T08:00:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_publish_router_requires_composite_tools_for_browser_receipts(monkeypatch) -> None:
+    repository = SimpleNamespace(
+        begin=AsyncMock(),
+        get=AsyncMock(return_value={"id": "publish-1", "executor": "browser"}),
+        record_attempt=AsyncMock(),
+    )
+    app = FastAPI()
+    app.state.personal_ip_publish_receipt_repo = repository
+    app.include_router(router_module.router)
+
+    async def current_user(_request):
+        return SimpleNamespace(id="user-1")
+
+    monkeypatch.setattr(router_module, "get_current_user_from_request", current_user)
+    async with httpx.AsyncClient(base_url="http://test", transport=httpx.ASGITransport(app=app)) as client:
+        created = await client.post(
+            "/api/personal-ip/publish-receipts",
+            json={
+                "operation_key": "publish:draft-1:browser",
+                "idempotency_key": "idem-draft-1-browser",
+                "account_id": "acct-1",
+                "executor": "browser",
+                "request": {"caption": "候选文案"},
+            },
+        )
+        attempted = await client.post(
+            "/api/personal-ip/publish-receipts/publish-1/attempts",
+            json={
+                "attempt_key": "attempt-1",
+                "status": "published",
+                "result": {"confirmation": "未经 live proof"},
+                "external_post_id": "post-1",
+            },
+        )
+
+    assert created.status_code == 422
+    assert attempted.status_code == 422
+    repository.begin.assert_not_awaited()
+    repository.record_attempt.assert_not_awaited()
 
 
 @pytest.mark.asyncio
