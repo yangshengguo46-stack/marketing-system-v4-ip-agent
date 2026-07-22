@@ -50,3 +50,16 @@ not include or start Agent TARS. The upstream package manifest's precompiled
 libnut dependencies are deliberately not installed: the managed macOS adapter
 uses local operating-system desktop APIs and performs one UI-TARS action per
 DeerFlow tool call. No UI-TARS binary is redistributed.
+
+The complete Volcengine MineContext source is vendored at
+`third_party/volcengine/MineContext` from official commit
+`171c7a9ea8091e326ddcf0f10718aa1b58c83c65` under Apache-2.0. The official
+tree had no NOTICE at that commit, so this distribution adds a provenance
+NOTICE and `VENDORED_VERSION.json` with the exact Git tree, commit date and
+checksums for all 504 official files plus the license, package metadata, CLI
+and search boundary. No
+upstream prebuilt application binary is included. `make minecontext-install`
+creates an ignored project-local Python environment linked to this source.
+MineContext remains an optional, per-owner local observation sidecar; DeerFlow
+is the only agent runtime and receives only the versioned minimized evidence
+contract.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -253,6 +253,65 @@ async def test_run_preflight_keeps_local_identity_out_of_provider_request(monkey
     assert kwargs["subject_ids"] == ["subject-1"]
     assert kwargs["target_account_ids"] == ["acct-1"]
     assert kwargs["result"].variants[0].variant_id == "variant-1"
+
+
+@pytest.mark.asyncio
+async def test_run_preflight_requires_both_local_evidence_purposes(monkeypatch) -> None:
+    preflights = SimpleNamespace(seal=AsyncMock(return_value={"id": "preflight-local", "status": "sealed"}))
+    evidence = {
+        "schema_version": "personal-ip-local-context-evidence-v1",
+        "evidence_id": "mctx_1",
+        "source": {"source_kind": "projects", "context_type": "activity", "observed_at": "2026-07-22T05:00:00+00:00"},
+        "summary": {"title": "路线图", "text": "下周交付", "keywords": ["交付"]},
+        "digest": "a" * 64,
+    }
+    minecontext = SimpleNamespace(read_evidence=MagicMock(return_value=[evidence]))
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            connections=SimpleNamespace(),
+            metrics=SimpleNamespace(),
+            publish_receipts=SimpleNamespace(),
+            preflights=preflights,
+            minecontext=minecontext,
+        )
+    )
+
+    async def preflight(request):
+        profile = json.loads(request.to_payload()["example"]["user_profile"])
+        assert profile["local_context_evidence"]["items"][0]["evidence_id"] == "mctx_1"
+        return AudiencePreflightResult(
+            provider="hllm-lite",
+            model_version="doubao-test",
+            algorithm_version="lite-v0",
+            request_digest=request.request_digest,
+            audience_basis="aggregate_account_cohort",
+            variants=[{"variant_id": "variant-1", "text": "候选文案"}],
+        )
+
+    monkeypatch.setattr(
+        "deerflow.tools.builtins.personal_ip_workflow_tools._audience_preflight_provider",
+        lambda: SimpleNamespace(preflight=preflight),
+    )
+    result = json.loads(
+        await _personal_ip_run_preflight(
+            SimpleNamespace(context={"user_id": "user-1"}),
+            operation_key="preflight:local",
+            subject_ids=[],
+            target_account_ids=[],
+            history=[{
+                "content_id": "published-1", "published_at": "2026-07-20T08:00:00Z",
+                "platform": "douyin", "title": "历史内容", "content_type": "short_video",
+                "metrics": {"views": 1000},
+            }],
+            audience_profile={"cohort_label": "智能体创作者"},
+            creator_profile={"voice": ["直接"]},
+            target={"content_id": "draft-1", "title": "待发布", "description": "预演"},
+            local_context_evidence_ids=["mctx_1"],
+        )
+    )
+
+    assert result["id"] == "preflight-local"
+    assert [call.kwargs["purpose"] for call in minecontext.read_evidence.call_args_list] == ["preflight", "hllm_user_profile"]
 
 
 @pytest.mark.asyncio

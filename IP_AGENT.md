@@ -20,9 +20,10 @@ ByteDance/Volcengine stack as its default capability layer.
 UI-TARS is a default-off, source-auditable local computer organ. DeerFlow calls
 it for one visual desktop step only after native Browser Control cannot finish
 the work or a native desktop application is genuinely required; Agent TARS is
-not included. MineContext remains an optional local connector. AgentKit is not
-used as the runtime because it duplicates DeerFlow in the cloud. Data Agent is
-not part of the distribution.
+not included. MineContext is a native but default-off local observation source;
+it never replaces DeerFlow as the agent brain. AgentKit is not used as the
+runtime because it duplicates DeerFlow in the cloud. Data Agent is not part of
+the distribution.
 
 ## First run
 
@@ -44,6 +45,35 @@ To build the pinned AI MediaKit CLI source used by the bundled Skills:
 make volcengine-install
 make volcengine-doctor
 ```
+
+To verify or install the exact MineContext source runtime (this does not start
+capture):
+
+```bash
+make minecontext-verify
+make minecontext-install
+make minecontext-doctor
+```
+
+Then set `minecontext.enabled: true`, restart the Gateway, and use “本地上下文
+（MineContext）” in the Personal-IP workspace. Operator enablement only makes
+the source available. Each owner must separately select scopes, purposes and a
+retention period, authorize, and press Start. The normal UI uses manual mode:
+it never enables continuous screenshots or file watchers. The advanced API can
+enable a bounded watcher only with explicit directories (`initial_scan: false`)
+or an explicit `all_displays` acknowledgement at a minimum 60-second interval.
+Stop terminates the sidecar; Revoke also removes runtime configuration and raw
+runtime data; Delete evidence or Delete all enforces the corresponding local
+deletion semantics.
+
+The model-facing boundary is `personal-ip-local-context-evidence-v1`. It
+contains a hashed source-record reference, source kind, processed context type,
+observation/seal times, bounded title/summary/keywords, partial-coverage notice,
+redaction count and digest. It never includes raw screenshots, complete screen
+text, raw document content, paths, vectors, cookies, tokens, passwords or API
+keys. A preflight can opt into selected evidence ids only when both `preflight`
+and `hllm_user_profile` purposes were authorized; the same sealed projection is
+preserved in its later retrospective.
 
 The repository contains the MediaKit Go source under
 `third_party/volcengine/mediakit-cli`; the incompatible upstream arm64
@@ -174,6 +204,12 @@ DOUYIN_MINI_APP_ID=
 DOUYIN_MINI_APP_SECRET=
 PERSONAL_IP_CREDENTIAL_KEY=
 MEDIAKIT_API_KEY=
+MINECONTEXT_VLM_BASE_URL=
+MINECONTEXT_VLM_API_KEY=
+MINECONTEXT_VLM_MODEL=
+MINECONTEXT_EMBEDDING_BASE_URL=
+MINECONTEXT_EMBEDDING_API_KEY=
+MINECONTEXT_EMBEDDING_MODEL=
 VOLCENGINE_TTS_APPID=
 VOLCENGINE_TTS_ACCESS_TOKEN=
 ```

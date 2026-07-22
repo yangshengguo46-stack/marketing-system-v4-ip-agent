@@ -32,6 +32,7 @@ from app.gateway.routers import (
     personal_ip_cockpit,
     personal_ip_evidence_promotions,
     personal_ip_metrics,
+    personal_ip_minecontext,
     personal_ip_platform_connections,
     personal_ip_platform_observations,
     personal_ip_preflights,
@@ -505,6 +506,7 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
     app.include_router(personal_ip_cockpit.router)
     app.include_router(personal_ip_evidence_promotions.router)
     app.include_router(personal_ip_metrics.router)
+    app.include_router(personal_ip_minecontext.router)
     app.include_router(personal_ip_platform_connections.router)
     app.include_router(personal_ip_platform_observations.router)
     app.include_router(personal_ip_preflights.router)

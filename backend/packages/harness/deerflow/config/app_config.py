@@ -23,6 +23,7 @@ from deerflow.config.guardrails_config import GuardrailsConfig, load_guardrails_
 from deerflow.config.input_polish_config import InputPolishConfig
 from deerflow.config.loop_detection_config import LoopDetectionConfig
 from deerflow.config.memory_config import MemoryConfig, load_memory_config_from_dict
+from deerflow.config.minecontext_config import MineContextConfig
 from deerflow.config.model_config import ModelConfig
 from deerflow.config.read_before_write_config import ReadBeforeWriteConfig
 from deerflow.config.reload_boundary import format_field_description
@@ -243,6 +244,13 @@ class AppConfig(BaseModel):
         description=format_field_description(
             "channel_connections",
             field_doc="User-facing IM channel connection configuration.",
+        ),
+    )
+    minecontext: MineContextConfig = Field(
+        default_factory=MineContextConfig,
+        description=format_field_description(
+            "minecontext",
+            field_doc="Optional local observation source. Operator enablement never substitutes for per-owner consent or starts capture automatically.",
         ),
     )
     loop_detection: LoopDetectionConfig = Field(default_factory=LoopDetectionConfig, description="Loop detection middleware configuration")

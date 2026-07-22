@@ -30,6 +30,7 @@ import {
   AccountBrowserLoginDialog,
   AccountEditorDialog,
   OperatingReviewPanel,
+  MineContextPanel,
   PlatformConnectionsPanel,
   SubjectEditorDialog,
 } from "@/components/workspace/personal-ip";
@@ -284,6 +285,8 @@ export default function PersonalIPPortfolioPage() {
             }}
             onDismissError={() => setConnectionError(null)}
           />
+
+          <MineContextPanel />
 
           <section className="space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-4">

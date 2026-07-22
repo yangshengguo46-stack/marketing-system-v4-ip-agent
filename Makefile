@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify ip-clean-install personal-ip-publish-acceptance video-e2e-local video-e2e-paid-checkpoints volcengine-install volcengine-doctor hllm-doctor hllm-lite ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify ip-clean-install personal-ip-publish-acceptance video-e2e-local video-e2e-paid-checkpoints volcengine-install volcengine-doctor hllm-doctor hllm-lite ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 PNPM ?= pnpm
@@ -38,6 +38,9 @@ help:
 	@echo "  make ui-tars-stop       - Stop the managed local UI-TARS operator"
 	@echo "  make ui-tars-status     - Show sanitized UI-TARS lifecycle and health status"
 	@echo "  make ui-tars-doctor     - Check source, config, connection and desktop permissions"
+	@echo "  make minecontext-verify - Verify pinned Apache-2.0 MineContext source"
+	@echo "  make minecontext-install - Install an isolated runtime from vendored source"
+	@echo "  make minecontext-doctor - Verify source/runtime linkage (never starts capture)"
 	@echo "  make douyin-metrics-smoke - Query authorized Douyin video metrics"
 	@echo "  make ffmpeg-toolchain   - Build pinned project-local FFmpeg with subtitles"
 	@echo "  make mediakit-toolchain - Install a pinned project-local Go toolchain"
@@ -124,6 +127,15 @@ ui-tars-status:
 
 ui-tars-doctor:
 	@$(BACKEND_UV_RUN) python ../scripts/ui_tars_operator.py doctor
+
+minecontext-verify:
+	@$(PYTHON) ./scripts/minecontext_source.py verify
+
+minecontext-install:
+	@$(PYTHON) ./scripts/minecontext_source.py install
+
+minecontext-doctor:
+	@$(PYTHON) ./scripts/minecontext_source.py doctor
 
 douyin-metrics-smoke:
 	@$(BACKEND_UV_RUN) python ../scripts/douyin_metrics_smoke.py

@@ -85,6 +85,16 @@ IP Agent distribution note:
   HLLM-Lite and a future full HLLM-Creator cloud deployment. `make hllm-doctor`
   verifies the pin without downloading weights; `make hllm-lite` runs the
   local-only Doubao-backed sidecar on port 9128.
+- `third_party/volcengine/MineContext` is the complete Apache-2.0 source pinned
+  at `171c7a9ea8091e326ddcf0f10718aa1b58c83c65`. Keep DeerFlow as the only
+  agent brain. `deerflow.personal_ip.minecontext` may run it only as a
+  default-off, explicitly authorized, owner-isolated loopback sidecar. Never
+  auto-start capture or place raw screenshots, full screen/file text, paths,
+  vectors or credentials in model evidence. Preserve source/observation time,
+  partial coverage, retention, stop/revoke/delete controls and the
+  `personal-ip-local-context-evidence-v1` boundary. `make minecontext-install`
+  must install from the vendored source; do not add an opaque prebuilt
+  MineContext executable.
 - `scripts/install_ffmpeg_toolchain.py` owns the pinned project-local FFmpeg
   build. Service launch and MediaKit diagnosis must prefer its `bin` directory;
   do not silently fall back to a feature-incomplete system FFmpeg.

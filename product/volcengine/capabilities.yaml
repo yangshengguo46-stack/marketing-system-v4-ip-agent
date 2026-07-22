@@ -1,5 +1,5 @@
 version: 1
-updated_at: "2026-07-21"
+updated_at: "2026-07-22"
 policy:
   harness: deerflow-local
   provider_preference: bytedance-volcengine-first
@@ -85,8 +85,34 @@ capabilities:
     default_enabled: false
   local_context:
     product: MineContext
-    integration: optional-connector
+    integration: deerflow-native-owner-sidecar
+    source: third_party/volcengine/MineContext
+    source_commit: 171c7a9ea8091e326ddcf0f10718aa1b58c83c65
+    license: Apache-2.0
+    contract: personal-ip-local-context-evidence-v1
+    adapter: deerflow.personal_ip.minecontext
+    model_role: observation-only
+    agent_brain: deerflow-only
     default_enabled: false
+    auto_start: false
+    storage: local-owner-isolated
+    consent: explicit-scopes-and-purposes
+    retention: owner-configurable-with-operator-cap
+    deletion:
+      - stop
+      - revoke
+      - delete-evidence
+      - delete-all-local-data
+    forbidden_model_inputs:
+      - cookies
+      - tokens
+      - passwords
+      - api_keys
+      - raw_screenshots
+      - complete_raw_screen_text
+      - raw_file_content
+      - file_paths
+      - vectors
   cloud_agent_runtime:
     product: AgentKit
     integration: reference-only

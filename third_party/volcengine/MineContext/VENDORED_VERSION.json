@@ -1,0 +1,18 @@
+{
+  "name": "MineContext",
+  "upstream": "https://github.com/volcengine/MineContext",
+  "ref": "main",
+  "commit": "171c7a9ea8091e326ddcf0f10718aa1b58c83c65",
+  "tree": "b185239b776e176ad25faf584050cf0c31226108",
+  "commit_date": "2026-05-07T21:23:05+08:00",
+  "license": "Apache-2.0",
+  "source_mode": "full-upstream-source",
+  "upstream_notice_present": false,
+  "upstream_tracked_file_count": 504,
+  "upstream_file_manifest": "UPSTREAM_FILES.sha256",
+  "upstream_file_manifest_sha256": "6a833c22ece0a9d350cc00cc26923497f43e9eb9cdac203dfcbbf803c64ce8b2",
+  "license_sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
+  "pyproject_sha256": "386eb52db920ce30c04b44e304abff3e62afedef944ed760b9dc3183fae58b89",
+  "cli_sha256": "f44cff7936fb5c15ba49bfab338b0943f0c2c51cb300324997adf39220a5040b",
+  "context_operations_sha256": "967f95099ad58040e59b4e81b7feceeb700e0ac8ad7280d1623ec31a502b1e10"
+}

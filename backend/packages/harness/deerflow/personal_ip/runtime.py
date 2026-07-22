@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
 from deerflow.persistence.personal_ip_evidence_promotions import PersonalIPEvidencePromotionRepository
@@ -14,6 +15,9 @@ from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishR
 from deerflow.persistence.personal_ip_retrospectives import PersonalIPRetrospectiveRepository
 from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
 from deerflow.persistence.personal_ip_video_productions import PersonalIPVideoProductionRepository
+
+if TYPE_CHECKING:
+    from deerflow.personal_ip.minecontext import MineContextService
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +32,7 @@ class PersonalIPRuntimeServices:
     retrospectives: PersonalIPRetrospectiveRepository | None = None
     evidence_promotions: PersonalIPEvidencePromotionRepository | None = None
     video_productions: PersonalIPVideoProductionRepository | None = None
+    minecontext: MineContextService | None = None
 
 
 _services: PersonalIPRuntimeServices | None = None

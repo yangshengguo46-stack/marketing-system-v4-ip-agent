@@ -55,3 +55,19 @@ not included. The upstream precompiled libnut dependencies are not installed;
 DeerFlow's managed macOS adapter uses system desktop APIs and keeps one-step
 execution under the DeerFlow lead agent. Run `make ui-tars-install` to verify
 the source and register the local source-only installation receipt.
+
+## MineContext
+
+- Upstream: `volcengine/MineContext`
+- Commit: `171c7a9ea8091e326ddcf0f10718aa1b58c83c65`
+- Git tree: `b185239b776e176ad25faf584050cf0c31226108`
+- License: Apache-2.0
+- Local path: `third_party/volcengine/MineContext`
+
+The full official source is included. `VENDORED_VERSION.json` pins provenance
+and `UPSTREAM_FILES.sha256` pins all 504 official blobs; the local NOTICE
+records that upstream had no NOTICE
+file at this commit. Run `make minecontext-verify` without installing anything,
+or `make minecontext-install && make minecontext-doctor` to create and check an
+isolated runtime from this source. No capture starts as part of verification,
+installation, doctor, Gateway boot or package smoke testing.

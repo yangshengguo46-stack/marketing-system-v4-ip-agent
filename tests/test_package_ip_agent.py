@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -25,10 +26,16 @@ def _source_repo(tmp_path: Path) -> Path:
     root = tmp_path / "source"
     root.mkdir()
     real_root = Path(__file__).resolve().parents[1]
+    shutil.copytree(
+        real_root / "third_party" / "volcengine" / "MineContext",
+        root / "third_party" / "volcengine" / "MineContext",
+    )
     for relative in REQUIRED_PACKAGE_PATHS:
+        if relative.startswith("third_party/volcengine/MineContext/"):
+            continue
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
-        if relative == "scripts/init_ip_agent.py":
+        if relative in {"scripts/init_ip_agent.py", "scripts/minecontext_source.py"}:
             path.write_bytes((real_root / relative).read_bytes())
         else:
             path.write_text("source\n", encoding="utf-8")
@@ -39,6 +46,7 @@ def _source_repo(tmp_path: Path) -> Path:
     _git(root, "config", "user.email", "package-test@example.invalid")
     _git(root, "config", "user.name", "Package Test")
     _git(root, "add", ".")
+    _git(root, "add", "-f", "third_party/volcengine/MineContext")
     _git(root, "commit", "-m", "source")
     return root
 
@@ -55,7 +63,16 @@ def test_source_package_is_deterministic_verified_and_smoke_installable(tmp_path
     smoke_test_source_package(output_one)
 
     assert hashlib.sha256(output_one.read_bytes()).digest() == hashlib.sha256(output_two.read_bytes()).digest()
-    assert manifest["file_count"] == len(REQUIRED_PACKAGE_PATHS) + 1
+    tracked_count = len(
+        subprocess.run(
+            ["git", "ls-files"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+    )
+    assert manifest["file_count"] == tracked_count
     assert not any(item["path"] == ".env" for item in manifest["files"])
     checksum = output_one.with_suffix(output_one.suffix + ".sha256").read_text(encoding="utf-8")
     assert hashlib.sha256(output_one.read_bytes()).hexdigest() in checksum

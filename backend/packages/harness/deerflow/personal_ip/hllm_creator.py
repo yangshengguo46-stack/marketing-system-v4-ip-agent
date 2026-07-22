@@ -16,6 +16,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from deerflow.personal_ip.minecontext import model_evidence_projection
+
 HLLM_UPSTREAM_COMMIT = "864f17221c04a2d3082d9a072df00616bc7e6dab"
 HLLM_UPSTREAM_RELATIVE_PATH = Path("third_party/bytedance/HLLM")
 HLLM_CREATOR_FIELDS = (
@@ -170,6 +172,7 @@ class HLLMCreatorAdapter:
         creator_profile: Mapping[str, Any],
         target: Mapping[str, Any],
         expected_creative: str = "",
+        local_context_evidence: Sequence[Mapping[str, Any]] = (),
     ) -> dict[str, Any]:
         """Return one row accepted by upstream ``CreatorProcessor``.
 
@@ -207,6 +210,8 @@ class HLLMCreatorAdapter:
             "privacy": "anonymous_cohort_no_individual_viewer_identity",
             "interpretable_projection": dict(audience_profile),
         }
+        if local_context_evidence:
+            profile["local_context_evidence"] = model_evidence_projection(local_context_evidence)
         prompt1 = "你是个人 IP 创意生成器。前面插入的是根据跨平台历史内容及实绩形成的匿名受众群体向量。请在不虚构受众事实、不破坏创作者表达边界的前提下，生成更匹配该受众的创意：\n"
         prompt2 = f"目标内容：{target_title}\n内容说明：{target_description}\n创作者约束：{_canonical_json(dict(creator_profile))}\n只输出最终创意，不要解释："
         values: dict[str, Any] = {

@@ -15,7 +15,33 @@
 # ============================================================================
 # Bump this number when the config schema changes.
 # Run `make config-upgrade` to merge new fields into your local config.yaml.
-config_version: 30
+config_version: 31
+
+# ============================================================================
+# MineContext — optional local observation source (restart required)
+# ============================================================================
+# Disabled by default. Setting enabled=true only makes the local sidecar
+# available: every owner must still choose exact scopes/purposes and press
+# Start. No screenshot or file watcher starts on Gateway boot.
+# Install from the complete pinned Apache-2.0 source with:
+#   make minecontext-install
+# Provider credentials are read only from the six explicitly named
+# MINECONTEXT_* variables and are never copied into DeerFlow model evidence.
+minecontext:
+  enabled: false
+  source_path: third_party/volcengine/MineContext
+  # runtime_python: .deer-flow/toolchains/minecontext/bin/python
+  host: 127.0.0.1
+  port_start: 17400
+  port_end: 17500
+  start_timeout_seconds: 20
+  stop_timeout_seconds: 5
+  max_owner_processes: 2
+  default_retention_days: 30
+  max_retention_days: 365
+  min_screen_interval_seconds: 60
+  max_evidence_records: 2000
+  max_sync_results: 20
 
 # ============================================================================
 # Logging

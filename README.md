@@ -32,6 +32,13 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > replace the DeerFlow runtime or bind conversations to one account.
 > `make hllm-lite` starts today's local Doubao-backed provider; it does not
 > fabricate ranking scores before outcome-trained calibration exists.
+> MineContext is included as complete Apache-2.0 source at official commit
+> `171c7a9ea8091e326ddcf0f10718aa1b58c83c65`, but remains default-off. It runs
+> only after operator enablement plus an owner's explicit scoped authorization
+> and Start action. Only minimized `personal-ip-local-context-evidence-v1`
+> summaries can enter DeerFlow/HLLM; raw screens, files, paths and credentials
+> remain local. Verify/install it with `make minecontext-verify` and
+> `make minecontext-install`; neither command starts capture.
 > Release owners can run `make ip-clean-install` to package the committed tree
 > and validate it with a fresh HOME, dependency caches and allowlisted
 > environment. The clean room covers config bootstrap, IP Agent initialization,
