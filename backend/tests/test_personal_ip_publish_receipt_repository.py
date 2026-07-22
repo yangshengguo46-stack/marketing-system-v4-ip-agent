@@ -269,10 +269,20 @@ async def test_publish_receipt_rejects_credentials_and_sanitizes_external_url(tm
         status="published",
         result_payload={"confirmation": "页面显示发布成功"},
         external_post_id="post-1",
-        external_url="https://example.com/post/1?share_token=secret#fragment",
+        external_url="https://www.douyin.com/video/post-1?share_token=secret#fragment",
     )
     assert published is not None
-    assert published["external_url"] == "https://example.com/post/1"
+    assert published["external_url"] == "https://www.douyin.com/video/post-1"
+    with pytest.raises(ValueError, match="publish platform"):
+        await receipts.record_attempt(
+            created["id"],
+            owner_user_id="user-1",
+            attempt_key="attempt-cross-platform",
+            status="published",
+            result_payload={"confirmation": "伪造跨平台地址"},
+            external_post_id="post-1",
+            external_url="https://example.com/post/1",
+        )
     with pytest.raises(ValueError, match="credential"):
         await receipts.record_attempt(
             created["id"],

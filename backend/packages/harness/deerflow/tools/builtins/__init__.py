@@ -17,6 +17,8 @@ from .personal_ip_tools import (
 )
 from .personal_ip_workflow_tools import (
     personal_ip_begin_publish_receipt_tool,
+    personal_ip_finish_browser_publish_tool,
+    personal_ip_prepare_browser_publish_tool,
     personal_ip_promote_evidence_tool,
     personal_ip_read_evidence_promotion_tool,
     personal_ip_read_preflight_tool,
@@ -41,9 +43,11 @@ __all__ = [
     "personal_ip_begin_video_production_tool",
     "personal_ip_collect_browser_page_tool",
     "personal_ip_collect_douyin_browser_page_tool",
+    "personal_ip_finish_browser_publish_tool",
     "personal_ip_metrics_aggregate_tool",
     "personal_ip_operating_cockpit_tool",
     "personal_ip_promote_evidence_tool",
+    "personal_ip_prepare_browser_publish_tool",
     "personal_ip_performance_inventory_tool",
     "personal_ip_platform_observation_inventory_tool",
     "personal_ip_read_platform_observation_tool",

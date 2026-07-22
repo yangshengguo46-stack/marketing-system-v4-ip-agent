@@ -9,7 +9,10 @@ from datetime import UTC, datetime
 import httpx
 from langchain.tools import tool
 
+from deerflow.config.paths import get_paths
 from deerflow.personal_ip.audience_provider import AudiencePreflightRequest, HLLMCreatorHTTPProvider
+from deerflow.personal_ip.browser_profiles import get_browser_account_target, select_browser_account_target
+from deerflow.personal_ip.browser_publishing import verify_browser_publication_evidence
 from deerflow.personal_ip.hllm_creator import HLLMCreatorAdapter
 from deerflow.personal_ip.runtime import get_personal_ip_runtime
 from deerflow.runtime.user_context import resolve_runtime_user_id
@@ -177,6 +180,188 @@ async def _personal_ip_begin_publish_receipt(
         return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
     except Exception:
         return _json({"status": "error", "category": "internal", "message": "Publish receipt could not be created"})
+
+
+async def _personal_ip_prepare_browser_publish(
+    runtime: Runtime,
+    operation_key: str,
+    idempotency_key: str,
+    pending_attempt_key: str,
+    account_id: str,
+    preflight_id: str,
+    request: dict,
+) -> str:
+    """Bind a selected account browser to an immutable publication receipt.
+
+    Call this after the user has requested or confirmed publication, before any
+    browser click that submits content. It selects the owner/account-isolated
+    profile, seals the exact request and appends a pending browser handoff in
+    one idempotent operation.
+
+    Args:
+        operation_key: Stable business operation key.
+        idempotency_key: Stable key for this exact publish request.
+        pending_attempt_key: Stable key for the browser handoff attempt.
+        account_id: Exact owner-scoped platform account to publish through.
+        preflight_id: Optional preflight id; pass an empty string when absent.
+        request: Exact caption, media, options and selected variant snapshot.
+
+    Returns:
+        JSON receipt plus the selected platform start URL for Browser Control.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.accounts is None:
+            raise RuntimeError("Personal-IP account persistence is not available")
+        owner_user_id = resolve_runtime_user_id(runtime)
+        thread_id = str((runtime.context or {}).get("thread_id") or "").strip()
+        if not thread_id:
+            raise ValueError("browser publication requires a thread")
+        account = await services.accounts.get(account_id, owner_user_id=owner_user_id)
+        if account is None or account.get("status") != "active":
+            raise ValueError("Personal-IP publish target account not found")
+        paths = get_paths()
+        safe_user_id = paths.prepare_user_dir_for_raw_id(owner_user_id)
+        target = select_browser_account_target(
+            owner_user_id=owner_user_id,
+            thread_id=thread_id,
+            account_id=account["id"],
+            platform=account["platform"],
+            display_name=account["display_name"],
+            user_data_dir=paths.ensure_browser_profile_dir(account["id"], user_id=safe_user_id),
+        )
+        receipt = await services.publish_receipts.begin(
+            owner_user_id=owner_user_id,
+            operation_key=operation_key,
+            idempotency_key=idempotency_key,
+            account_id=account["id"],
+            preflight_id=str(preflight_id or "").strip() or None,
+            executor="browser",
+            request_payload=request,
+        )
+        existing_attempt = next(
+            (item for item in receipt.get("attempts") or [] if item.get("attempt_key") == pending_attempt_key),
+            None,
+        )
+        if existing_attempt is None:
+            if receipt.get("status") != "planned":
+                raise ValueError("browser publish receipt already entered execution with a different attempt key")
+            receipt = await services.publish_receipts.record_attempt(
+                receipt["id"],
+                owner_user_id=owner_user_id,
+                attempt_key=pending_attempt_key,
+                status="pending",
+                result_payload={
+                    "handoff": "deerflow_browser",
+                    "selected_account_id": target.account_id,
+                    "start_url": target.start_url,
+                },
+                occurred_at=_parse_datetime(receipt["created_at"], field="created_at"),
+            )
+            if receipt is None:
+                raise RuntimeError("Publish receipt disappeared during browser handoff")
+        return _json(
+            {
+                "operation_status": "ok",
+                "browser_target": {
+                    "account_id": target.account_id,
+                    "platform": target.platform,
+                    "display_name": target.display_name,
+                    "start_url": target.start_url,
+                },
+                "receipt": receipt,
+            }
+        )
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Browser publication could not be prepared"})
+
+
+async def _observe_selected_browser(runtime: Runtime) -> dict:
+    from deerflow.community.browser_automation import acquire_runtime_browser_session
+
+    with acquire_runtime_browser_session(runtime) as session:
+        snapshot = await session.snapshot()
+        visible_text = await session.get_text(max_chars=20_000)
+    return {
+        "url": snapshot.url,
+        "title": snapshot.title,
+        "visible_text": visible_text,
+    }
+
+
+async def _personal_ip_finish_browser_publish(
+    runtime: Runtime,
+    receipt_id: str,
+    attempt_key: str,
+    status: str,
+    evidence: dict,
+    occurred_at: str,
+    external_post_id: str,
+    external_url: str,
+) -> str:
+    """Seal the outcome of the currently selected account's browser publish.
+
+    A published outcome is accepted only when the live browser is open on the
+    declared platform post, or the declared post id is visible there. Query
+    credentials and fragments are removed; only a page-title and text digest
+    are persisted with caller-supplied credential-free evidence.
+
+    Args:
+        receipt_id: Browser publish receipt returned by prepare.
+        attempt_key: Stable key for this terminal browser observation.
+        status: published, failed or unknown.
+        evidence: Credential-free visible confirmation or failure context.
+        occurred_at: Optional ISO-8601 time with timezone; empty uses server time.
+        external_post_id: Platform post id; empty when unavailable.
+        external_url: Public post URL; empty when unavailable.
+
+    Returns:
+        JSON updated immutable receipt with live-browser proof on success.
+    """
+    try:
+        if status not in {"published", "failed", "unknown"}:
+            raise ValueError("browser publish outcome must be published, failed or unknown")
+        services = get_personal_ip_runtime()
+        owner_user_id = resolve_runtime_user_id(runtime)
+        receipt = await services.publish_receipts.get(receipt_id, owner_user_id=owner_user_id)
+        if receipt is None:
+            return _json({"status": "error", "category": "not_found", "message": "Publish receipt not found"})
+        if receipt.get("executor") != "browser":
+            raise ValueError("publish receipt is not assigned to the browser executor")
+        thread_id = str((runtime.context or {}).get("thread_id") or "").strip()
+        target = get_browser_account_target(owner_user_id=owner_user_id, thread_id=thread_id)
+        if target is None or target.account_id != receipt.get("account_id"):
+            raise ValueError("selected browser account does not match the publish receipt")
+        result_payload = dict(evidence)
+        if status == "published":
+            observed = await _observe_selected_browser(runtime)
+            result_payload["browser_proof"] = verify_browser_publication_evidence(
+                platform=target.platform,
+                observed_url=observed["url"],
+                page_title=observed["title"],
+                visible_text=observed["visible_text"],
+                external_url=str(external_url or "").strip() or None,
+                external_post_id=str(external_post_id or "").strip() or None,
+            )
+        result = await services.publish_receipts.record_attempt(
+            receipt_id,
+            owner_user_id=owner_user_id,
+            attempt_key=attempt_key,
+            status=status,
+            result_payload=result_payload,
+            occurred_at=_optional_datetime(occurred_at, field="occurred_at"),
+            external_post_id=str(external_post_id or "").strip() or None,
+            external_url=str(external_url or "").strip() or None,
+        )
+        if result is None:
+            return _json({"status": "error", "category": "not_found", "message": "Publish receipt not found"})
+        return _json({"operation_status": "ok", **result})
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Browser publication outcome could not be sealed"})
 
 
 async def _personal_ip_record_publish_attempt(
@@ -385,6 +570,8 @@ async def _personal_ip_read_evidence_promotion(runtime: Runtime, promotion_id: s
 personal_ip_run_preflight_tool = tool("personal_ip_run_preflight", parse_docstring=True)(_personal_ip_run_preflight)
 personal_ip_read_preflight_tool = tool("personal_ip_read_preflight", parse_docstring=True)(_personal_ip_read_preflight)
 personal_ip_begin_publish_receipt_tool = tool("personal_ip_begin_publish_receipt", parse_docstring=True)(_personal_ip_begin_publish_receipt)
+personal_ip_prepare_browser_publish_tool = tool("personal_ip_prepare_browser_publish", parse_docstring=True)(_personal_ip_prepare_browser_publish)
+personal_ip_finish_browser_publish_tool = tool("personal_ip_finish_browser_publish", parse_docstring=True)(_personal_ip_finish_browser_publish)
 personal_ip_record_publish_attempt_tool = tool("personal_ip_record_publish_attempt", parse_docstring=True)(_personal_ip_record_publish_attempt)
 personal_ip_read_publish_receipt_tool = tool("personal_ip_read_publish_receipt", parse_docstring=True)(_personal_ip_read_publish_receipt)
 personal_ip_seal_retrospective_tool = tool("personal_ip_seal_retrospective", parse_docstring=True)(_personal_ip_seal_retrospective)

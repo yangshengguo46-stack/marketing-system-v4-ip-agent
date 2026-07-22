@@ -151,6 +151,11 @@ def _resolve_session(runtime: Runtime, tool_name: str) -> _SessionLease:
     return _SessionLease(manager, session_key, session)
 
 
+def acquire_runtime_browser_session(runtime: Runtime) -> _SessionLease:
+    """Acquire the same selected-account browser session used by agent tools."""
+    return _resolve_session(runtime, "browser_snapshot")
+
+
 def validate_browser_url(url: str, *, tool_name: str = "browser_navigate") -> str | None:
     """SSRF-screen a browser navigation URL using the tool's config policy.
 

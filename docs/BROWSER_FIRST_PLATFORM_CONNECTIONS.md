@@ -85,7 +85,10 @@ may collect afterward through Browser Control or an official API.
 5. DeerFlow Browser Control uses the account profile first. UI-TARS is the
    visual/desktop fallback when DOM browser actions cannot complete the task.
 6. Publishing, sending, deleting and account-setting changes still require the
-   product's explicit approval and immutable receipt flow.
+   product's explicit approval. Browser publication uses
+   `personal_ip_prepare_browser_publish` before submission and
+   `personal_ip_finish_browser_publish` afterward; success is sealed only when
+   the selected live browser visibly opens the declared platform post URL/id.
 
 Closing an in-memory browser session releases Chromium resources but preserves
 the account profile and its login state. Deleting an account does not silently

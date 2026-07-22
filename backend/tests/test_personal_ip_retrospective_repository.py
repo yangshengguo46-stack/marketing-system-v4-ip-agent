@@ -163,7 +163,8 @@ async def test_retrospective_rejects_unpublished_or_unrelated_evidence(tmp_path)
         owner_user_id="user-1",
         attempt_key="published",
         status="published",
-        result_payload={},
+        result_payload={"post_id": "post-1"},
+        external_post_id="post-1",
     )
     other_receipt = await receipts.begin(
         owner_user_id="user-1",

@@ -7,7 +7,6 @@ import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -16,6 +15,7 @@ from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
 from deerflow.persistence.personal_ip_platform_observations.sql import validate_credential_free_payload
 from deerflow.persistence.personal_ip_preflights.model import PersonalIPPreflightRow
 from deerflow.persistence.personal_ip_publish_receipts.model import PersonalIPPublishReceiptRow
+from deerflow.personal_ip.browser_publishing import normalize_publication_url, platform_publication_url_allowed
 from deerflow.utils.time import coerce_iso
 
 _EXECUTORS = {"platform_api", "ui_tars", "browser", "manual"}
@@ -48,19 +48,16 @@ def _json_snapshot(value: Any, *, field: str) -> Any:
     return json.loads(serialized)
 
 
-def _safe_external_url(value: Any) -> str | None:
+def _safe_external_url(value: Any, *, platform: str) -> str | None:
     raw = str(value or "").strip()
     if not raw:
         return None
     if len(raw) > 4096:
         raise ValueError("external_url is too long")
-    parsed = urlsplit(raw)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise ValueError("external_url must be an HTTP(S) URL")
-    host = parsed.hostname.lower()
-    if parsed.port is not None:
-        host = f"{host}:{parsed.port}"
-    return urlunsplit((parsed.scheme.lower(), host, parsed.path or "/", "", ""))
+    url = normalize_publication_url(raw, platform=platform)
+    if not platform_publication_url_allowed(platform, url):
+        raise ValueError("external_url does not belong to the publish platform")
+    return url
 
 
 def _digest(value: Any) -> str:
@@ -212,22 +209,24 @@ class PersonalIPPublishReceiptRepository:
             raise ValueError("result_payload must be an object")
         event_time = _utc_datetime(occurred_at)
         post_id = str(external_post_id or "").strip() or None
-        url = _safe_external_url(external_url)
         if post_id is not None and len(post_id) > 256:
             raise ValueError("external_post_id is too long")
-        event = {
-            "attempt_key": attempt,
-            "status": status_key,
-            "result": result_snapshot,
-            "external_post_id": post_id,
-            "external_url": url,
-            "occurred_at": coerce_iso(event_time),
-        }
 
         async with self._sf() as session:
             row = await session.get(PersonalIPPublishReceiptRow, receipt_id)
             if row is None or row.owner_user_id != owner_user_id:
                 return None
+            url = _safe_external_url(external_url, platform=row.platform)
+            if status_key == "published" and post_id is None and url is None:
+                raise ValueError("published attempts require an external post id or URL")
+            event = {
+                "attempt_key": attempt,
+                "status": status_key,
+                "result": result_snapshot,
+                "external_post_id": post_id,
+                "external_url": url,
+                "occurred_at": coerce_iso(event_time),
+            }
             for existing in row.attempts_json or []:
                 if existing.get("attempt_key") == attempt:
                     if existing == event:

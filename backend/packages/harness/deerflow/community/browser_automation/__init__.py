@@ -12,6 +12,7 @@ from .session import (
     reset_browser_session_manager,
 )
 from .tools import (
+    acquire_runtime_browser_session,
     browser_back_tool,
     browser_click_tool,
     browser_close_tool,
@@ -33,6 +34,7 @@ __all__ = [
     "PageSnapshot",
     "SnapshotElement",
     "browser_multi_worker_error",
+    "acquire_runtime_browser_session",
     "browser_back_tool",
     "browser_click_tool",
     "browser_close_tool",

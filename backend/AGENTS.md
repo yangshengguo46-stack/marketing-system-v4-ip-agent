@@ -1157,6 +1157,12 @@ still use credentials internally. After login, Browser Control may extract
 detailed authorized operating data with source/time/pagination/coverage
 evidence for receipts and retrospectives.
 
+Browser publishing must use the composite native tools. Prepare selects the
+owner/account profile, freezes the request and appends the pending handoff;
+finish requires that same live browser to show the declared platform post
+URL/id before it can append `published`. Persist only the normalized public URL,
+page title and visible-text digest, never query credentials or raw page secrets.
+
 ### Vision Support
 
 For models with `supports_vision: true`:
