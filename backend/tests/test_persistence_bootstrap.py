@@ -48,7 +48,7 @@ from deerflow.persistence.migrations._helpers import _normalize_default
 asyncio_test = pytest.mark.asyncio
 
 
-HEAD = "0014_personal_ip_platform_observations"
+HEAD = "0015_personal_ip_video_productions"
 BASELINE = "0001_baseline"
 
 

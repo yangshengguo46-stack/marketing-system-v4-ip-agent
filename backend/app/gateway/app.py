@@ -29,6 +29,7 @@ from app.gateway.routers import (
     memory,
     models,
     personal_ip_accounts,
+    personal_ip_cockpit,
     personal_ip_evidence_promotions,
     personal_ip_metrics,
     personal_ip_platform_connections,
@@ -36,6 +37,7 @@ from app.gateway.routers import (
     personal_ip_preflights,
     personal_ip_publish_receipts,
     personal_ip_retrospectives,
+    personal_ip_video_productions,
     runs,
     scheduled_tasks,
     skills,
@@ -500,6 +502,7 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
 
     # Personal-IP portfolio, evidence, publishing and metrics are mounted at /api/personal-ip
     app.include_router(personal_ip_accounts.router)
+    app.include_router(personal_ip_cockpit.router)
     app.include_router(personal_ip_evidence_promotions.router)
     app.include_router(personal_ip_metrics.router)
     app.include_router(personal_ip_platform_connections.router)
@@ -507,6 +510,7 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
     app.include_router(personal_ip_preflights.router)
     app.include_router(personal_ip_publish_receipts.router)
     app.include_router(personal_ip_retrospectives.router)
+    app.include_router(personal_ip_video_productions.router)
 
     # Features API is mounted at /api/features
     app.include_router(features.router)

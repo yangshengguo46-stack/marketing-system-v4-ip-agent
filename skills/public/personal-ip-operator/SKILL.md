@@ -39,7 +39,11 @@ facts through a Tool/MCP; do not recreate that model in prompts.
 
 ## Work loop
 
-1. Determine whether the request is portfolio-wide or a concrete account operation; never infer an account restriction for a global request.
+1. Call `personal_ip_operating_cockpit` before planning substantial work. It is
+   the authoritative whole-portfolio read model for modeling, preflight,
+   publishing, performance, retrospective, evidence and video queues. Determine
+   whether the request is portfolio-wide or a concrete account operation; never
+   infer an account restriction for a global request.
 2. Inspect evidence before strategy: prior content, comments, metrics, source
    documents and competitor examples.
    After browser login, collect the creator backend as deeply as the requested
@@ -90,7 +94,12 @@ quality check -> candidate selection -> voice/edit/finish -> approval -> deliver
 
 Seedream, Seedance and MediaKit perform generation and media operations. The
 agent remains responsible for account fit, evidence, approvals, retries and
-receipts.
+receipts. Begin the immutable request with
+`personal_ip_begin_video_production`, append every provider job, failure,
+retry, QA result, human decision, cost and delivery through
+`personal_ip_record_video_production_event`, and use
+`personal_ip_read_video_production` before resuming a production. Never infer
+stage completion from a model response when no production event proves it.
 
 ## Output contract
 

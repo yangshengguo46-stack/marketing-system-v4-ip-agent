@@ -1113,6 +1113,24 @@ errors must stay sanitized.
 only sanitized connection and confirmed-publication fields—never forward full
 publish request/attempt payloads into model context.
 
+`deerflow.personal_ip.operating_cockpit.PersonalIPOperatingCockpitService`
+joins subjects/accounts, preflights, publish receipts, metrics, detailed
+platform observations, retrospectives, evidence promotions and video
+productions for one authenticated owner. The Gateway route and native
+`personal_ip_operating_cockpit` tool must share it. It is intentionally
+portfolio-wide, returns explicit pending ids, and labels history truncation;
+never reconstruct this state from a conversation or add an account filter.
+
+Migration `0015_personal_ip_video_productions` owns one immutable production
+request plus an append-only event ledger. Registered event types map to the
+nine stages from intake through delivery. Provider task ids, model versions,
+artifact refs, costs, QA results, retries and human decisions belong in those
+events. Repeated keys are idempotent only when their digests match, terminal
+productions reject new events, and only successful `delivery_completed` marks
+completion. Native `personal_ip_begin_video_production`,
+`personal_ip_record_video_production_event` and
+`personal_ip_read_video_production` are the DeerFlow execution surface.
+
 `PersonalIPMetricCollectionService` assigns official Douyin snapshots a stable
 post series. When a strictly older snapshot exists, it writes a separate exact
 interval `delta` from monotonic counter differences. The delta is always

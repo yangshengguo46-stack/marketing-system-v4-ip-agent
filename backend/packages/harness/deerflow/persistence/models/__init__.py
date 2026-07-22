@@ -35,6 +35,10 @@ from deerflow.persistence.personal_ip_preflights.model import PersonalIPPrefligh
 from deerflow.persistence.personal_ip_publish_receipts.model import PersonalIPPublishReceiptRow
 from deerflow.persistence.personal_ip_retrospectives.model import PersonalIPRetrospectiveRow
 from deerflow.persistence.personal_ip_subjects.model import PersonalIPSubjectRow
+from deerflow.persistence.personal_ip_video_productions.model import (
+    PersonalIPVideoProductionEventRow,
+    PersonalIPVideoProductionRow,
+)
 from deerflow.persistence.run.model import RunRow
 from deerflow.persistence.scheduled_task_runs.model import ScheduledTaskRunRow
 from deerflow.persistence.scheduled_tasks.model import ScheduledTaskRow
@@ -58,6 +62,8 @@ __all__ = [
     "PersonalIPPublishReceiptRow",
     "PersonalIPRetrospectiveRow",
     "PersonalIPSubjectRow",
+    "PersonalIPVideoProductionEventRow",
+    "PersonalIPVideoProductionRow",
     "RunEventRow",
     "RunRow",
     "ScheduledTaskRow",

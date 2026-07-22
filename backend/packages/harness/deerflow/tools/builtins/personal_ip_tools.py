@@ -19,6 +19,7 @@ from deerflow.personal_ip.browser_collection import (
 )
 from deerflow.personal_ip.browser_profiles import select_browser_account_target
 from deerflow.personal_ip.douyin_oauth import DouyinMiniAppOAuthClient, DouyinOAuthError
+from deerflow.personal_ip.operating_cockpit import PersonalIPOperatingCockpitService
 from deerflow.personal_ip.platform_metrics import (
     DouyinAuthorizedMetricCollectionService,
     PlatformMetricCollectionError,
@@ -87,6 +88,207 @@ def _browser_platform_collection_service(services: PersonalIPRuntimeServices) ->
         accounts=services.accounts,
         observations=services.platform_observations,
     )
+
+
+def _operating_cockpit_service(services: PersonalIPRuntimeServices) -> PersonalIPOperatingCockpitService:
+    required = {
+        "subjects": services.subjects,
+        "accounts": services.accounts,
+        "preflights": services.preflights,
+        "publish_receipts": services.publish_receipts,
+        "metrics": services.metrics,
+        "platform_observations": services.platform_observations,
+        "retrospectives": services.retrospectives,
+        "evidence_promotions": services.evidence_promotions,
+        "video_productions": services.video_productions,
+    }
+    missing = sorted(name for name, repository in required.items() if repository is None)
+    if missing:
+        raise RuntimeError(f"Personal-IP operating cockpit is incomplete: {', '.join(missing)}")
+    return PersonalIPOperatingCockpitService(**required)
+
+
+async def _personal_ip_operating_cockpit(runtime: Runtime) -> str:
+    """Read the user's whole Personal-IP business and video operating state.
+
+    Use this as the default orientation tool before planning or executing work.
+    It joins every subject and platform account with modeling, preflight,
+    publishing, performance, retrospective, evidence-promotion and video
+    production queues. It intentionally has no account filter because one
+    conversation coordinates the user's entire portfolio.
+
+    Returns:
+        JSON containing the six-stage operating loop, nine-stage video line,
+        explicit work queues, recent receipts and bounded history coverage.
+    """
+    try:
+        result = await _operating_cockpit_service(get_personal_ip_runtime()).build(owner_user_id=resolve_runtime_user_id(runtime))
+        return _json(result)
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Personal-IP cockpit is unavailable"})
+
+
+async def _personal_ip_begin_video_production(
+    runtime: Runtime,
+    operation_key: str,
+    title: str,
+    subject_id: str,
+    target_account_ids: list[str],
+    source_kind: str,
+    source: dict,
+    delivery_spec: dict,
+    provider_policy: dict,
+    budget: dict,
+) -> str:
+    """Create one immutable Personal-IP video production request.
+
+    Call this once an idea or script and delivery intent are known. The request
+    is provider-independent: Seedance, Seedream, speech, MediaKit, FFmpeg or a
+    future provider are execution choices recorded later as append-only events.
+    Reusing operation_key with the exact same request is idempotent.
+
+    Args:
+        operation_key: Stable idempotency key for this production request.
+        title: Customer-facing production title.
+        subject_id: Optional Personal-IP subject id; pass an empty string when absent.
+        target_account_ids: Platform account ids targeted by the final delivery.
+        source_kind: Either idea or script.
+        source: Immutable source snapshot, such as an idea, brief or full script.
+        delivery_spec: Aspect ratios, durations, languages and target deliverables.
+        provider_policy: Preferred models/providers and allowed fallbacks.
+        budget: Currency, limits and approval thresholds; may be empty.
+
+    Returns:
+        JSON production id, immutable request, current stage and ordered events.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.video_productions is None:
+            raise RuntimeError("Personal-IP video production is not available")
+        result = await services.video_productions.begin(
+            owner_user_id=resolve_runtime_user_id(runtime),
+            operation_key=operation_key,
+            title=title,
+            subject_id=str(subject_id or "").strip() or None,
+            target_account_ids=target_account_ids,
+            source_kind=source_kind,
+            source=source,
+            delivery_spec=delivery_spec,
+            provider_policy=provider_policy,
+            budget=budget,
+        )
+        return _json({"operation_status": "ok", **result})
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Video production could not be created"})
+
+
+async def _personal_ip_record_video_production_event(
+    runtime: Runtime,
+    production_id: str,
+    event_key: str,
+    event_type: str,
+    status: str,
+    entity_type: str,
+    entity_id: str,
+    payload: dict,
+    input_refs: list[str],
+    output_refs: list[str],
+    provider: str,
+    model: str,
+    provider_task_id: str,
+    cost: dict,
+    occurred_at: str,
+) -> str:
+    """Append one immutable stage, provider, review or delivery receipt.
+
+    This is the shared evidence spine for blueprint, assets, storyboard, shot
+    generation, consistency, candidate selection, finishing and delivery.
+    Store detailed business artifacts by reference or in payload, but never put
+    cookies, tokens, passwords or authorization headers into any field.
+
+    Args:
+        production_id: Server-issued video production id.
+        event_key: Stable idempotency key for this event or provider callback.
+        event_type: Registered video event such as storyboard_sealed or edit_completed.
+        status: planned, running, succeeded, failed, awaiting_review, approved or rejected.
+        entity_type: production, character, scene, prop, shot, candidate, audio, timeline or delivery.
+        entity_id: Stable id of the entity affected by this event.
+        payload: Detailed contract, result, QA finding or human decision snapshot.
+        input_refs: Immutable artifact or upstream event references.
+        output_refs: Generated artifact, media or delivery references.
+        provider: Provider or executor name, including deerflow or manual.
+        model: Optional exact model/version; pass an empty string when absent.
+        provider_task_id: Optional provider task id; pass an empty string when absent.
+        cost: Actual or estimated cost snapshot; may be empty.
+        occurred_at: ISO-8601 event time with timezone.
+
+    Returns:
+        JSON with the updated production projection and full ordered event history.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.video_productions is None:
+            raise RuntimeError("Personal-IP video production is not available")
+        result = await services.video_productions.append_event(
+            production_id,
+            owner_user_id=resolve_runtime_user_id(runtime),
+            event_key=event_key,
+            event_type=event_type,
+            status=status,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            payload=payload,
+            input_refs=input_refs,
+            output_refs=output_refs,
+            provider=provider,
+            model=str(model or "").strip() or None,
+            provider_task_id=str(provider_task_id or "").strip() or None,
+            cost=cost,
+            occurred_at=_parse_datetime(occurred_at, field="occurred_at"),
+        )
+        if result is None:
+            return _json({"status": "error", "category": "not_found", "message": "Video production not found"})
+        return _json(
+            {
+                "operation_status": "ok",
+                **result,
+                "event_count": result.get("event_count", len(result.get("events") or [])),
+            }
+        )
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Video production event could not be recorded"})
+
+
+async def _personal_ip_read_video_production(runtime: Runtime, production_id: str) -> str:
+    """Read one full owner-scoped video production and its immutable history.
+
+    Args:
+        production_id: Server-issued video production id from the cockpit.
+
+    Returns:
+        JSON immutable request, current projection and every ordered stage receipt.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.video_productions is None:
+            raise RuntimeError("Personal-IP video production is not available")
+        result = await services.video_productions.get(
+            str(production_id or "").strip(),
+            owner_user_id=resolve_runtime_user_id(runtime),
+        )
+        if result is None:
+            return _json({"status": "error", "category": "not_found", "message": "Video production not found"})
+        return _json({"operation_status": "ok", **result})
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Video production is unavailable"})
 
 
 async def _personal_ip_metrics_aggregate(
@@ -751,6 +953,26 @@ personal_ip_metrics_aggregate_tool = tool(
     "personal_ip_metrics_aggregate",
     parse_docstring=True,
 )(_personal_ip_metrics_aggregate)
+
+personal_ip_operating_cockpit_tool = tool(
+    "personal_ip_operating_cockpit",
+    parse_docstring=True,
+)(_personal_ip_operating_cockpit)
+
+personal_ip_begin_video_production_tool = tool(
+    "personal_ip_begin_video_production",
+    parse_docstring=True,
+)(_personal_ip_begin_video_production)
+
+personal_ip_record_video_production_event_tool = tool(
+    "personal_ip_record_video_production_event",
+    parse_docstring=True,
+)(_personal_ip_record_video_production_event)
+
+personal_ip_read_video_production_tool = tool(
+    "personal_ip_read_video_production",
+    parse_docstring=True,
+)(_personal_ip_read_video_production)
 
 personal_ip_collect_douyin_browser_page_tool = tool(
     "personal_ip_collect_douyin_browser_page",

@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetch } from "@/core/api/fetcher";
 import { getBackendBaseURL } from "@/core/config";
 
+import { PERSONAL_IP_COCKPIT_QUERY_KEY } from "./cockpit";
+
 export type PersonalIPAccount = {
   id: string;
   owner_user_id: string;
@@ -74,8 +76,14 @@ export function useCreatePersonalIPAccount() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY }),
+        queryClient.invalidateQueries({
+          queryKey: PERSONAL_IP_COCKPIT_QUERY_KEY,
+        }),
+      ]);
+    },
   });
 }
 
@@ -99,8 +107,14 @@ export function useUpdatePersonalIPAccount() {
           body: JSON.stringify(updates),
         },
       ),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY }),
+        queryClient.invalidateQueries({
+          queryKey: PERSONAL_IP_COCKPIT_QUERY_KEY,
+        }),
+      ]);
+    },
   });
 }
 
@@ -112,7 +126,13 @@ export function useDeletePersonalIPAccount() {
         `/api/personal-ip/accounts/${encodeURIComponent(accountId)}`,
         { method: "DELETE" },
       ),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY }),
+        queryClient.invalidateQueries({
+          queryKey: PERSONAL_IP_COCKPIT_QUERY_KEY,
+        }),
+      ]);
+    },
   });
 }

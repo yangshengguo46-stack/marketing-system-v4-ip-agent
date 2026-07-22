@@ -10,9 +10,10 @@ checkbox state also includes the current ledger change set.
 
 ## Current completion
 
-**Weighted product completion: 63%.** The native agent and backend foundation
-are about 78% complete; the lower product number reflects the unfinished
-multi-platform data, publishing and user-facing operating loop.
+**Weighted product completion: 65%.** The native agent and backend foundation
+are about 83% complete; the lower product number reflects the deliberately
+deferred eight-platform acceptance work, unfinished real publishing and the
+absence of one accepted paid video production.
 
 | Ledger area | Weight | Complete | Current evidence | Completion gate still open |
 |---|---:|---:|---|---|
@@ -21,10 +22,10 @@ multi-platform data, publishing and user-facing operating loop.
 | Persona/fan modelling and preflight | 20% | 60% | HLLM source pin; HLLM-Lite provider contract; aggregate audience adapter; immutable preflight receipt; personality/Maslow/Jung/existence lenses | Detailed real platform inputs, calibrated ranker and user-facing preflight workflow |
 | Publishing and receipts | 15% | 55% | Immutable publish request, append-only attempts, terminal-status rules and account targeting | Real browser/API publisher executors across the eight platforms and recovery verification |
 | Metrics, retrospectives and evidence promotion | 20% | 55% | Normalized observations; exact snapshot deltas; portfolio aggregate; Douyin official post collector; detailed browser-evidence contract; real persisted-login Douyin dashboard/content capture; immutable retrospective; human-gated evidence promotion | Extend detailed collection across Douyin sections and the other seven platforms, scheduled coverage and user-facing review |
-| Video production | 15% | 60% | Seedance/Seedream generation Skills; Doubao Speech route; official MediaKit source/Skills; local FFmpeg toolchain | One accepted script-to-delivery orchestration with assets, shot retries, selection, continuity and delivery receipt |
-| Product UI, packaging and acceptance | 10% | 50% | DeerFlow UI skin; Personal-IP portfolio page; login workspace; source-distribution bootstrap | Operating cockpit for preflight/receipts/results/evidence, clean-machine package test and customer onboarding |
+| Video production | 15% | 65% | Seedance/Seedream generation Skills; Doubao Speech route; official MediaKit source/Skills; local FFmpeg toolchain; immutable production request plus append-only nine-stage provider/artifact/cost/retry ledger; native begin/event/read tools | Bind real provider executors and complete one accepted script-to-delivery production |
+| Product UI, packaging and acceptance | 10% | 60% | DeerFlow UI skin; Personal-IP portfolio/login workspace; six-stage operating cockpit; nine-stage video-line status; source-distribution bootstrap | Detailed review/approval interactions, clean-machine package test and customer onboarding |
 
-Weighted score: `9 + 8.5 + 12 + 8.25 + 11 + 9 + 5 = 62.75`, displayed as 63%.
+Weighted score: `9 + 8.5 + 12 + 8.25 + 11 + 9.75 + 6 = 64.5`, displayed as 65%.
 
 ## Product truth
 
@@ -50,7 +51,7 @@ coverage evidence.
 
 ## Delivery queue
 
-### P0 — close the real operating-data loop
+### Deferred acceptance — platform login and real operating data
 
 - [x] Add one versioned, platform-neutral browser observation/evidence contract.
 - [x] Collect detailed authenticated Douyin creator data into that contract.
@@ -59,13 +60,19 @@ coverage evidence.
 - [x] Verify the collector against the existing real logged-in Douyin profile.
 - [x] Reuse one account-isolated, credential-free direct collector across all
       eight platforms; keep unverified platform pages explicitly partial.
-- [ ] Extend collection to WeChat Channels, WeChat Official Accounts and
-      Xiaohongshu, then X, Instagram, YouTube and TikTok.
+- [ ] During final end-to-end acceptance, extend verified collection to WeChat
+      Channels, WeChat Official Accounts and Xiaohongshu, then X, Instagram,
+      YouTube and TikTok. Do not let this block the product framework phase.
 
 ### P1 — execute and show the loop
 
+- [x] Add one owner-scoped operating cockpit shared by the Gateway, user
+      workspace and native DeerFlow tool. It joins all six business stages,
+      exposes explicit queues and never filters conversation scope by account.
 - [ ] Connect real browser publishing attempts to the immutable receipt ledger.
-- [ ] Add Personal-IP views for preflight, publication attempts, observed
+- [x] Show the six-stage operating line and pending counts in the Personal-IP
+      workspace.
+- [ ] Add detailed interactions for preflight, publication attempts, observed
       metrics, retrospective review and evidence approval.
 - [ ] Run the full portfolio question acceptance case: “今天全平台浏览量多少？”
       The answer must report totals plus missing, partial and unavailable
@@ -73,10 +80,15 @@ coverage evidence.
 
 ### P1 — finish video as a workflow, not only model calls
 
-- [ ] Orchestrate script understanding, assets, storyboard, per-shot generation,
-      consistency checks, retries, selection, dubbing/editing and delivery.
-- [ ] Record paid task ids, costs, generated assets, chosen candidates, failures
-      and final delivery as auditable receipts.
+- [x] Establish the provider-independent request and nine-stage orchestration
+      contract for script understanding, assets, storyboard, per-shot
+      generation, consistency, selection, finishing and delivery.
+- [x] Persist provider/model/task ids, costs, artifacts, failures, retries,
+      human decisions and final delivery as idempotent append-only receipts.
+- [x] Expose owner-scoped begin/event/read tools natively to DeerFlow and show
+      the production line in the Personal-IP cockpit.
+- [ ] Bind the event contract to real Seedance, Seedream, speech,
+      MediaKit/FFmpeg and QA executors.
 - [ ] Complete one real Seedance-to-MediaKit/FFmpeg acceptance production.
 
 ### P2 — customer delivery

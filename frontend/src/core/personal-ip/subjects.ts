@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetch } from "@/core/api/fetcher";
 import { getBackendBaseURL } from "@/core/config";
 
+import { PERSONAL_IP_COCKPIT_QUERY_KEY } from "./cockpit";
+
 export type PersonalIPSubject = {
   id: string;
   owner_user_id: string;
@@ -55,8 +57,14 @@ export function useCreatePersonalIPSubject() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: SUBJECTS_QUERY_KEY }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: SUBJECTS_QUERY_KEY }),
+        queryClient.invalidateQueries({
+          queryKey: PERSONAL_IP_COCKPIT_QUERY_KEY,
+        }),
+      ]);
+    },
   });
 }
 
@@ -80,7 +88,13 @@ export function useUpdatePersonalIPSubject() {
           body: JSON.stringify(updates),
         },
       ),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: SUBJECTS_QUERY_KEY }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: SUBJECTS_QUERY_KEY }),
+        queryClient.invalidateQueries({
+          queryKey: PERSONAL_IP_COCKPIT_QUERY_KEY,
+        }),
+      ]);
+    },
   });
 }

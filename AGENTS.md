@@ -182,6 +182,20 @@ IP Agent distribution note:
   compatibility wrappers over this service. Native inventory/read tools expose
   the credential-free detailed evidence to analysis; inventory remains
   portfolio-wide and an observation id selects only the exact read target.
+- Personal-IP video production lives in
+  `deerflow.persistence.personal_ip_video_productions` and migration
+  `0015_personal_ip_video_productions`. Keep the initial idea/script, delivery
+  spec, provider policy and budget immutable; record blueprint, assets,
+  storyboard, per-shot generation/failure/retry, consistency, selection,
+  finishing and delivery as idempotent append-only events. Providers and model
+  versions are receipt fields, not orchestration state. A production completes
+  only through a successful `delivery_completed` event.
+- `deerflow.personal_ip.operating_cockpit` is the owner-scoped read model that
+  joins the six-stage operating loop and nine-stage video line. The Gateway
+  route and native `personal_ip_operating_cockpit` tool must use the same
+  service, stay whole-portfolio, expose explicit pending queues and report
+  bounded-history coverage. The native begin/event/read video tools are the
+  agent's write/resume surface; chat history is never the production ledger.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.

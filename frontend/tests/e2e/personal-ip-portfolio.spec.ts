@@ -86,7 +86,9 @@ test("portfolio shows all eight platforms and opens manual login", async ({
         });
       }
 
-      send() {}
+      send() {
+        return undefined;
+      }
 
       close() {
         this.readyState = 3;

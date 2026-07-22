@@ -219,6 +219,24 @@ Later conversations use the whole-portfolio
 `personal_ip_read_platform_observation` to retrieve the owner-scoped full
 records, summary, coverage and evidence provenance.
 
+### Operating cockpit and video ledger
+
+`GET /api/personal-ip/cockpit` is the shared whole-portfolio read model. It
+joins the durable six-step operating loop—modeling, preflight, publish receipt,
+observed performance, retrospective and evidence promotion—with explicit work
+queues and bounded-history coverage. The native
+`personal_ip_operating_cockpit` tool gives DeerFlow the same view; it never
+takes an account filter.
+
+Video production uses `personal-ip-video-production-v1`. Begin one immutable
+idea/script request through `personal_ip_begin_video_production`, then append
+blueprint, asset, storyboard, shot generation/failure/retry, consistency,
+selection/review, voice/edit and delivery events through
+`personal_ip_record_video_production_event`. Each event can retain provider,
+model, task id, artifacts and cost without making any provider the workflow
+owner. `personal_ip_read_video_production` resumes from the complete ordered
+ledger; only a successful delivery event marks the project complete.
+
 ### Browser-first platform accounts
 
 Douyin, WeChat Channels, WeChat Official Accounts, Xiaohongshu, X, Instagram,

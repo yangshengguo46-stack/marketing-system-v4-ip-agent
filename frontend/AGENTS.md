@@ -93,7 +93,10 @@ Tool-calling AI messages can contain user-visible text as well as `tool_calls`. 
 
 - `src/app/workspace/chats/[thread_id]/page.tsx` owns composer busy-state wiring.
 - `src/core/personal-ip/` owns account API hooks and
-  the fixed browser-platform registry. `/workspace/personal-ip` always renders
+  the fixed browser-platform registry. It also owns the versioned operating
+  cockpit query for the six-stage business loop and nine-stage video line;
+  account/subject mutations must invalidate that cockpit query.
+  `/workspace/personal-ip` always renders
   all eight supported platforms; `src/components/workspace/personal-ip/` owns
   account editing and the manual-login dialog. Account login uses the
   account-scoped Browser Live socket, never a synthetic chat thread. Empty
@@ -102,7 +105,9 @@ Tool-calling AI messages can contain user-visible text as well as `tool_calls`. 
   login dialog and shows success; it carries no credential or business-data
   payload. Later detailed collection remains an agent/browser responsibility.
   Never accept or cache an expanded account record as run authority; the Gateway
-  resolves it again for the authenticated owner.
+  resolves it again for the authenticated owner. Keep this page a thin status
+  and account surface: DeerFlow conversation tools create and advance business
+  or video workflows instead of duplicating them as form-heavy applications.
 - `src/app/workspace/chats/[thread_id]/page.tsx` owns branch-from-turn submission and navigation; sidecar `MessageList` instances do not receive the branch action.
 - `src/app/workspace/chats/[thread_id]/page.tsx` gates the Workspace Browser trigger and browser right panel on `/api/features -> browser_control.enabled`; default/failed feature discovery hides the browser control so optional backend installs do not show a dead Live socket.
 - `src/app/workspace/chats/[thread_id]/page.tsx` and `src/app/workspace/agents/[agent_name]/chats/[thread_id]/page.tsx` own active-goal display state for their composer overlays.

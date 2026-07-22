@@ -81,6 +81,16 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > content-inventory evidence. Native inventory/read tools keep those detailed,
 > credential-free records available to later agent analysis. See
 > [docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md](docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md).
+>
+> The Personal-IP workspace now reads one whole-portfolio operating cockpit:
+> persona/fan modeling → preflight → publish receipt → observed performance →
+> retrospective → evidence promotion. DeerFlow can read the same state through
+> a native tool, so account ids remain operation targets rather than chat
+> filters. Video uses a second auditable line from idea/script through blueprint,
+> assets, storyboard, shot jobs and retries, consistency, selection, finishing
+> and delivery. The request is immutable and every provider/model/task/cost or
+> human-review outcome is an append-only receipt; successful delivery is the
+> only completion signal.
 
 ## Official Website
 

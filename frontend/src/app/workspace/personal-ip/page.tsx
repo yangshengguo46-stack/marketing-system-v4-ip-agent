@@ -1,11 +1,18 @@
 "use client";
 
 import {
+  BarChart3Icon,
+  BrainCircuitIcon,
+  ClapperboardIcon,
   Edit3Icon,
+  FlaskConicalIcon,
   Globe2Icon,
   LoaderCircleIcon,
   LogInIcon,
   PlusIcon,
+  RefreshCcwIcon,
+  SendIcon,
+  ShieldCheckIcon,
   UserRoundIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -36,16 +43,47 @@ import {
   type PersonalIPAccount,
   type PersonalIPAccountInput,
   type PersonalIPBrowserPlatform,
+  countCockpitPending,
   type PersonalIPSubject,
   type PersonalIPSubjectInput,
   PERSONAL_IP_BROWSER_PLATFORMS,
+  PERSONAL_IP_OPERATING_STAGES,
+  PERSONAL_IP_VIDEO_STAGES,
   useCreatePersonalIPAccount,
   useCreatePersonalIPSubject,
   usePersonalIPAccounts,
+  usePersonalIPOperatingCockpit,
   usePersonalIPSubjects,
   useUpdatePersonalIPAccount,
   useUpdatePersonalIPSubject,
 } from "@/core/personal-ip";
+
+const OPERATING_STAGE_DETAILS = {
+  modeling: {
+    icon: BrainCircuitIcon,
+    description: "存在哲学、人格、需求与受众假设",
+  },
+  preflight: {
+    icon: FlaskConicalIcon,
+    description: "发布前预测、变体比较与风险判断",
+  },
+  publishing: {
+    icon: SendIcon,
+    description: "每次执行都有不可变请求与尝试回执",
+  },
+  performance: {
+    icon: BarChart3Icon,
+    description: "平台实绩、内容指标与覆盖证据",
+  },
+  retrospective: {
+    icon: RefreshCcwIcon,
+    description: "预测和结果对照，等待人工复核",
+  },
+  evidence: {
+    icon: ShieldCheckIcon,
+    description: "跨样本证据经确认后进入长期模型",
+  },
+} as const;
 
 const RELATIONSHIP_LABELS = {
   self: "自营",
@@ -56,6 +94,7 @@ const RELATIONSHIP_LABELS = {
 export default function PersonalIPPortfolioPage() {
   const accountsQuery = usePersonalIPAccounts();
   const subjectsQuery = usePersonalIPSubjects();
+  const cockpitQuery = usePersonalIPOperatingCockpit();
   const createAccount = useCreatePersonalIPAccount();
   const updateAccount = useUpdatePersonalIPAccount();
   const createSubject = useCreatePersonalIPSubject();
@@ -76,8 +115,16 @@ export default function PersonalIPPortfolioPage() {
     document.title = "经营组合 - IP Agent";
   }, []);
 
-  const subjects = subjectsQuery.data ?? [];
-  const accounts = accountsQuery.data ?? [];
+  const subjects = useMemo(
+    () => subjectsQuery.data ?? [],
+    [subjectsQuery.data],
+  );
+  const accounts = useMemo(
+    () => accountsQuery.data ?? [],
+    [accountsQuery.data],
+  );
+  const cockpit = cockpitQuery.data;
+  const pendingCount = countCockpitPending(cockpit);
   const subjectNames = useMemo(
     () =>
       new Map(subjects.map((subject) => [subject.id, subject.display_name])),
@@ -173,6 +220,128 @@ export default function PersonalIPPortfolioPage() {
               这里只登记主体和平台账号。每次对话仍拥有完整智能体能力，并可统筹全部已授权账号；账号只在具体发布、采集或回执中作为目标。
             </p>
           </div>
+
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold">经营主线</h2>
+                <p className="text-muted-foreground text-sm">
+                  DeerFlow 负责执行，这六步保存个人 IP 真正需要积累的业务状态。
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">
+                  {cockpit?.portfolio.subject_count ?? subjects.length} 个主体
+                </Badge>
+                <Badge variant="outline">
+                  {cockpit?.portfolio.account_count ?? accounts.length} 个账号
+                </Badge>
+                <Badge variant={pendingCount > 0 ? "secondary" : "outline"}>
+                  {pendingCount > 0 ? `${pendingCount} 项待推进` : "当前无待办"}
+                </Badge>
+              </div>
+            </div>
+
+            {cockpitQuery.isLoading ? (
+              <Card>
+                <CardContent className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <LoaderCircleIcon className="size-4 animate-spin" />
+                  正在汇总经营闭环…
+                </CardContent>
+              </Card>
+            ) : cockpitQuery.isError || !cockpit ? (
+              <Card>
+                <CardContent className="text-destructive text-sm">
+                  经营闭环暂时无法读取，账号管理仍可正常使用。
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                {PERSONAL_IP_OPERATING_STAGES.map((definition, index) => {
+                  const stage = cockpit.stages[definition.id];
+                  const details = OPERATING_STAGE_DETAILS[definition.id];
+                  const Icon = details.icon;
+                  return (
+                    <Card key={definition.id} className="gap-3 py-4">
+                      <CardHeader className="gap-3 px-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground text-xs tabular-nums">
+                            {String(index + 1).padStart(2, "0")}
+                          </span>
+                          <Icon className="text-muted-foreground size-4" />
+                        </div>
+                        <CardTitle className="text-sm leading-5">
+                          {definition.label}
+                        </CardTitle>
+                        <CardDescription className="text-xs leading-5">
+                          {details.description}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex items-center justify-between px-4">
+                        <span className="text-lg font-semibold tabular-nums">
+                          {stage.total}
+                        </span>
+                        <Badge
+                          variant={stage.pending > 0 ? "secondary" : "outline"}
+                        >
+                          {stage.pending > 0
+                            ? `${stage.pending} 待处理`
+                            : stage.total > 0
+                              ? "已接通"
+                              : "待开始"}
+                        </Badge>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <h2 className="flex items-center gap-2 text-lg font-semibold">
+                  <ClapperboardIcon className="size-5" />
+                  影视生产线
+                </h2>
+                <p className="text-muted-foreground text-sm">
+                  生成模型可以替换，蓝图、资产、镜头、失败重试、成本和交付回执留在同一条生产线上。
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">
+                  {cockpit?.video.production_count ?? 0} 个项目
+                </Badge>
+                <Badge variant="outline">
+                  {cockpit?.video.completed_count ?? 0} 已交付
+                </Badge>
+                {(cockpit?.video.blocked_production_ids.length ?? 0) > 0 && (
+                  <Badge variant="secondary">
+                    {cockpit?.video.blocked_production_ids.length} 个受阻
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <Card>
+              <CardContent className="grid gap-2 sm:grid-cols-3 xl:grid-cols-9">
+                {PERSONAL_IP_VIDEO_STAGES.map((stage, index) => (
+                  <div
+                    key={stage.id}
+                    className="bg-muted/35 rounded-lg border px-3 py-3"
+                  >
+                    <div className="text-muted-foreground flex items-center justify-between text-[11px] tabular-nums">
+                      <span>{String(index + 1).padStart(2, "0")}</span>
+                      <span>{cockpit?.video.stages[stage.id] ?? 0}</span>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 font-medium">
+                      {stage.label}
+                    </p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </section>
 
           <section className="space-y-4">
             <div className="flex items-center justify-between gap-4">
@@ -300,10 +469,10 @@ export default function PersonalIPPortfolioPage() {
                                   {account.display_name}
                                 </span>
                                 <span className="text-muted-foreground block truncate text-xs">
-                                  {account.handle ||
+                                  {account.handle ??
                                     (account.subject_id
-                                      ? subjectNames.get(account.subject_id) ||
-                                        "未知主体"
+                                      ? (subjectNames.get(account.subject_id) ??
+                                        "未知主体")
                                       : "未归属主体")}
                                 </span>
                               </button>

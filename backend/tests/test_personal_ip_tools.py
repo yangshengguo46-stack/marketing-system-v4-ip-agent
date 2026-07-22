@@ -9,25 +9,33 @@ import pytest
 
 from deerflow.personal_ip.runtime import PersonalIPRuntimeServices, configure_personal_ip_runtime
 from deerflow.tools.builtins import (
+    personal_ip_begin_video_production_tool,
     personal_ip_collect_browser_page_tool,
     personal_ip_collect_douyin_browser_page_tool,
     personal_ip_metrics_aggregate_tool,
+    personal_ip_operating_cockpit_tool,
     personal_ip_performance_inventory_tool,
     personal_ip_platform_observation_inventory_tool,
     personal_ip_read_platform_observation_tool,
+    personal_ip_read_video_production_tool,
     personal_ip_record_browser_observation_tool,
+    personal_ip_record_video_production_event_tool,
     personal_ip_select_browser_account_tool,
     personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,
 )
 from deerflow.tools.builtins.personal_ip_tools import (
+    _personal_ip_begin_video_production,
     _personal_ip_collect_browser_page,
     _personal_ip_collect_douyin_browser_page,
     _personal_ip_metrics_aggregate,
+    _personal_ip_operating_cockpit,
     _personal_ip_performance_inventory,
     _personal_ip_platform_observation_inventory,
     _personal_ip_read_platform_observation,
+    _personal_ip_read_video_production,
     _personal_ip_record_browser_observation,
+    _personal_ip_record_video_production_event,
     _personal_ip_select_browser_account,
     _personal_ip_sync_douyin_portfolio,
     _personal_ip_sync_douyin_post,
@@ -116,11 +124,15 @@ async def test_douyin_sync_tool_uses_connection_reference_without_returning_toke
 def test_personal_ip_native_tools_are_available_without_thread_account_binding() -> None:
     names = {tool.name for tool in BUILTIN_TOOLS}
     assert personal_ip_metrics_aggregate_tool.name == "personal_ip_metrics_aggregate"
+    assert personal_ip_operating_cockpit_tool.name == "personal_ip_operating_cockpit"
     assert personal_ip_collect_browser_page_tool.name == "personal_ip_collect_browser_page"
     assert personal_ip_collect_douyin_browser_page_tool.name == "personal_ip_collect_douyin_browser_page"
     assert personal_ip_performance_inventory_tool.name == "personal_ip_performance_inventory"
     assert personal_ip_platform_observation_inventory_tool.name == "personal_ip_platform_observation_inventory"
     assert personal_ip_read_platform_observation_tool.name == "personal_ip_read_platform_observation"
+    assert personal_ip_read_video_production_tool.name == "personal_ip_read_video_production"
+    assert personal_ip_begin_video_production_tool.name == "personal_ip_begin_video_production"
+    assert personal_ip_record_video_production_event_tool.name == "personal_ip_record_video_production_event"
     assert personal_ip_record_browser_observation_tool.name == "personal_ip_record_browser_observation"
     assert personal_ip_select_browser_account_tool.name == "personal_ip_select_browser_account"
     assert personal_ip_sync_douyin_portfolio_tool.name == "personal_ip_sync_douyin_portfolio"
@@ -128,10 +140,14 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     assert personal_ip_collect_browser_page_tool in BUILTIN_TOOLS
     assert {
         "personal_ip_metrics_aggregate",
+        "personal_ip_operating_cockpit",
         "personal_ip_collect_browser_page",
         "personal_ip_performance_inventory",
         "personal_ip_platform_observation_inventory",
         "personal_ip_read_platform_observation",
+        "personal_ip_read_video_production",
+        "personal_ip_begin_video_production",
+        "personal_ip_record_video_production_event",
         "personal_ip_record_browser_observation",
         "personal_ip_select_browser_account",
         "personal_ip_sync_douyin_portfolio",
@@ -139,6 +155,93 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     } <= names
     schema = personal_ip_metrics_aggregate_tool.tool_call_schema.model_json_schema()
     assert "account_id" not in schema.get("properties", {})
+
+
+@pytest.mark.asyncio
+async def test_native_cockpit_and_video_tools_use_owner_scoped_product_services(monkeypatch) -> None:
+    video_productions = SimpleNamespace(
+        begin=AsyncMock(
+            return_value={
+                "id": "video-production-1",
+                "status": "draft",
+                "current_stage": "intake",
+                "events": [],
+            }
+        ),
+        append_event=AsyncMock(
+            return_value={
+                "id": "video-production-1",
+                "status": "running",
+                "current_stage": "storyboard",
+                "events": [{"event_type": "storyboard_sealed"}],
+            }
+        ),
+        get=AsyncMock(
+            return_value={
+                "id": "video-production-1",
+                "status": "running",
+                "events": [{"event_type": "storyboard_sealed"}],
+            }
+        ),
+    )
+    services = PersonalIPRuntimeServices(
+        connections=SimpleNamespace(),
+        metrics=SimpleNamespace(),
+        publish_receipts=SimpleNamespace(),
+        video_productions=video_productions,
+    )
+    configure_personal_ip_runtime(services)
+    build = AsyncMock(return_value={"contract_version": "personal-ip-operating-cockpit-v1", "stages": {}})
+    monkeypatch.setattr(
+        "deerflow.tools.builtins.personal_ip_tools._operating_cockpit_service",
+        lambda _services: SimpleNamespace(build=build),
+    )
+    runtime = SimpleNamespace(context={"user_id": "user-1"})
+
+    cockpit = json.loads(await _personal_ip_operating_cockpit(runtime))
+    created = json.loads(
+        await _personal_ip_begin_video_production(
+            runtime,
+            operation_key="video:1",
+            title="一句话微电影",
+            subject_id="",
+            target_account_ids=[],
+            source_kind="idea",
+            source={"idea": "智能体理解创作者"},
+            delivery_spec={"aspect_ratio": "16:9"},
+            provider_policy={"video": ["seedance"]},
+            budget={"currency": "CNY", "hard_limit": 100},
+        )
+    )
+    event = json.loads(
+        await _personal_ip_record_video_production_event(
+            runtime,
+            production_id="video-production-1",
+            event_key="storyboard:v1",
+            event_type="storyboard_sealed",
+            status="succeeded",
+            entity_type="production",
+            entity_id="video-production-1",
+            payload={"shots": 12},
+            input_refs=[],
+            output_refs=["artifact://storyboard-v1.json"],
+            provider="doubao",
+            model="doubao-seed-1-8",
+            provider_task_id="",
+            cost={"currency": "CNY", "amount": 0.1},
+            occurred_at="2026-07-22T05:00:00Z",
+        )
+    )
+    detail = json.loads(await _personal_ip_read_video_production(runtime, "video-production-1"))
+
+    assert cockpit["contract_version"] == "personal-ip-operating-cockpit-v1"
+    assert created["id"] == "video-production-1"
+    assert event["event_count"] == 1
+    assert detail["events"][0]["event_type"] == "storyboard_sealed"
+    build.assert_awaited_once_with(owner_user_id="user-1")
+    assert video_productions.begin.await_args.kwargs["subject_id"] is None
+    assert video_productions.append_event.await_args.kwargs["occurred_at"].isoformat() == "2026-07-22T05:00:00+00:00"
+    video_productions.get.assert_awaited_once_with("video-production-1", owner_user_id="user-1")
 
 
 @pytest.mark.asyncio

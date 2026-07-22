@@ -5,10 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
+from deerflow.persistence.personal_ip_evidence_promotions import PersonalIPEvidencePromotionRepository
 from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
 from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
 from deerflow.persistence.personal_ip_platform_observations import PersonalIPPlatformObservationRepository
+from deerflow.persistence.personal_ip_preflights import PersonalIPPreflightRepository
 from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
+from deerflow.persistence.personal_ip_retrospectives import PersonalIPRetrospectiveRepository
+from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
+from deerflow.persistence.personal_ip_video_productions import PersonalIPVideoProductionRepository
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,6 +23,11 @@ class PersonalIPRuntimeServices:
     publish_receipts: PersonalIPPublishReceiptRepository
     accounts: PersonalIPAccountRepository | None = None
     platform_observations: PersonalIPPlatformObservationRepository | None = None
+    subjects: PersonalIPSubjectRepository | None = None
+    preflights: PersonalIPPreflightRepository | None = None
+    retrospectives: PersonalIPRetrospectiveRepository | None = None
+    evidence_promotions: PersonalIPEvidencePromotionRepository | None = None
+    video_productions: PersonalIPVideoProductionRepository | None = None
 
 
 _services: PersonalIPRuntimeServices | None = None
