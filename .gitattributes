@@ -22,6 +22,9 @@ Makefile text eol=lf
 *.html text eol=lf
 *.env text eol=lf
 
+# Preserve byte-identical pinned upstream source, including its original EOF.
+third_party/bytedance/UI-TARS-desktop/** whitespace=-blank-at-eof
+
 # Windows scripts
 *.bat text eol=crlf
 *.cmd text eol=crlf

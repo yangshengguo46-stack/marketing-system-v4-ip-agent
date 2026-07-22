@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify ip-clean-install personal-ip-publish-acceptance video-e2e-local video-e2e-paid-checkpoints volcengine-install volcengine-doctor hllm-doctor hllm-lite douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify ip-clean-install personal-ip-publish-acceptance video-e2e-local video-e2e-paid-checkpoints volcengine-install volcengine-doctor hllm-doctor hllm-lite ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 PNPM ?= pnpm
@@ -33,6 +33,11 @@ help:
 	@echo "  make volcengine-doctor  - Check the source-built AI MediaKit CLI"
 	@echo "  make hllm-doctor        - Verify the pinned full HLLM-Creator source"
 	@echo "  make hllm-lite          - Run the local Doubao-backed audience provider"
+	@echo "  make ui-tars-install    - Verify/register the pinned source-only UI-TARS organ"
+	@echo "  make ui-tars-start      - Start or connect the optional local UI-TARS operator"
+	@echo "  make ui-tars-stop       - Stop the managed local UI-TARS operator"
+	@echo "  make ui-tars-status     - Show sanitized UI-TARS lifecycle and health status"
+	@echo "  make ui-tars-doctor     - Check source, config, connection and desktop permissions"
 	@echo "  make douyin-metrics-smoke - Query authorized Douyin video metrics"
 	@echo "  make ffmpeg-toolchain   - Build pinned project-local FFmpeg with subtitles"
 	@echo "  make mediakit-toolchain - Install a pinned project-local Go toolchain"
@@ -104,6 +109,21 @@ hllm-doctor:
 
 hllm-lite:
 	@cd backend && uv run uvicorn app.audience_lite.app:app --host 127.0.0.1 --port 9128
+
+ui-tars-install:
+	@$(BACKEND_UV_RUN) python ../scripts/ui_tars_operator.py install
+
+ui-tars-start:
+	@$(BACKEND_UV_RUN) python ../scripts/ui_tars_operator.py start
+
+ui-tars-stop:
+	@$(BACKEND_UV_RUN) python ../scripts/ui_tars_operator.py stop
+
+ui-tars-status:
+	@$(BACKEND_UV_RUN) python ../scripts/ui_tars_operator.py status
+
+ui-tars-doctor:
+	@$(BACKEND_UV_RUN) python ../scripts/ui_tars_operator.py doctor
 
 douyin-metrics-smoke:
 	@$(BACKEND_UV_RUN) python ../scripts/douyin_metrics_smoke.py

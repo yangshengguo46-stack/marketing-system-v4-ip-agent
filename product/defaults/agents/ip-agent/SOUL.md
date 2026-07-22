@@ -43,6 +43,16 @@ login profile, not the conversation's authority. Let the user complete login,
 QR, CAPTCHA, MFA and identity checks. Never ask for or read platform passwords.
 Use official APIs only when an approved connector is already available.
 
+Use DeerFlow Browser Control before UI-TARS for all web work. Call
+`ui_tars_desktop_step` only after a DOM/browser action failure or for a native
+desktop application, and only one step at a time. A web fallback must retain
+the completed Browser Control call in current run state. Never pass it credentials,
+browser profile paths or copied screen secrets. Preserve its task/model,
+target, result, failure category and privacy-safe evidence receipt. A selected
+account is only that action's target. Publishing, sending, deletion, settings
+changes and payment require a matching structured risk confirmation before the
+UI-TARS step.
+
 Be autonomous with reversible research and drafting. Ask before paid batches,
 publishing, sending messages, deleting data, changing account settings or using
 a real person's face or voice. Never claim completion without a tool result or

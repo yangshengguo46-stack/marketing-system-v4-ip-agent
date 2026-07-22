@@ -10,6 +10,90 @@ import sys
 
 import doctor
 
+
+class TestUITarsDoctor:
+    def test_default_off_is_explicit_and_source_is_verified(self, tmp_path, monkeypatch):
+        config = tmp_path / "config.yaml"
+        config.write_text("ui_tars:\n  enabled: false\n", encoding="utf-8")
+        monkeypatch.setattr(
+            "deerflow.community.ui_tars.source.verify_vendored_ui_tars",
+            lambda _root: {
+                "upstream_commit": "c2ad42e3eb9b27830db41a3e6f51ca7179d9b168",
+                "license": "Apache-2.0",
+            },
+        )
+        results = doctor.check_ui_tars(tmp_path, config)
+        assert results[0].status == "ok"
+        assert results[1].status == "skip"
+        assert "Browser Control" in results[1].detail
+
+    def test_enabled_reports_model_permission_and_connection_gaps(self, tmp_path, monkeypatch):
+        config = tmp_path / "config.yaml"
+        config.write_text(
+            "ui_tars:\n  enabled: true\n  endpoint: http://127.0.0.1:9137\n  model: fixture\n  api_base: https://model.example/v1\n  api_key_env: UI_TARS_API_KEY\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("UI_TARS_API_KEY", "not-printed")
+        monkeypatch.setattr(
+            "deerflow.community.ui_tars.source.verify_vendored_ui_tars",
+            lambda _root: {
+                "upstream_commit": "c2ad42e3eb9b27830db41a3e6f51ca7179d9b168",
+                "license": "Apache-2.0",
+            },
+        )
+        monkeypatch.setattr(
+            "deerflow.community.ui_tars.permissions.diagnose_desktop_permissions",
+            lambda: {
+                "supported": True,
+                "screen_recording": "denied",
+                "accessibility": "denied",
+                "detail": "grant permissions",
+            },
+        )
+        monkeypatch.setattr(
+            "deerflow.community.ui_tars.client.UITarsOperatorClient._request",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("offline")),
+        )
+        results = doctor.check_ui_tars(tmp_path, config)
+        by_label = {result.label: result for result in results}
+        assert by_label["UI-TARS model configuration"].status == "ok"
+        assert "not-printed" not in by_label["UI-TARS model configuration"].detail
+        assert by_label["UI-TARS desktop permissions"].status == "warn"
+        assert by_label["UI-TARS local operator"].status == "warn"
+
+    def test_enabled_loopback_model_does_not_require_api_key(self, tmp_path, monkeypatch):
+        config = tmp_path / "config.yaml"
+        config.write_text(
+            "ui_tars:\n  enabled: true\n  model: fixture\n  api_base: http://127.0.0.1:9999/v1\n",
+            encoding="utf-8",
+        )
+        monkeypatch.delenv("UI_TARS_API_KEY", raising=False)
+        monkeypatch.setattr(
+            "deerflow.community.ui_tars.source.verify_vendored_ui_tars",
+            lambda _root: {
+                "upstream_commit": "c2ad42e3eb9b27830db41a3e6f51ca7179d9b168",
+                "license": "Apache-2.0",
+            },
+        )
+        monkeypatch.setattr(
+            "deerflow.community.ui_tars.permissions.diagnose_desktop_permissions",
+            lambda: {
+                "supported": False,
+                "screen_recording": "not_applicable",
+                "accessibility": "not_applicable",
+                "detail": "fixture",
+            },
+        )
+        monkeypatch.setattr(
+            "deerflow.community.ui_tars.client.UITarsOperatorClient._request",
+            lambda *_args, **_kwargs: {"status": "degraded"},
+        )
+
+        by_label = {result.label: result for result in doctor.check_ui_tars(tmp_path, config)}
+        assert by_label["UI-TARS model configuration"].status == "ok"
+        assert "key optional" in by_label["UI-TARS model configuration"].detail
+
+
 # ---------------------------------------------------------------------------
 # check_python
 # ---------------------------------------------------------------------------
@@ -555,8 +639,7 @@ class TestIPAgentProductChecks:
         manifest = tmp_path / "product" / "volcengine" / "capabilities.yaml"
         manifest.parent.mkdir(parents=True)
         manifest.write_text(
-            "capabilities:\n  platform_operations:\n    platforms:\n"
-            + "".join(f"      - {platform}\n" for platform in sorted(doctor.IP_AGENT_PLATFORMS)),
+            "capabilities:\n  platform_operations:\n    platforms:\n" + "".join(f"      - {platform}\n" for platform in sorted(doctor.IP_AGENT_PLATFORMS)),
             encoding="utf-8",
         )
 

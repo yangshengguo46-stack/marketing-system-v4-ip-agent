@@ -178,6 +178,17 @@ IP Agent distribution note:
   persistent Chromium profile; it never narrows conversation authority or
   exposes the profile path/cookies/passwords to the model. See
   `docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md`.
+- UI-TARS is a default-off local desktop fallback, not another agent runtime.
+  The selected Apache-2.0 upstream source is pinned under
+  `third_party/bytedance/UI-TARS-desktop`; do not install its precompiled libnut
+  packages or introduce Agent TARS. `deerflow.community.ui_tars` owns the
+  source-only single-step service, local pixelation boundary, permission
+  diagnosis and append-only audit receipts. Browser Control stays first for
+  web work. Web fallbacks require a completed Browser Control call in current
+  run state, not only a claimed reason. `ui_tars_desktop_step` requires an explicit browser failure/native
+  desktop reason, validates an optional account as an operation target only,
+  and requires a structured risk confirmation for high-impact work. Run
+  `make ui-tars-doctor`; see `docs/UI_TARS_INTEGRATION.md`.
 - Detailed creator-backend evidence lives in
   `deerflow.persistence.personal_ip_platform_observations` and migration
   `0014_personal_ip_platform_observations`. Preserve the immutable

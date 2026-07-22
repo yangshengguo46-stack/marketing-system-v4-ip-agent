@@ -40,3 +40,18 @@ The full upstream source is included and checksum-pinned by
 out of DeerFlow's ordinary backend environment. See
 `docs/HLLM_CREATOR_INTEGRATION.md` for the thin-adapter and model-service
 boundary.
+
+## UI-TARS desktop operator/SDK
+
+- Upstream: `bytedance/UI-TARS-desktop`
+- Commit: `c2ad42e3eb9b27830db41a3e6f51ca7179d9b168`
+- Package versions: `1.2.3`
+- License: Apache-2.0
+- Local path: `third_party/bytedance/UI-TARS-desktop`
+
+The selected SDK, action parser, shared types and NutJS operator source are
+included and tree-digest pinned. Agent TARS and its orchestration runtime are
+not included. The upstream precompiled libnut dependencies are not installed;
+DeerFlow's managed macOS adapter uses system desktop APIs and keeps one-step
+execution under the DeerFlow lead agent. Run `make ui-tars-install` to verify
+the source and register the local source-only installation receipt.

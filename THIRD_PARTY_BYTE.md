@@ -40,3 +40,13 @@ verifies the source pin. HLLM's published weights are separate model assets;
 the HLLM-Creator directory alone is 75.8 GB and is not silently downloaded by
 the ordinary DeerFlow installer. TinyLlama and Qwen base-weight terms still
 apply when those weights are selected.
+
+The selected ByteDance UI-TARS desktop SDK, action parser, shared contracts and
+NutJS operator source are vendored at
+`third_party/bytedance/UI-TARS-desktop` from commit
+`c2ad42e3eb9b27830db41a3e6f51ca7179d9b168`, package version `1.2.3`, under
+Apache-2.0. Their tree digest is fixed by `VENDORED_VERSION.json`. DeerFlow does
+not include or start Agent TARS. The upstream package manifest's precompiled
+libnut dependencies are deliberately not installed: the managed macOS adapter
+uses local operating-system desktop APIs and performs one UI-TARS action per
+DeerFlow tool call. No UI-TARS binary is redistributed.
