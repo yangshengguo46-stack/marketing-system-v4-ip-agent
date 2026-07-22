@@ -530,6 +530,124 @@ class TestCheckSandbox:
 
 
 # ---------------------------------------------------------------------------
+# IP Agent product checks
+# ---------------------------------------------------------------------------
+
+
+class TestIPAgentProductChecks:
+    def test_source_bundle_fails_when_required_source_is_missing(self, tmp_path):
+        result = doctor.check_ip_agent_source_bundle(tmp_path)
+        assert result.status == "fail"
+        assert "missing" in result.detail
+
+    def test_source_bundle_accepts_complete_required_tree(self, tmp_path):
+        for relative in doctor.IP_AGENT_REQUIRED_SOURCE_PATHS:
+            path = tmp_path / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("source", encoding="utf-8")
+
+        result = doctor.check_ip_agent_source_bundle(tmp_path)
+
+        assert result.status == "ok"
+        assert str(len(doctor.IP_AGENT_REQUIRED_SOURCE_PATHS)) in result.detail
+
+    def test_capability_manifest_requires_exact_eight_platforms(self, tmp_path):
+        manifest = tmp_path / "product" / "volcengine" / "capabilities.yaml"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text(
+            "capabilities:\n  platform_operations:\n    platforms:\n"
+            + "".join(f"      - {platform}\n" for platform in sorted(doctor.IP_AGENT_PLATFORMS)),
+            encoding="utf-8",
+        )
+
+        result = doctor.check_ip_agent_capability_manifest(tmp_path)
+
+        assert result.status == "ok"
+        assert "8" in result.detail
+
+        manifest.write_text(
+            "capabilities:\n  platform_operations:\n    platforms:\n      - douyin\n",
+            encoding="utf-8",
+        )
+        result = doctor.check_ip_agent_capability_manifest(tmp_path)
+        assert result.status == "fail"
+        assert "wechat_channels" in result.detail
+
+    def test_product_credentials_distinguish_optional_cloud_from_missing_generation(self, monkeypatch):
+        for name in (
+            "VOLCENGINE_API_KEY",
+            "VOLCENGINE_TTS_APPID",
+            "VOLCENGINE_TTS_ACCESS_TOKEN",
+            "MEDIAKIT_API_KEY",
+        ):
+            monkeypatch.delenv(name, raising=False)
+
+        results = doctor.check_volcengine_product_credentials()
+        by_label = {result.label: result for result in results}
+
+        assert by_label["Volcengine Ark generation"].status == "warn"
+        assert by_label["Doubao Speech"].status == "warn"
+        assert by_label["AI MediaKit cloud"].status == "ok"
+        assert "optional" in by_label["AI MediaKit cloud"].detail
+
+    def test_product_credentials_report_complete_pairs_without_values(self, monkeypatch):
+        monkeypatch.setenv("VOLCENGINE_API_KEY", "secret-ark")
+        monkeypatch.setenv("VOLCENGINE_TTS_APPID", "secret-app")
+        monkeypatch.setenv("VOLCENGINE_TTS_ACCESS_TOKEN", "secret-token")
+        monkeypatch.setenv("MEDIAKIT_API_KEY", "secret-media")
+
+        results = doctor.check_volcengine_product_credentials()
+        rendered = " ".join(result.detail for result in results)
+
+        assert all(result.status == "ok" for result in results)
+        assert "secret-" not in rendered
+
+    def test_local_media_toolchain_prefers_project_binaries(self, tmp_path, monkeypatch):
+        ffmpeg_dir = tmp_path / ".deer-flow" / "toolchains" / "ffmpeg" / "bin"
+        ffmpeg_dir.mkdir(parents=True)
+        (ffmpeg_dir / "ffmpeg").write_text("binary")
+        (ffmpeg_dir / "ffprobe").write_text("binary")
+        mediakit = tmp_path / ".deer-flow" / "bin" / "mediakit-cli"
+        mediakit.parent.mkdir(parents=True)
+        mediakit.write_text("binary")
+        calls = []
+        monkeypatch.setattr(doctor, "_run", lambda command: calls.append(command) or "tool version 1")
+
+        results = doctor.check_local_media_toolchain(tmp_path)
+
+        assert all(result.status == "ok" for result in results)
+        assert calls[0][0] == str(ffmpeg_dir / "ffmpeg")
+        assert calls[1][0] == str(mediakit)
+
+    def test_chromium_runtime_reports_installed_and_missing(self, tmp_path, monkeypatch):
+        executable = tmp_path / "chromium"
+        executable.write_text("binary")
+        monkeypatch.setattr(doctor, "_playwright_chromium_path", lambda: executable)
+        assert doctor.check_chromium_runtime().status == "ok"
+
+        monkeypatch.setattr(doctor, "_playwright_chromium_path", lambda: tmp_path / "missing")
+        missing = doctor.check_chromium_runtime()
+        assert missing.status == "warn"
+        assert "playwright install chromium" in (missing.fix or "")
+
+    def test_local_state_reports_agent_and_profile_count(self, tmp_path, monkeypatch):
+        state = tmp_path / "state"
+        agent = state / "users" / "user-1" / "agents" / "ip-agent" / "SOUL.md"
+        agent.parent.mkdir(parents=True)
+        agent.write_text("agent")
+        profile = state / "users" / "user-1" / "browser-profiles" / "account-1"
+        profile.mkdir(parents=True)
+        monkeypatch.setenv("DEER_FLOW_HOME", str(state))
+
+        results = doctor.check_ip_agent_local_state(tmp_path)
+
+        assert results[0].status == "ok"
+        assert "1 user" in results[0].detail
+        assert results[1].status == "ok"
+        assert "1 persisted" in results[1].detail
+
+
+# ---------------------------------------------------------------------------
 # main() exit code
 # ---------------------------------------------------------------------------
 

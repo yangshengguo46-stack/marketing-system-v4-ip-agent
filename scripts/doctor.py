@@ -25,6 +25,40 @@ from typing import Literal
 
 Status = Literal["ok", "warn", "fail", "skip"]
 
+IP_AGENT_PLATFORMS = {
+    "douyin",
+    "wechat_channels",
+    "wechat_official",
+    "xiaohongshu",
+    "x",
+    "instagram",
+    "youtube",
+    "tiktok",
+}
+
+IP_AGENT_REQUIRED_SOURCE_PATHS = (
+    "product/defaults/USER.md",
+    "product/defaults/agents/ip-agent/SOUL.md",
+    "product/defaults/agents/ip-agent/config.yaml",
+    "product/volcengine/capabilities.yaml",
+    "skills/public/video-generation/scripts/generate.py",
+    "skills/public/image-generation/scripts/generate.py",
+    "skills/public/podcast-generation/scripts/generate.py",
+    "skills/public/volcengine-stack/scripts/run_media_executor.py",
+    "skills/public/byted-mediakit-shared/SKILL.md",
+    "skills/public/byted-mediakit-editing/SKILL.md",
+    "skills/public/byted-mediakit-video/SKILL.md",
+    "skills/public/byted-mediakit-image/SKILL.md",
+    "skills/public/byted-mediakit-audio/SKILL.md",
+    "scripts/package_ip_agent.py",
+    "third_party/volcengine/mediakit-cli/go.mod",
+    "third_party/volcengine/mediakit-cli/cmd/mediakit/main.go",
+    "third_party/volcengine/mediakit-cli/LICENSE",
+    "third_party/bytedance/HLLM/VENDORED_VERSION.json",
+    "third_party/bytedance/HLLM/HLLM_CREATOR_README.md",
+    "third_party/bytedance/HLLM/LICENSE",
+)
+
 
 def _supports_color() -> bool:
     return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
@@ -677,6 +711,216 @@ def check_env_file(project_root: Path) -> CheckResult:
     )
 
 
+def check_ip_agent_source_bundle(project_root: Path) -> CheckResult:
+    missing = [relative for relative in IP_AGENT_REQUIRED_SOURCE_PATHS if not (project_root / relative).is_file()]
+    if missing:
+        preview = ", ".join(missing[:3])
+        if len(missing) > 3:
+            preview += f", and {len(missing) - 3} more"
+        return CheckResult(
+            "IP Agent source bundle",
+            "fail",
+            f"missing {len(missing)} required source file(s): {preview}",
+            fix="Restore the complete IP Agent source distribution; do not replace it with standalone binaries",
+        )
+    return CheckResult("IP Agent source bundle", "ok", f"{len(IP_AGENT_REQUIRED_SOURCE_PATHS)} required source files")
+
+
+def check_ip_agent_capability_manifest(project_root: Path) -> CheckResult:
+    manifest_path = project_root / "product" / "volcengine" / "capabilities.yaml"
+    if not manifest_path.is_file():
+        return CheckResult("eight-platform capability manifest", "fail", "manifest missing")
+    try:
+        manifest = _load_yaml_file(manifest_path)
+        configured = set(
+            manifest.get("capabilities", {})
+            .get("platform_operations", {})
+            .get("platforms", [])
+        )
+    except Exception as exc:
+        return CheckResult("eight-platform capability manifest", "fail", str(exc))
+    missing = sorted(IP_AGENT_PLATFORMS - configured)
+    unexpected = sorted(configured - IP_AGENT_PLATFORMS)
+    if missing or unexpected:
+        detail = f"missing={missing or 'none'}; unexpected={unexpected or 'none'}"
+        return CheckResult(
+            "eight-platform capability manifest",
+            "fail",
+            detail,
+            fix="Restore product/volcengine/capabilities.yaml from the source distribution",
+        )
+    return CheckResult("eight-platform capability manifest", "ok", "8 browser-first platforms")
+
+
+def check_volcengine_product_credentials() -> list[CheckResult]:
+    results: list[CheckResult] = []
+    if os.environ.get("VOLCENGINE_API_KEY"):
+        results.append(CheckResult("Volcengine Ark generation", "ok", "VOLCENGINE_API_KEY set"))
+    else:
+        results.append(
+            CheckResult(
+                "Volcengine Ark generation",
+                "warn",
+                "Seedream/Seedance and default Doubao models are unavailable",
+                fix="Add VOLCENGINE_API_KEY=<your-key> to .env",
+            )
+        )
+
+    tts_names = ("VOLCENGINE_TTS_APPID", "VOLCENGINE_TTS_ACCESS_TOKEN")
+    tts_present = [name for name in tts_names if os.environ.get(name)]
+    if len(tts_present) == len(tts_names):
+        results.append(CheckResult("Doubao Speech", "ok", "AppID and access token set"))
+    elif tts_present:
+        missing = next(name for name in tts_names if name not in tts_present)
+        results.append(
+            CheckResult(
+                "Doubao Speech",
+                "warn",
+                f"incomplete credential pair; {missing} missing",
+                fix=f"Add {missing}=<value> to .env, or remove the unused partial configuration",
+            )
+        )
+    else:
+        results.append(
+            CheckResult(
+                "Doubao Speech",
+                "warn",
+                "voice generation disabled",
+                fix="Add VOLCENGINE_TTS_APPID and VOLCENGINE_TTS_ACCESS_TOKEN to .env",
+            )
+        )
+
+    if os.environ.get("MEDIAKIT_API_KEY"):
+        results.append(CheckResult("AI MediaKit cloud", "ok", "paid cloud capabilities enabled"))
+    else:
+        results.append(
+            CheckResult(
+                "AI MediaKit cloud",
+                "ok",
+                "optional paid key not set; deterministic local media operations remain available",
+            )
+        )
+    return results
+
+
+def check_local_media_toolchain(project_root: Path) -> list[CheckResult]:
+    suffix = ".exe" if sys.platform.startswith("win") else ""
+    ffmpeg = project_root / ".deer-flow" / "toolchains" / "ffmpeg" / "bin" / f"ffmpeg{suffix}"
+    ffprobe = project_root / ".deer-flow" / "toolchains" / "ffmpeg" / "bin" / f"ffprobe{suffix}"
+    mediakit = project_root / ".deer-flow" / "bin" / f"mediakit-cli{suffix}"
+    results: list[CheckResult] = []
+
+    if ffmpeg.is_file() and ffprobe.is_file():
+        version = _run([str(ffmpeg), "-version"])
+        if version is None:
+            results.append(
+                CheckResult(
+                    "project-local FFmpeg",
+                    "fail",
+                    "installed binaries cannot execute",
+                    fix="Run 'make ffmpeg-toolchain' to rebuild the pinned toolchain",
+                )
+            )
+        else:
+            first_line = version.splitlines()[0] if version else "version available"
+            results.append(CheckResult("project-local FFmpeg", "ok", first_line))
+    else:
+        results.append(
+            CheckResult(
+                "project-local FFmpeg",
+                "warn",
+                "pinned ffmpeg/ffprobe not built",
+                fix="Run 'make ffmpeg-toolchain'",
+            )
+        )
+
+    if mediakit.is_file():
+        version = _run([str(mediakit), "version"])
+        if version is None:
+            results.append(
+                CheckResult(
+                    "source-built MediaKit CLI",
+                    "fail",
+                    "binary cannot execute",
+                    fix="Run 'make mediakit-build' to rebuild from vendored source",
+                )
+            )
+        else:
+            results.append(CheckResult("source-built MediaKit CLI", "ok", version.splitlines()[0] if version else "version available"))
+    else:
+        results.append(
+            CheckResult(
+                "source-built MediaKit CLI",
+                "warn",
+                "not built yet",
+                fix="Run 'make mediakit-toolchain && make mediakit-build'",
+            )
+        )
+    return results
+
+
+def _playwright_chromium_path() -> Path:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        return Path(playwright.chromium.executable_path)
+
+
+def check_chromium_runtime() -> CheckResult:
+    try:
+        executable = _playwright_chromium_path()
+    except ImportError:
+        return CheckResult(
+            "Chromium browser runtime",
+            "warn",
+            "Playwright browser extra is not installed",
+            fix="cd backend && uv sync --extra browser && uv run playwright install chromium",
+        )
+    except Exception as exc:
+        return CheckResult(
+            "Chromium browser runtime",
+            "warn",
+            f"Playwright could not resolve Chromium: {exc}",
+            fix="cd backend && uv run playwright install chromium",
+        )
+    if executable.is_file():
+        return CheckResult("Chromium browser runtime", "ok", "Playwright Chromium installed")
+    return CheckResult(
+        "Chromium browser runtime",
+        "warn",
+        "Playwright is installed but Chromium is missing",
+        fix="cd backend && uv run playwright install chromium",
+    )
+
+
+def _ip_agent_state_dir(project_root: Path) -> Path:
+    configured = os.environ.get("DEER_FLOW_HOME")
+    return Path(configured).expanduser().resolve() if configured else project_root / ".deer-flow"
+
+
+def check_ip_agent_local_state(project_root: Path) -> list[CheckResult]:
+    state_dir = _ip_agent_state_dir(project_root)
+    installed_agents = list(state_dir.glob("users/*/agents/ip-agent/SOUL.md")) if state_dir.is_dir() else []
+    if installed_agents:
+        agent_result = CheckResult("default IP Agent installed", "ok", f"{len(installed_agents)} user profile(s)")
+    else:
+        agent_result = CheckResult(
+            "default IP Agent installed",
+            "warn",
+            "no user-scoped IP Agent profile found",
+            fix="Run 'make ip-init' for the default user before first launch",
+        )
+
+    profile_roots = list(state_dir.glob("users/*/browser-profiles")) if state_dir.is_dir() else []
+    profile_count = sum(1 for root in profile_roots for child in root.iterdir() if child.is_dir())
+    profile_result = CheckResult(
+        "account-isolated browser profiles",
+        "ok",
+        f"{profile_count} persisted account profile(s); new profiles are created after manual login",
+    )
+    return [agent_result, profile_result]
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -743,6 +987,17 @@ def main() -> int:
     # ── Sandbox ──────────────────────────────────────────────────────────────
     sandbox_checks = check_sandbox(config_path)
     sections.append(("Sandbox", sandbox_checks))
+
+    # ── IP Agent Product ─────────────────────────────────────────────────────
+    ip_agent_checks = [
+        check_ip_agent_source_bundle(project_root),
+        check_ip_agent_capability_manifest(project_root),
+        *check_volcengine_product_credentials(),
+        *check_local_media_toolchain(project_root),
+        check_chromium_runtime(),
+        *check_ip_agent_local_state(project_root),
+    ]
+    sections.append(("IP Agent Product", ip_agent_checks))
 
     # ── Render ────────────────────────────────────────────────────────────────
     total_fails = 0

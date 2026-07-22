@@ -28,6 +28,7 @@ cp .env.example .env
 make setup
 make ip-init
 make install
+make doctor
 make dev
 ```
 
@@ -55,6 +56,30 @@ FFmpeg GitHub repository archive, avoiding a hard dependency on ffmpeg.org.
 Both binary directories are added to the service PATH automatically. Cloud
 MediaKit uses its own `MEDIAKIT_API_KEY`; without that key, trim, concat,
 subtitle, mix and probe continue to run locally.
+
+`make doctor` has an IP Agent Product section. It verifies the complete
+ByteDance/Volcengine source bundle, all eight browser-first platform entries,
+Ark and speech credentials, optional cloud MediaKit status, the project-local
+FFmpeg and source-built MediaKit CLI, Playwright Chromium, the installed IP
+Agent profile and account-isolated browser-profile storage. It reports only
+whether credentials exist; it never prints their values.
+
+To create the customer-facing source package:
+
+```bash
+make ip-package
+```
+
+The command accepts only a committed tree, archives every tracked source file,
+adds a per-file SHA-256 manifest, excludes `.env`, `config.yaml`, `.deer-flow`,
+browser profiles, virtual environments and `node_modules`, verifies the
+archive, extracts it into a temporary clean directory, installs the default IP
+Agent profile there and compiles the product scripts. The archive and its
+checksum are written to `dist/`. A recipient can independently verify it with:
+
+```bash
+make ip-package-verify PACKAGE=/path/to/ip-agent-source-<commit>.tar.gz
+```
 
 ## Important environment variables
 

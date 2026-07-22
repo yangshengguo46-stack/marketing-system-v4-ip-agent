@@ -10,7 +10,7 @@ checkbox state also includes the current ledger change set.
 
 ## Current completion
 
-**Weighted product completion: 71%.** The native agent and backend foundation
+**Weighted product completion: 72%.** The native agent and backend foundation
 are about 83% complete; the lower product number reflects the deliberately
 deferred eight-platform acceptance work, unfinished real publishing and the
 absence of one accepted paid video production.
@@ -23,9 +23,9 @@ absence of one accepted paid video production.
 | Publishing and receipts | 15% | 70% | Immutable publish request; append-only attempts; atomic browser prepare/finish tools; selected-profile binding; live public-post URL/id verification across eight platform domains | Eight-platform end-to-end execution and recovery verification; official API publishers where available |
 | Metrics, retrospectives and evidence promotion | 20% | 65% | Normalized observations; exact snapshot deltas; portfolio aggregate; Douyin official post collector; detailed browser-evidence contract; real persisted-login Douyin capture; immutable retrospective; policy-gated automatic evidence promotion | Extend detailed collection across the other seven platforms and scheduled coverage |
 | Video production | 15% | 72% | Seedance/Seedream/Doubao Speech scripts emit one credential-free executor receipt with task/request ids and checksummed outputs; MediaKit/FFmpeg have a verified execution wrapper; native ingestion derives immutable stage events; nine-stage production ledger remains provider-independent | Exercise the paid providers and complete one accepted script-to-delivery production |
-| Product UI, packaging and acceptance | 10% | 65% | DeerFlow UI skin; Personal-IP portfolio/login workspace; six-stage operating cockpit; detailed read-only receipt/evidence views; nine-stage video-line status; source-distribution bootstrap | Clean-machine package test and customer onboarding |
+| Product UI, packaging and acceptance | 10% | 75% | DeerFlow UI skin; Personal-IP portfolio/login workspace; operating and video lines; deterministic credential-free source archive with per-file manifest and extracted-profile smoke test; product-aware first-run diagnostics | Full dependency installation in a genuinely clean machine and customer onboarding |
 
-Weighted score: `9 + 8.5 + 13 + 10.5 + 13 + 10.8 + 6.5 = 71.3`, displayed as 71%.
+Weighted score: `9 + 8.5 + 13 + 10.5 + 13 + 10.8 + 7.5 = 72.3`, displayed as 72%.
 
 ## Product truth
 
@@ -96,9 +96,12 @@ coverage evidence.
 
 ### P2 — customer delivery
 
-- [ ] Build and verify a clean-machine source installation package.
-- [ ] Add first-run diagnostics for model keys, optional paid MediaKit,
-      Chromium profiles and platform capability availability.
+- [x] Build and verify a deterministic source archive, reject local credentials
+      and runtime state, and smoke-test extraction plus default-agent install.
+- [x] Add first-run diagnostics for model keys, optional paid MediaKit,
+      project-local media tools, Chromium profiles and platform availability.
+- [ ] Run the full dependency installation and launch on a genuinely clean
+      customer machine or disposable VM.
 - [ ] Complete an eight-platform login/restore/collect/publish acceptance matrix.
 
 ## Counting rules

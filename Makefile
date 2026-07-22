@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init volcengine-install volcengine-doctor hllm-doctor hllm-lite douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify volcengine-install volcengine-doctor hllm-doctor hllm-lite douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 BACKEND_UV_RUN = cd backend && uv run
@@ -20,6 +20,8 @@ help:
 	@echo "DeerFlow Development Commands:"
 	@echo "  make setup           - Interactive setup wizard (recommended for new users)"
 	@echo "  make ip-init         - Install the default local personal-IP Agent"
+	@echo "  make ip-package      - Build and smoke-test the complete source archive"
+	@echo "  make ip-package-verify PACKAGE=... - Verify an existing source archive"
 	@echo "  make volcengine-install - Build the pinned AI MediaKit CLI from source"
 	@echo "  make volcengine-doctor  - Check the source-built AI MediaKit CLI"
 	@echo "  make hllm-doctor        - Verify the pinned full HLLM-Creator source"
@@ -64,6 +66,13 @@ setup:
 
 ip-init:
 	@$(PYTHON) ./scripts/init_ip_agent.py
+
+ip-package:
+	@$(PYTHON) ./scripts/package_ip_agent.py build --smoke
+
+ip-package-verify:
+	@test -n "$(PACKAGE)" || (echo "Set PACKAGE=/path/to/ip-agent-source-*.tar.gz" && exit 2)
+	@$(PYTHON) ./scripts/package_ip_agent.py verify "$(PACKAGE)" --smoke
 
 volcengine-install: ffmpeg-toolchain mediakit-toolchain
 	@$(PYTHON) ./scripts/mediakit_source.py build
