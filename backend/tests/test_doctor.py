@@ -551,6 +551,35 @@ class TestIPAgentProductChecks:
         assert result.status == "ok"
         assert str(len(doctor.IP_AGENT_REQUIRED_SOURCE_PATHS)) in result.detail
 
+    def test_minecontext_doctor_reports_disabled_source_without_runtime_requirement(self, tmp_path, monkeypatch):
+        config = tmp_path / "config.yaml"
+        config.write_text("minecontext:\n  enabled: false\n", encoding="utf-8")
+        monkeypatch.setattr(doctor, "_verify_minecontext_source", lambda _root: {"commit": "171c7a9"})
+
+        results = doctor.check_minecontext(tmp_path, config)
+
+        assert results[0].status == "ok"
+        assert results[1].status == "ok"
+        assert "disabled" in results[1].detail
+
+    def test_minecontext_doctor_warns_when_enabled_runtime_or_credentials_missing(self, tmp_path, monkeypatch):
+        config = tmp_path / "config.yaml"
+        config.write_text("minecontext:\n  enabled: true\n", encoding="utf-8")
+        monkeypatch.setattr(doctor, "_verify_minecontext_source", lambda _root: {"commit": "171c7a9"})
+        for name in (
+            "MINECONTEXT_VLM_BASE_URL", "MINECONTEXT_VLM_API_KEY", "MINECONTEXT_VLM_MODEL",
+            "MINECONTEXT_EMBEDDING_BASE_URL", "MINECONTEXT_EMBEDDING_API_KEY", "MINECONTEXT_EMBEDDING_MODEL",
+        ):
+            monkeypatch.delenv(name, raising=False)
+
+        results = doctor.check_minecontext(tmp_path, config)
+
+        assert results[0].status == "ok"
+        assert results[1].status == "warn"
+        assert "minecontext-install" in (results[1].fix or "")
+        assert results[2].status == "warn"
+        assert "MINECONTEXT_VLM_API_KEY" in results[2].detail
+
     def test_capability_manifest_requires_exact_eight_platforms(self, tmp_path):
         manifest = tmp_path / "product" / "volcengine" / "capabilities.yaml"
         manifest.parent.mkdir(parents=True)

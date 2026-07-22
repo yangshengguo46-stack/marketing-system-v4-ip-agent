@@ -1,0 +1,4 @@
+# Preserve the pinned upstream byte stream; repository-wide EOL rules must not
+# rewrite third-party source blobs during staging or archive construction.
+* -text -whitespace
+**/* -text -whitespace

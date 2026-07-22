@@ -178,6 +178,7 @@ if TYPE_CHECKING:
     from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
     from deerflow.persistence.personal_ip_video_productions import PersonalIPVideoProductionRepository
     from deerflow.persistence.thread_meta.base import ThreadMetaStore
+    from deerflow.personal_ip.minecontext import MineContextService
     from deerflow.runtime import RunRecord
 
 
@@ -283,6 +284,13 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
     async with AsyncExitStack() as stack:
         config = startup_config
 
+        from deerflow.config.minecontext_config import MineContextConfig
+        from deerflow.personal_ip.minecontext import MineContextService
+
+        app.state.minecontext_service = MineContextService(
+            config=getattr(config, "minecontext", MineContextConfig())
+        )
+
         app.state.stream_bridge = await stack.enter_async_context(make_stream_bridge(config))
 
         # Initialize persistence engine BEFORE checkpointer so that
@@ -362,6 +370,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
                     retrospectives=app.state.personal_ip_retrospective_repo,
                     subjects=app.state.personal_ip_subject_repo,
                     video_productions=app.state.personal_ip_video_production_repo,
+                    minecontext=app.state.minecontext_service,
                 )
             )
         else:
@@ -425,6 +434,9 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             run_manager = getattr(app.state, "run_manager", None)
             if run_manager is not None:
                 await _drain_inflight_runs(run_manager)
+            minecontext_service = getattr(app.state, "minecontext_service", None)
+            if minecontext_service is not None:
+                await asyncio.to_thread(minecontext_service.stop_all)
             await close_engine()
 
 
@@ -452,6 +464,13 @@ get_checkpointer: Callable[[Request], Checkpointer] = _require("checkpointer", "
 get_run_event_store: Callable[[Request], RunEventStore] = _require("run_event_store", "Run event store")
 get_feedback_repo: Callable[[Request], FeedbackRepository] = _require("feedback_repo", "Feedback")
 get_run_store: Callable[[Request], RunStore] = _require("run_store", "Run store")
+
+
+def get_minecontext_service(request: Request) -> MineContextService:
+    value = getattr(request.app.state, "minecontext_service", None)
+    if value is None:
+        raise HTTPException(status_code=503, detail="MineContext service not available")
+    return value
 
 
 def get_store(request: Request):

@@ -30,6 +30,15 @@ def _preflight_contract() -> tuple[AudiencePreflightRequest, AudiencePreflightRe
         audience_profile={"cohort_label": "智能体创作者"},
         creator_profile={"voice": ["直接"]},
         target={"content_id": "draft-1", "title": "待发布", "description": "发布前预演"},
+        local_context_evidence=[
+            {
+                "schema_version": "personal-ip-local-context-evidence-v1",
+                "evidence_id": "mctx_retro",
+                "source": {"source_kind": "projects", "context_type": "activity", "observed_at": "2026-07-22T05:00:00+00:00"},
+                "summary": {"title": "路线图", "text": "下周交付", "keywords": ["交付"]},
+                "digest": "b" * 64,
+            }
+        ],
     )
     request = AudiencePreflightRequest(example=example, variant_count=1)
     result = AudiencePreflightResult(
@@ -110,6 +119,7 @@ async def test_retrospective_seals_prediction_publish_and_actual_evidence(tmp_pa
     assert created["account_id"] == account["id"]
     assert created["selected_variant_id"] == "v1"
     assert created["prediction"]["variant"]["text"] == "候选文案"
+    assert created["prediction"]["local_context_evidence"]["items"][0]["evidence_id"] == "mctx_retro"
     assert created["outcome"]["latest_metrics"] == {"likes": 80, "views": 1200}
     assert created["status"] == "partial"
     assert created["comparison_state"] == "unscored"

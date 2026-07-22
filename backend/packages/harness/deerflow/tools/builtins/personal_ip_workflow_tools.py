@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from datetime import UTC, datetime
@@ -107,6 +108,7 @@ async def _personal_ip_run_preflight(
     creator_profile: dict,
     target: dict,
     variant_count: int = 3,
+    local_context_evidence_ids: list[str] | None = None,
 ) -> str:
     """Run HLLM-Lite/full HLLM preflight and seal its immutable receipt.
 
@@ -123,6 +125,7 @@ async def _personal_ip_run_preflight(
         creator_profile: Creator voice, boundaries, positioning and business intent.
         target: Draft content id, title, description and content type to evaluate.
         variant_count: Number of creative variants, from 1 to 8.
+        local_context_evidence_ids: Optional sealed MineContext evidence ids; both preflight and HLLM-profile purposes must already be authorized.
 
     Returns:
         JSON sealed preflight with provider/model versions and prediction variants.
@@ -131,16 +134,42 @@ async def _personal_ip_run_preflight(
         services = get_personal_ip_runtime()
         if services.preflights is None:
             raise RuntimeError("Personal-IP preflight persistence is not available")
+        owner_user_id = resolve_runtime_user_id(runtime)
+        local_context_evidence: list[dict] = []
+        requested_evidence_ids = list(dict.fromkeys(local_context_evidence_ids or []))
+        if requested_evidence_ids:
+            if services.minecontext is None:
+                raise RuntimeError("MineContext local evidence is not available")
+            local_context_evidence = await asyncio.to_thread(
+                services.minecontext.read_evidence,
+                owner_user_id,
+                purpose="preflight",
+                evidence_ids=requested_evidence_ids,
+                limit=len(requested_evidence_ids),
+            )
+            # Require the independent HLLM-profile purpose as well. The second
+            # read is intentional: the service enforces the persisted consent.
+            await asyncio.to_thread(
+                services.minecontext.read_evidence,
+                owner_user_id,
+                purpose="hllm_user_profile",
+                evidence_ids=requested_evidence_ids,
+                limit=len(requested_evidence_ids),
+            )
+            found_ids = {item.get("evidence_id") for item in local_context_evidence}
+            if found_ids != set(requested_evidence_ids):
+                raise ValueError("requested MineContext evidence is missing or expired")
         example = HLLMCreatorAdapter().build_example(
             history=history,
             audience_profile=audience_profile,
             creator_profile=creator_profile,
             target=target,
+            local_context_evidence=local_context_evidence,
         )
         request = AudiencePreflightRequest(example=example, variant_count=int(variant_count))
         result = await _audience_preflight_provider().preflight(request)
         sealed = await services.preflights.seal(
-            owner_user_id=resolve_runtime_user_id(runtime),
+            owner_user_id=owner_user_id,
             operation_key=operation_key,
             subject_ids=subject_ids,
             target_account_ids=target_account_ids,

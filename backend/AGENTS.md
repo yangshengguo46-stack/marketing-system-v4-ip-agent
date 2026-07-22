@@ -990,6 +990,19 @@ generation. It must leave `match_score` unset until a ranking model has been
 trained and calibrated from observed outcomes; model-authored confidence is not
 a substitute for that evidence.
 
+MineContext is an observation source, not another harness. Its process-local
+lifecycle manager is `deerflow.personal_ip.minecontext.MineContextService` and
+is injected app → harness through `PersonalIPRuntimeServices`; harness code
+must not import `app.*`. Config is startup-only and default-off. Operator
+enablement does not grant owner consent, resume a prior process, or turn on
+capture. Routes under `/api/personal-ip/minecontext` own authorize/start/stop/
+revoke/delete controls. Native tools may only sync/read evidence and must not
+start capture or widen scope. Store state under `Paths.user_dir(owner) /
+"minecontext"` with private permissions. Only
+`personal-ip-local-context-evidence-v1` may cross into HLLM/preflight/retro;
+keep raw screenshots, document content, paths, embeddings and credentials out.
+Preflight evidence requires both `preflight` and `hllm_user_profile` consent.
+
 Migration `0008_personal_ip_preflights` and
 `deerflow.persistence.personal_ip_preflights` store immutable, owner-scoped
 model request/receipt snapshots. Gateway endpoints are under

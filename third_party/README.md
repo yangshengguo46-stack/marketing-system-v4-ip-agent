@@ -40,3 +40,19 @@ The full upstream source is included and checksum-pinned by
 out of DeerFlow's ordinary backend environment. See
 `docs/HLLM_CREATOR_INTEGRATION.md` for the thin-adapter and model-service
 boundary.
+
+## MineContext
+
+- Upstream: `volcengine/MineContext`
+- Commit: `171c7a9ea8091e326ddcf0f10718aa1b58c83c65`
+- Git tree: `b185239b776e176ad25faf584050cf0c31226108`
+- License: Apache-2.0
+- Local path: `third_party/volcengine/MineContext`
+
+The full official source is included. `VENDORED_VERSION.json` pins provenance
+and `UPSTREAM_FILES.sha256` pins all 504 official blobs; the local NOTICE
+records that upstream had no NOTICE
+file at this commit. Run `make minecontext-verify` without installing anything,
+or `make minecontext-install && make minecontext-doctor` to create and check an
+isolated runtime from this source. No capture starts as part of verification,
+installation, doctor, Gateway boot or package smoke testing.

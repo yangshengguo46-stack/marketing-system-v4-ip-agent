@@ -40,6 +40,7 @@ REQUIRED_PACKAGE_PATHS = (
     "scripts/install_ffmpeg_toolchain.py",
     "scripts/install_go_toolchain.py",
     "scripts/mediakit_source.py",
+    "scripts/minecontext_source.py",
     "scripts/package_ip_agent.py",
     "scripts/personal_ip_video_e2e.py",
     "backend/packages/harness/deerflow/personal_ip/video_acceptance.py",
@@ -47,6 +48,15 @@ REQUIRED_PACKAGE_PATHS = (
     "skills/public/volcengine-stack/scripts/run_media_executor.py",
     "third_party/bytedance/HLLM/VENDORED_VERSION.json",
     "third_party/volcengine/mediakit-cli/go.mod",
+    "third_party/volcengine/MineContext/VENDORED_VERSION.json",
+    "third_party/volcengine/MineContext/LICENSE",
+    "third_party/volcengine/MineContext/NOTICE",
+    "third_party/volcengine/MineContext/README.md",
+    "third_party/volcengine/MineContext/UPSTREAM_FILES.sha256",
+    "third_party/volcengine/MineContext/pyproject.toml",
+    "third_party/volcengine/MineContext/opencontext/cli.py",
+    "third_party/volcengine/MineContext/opencontext/server/context_operations.py",
+    "third_party/volcengine/MineContext/config/config.yaml",
 )
 FORBIDDEN_PARTS = {
     ".deer-flow",
@@ -66,6 +76,10 @@ RUNTIME_ROOT_FILES = {
     "configure.yml",
     "extensions_config.json",
     "mcp_config.json",
+}
+SOURCE_CONFIG_PATHS = {
+    "product/defaults/agents/ip-agent/config.yaml",
+    "third_party/volcengine/MineContext/config/config.yaml",
 }
 
 
@@ -124,7 +138,7 @@ def _assert_credential_free_path(relative: str) -> None:
         raise RuntimeError(f"forbidden local/runtime path in source package: {relative}")
     if len(path.parts) == 1 and path.name in RUNTIME_ROOT_FILES:
         raise RuntimeError(f"runtime config must not enter source package: {relative}")
-    if path.name == "config.yaml" and str(path) != "product/defaults/agents/ip-agent/config.yaml":
+    if path.name == "config.yaml" and str(path) not in SOURCE_CONFIG_PATHS:
         raise RuntimeError(f"runtime config must not enter source package: {relative}")
 
 
@@ -147,6 +161,7 @@ def _manifest(
         "install": ["make config", "make ip-init", "make install", "make doctor"],
         "clean_install_acceptance": ["python3 scripts/clean_install_ip_agent.py"],
         "optional_media_install": ["make volcengine-install", "make volcengine-doctor"],
+        "optional_local_context_install": ["make minecontext-install", "make minecontext-doctor"],
     }
 
 
@@ -323,6 +338,13 @@ def smoke_test_source_package(archive_path: Path) -> None:
             ],
             cwd=root,
             check=True,
+        )
+        subprocess.run(
+            [sys.executable, str(root / "scripts" / "minecontext_source.py"), "verify"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
         )
 
 

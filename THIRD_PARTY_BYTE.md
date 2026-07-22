@@ -40,3 +40,16 @@ verifies the source pin. HLLM's published weights are separate model assets;
 the HLLM-Creator directory alone is 75.8 GB and is not silently downloaded by
 the ordinary DeerFlow installer. TinyLlama and Qwen base-weight terms still
 apply when those weights are selected.
+
+The complete Volcengine MineContext source is vendored at
+`third_party/volcengine/MineContext` from official commit
+`171c7a9ea8091e326ddcf0f10718aa1b58c83c65` under Apache-2.0. The official
+tree had no NOTICE at that commit, so this distribution adds a provenance
+NOTICE and `VENDORED_VERSION.json` with the exact Git tree, commit date and
+checksums for all 504 official files plus the license, package metadata, CLI
+and search boundary. No
+upstream prebuilt application binary is included. `make minecontext-install`
+creates an ignored project-local Python environment linked to this source.
+MineContext remains an optional, per-owner local observation sidecar; DeerFlow
+is the only agent runtime and receives only the versioned minimized evidence
+contract.

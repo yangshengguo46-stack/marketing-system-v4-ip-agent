@@ -50,6 +50,45 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+def _local_context_evidence(model_request: dict[str, Any]) -> dict[str, Any] | None:
+    """Extract only the sealed projection allowlist from an immutable preflight."""
+
+    example = model_request.get("example")
+    if not isinstance(example, dict):
+        return None
+    try:
+        profile = json.loads(example.get("user_profile") or "{}")
+    except (TypeError, json.JSONDecodeError):
+        return None
+    projection = profile.get("local_context_evidence") if isinstance(profile, dict) else None
+    if not isinstance(projection, dict) or projection.get("schema_version") != "personal-ip-hllm-context-evidence-v1":
+        return None
+    if projection.get("raw_content_included") is not False:
+        return None
+    items: list[dict[str, Any]] = []
+    for raw in (projection.get("items") or [])[:20]:
+        if not isinstance(raw, dict):
+            continue
+        items.append(
+            {
+                "evidence_id": str(raw.get("evidence_id") or "")[:64],
+                "source_kind": str(raw.get("source_kind") or "")[:40],
+                "context_type": str(raw.get("context_type") or "")[:80],
+                "observed_at": str(raw.get("observed_at") or "")[:64],
+                "title": str(raw.get("title") or "")[:200],
+                "summary": str(raw.get("summary") or "")[:800],
+                "keywords": [str(item)[:80] for item in (raw.get("keywords") or [])[:20]],
+                "digest": str(raw.get("digest") or "")[:64],
+            }
+        )
+    return {
+        "schema_version": "personal-ip-hllm-context-evidence-v1",
+        "epistemic_status": "observational_partial_revisable",
+        "raw_content_included": False,
+        "items": items,
+    }
+
+
 class PersonalIPRetrospectiveRepository:
     """Seal facts for review without auto-promoting them into model training."""
 
@@ -169,6 +208,9 @@ class PersonalIPRetrospectiveRepository:
                 "request_digest": preflight.request_digest,
                 "variant": dict(selected_variant),
             }
+            local_context = _local_context_evidence(preflight.model_request_json or {})
+            if local_context is not None:
+                prediction["local_context_evidence"] = local_context
             outcome = {
                 "horizon": horizon_key,
                 "latest_metrics": dict(sorted(latest_metrics.items())),

@@ -114,6 +114,13 @@ Tool-calling AI messages can contain user-visible text as well as `tool_calls`. 
   采集受限 / 可执行 states from non-secret account metadata and records only a
   non-secret login marker after that event. Later detailed collection remains an
   agent/browser responsibility.
+  The same workspace renders the MineContext control surface. It must keep
+  operator availability distinct from owner consent and running state, default
+  every new consent form to no selected scope/purpose, and never imply that
+  authorization alone starts capture. Show retention, evidence count,
+  stop/revoke/delete controls and the raw-data exclusion copy. The normal UI
+  stays in manual mode; continuous screen/file collection must not be added
+  without an equally explicit bounded-scope confirmation flow.
   Never accept or cache an expanded account record as run authority; the Gateway
   resolves it again for the authenticated owner. Keep this page a thin status
   and account surface: DeerFlow conversation tools create and advance business

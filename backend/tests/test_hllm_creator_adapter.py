@@ -85,6 +85,39 @@ def test_adapter_requires_observed_aggregate_metrics() -> None:
         )
 
 
+def test_adapter_embeds_only_sealed_local_context_projection() -> None:
+    adapter = HLLMCreatorAdapter()
+    row = adapter.build_example(
+        history=[_history_item(1)],
+        audience_profile={"cohort_label": "创作者"},
+        creator_profile={"voice": ["直接"]},
+        target={"content_id": "draft-1", "title": "标题", "description": "说明"},
+        local_context_evidence=[
+            {
+                "schema_version": "personal-ip-local-context-evidence-v1",
+                "evidence_id": "mctx_1",
+                "source": {
+                    "source_kind": "projects",
+                    "context_type": "activity",
+                    "observed_at": "2026-07-22T05:00:00+00:00",
+                },
+                "summary": {"title": "路线图", "text": "下周交付", "keywords": ["交付"]},
+                "digest": "a" * 64,
+                "raw_private_text": "must never cross",
+            }
+        ],
+    )
+
+    profile = json.loads(row["user_profile"])
+    projection = profile["local_context_evidence"]
+    assert projection["schema_version"] == "personal-ip-hllm-context-evidence-v1"
+    assert projection["epistemic_status"] == "observational_partial_revisable"
+    assert projection["raw_content_included"] is False
+    assert projection["items"][0]["summary"] == "下周交付"
+    assert "raw_private_text" not in row["user_profile"]
+    assert "must never cross" not in row["user_profile"]
+
+
 def test_vendored_hllm_source_is_pinned_and_complete() -> None:
     repo_root = Path(__file__).resolve().parents[2]
 

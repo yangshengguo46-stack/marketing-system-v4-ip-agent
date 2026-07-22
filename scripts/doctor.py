@@ -59,6 +59,14 @@ IP_AGENT_REQUIRED_SOURCE_PATHS = (
     "third_party/bytedance/HLLM/VENDORED_VERSION.json",
     "third_party/bytedance/HLLM/HLLM_CREATOR_README.md",
     "third_party/bytedance/HLLM/LICENSE",
+    "scripts/minecontext_source.py",
+    "third_party/volcengine/MineContext/VENDORED_VERSION.json",
+    "third_party/volcengine/MineContext/LICENSE",
+    "third_party/volcengine/MineContext/NOTICE",
+    "third_party/volcengine/MineContext/UPSTREAM_FILES.sha256",
+    "third_party/volcengine/MineContext/pyproject.toml",
+    "third_party/volcengine/MineContext/opencontext/cli.py",
+    "third_party/volcengine/MineContext/config/config.yaml",
 )
 
 
@@ -728,6 +736,61 @@ def check_ip_agent_source_bundle(project_root: Path) -> CheckResult:
     return CheckResult("IP Agent source bundle", "ok", f"{len(IP_AGENT_REQUIRED_SOURCE_PATHS)} required source files")
 
 
+def _verify_minecontext_source(project_root: Path) -> dict:
+    from deerflow.personal_ip.minecontext import verify_vendored_minecontext
+
+    return verify_vendored_minecontext(project_root)
+
+
+def check_minecontext(project_root: Path, config_path: Path) -> list[CheckResult]:
+    """Report pinned source, optional runtime and explicitly named credentials."""
+
+    try:
+        manifest = _verify_minecontext_source(project_root)
+        results = [CheckResult("MineContext pinned source", "ok", f"Apache-2.0 @ {manifest['commit'][:12]}")]
+    except Exception:
+        return [
+            CheckResult(
+                "MineContext pinned source",
+                "fail",
+                "source verification failed",
+                fix="Restore the complete pinned third_party/volcengine/MineContext source tree",
+            )
+        ]
+    try:
+        data = _load_yaml_file(config_path) if config_path.is_file() else {}
+    except Exception as exc:
+        return [*results, CheckResult("MineContext configuration", "fail", str(exc))]
+    config = data.get("minecontext") if isinstance(data.get("minecontext"), dict) else {}
+    enabled = bool(config.get("enabled", False))
+    configured_runtime = str(config.get("runtime_python") or "").strip()
+    suffix = Path("Scripts/python.exe") if sys.platform.startswith("win") else Path("bin/python")
+    runtime = Path(configured_runtime).expanduser() if configured_runtime else project_root / ".deer-flow" / "toolchains" / "minecontext" / suffix
+    if not runtime.is_absolute():
+        runtime = project_root / runtime
+    if not enabled:
+        results.append(CheckResult("MineContext local source", "ok", "disabled by default; no capture process starts"))
+        return results
+    if runtime.is_file():
+        results.append(CheckResult("MineContext source runtime", "ok", "installed from vendored source"))
+    else:
+        results.append(CheckResult("MineContext source runtime", "warn", "enabled but runtime is not installed", fix="Run 'make minecontext-install'"))
+    env_names = (
+        "MINECONTEXT_VLM_BASE_URL",
+        "MINECONTEXT_VLM_API_KEY",
+        "MINECONTEXT_VLM_MODEL",
+        "MINECONTEXT_EMBEDDING_BASE_URL",
+        "MINECONTEXT_EMBEDDING_API_KEY",
+        "MINECONTEXT_EMBEDDING_MODEL",
+    )
+    missing = [name for name in env_names if not os.environ.get(name)]
+    if missing:
+        results.append(CheckResult("MineContext provider settings", "warn", "missing: " + ", ".join(missing), fix="Set only the required MINECONTEXT_* values in .env before processing local observations"))
+    else:
+        results.append(CheckResult("MineContext provider settings", "ok", "six explicit variables set; values not displayed"))
+    return results
+
+
 def check_ip_agent_capability_manifest(project_root: Path) -> CheckResult:
     manifest_path = project_root / "product" / "volcengine" / "capabilities.yaml"
     if not manifest_path.is_file():
@@ -990,6 +1053,7 @@ def main() -> int:
     ip_agent_checks = [
         check_ip_agent_source_bundle(project_root),
         check_ip_agent_capability_manifest(project_root),
+        *check_minecontext(project_root, config_path),
         *check_volcengine_product_credentials(),
         *check_local_media_toolchain(project_root),
         check_chromium_runtime(),
