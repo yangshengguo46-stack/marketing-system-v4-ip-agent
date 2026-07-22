@@ -6,9 +6,7 @@ import {
   ClapperboardIcon,
   Edit3Icon,
   FlaskConicalIcon,
-  Globe2Icon,
   LoaderCircleIcon,
-  LogInIcon,
   PlusIcon,
   RefreshCcwIcon,
   SendIcon,
@@ -25,7 +23,6 @@ import {
   CardAction,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -33,6 +30,7 @@ import {
   AccountBrowserLoginDialog,
   AccountEditorDialog,
   OperatingReviewPanel,
+  PlatformConnectionsPanel,
   SubjectEditorDialog,
 } from "@/components/workspace/personal-ip";
 import {
@@ -111,6 +109,7 @@ export default function PersonalIPPortfolioPage() {
   );
   const [loginPlatform, setLoginPlatform] =
     useState<PersonalIPBrowserPlatform | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "经营组合 - IP Agent";
@@ -154,6 +153,7 @@ export default function PersonalIPPortfolioPage() {
 
   const submitAccount = async (input: PersonalIPAccountInput) => {
     try {
+      setConnectionError(null);
       if (editingAccount) {
         await updateAccount.mutateAsync({
           accountId: editingAccount.id,
@@ -165,6 +165,9 @@ export default function PersonalIPPortfolioPage() {
       setAccountOpen(false);
       toast.success("平台账号已保存");
     } catch (error) {
+      setConnectionError(
+        error instanceof Error ? error.message : String(error),
+      );
       showError(error);
     }
   };
@@ -188,6 +191,7 @@ export default function PersonalIPPortfolioPage() {
       (account) => account.platform === platform.id,
     ).length;
     try {
+      setConnectionError(null);
       const account = await createAccount.mutateAsync({
         subject_id: null,
         platform: platform.id,
@@ -202,12 +206,43 @@ export default function PersonalIPPortfolioPage() {
         content_pillars: [],
         voice_and_boundaries: [],
         business_goal: "",
-        metadata: { connection_mode: "local_browser_profile" },
+        metadata: {
+          connection_mode: "local_browser_profile",
+          connection_state: "pending_login",
+        },
       });
       openAccountLogin(account);
     } catch (error) {
+      setConnectionError(
+        error instanceof Error ? error.message : String(error),
+      );
       showError(error);
     }
+  };
+
+  const markAccountAuthenticated = (account: PersonalIPAccount) => {
+    setConnectionError(null);
+    void updateAccount
+      .mutateAsync({
+        accountId: account.id,
+        updates: {
+          metadata: {
+            ...account.metadata,
+            connection_mode: "local_browser_profile",
+            connection_state: "logged_in",
+            browser_authenticated: true,
+            browser_authenticated_at: new Date().toISOString(),
+          },
+        },
+      })
+      .then(() => toast.success(`${account.display_name} 已登录`))
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setConnectionError(
+          `平台登录已经完成，但连接状态暂时没有保存：${message}`,
+        );
+        toast.error("登录成功，但状态保存失败；请重新读取后再试");
+      });
   };
 
   return (
@@ -216,11 +251,39 @@ export default function PersonalIPPortfolioPage() {
       <WorkspaceBody className="overflow-y-auto">
         <div className="mx-auto w-full max-w-6xl space-y-8 p-6 lg:p-10">
           <div className="space-y-2">
-            <h1 className="text-2xl font-semibold">经营组合</h1>
+            <h1 className="text-2xl font-semibold">IP Agent 经营总台账</h1>
             <p className="text-muted-foreground max-w-3xl text-sm leading-6">
-              这里只登记主体和平台账号。每次对话仍拥有完整智能体能力，并可统筹全部已授权账号；账号只在具体发布、采集或回执中作为目标。
+              先连接账号，再让同一场会话统筹全部已授权平台。账号只在具体采集、发布或回执中作为操作目标，不会缩小整场会话的经营范围。
             </p>
           </div>
+
+          <PlatformConnectionsPanel
+            accounts={accounts}
+            subjectNames={subjectNames}
+            loading={accountsQuery.isLoading}
+            loadError={
+              accountsQuery.isError
+                ? accountsQuery.error instanceof Error
+                  ? accountsQuery.error.message
+                  : "无法读取账号连接状态"
+                : null
+            }
+            actionError={connectionError}
+            actionPending={createAccount.isPending || updateAccount.isPending}
+            onAddPlatform={(platform) =>
+              void createAndOpenAccountLogin(platform)
+            }
+            onOpenAccount={openAccountLogin}
+            onEditAccount={(account) => {
+              setEditingAccount(account);
+              setAccountOpen(true);
+            }}
+            onRetry={() => {
+              setConnectionError(null);
+              void accountsQuery.refetch();
+            }}
+            onDismissError={() => setConnectionError(null)}
+          />
 
           <section className="space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-4">
@@ -415,122 +478,6 @@ export default function PersonalIPPortfolioPage() {
               </div>
             )}
           </section>
-
-          <section className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold">平台账号</h2>
-                <p className="text-muted-foreground text-sm">
-                  八个平台固定在这里。登录一次后，本机将按账号隔离并复用登录状态。
-                </p>
-              </div>
-              <Button
-                onClick={() => {
-                  setEditingAccount(null);
-                  setAccountOpen(true);
-                }}
-              >
-                <PlusIcon /> 新建账号
-              </Button>
-            </div>
-            {accountsQuery.isLoading ? (
-              <p className="text-muted-foreground text-sm">正在读取账号…</p>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {PERSONAL_IP_BROWSER_PLATFORMS.map((platform) => {
-                  const platformAccounts = accounts.filter(
-                    (account) => account.platform === platform.id,
-                  );
-                  return (
-                    <Card key={platform.id} className="gap-4">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Globe2Icon className="size-4" />
-                          {platform.label}
-                        </CardTitle>
-                        <CardDescription>
-                          {platform.description}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="grow space-y-2">
-                        {platformAccounts.length === 0 ? (
-                          <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-                            尚未添加账号
-                          </div>
-                        ) : (
-                          platformAccounts.map((account) => (
-                            <div
-                              key={account.id}
-                              className="flex items-center gap-2 rounded-md border p-2"
-                            >
-                              <button
-                                type="button"
-                                className="min-w-0 flex-1 text-left"
-                                onClick={() => openAccountLogin(account)}
-                              >
-                                <span className="block truncate text-sm font-medium">
-                                  {account.display_name}
-                                </span>
-                                <span className="text-muted-foreground block truncate text-xs">
-                                  {account.handle ??
-                                    (account.subject_id
-                                      ? (subjectNames.get(account.subject_id) ??
-                                        "未知主体")
-                                      : "未归属主体")}
-                                </span>
-                              </button>
-                              <Button
-                                size="icon-sm"
-                                variant="ghost"
-                                aria-label={`编辑${account.display_name}`}
-                                onClick={() => {
-                                  setEditingAccount(account);
-                                  setAccountOpen(true);
-                                }}
-                              >
-                                <Edit3Icon />
-                              </Button>
-                              <Button
-                                size="icon-sm"
-                                variant="outline"
-                                aria-label={`登录${account.display_name}`}
-                                onClick={() => openAccountLogin(account)}
-                              >
-                                <LogInIcon />
-                              </Button>
-                            </div>
-                          ))
-                        )}
-                      </CardContent>
-                      <CardFooter>
-                        <Button
-                          className="w-full"
-                          variant={
-                            platformAccounts.length === 0
-                              ? "default"
-                              : "outline"
-                          }
-                          disabled={createAccount.isPending}
-                          onClick={() =>
-                            void createAndOpenAccountLogin(platform)
-                          }
-                        >
-                          {createAccount.isPending ? (
-                            <LoaderCircleIcon className="animate-spin" />
-                          ) : (
-                            <LogInIcon />
-                          )}
-                          {platformAccounts.length === 0
-                            ? "登录账号"
-                            : "登录新账号"}
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </section>
         </div>
       </WorkspaceBody>
 
@@ -553,6 +500,7 @@ export default function PersonalIPPortfolioPage() {
         open={Boolean(loginAccount && loginPlatform)}
         account={loginAccount}
         platform={loginPlatform}
+        onAuthenticated={markAccountAuthenticated}
         onOpenChange={(open) => {
           if (!open) {
             setLoginAccount(null);
