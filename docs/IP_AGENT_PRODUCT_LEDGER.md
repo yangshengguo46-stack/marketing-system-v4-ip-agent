@@ -5,27 +5,28 @@ operating loop. It is deliberately stricter than source-code completion. A
 schema, mocked test or configured model is not counted as a finished product
 until its real execution path, evidence and user interaction are usable.
 
-Last audited: 2026-07-22. The baseline audit began at commit `fd78208`; the
-checkbox state also includes the current ledger change set.
+Last audited: 2026-07-22. The baseline audit began at commit `fd78208`; this
+audit includes the five parallel work lines integrated through `0578242` and
+the current ledger change set.
 
 ## Current completion
 
-**Weighted product completion: 72%.** The native agent and backend foundation
-are about 83% complete; the lower product number reflects the deliberately
-deferred eight-platform acceptance work, unfinished real publishing and the
-absence of one accepted paid video production.
+**Weighted product completion: 76%.** The native agent and backend foundation
+are about 86% complete; the lower product number reflects the deliberately
+deferred real-account eight-platform acceptance work, unfinished real
+publishing and the absence of one accepted paid video production.
 
 | Ledger area | Weight | Complete | Current evidence | Completion gate still open |
 |---|---:|---:|---|---|
-| DeerFlow and Volcengine foundation | 10% | 90% | Native DeerFlow runtime; Doubao/Seedream/Seedance routing; vendored MediaKit source and project-local FFmpeg | Release-grade installer and a full paid-call acceptance run |
-| Portfolio, accounts and browser login | 10% | 85% | Eight fixed platform entries; owner/account-isolated Chromium profiles; real Douyin login persisted across restart; automatic dialog close | Connected-state summaries and full eight-platform acceptance matrix |
+| DeerFlow and Volcengine foundation | 10% | 92% | Native DeerFlow runtime; Doubao/Seedream/Seedance routing; vendored MediaKit source and project-local FFmpeg; credential-free clean-room dependency/build acceptance | Full customer-machine launch and a full paid-call acceptance run |
+| Portfolio, accounts and browser login | 10% | 90% | Eight fixed platform entries; owner/account-isolated Chromium profiles; real Douyin login persisted across restart; automatic dialog close; five-state connection summary and recovery UI | Full real-account eight-platform acceptance matrix |
 | Persona/fan modelling and preflight | 20% | 65% | HLLM source pin; HLLM-Lite provider contract; aggregate audience adapter; immutable preflight receipt; native agent tool and detailed receipt view; personality/Maslow/Jung/existence lenses | Detailed real platform inputs and calibrated ranker |
-| Publishing and receipts | 15% | 70% | Immutable publish request; append-only attempts; atomic browser prepare/finish tools; selected-profile binding; live public-post URL/id verification across eight platform domains | Eight-platform end-to-end execution and recovery verification; official API publishers where available |
-| Metrics, retrospectives and evidence promotion | 20% | 65% | Normalized observations; exact snapshot deltas; portfolio aggregate; Douyin official post collector; detailed browser-evidence contract; real persisted-login Douyin capture; immutable retrospective; policy-gated automatic evidence promotion | Extend detailed collection across the other seven platforms and scheduled coverage |
-| Video production | 15% | 72% | Seedance/Seedream/Doubao Speech scripts emit one credential-free executor receipt with task/request ids and checksummed outputs; MediaKit/FFmpeg have a verified execution wrapper; native ingestion derives immutable stage events; nine-stage production ledger remains provider-independent | Exercise the paid providers and complete one accepted script-to-delivery production |
-| Product UI, packaging and acceptance | 10% | 75% | DeerFlow UI skin; Personal-IP portfolio/login workspace; operating and video lines; deterministic credential-free source archive with per-file manifest and extracted-profile smoke test; product-aware first-run diagnostics | Full dependency installation in a genuinely clean machine and customer onboarding |
+| Publishing and receipts | 15% | 70% | Immutable publish request; append-only attempts; atomic browser prepare/finish tools; strict eight-platform public-post proof; local recovery/idempotency acceptance matrix | Real per-platform publish and recovery acceptance; official API publishers where available |
+| Metrics, retrospectives and evidence promotion | 20% | 65% | Normalized observations; exact snapshot deltas; portfolio aggregate; Douyin official post collector; eight-platform browser dashboard adapters with explicit missing/partial/unavailable coverage; real persisted-login Douyin capture; immutable retrospective; automatic evidence promotion | Extend verified real collection across the other seven platforms and scheduled coverage |
+| Video production | 15% | 80% | Recoverable local script-to-delivery acceptance runs through blueprint, assets, storyboard, generation retry, consistency, selection, speech, source-built MediaKit/FFmpeg, delivery QA and immutable receipts; paid checkpoints are approval-gated | Exercise the paid providers and complete one accepted real-generation production |
+| Product UI, packaging and acceptance | 10% | 90% | Five-state eight-platform onboarding and responsive login UI; deterministic credential-free source archive; clean-room dependency install, migrations, doctor and production build; product-aware diagnostics | Full-stack launch on a clean customer machine/VM and real-account acceptance |
 
-Weighted score: `9 + 8.5 + 13 + 10.5 + 13 + 10.8 + 7.5 = 72.3`, displayed as 72%.
+Weighted score: `9.2 + 9 + 13 + 10.5 + 13 + 12 + 9 = 75.7`, displayed as 76%.
 
 ## Product truth
 
@@ -75,9 +76,14 @@ coverage evidence.
       workspace.
 - [x] Add detailed read interactions for preflight, publication attempts,
       observed metrics, retrospectives and automatically promoted evidence.
+- [x] Add one owner-wide browser collection tool for today's eight-platform
+      views with explicit observed, partial, unavailable and missing coverage;
+      verify its local persistence and aggregation path without account-bound
+      conversation scope.
 - [ ] Run the full portfolio question acceptance case: “今天全平台浏览量多少？”
-      The answer must report totals plus missing, partial and unavailable
-      coverage instead of saying “不知道” or treating missing data as zero.
+      against real logged-in accounts. The answer must report totals plus
+      missing, partial and unavailable coverage instead of saying “不知道” or
+      treating missing data as zero.
 
 ### P1 — finish video as a workflow, not only model calls
 
@@ -90,6 +96,9 @@ coverage evidence.
       the production line in the Personal-IP cockpit.
 - [x] Bind Seedance, Seedream and speech scripts plus MediaKit/FFmpeg execution
       to one verified receipt contract and native ingestion tool.
+- [x] Run the free local script-to-delivery acceptance twice, proving resumable
+      generation failure/retry, source-built MediaKit finishing, delivery QA,
+      idempotent receipts and identical final hashes without paid calls.
 - [ ] Exercise real paid Seedance, Seedream, speech and cloud MediaKit calls and
       preserve their returned identifiers and artifacts in the production.
 - [ ] Complete one real Seedance-to-MediaKit/FFmpeg acceptance production.
@@ -100,8 +109,14 @@ coverage evidence.
       and runtime state, and smoke-test extraction plus default-agent install.
 - [x] Add first-run diagnostics for model keys, optional paid MediaKit,
       project-local media tools, Chromium profiles and platform availability.
-- [ ] Run the full dependency installation and launch on a genuinely clean
-      customer machine or disposable VM.
+- [x] Install the source archive in a credential-free clean room with isolated
+      HOME/caches; verify dependencies, default agent, migrations, doctor and
+      the frontend production build.
+- [x] Add an ordinary-customer onboarding view with eight fixed entries,
+      five explicit connection states, manual login, automatic success close,
+      recovery actions and a responsive landscape browser surface.
+- [ ] Launch the complete stack on a genuinely clean customer machine or
+      disposable VM with a configured model.
 - [ ] Complete an eight-platform login/restore/collect/publish acceptance matrix.
 
 ## Counting rules
