@@ -1,0 +1,15 @@
+{
+  "components": [
+    "packages/ui-tars/sdk",
+    "packages/ui-tars/action-parser",
+    "packages/ui-tars/shared",
+    "packages/ui-tars/operators/nut-js"
+  ],
+  "license": "Apache-2.0",
+  "package_version": "1.2.3",
+  "source_file_count": 58,
+  "source_mode": "selected-upstream-source-no-prebuilt-binaries",
+  "source_tree_sha256": "ee927e93800fadb88479dd196cc86cba871f4afbe91166949437ad133a29bbbf",
+  "upstream": "bytedance/UI-TARS-desktop",
+  "upstream_commit": "c2ad42e3eb9b27830db41a3e6f51ca7179d9b168"
+}

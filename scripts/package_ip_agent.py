@@ -42,10 +42,17 @@ REQUIRED_PACKAGE_PATHS = (
     "scripts/mediakit_source.py",
     "scripts/package_ip_agent.py",
     "scripts/personal_ip_video_e2e.py",
+    "scripts/ui_tars_operator.py",
+    "backend/packages/harness/deerflow/community/ui_tars/source.py",
     "backend/packages/harness/deerflow/personal_ip/video_acceptance.py",
     "skills/public/volcengine-stack/SKILL.md",
     "skills/public/volcengine-stack/scripts/run_media_executor.py",
     "third_party/bytedance/HLLM/VENDORED_VERSION.json",
+    "third_party/bytedance/UI-TARS-desktop/VENDORED_VERSION.json",
+    "third_party/bytedance/UI-TARS-desktop/LICENSE",
+    "third_party/bytedance/UI-TARS-desktop/packages/ui-tars/sdk/src/GUIAgent.ts",
+    "third_party/bytedance/UI-TARS-desktop/packages/ui-tars/action-parser/src/actionParser.ts",
+    "third_party/bytedance/UI-TARS-desktop/packages/ui-tars/operators/nut-js/src/index.ts",
     "third_party/volcengine/mediakit-cli/go.mod",
 )
 FORBIDDEN_PARTS = {
@@ -147,6 +154,7 @@ def _manifest(
         "install": ["make config", "make ip-init", "make install", "make doctor"],
         "clean_install_acceptance": ["python3 scripts/clean_install_ip_agent.py"],
         "optional_media_install": ["make volcengine-install", "make volcengine-doctor"],
+        "optional_ui_tars_install": ["make ui-tars-install", "make ui-tars-doctor"],
     }
 
 
@@ -319,6 +327,7 @@ def smoke_test_source_package(archive_path: Path) -> None:
                 "-q",
                 str(root / "scripts"),
                 str(root / "backend" / "packages" / "harness" / "deerflow" / "personal_ip"),
+                str(root / "backend" / "packages" / "harness" / "deerflow" / "community" / "ui_tars"),
                 str(root / "skills" / "public" / "volcengine-stack" / "scripts"),
             ],
             cwd=root,

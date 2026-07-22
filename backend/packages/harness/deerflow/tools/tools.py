@@ -37,6 +37,7 @@ from deerflow.tools.builtins import (
     present_file_tool,
     review_skill_package,
     task_tool,
+    ui_tars_desktop_step_tool,
     view_image_tool,
 )
 from deerflow.tools.mcp_metadata import tag_mcp_tool
@@ -153,6 +154,11 @@ def get_available_tools(
         from deerflow.tools.skill_manage_tool import skill_manage_tool
 
         builtin_tools.append(skill_manage_tool)
+
+    # UI-TARS is an optional local organ. Keep it absent from the model schema
+    # unless explicitly enabled; DeerFlow and Browser Control remain primary.
+    if getattr(getattr(config, "ui_tars", None), "enabled", False):
+        builtin_tools.append(ui_tars_desktop_step_tool)
 
     # Add subagent tools only if enabled via runtime parameter
     if subagent_enabled:

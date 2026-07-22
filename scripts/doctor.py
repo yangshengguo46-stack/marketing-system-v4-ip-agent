@@ -18,6 +18,7 @@ import sys
 from importlib import import_module
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -52,6 +53,8 @@ IP_AGENT_REQUIRED_SOURCE_PATHS = (
     "skills/public/byted-mediakit-audio/SKILL.md",
     "scripts/package_ip_agent.py",
     "scripts/personal_ip_video_e2e.py",
+    "scripts/ui_tars_operator.py",
+    "backend/packages/harness/deerflow/community/ui_tars/source.py",
     "backend/packages/harness/deerflow/personal_ip/video_acceptance.py",
     "third_party/volcengine/mediakit-cli/go.mod",
     "third_party/volcengine/mediakit-cli/cmd/mediakit/main.go",
@@ -59,6 +62,11 @@ IP_AGENT_REQUIRED_SOURCE_PATHS = (
     "third_party/bytedance/HLLM/VENDORED_VERSION.json",
     "third_party/bytedance/HLLM/HLLM_CREATOR_README.md",
     "third_party/bytedance/HLLM/LICENSE",
+    "third_party/bytedance/UI-TARS-desktop/VENDORED_VERSION.json",
+    "third_party/bytedance/UI-TARS-desktop/LICENSE",
+    "third_party/bytedance/UI-TARS-desktop/packages/ui-tars/sdk/src/GUIAgent.ts",
+    "third_party/bytedance/UI-TARS-desktop/packages/ui-tars/action-parser/src/actionParser.ts",
+    "third_party/bytedance/UI-TARS-desktop/packages/ui-tars/operators/nut-js/src/index.ts",
 )
 
 
@@ -891,6 +899,126 @@ def check_chromium_runtime() -> CheckResult:
     )
 
 
+def check_ui_tars(project_root: Path, config_path: Path) -> list[CheckResult]:
+    """Verify the default-off UI-TARS source, config, permissions and health."""
+    from deerflow.community.ui_tars.permissions import diagnose_desktop_permissions
+    from deerflow.community.ui_tars.source import verify_vendored_ui_tars
+
+    results: list[CheckResult] = []
+    try:
+        manifest = verify_vendored_ui_tars(project_root / "third_party" / "bytedance" / "UI-TARS-desktop")
+        results.append(
+            CheckResult(
+                "UI-TARS pinned source",
+                "ok",
+                f"{manifest['upstream_commit'][:12]}; Apache-2.0; no precompiled operator binary",
+            )
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        results.append(
+            CheckResult(
+                "UI-TARS pinned source",
+                "fail",
+                str(exc),
+                fix="Restore third_party/bytedance/UI-TARS-desktop from the fixed source package",
+            )
+        )
+
+    if not config_path.is_file():
+        results.append(CheckResult("UI-TARS optional organ", "skip", "config.yaml missing"))
+        return results
+    try:
+        config = _load_yaml_file(config_path).get("ui_tars") or {}
+        if not isinstance(config, dict):
+            raise ValueError("ui_tars must be a mapping")
+    except Exception as exc:
+        results.append(CheckResult("UI-TARS optional organ", "fail", str(exc)))
+        return results
+    if config.get("enabled") is not True:
+        results.append(
+            CheckResult(
+                "UI-TARS optional organ",
+                "skip",
+                "disabled by default; Browser Control remains primary",
+                fix="Set ui_tars.enabled only after configuring a local model and desktop permissions",
+            )
+        )
+        return results
+
+    model = str(config.get("model") or "").strip()
+    api_base = str(config.get("api_base") or "").strip()
+    key_env = str(config.get("api_key_env") or "UI_TARS_API_KEY").strip()
+    missing = [name for name, value in (("model", model), ("api_base", api_base)) if not value]
+    model_host = urlsplit(api_base).hostname
+    model_is_loopback = model_host in {"127.0.0.1", "localhost", "::1"}
+    key_is_required = bool(api_base) and not model_is_loopback
+    key_is_configured = bool(os.environ.get(key_env))
+    if missing or (key_is_required and not key_is_configured):
+        detail = "missing " + ", ".join([*missing, *([key_env] if key_is_required and not key_is_configured else [])])
+        results.append(
+            CheckResult(
+                "UI-TARS model configuration",
+                "fail",
+                detail,
+                fix=f"Set ui_tars.model/api_base and export {key_env} for a remote model; the key value is never logged",
+            )
+        )
+    else:
+        authentication = f"{key_env} set" if key_is_configured else "loopback model; key optional"
+        results.append(CheckResult("UI-TARS model configuration", "ok", f"model={model}; {authentication}"))
+
+    state_dir = _ip_agent_state_dir(project_root) / "ui-tars"
+    token_is_configured = len(os.environ.get("UI_TARS_OPERATOR_TOKEN", "").strip()) >= 32
+    if not token_is_configured:
+        try:
+            token_is_configured = len((state_dir / "operator.token").read_text(encoding="utf-8").strip()) >= 32
+        except OSError:
+            token_is_configured = False
+    if token_is_configured:
+        results.append(CheckResult("UI-TARS operator authentication", "ok", "local token configured"))
+    else:
+        results.append(
+            CheckResult(
+                "UI-TARS operator authentication",
+                "warn",
+                "local token missing",
+                fix="Managed mode: run make ui-tars-start. Connect mode: export UI_TARS_OPERATOR_TOKEN in the Gateway environment",
+            )
+        )
+
+    permissions = diagnose_desktop_permissions()
+    permission_states = (permissions["screen_recording"], permissions["accessibility"])
+    if permissions["supported"] and all(state == "granted" for state in permission_states):
+        results.append(CheckResult("UI-TARS desktop permissions", "ok", "Screen Recording and Accessibility granted"))
+    else:
+        results.append(
+            CheckResult(
+                "UI-TARS desktop permissions",
+                "warn",
+                f"screen={permission_states[0]}; accessibility={permission_states[1]}; {permissions['detail']}",
+                fix="Grant the two permissions to the Python executable used by make ui-tars-start, then restart the operator",
+            )
+        )
+
+    try:
+        from deerflow.community.ui_tars.client import UITarsOperatorClient
+
+        endpoint = str(config.get("endpoint") or "http://127.0.0.1:9137")
+        client = UITarsOperatorClient(endpoint, timeout_seconds=2.0, state_dir=state_dir)
+        health = client._request("/health", payload=None, authenticated=False)  # noqa: SLF001 - doctor probe
+        results.append(CheckResult("UI-TARS local operator", "ok", f"connected; status={health.get('status', 'unknown')}"))
+    except Exception:
+        results.append(
+            CheckResult(
+                "UI-TARS local operator",
+                "warn",
+                "not connected",
+                fix="Run 'make ui-tars-install && make ui-tars-start', then rerun 'make ui-tars-doctor'",
+            )
+        )
+    return results
+
+
 def _ip_agent_state_dir(project_root: Path) -> Path:
     configured = os.environ.get("DEER_FLOW_HOME")
     return Path(configured).expanduser().resolve() if configured else project_root / ".deer-flow"
@@ -993,6 +1121,7 @@ def main() -> int:
         *check_volcengine_product_credentials(),
         *check_local_media_toolchain(project_root),
         check_chromium_runtime(),
+        *check_ui_tars(project_root, config_path),
         *check_ip_agent_local_state(project_root),
     ]
     sections.append(("IP Agent Product", ip_agent_checks))

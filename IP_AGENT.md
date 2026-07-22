@@ -17,9 +17,12 @@ ByteDance/Volcengine stack as its default capability layer.
 - A default `ip-agent` with portfolio-wide coordination, approval and receipt
   rules.
 
-UI-TARS and MineContext remain optional local connectors. AgentKit is not used
-as the runtime because it duplicates DeerFlow in the cloud. Data Agent is not
-part of the distribution.
+UI-TARS is a default-off, source-auditable local computer organ. DeerFlow calls
+it for one visual desktop step only after native Browser Control cannot finish
+the work or a native desktop application is genuinely required; Agent TARS is
+not included. MineContext remains an optional local connector. AgentKit is not
+used as the runtime because it duplicates DeerFlow in the cloud. Data Agent is
+not part of the distribution.
 
 ## First run
 
@@ -56,6 +59,36 @@ FFmpeg GitHub repository archive, avoiding a hard dependency on ffmpeg.org.
 Both binary directories are added to the service PATH automatically. Cloud
 MediaKit uses its own `MEDIAKIT_API_KEY`; without that key, trim, concat,
 subtitle, mix and probe continue to run locally.
+
+## Optional UI-TARS desktop fallback
+
+Browser Control remains the first choice for every web platform. UI-TARS is
+for DOM-inaccessible visual controls and native desktop windows only. Its
+selected upstream SDK/operator source is fixed under
+`third_party/bytedance/UI-TARS-desktop`; the Agent TARS task loop and upstream
+precompiled libnut packages are not installed.
+
+Configure `ui_tars` in `config.yaml`; for a remote model endpoint, export the
+environment variable named by `api_key_env`, then run:
+
+```bash
+make ui-tars-install
+make ui-tars-doctor
+make ui-tars-start
+```
+
+On macOS, grant Screen Recording and Accessibility to the Python executable
+used to launch the operator, then restart it. The native tool
+`ui_tars_desktop_step` requires a Browser Control failure category or
+`native_desktop_required`; web fallbacks additionally require a completed
+Browser Control call in the current run. It executes at most one action and returns an
+append-only receipt. Whole-screen images are pixelated locally before any
+model request; only the privacy-transformed screenshot, its digest and a
+relative evidence reference are stored. Cookies, tokens, passwords, browser
+profile paths and raw screen text are forbidden. Publishing, sending, deletion,
+settings changes and payment still require a matching structured DeerFlow
+`risk_confirmation` response. Account ids select one operation target and do
+not narrow portfolio authority.
 
 ## Video delivery acceptance
 

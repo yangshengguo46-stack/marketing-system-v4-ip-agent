@@ -35,6 +35,7 @@ from .review_skill_package_tool import review_skill_package
 from .setup_agent_tool import setup_agent
 from .task_tool import task_tool
 from .update_agent_tool import update_agent
+from .ui_tars_tools import ui_tars_desktop_step_tool
 from .view_image_tool import view_image_tool
 
 __all__ = [
@@ -72,4 +73,5 @@ __all__ = [
     "ask_clarification_tool",
     "view_image_tool",
     "task_tool",
+    "ui_tars_desktop_step_tool",
 ]

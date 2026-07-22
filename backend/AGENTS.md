@@ -470,6 +470,19 @@ Scheduled-task runtime note:
 - `aio_sandbox/` - Docker-based isolation (`AioSandboxProvider`)
 - `browser_automation/` - Agentic browser control (stateful `navigate → observe → click/type` loop) via Playwright, distinct from the read-only `web_fetch`/`web_capture` tools. Tools: `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_get_text`, `browser_back`, `browser_screenshot`, `browser_close` (config `group: browser`). A process-local `BrowserSessionManager` owns one private, loop-affine Playwright event-loop thread (same pattern as the BoxLite provider) so a per-thread browser session survives across turns regardless of the caller's loop (Gateway / TUI / test). Each action returns a fresh page snapshot whose interactive elements are addressed by a stable numeric `[ref]` index (stamped as `data-df-ref` during snapshot), so the model acts on what it just observed instead of holding stale handles or guessing selectors. URLs are SSRF-screened via the shared `validate_public_http_url` (opt-out `allow_private_addresses` only for intentional internal targets). CDP attachment cannot install the request guard on an existing Chrome context, so `cdp_url` fails closed unless the operator explicitly sets `allow_unguarded_cdp: true` for a trusted local browser. Browser REST/Live access requires either an exact non-NULL thread owner or an exact owner-scoped active Personal-IP account; account Live sessions derive the profile only after ownership validation. Session admission is a hard `max_sessions` cap: pinned Live/operation sessions are never evicted, and a new thread is rejected when no unpinned session can be closed; one Live viewer owns a session at a time. Optional dependency: `cd backend && uv sync --extra browser && uv run playwright install chromium`; `scripts/detect_uv_extras.py` preserves the extra when `config.yaml` enables `browser_navigate`, and Gateway startup fails fast if configured browser control cannot import Playwright. Tests: `tests/test_browser_automation.py` (mocked tools + a real-Chromium integration test guarded by `importorskip`); `tests/manual_browser_live_check.py` is a manual DeepSeek-driven end-to-end check (not collected by pytest).
   Live UI input dispatch is kept independent from JPEG capture: non-move actions start a rate-limited background refresh loop, so pointer, wheel, or keyboard input stays responsive while continuous gestures still produce frames throughout the interaction.
+- `ui_tars/` - Default-off local desktop visual fallback. It never embeds Agent
+  TARS or a second task loop: `ui_tars_desktop_step` is appended to built-ins
+  only when `ui_tars.enabled`, and each call performs at most one model/action
+  step. Browser Control stays first for web work; web fallbacks require a
+  completed Browser Control call in current run state. The tool requires a browser
+  failure/native-desktop reason, owner-validates an optional Personal-IP account
+  without narrowing session authority, and checks the matching structured
+  `risk_confirmation` message for high-impact work. Raw screenshots are
+  ephemeral; a whole-screen pixelated copy is the only image allowed to the
+  model/evidence store. Receipts omit credentials/profile paths and record
+  intent, target, task/model, result, evidence and failure category. The
+  managed macOS backend uses system commands rather than the upstream
+  precompiled libnut dependency. Lifecycle: `make ui-tars-install|start|stop|status|doctor`.
 
 Additional providers also live here (`boxlite`, `brave`, `browserless`, `crawl4ai`, `ddg_search`, `e2b_sandbox`, `exa`, `fastcrw`, `groundroute`, `infoquest`, `searxng`, `serper`); see each subpackage for specifics.
 

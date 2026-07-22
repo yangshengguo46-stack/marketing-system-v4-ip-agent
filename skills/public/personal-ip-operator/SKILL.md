@@ -87,6 +87,14 @@ facts through a Tool/MCP; do not recreate that model in prompts.
    CAPTCHA, MFA and identity prompts; never request those secrets in chat. A
    successful manual login closes its portfolio dialog automatically, while
    the persistent account profile remains available to later agent collection.
+   Browser Control is always first for web work. Use
+   `ui_tars_desktop_step` only with `browser_dom_unavailable`,
+   `browser_action_failed` or `native_desktop_required`; it performs one
+   privacy-bounded visual step and returns an audit receipt. The first two
+   reasons require a completed Browser Control call in current run state. Never send raw
+   screen text, Cookie/Token/password values or browser profile paths to it.
+   Publication, send, deletion, settings and payment intents need a matching
+   structured `risk_confirmation` request id.
 6. For browser-first publication, call `personal_ip_prepare_browser_publish`
    with the selected account and exact preflight `variant_id` before clicking
    submit. It selects the persistent profile, freezes the request and writes

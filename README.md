@@ -894,6 +894,30 @@ uv run playwright install chromium
 
 Then uncomment the `group: browser` tool entries in `config.yaml` (`browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_get_text`, `browser_back`, `browser_screenshot`, `browser_close`). `make dev` / Docker startup detects an enabled `browser_navigate` tool and preserves the `browser` extra on dependency syncs. The Gateway fails startup if browser control is configured but Playwright is missing, and `/api/features` hides the Browser UI unless the backend can actually serve it. Keep `headless: true` and `allow_private_addresses: false` for anything but local, trusted debugging. Attaching to an existing Chrome with `cdp_url` cannot enforce DeerFlow's subresource/redirect SSRF guard and therefore fails closed unless `allow_unguarded_cdp: true` explicitly acknowledges that risk; use it only with a trusted local browser. Browser sessions are process-local; keep `GATEWAY_WORKERS=1` while this tool group is enabled because ordinary uvicorn worker dispatch does not provide thread affinity.
 
+### Optional UI-TARS Desktop Fallback
+
+DeerFlow can expose a default-off `ui_tars_desktop_step` tool for native desktop
+windows or visual controls that Browser Control cannot operate. DeerFlow remains
+the only planner: the local organ takes one intent, makes one privacy-bounded
+UI-TARS model request and executes at most one allowlisted action. It never
+starts Agent TARS.
+
+The source package includes the Apache-2.0 UI-TARS SDK, action parser, shared
+contracts and NutJS operator source at fixed commit `c2ad42e3eb9b`. The
+upstream precompiled libnut dependencies are not installed; the managed macOS
+backend uses operating-system desktop APIs. Enable/configure `ui_tars` in
+`config.yaml`, set `UI_TARS_API_KEY` (or the configured environment-variable
+name) for a remote model endpoint, and run `make ui-tars-install`, `make ui-tars-doctor`, then
+`make ui-tars-start`.
+
+Screenshots are pixelated on-device before model access and never returned to
+the DeerFlow model. Receipts contain the sanitized intent, application/window,
+task/model ids, result, failure category and privacy-safe screenshot evidence.
+Credential values, browser profile paths and raw screen text are rejected or
+omitted. High-impact publication, send, delete, setting-change and payment
+steps require DeerFlow's structured risk confirmation. Web fallbacks also
+require an observed Browser Control call in the current run.
+
 ### Context Engineering
 
 **Isolated Sub-Agent Context**: Each sub-agent runs in its own isolated context. This means that the sub-agent will not be able to see the context of the main agent or other sub-agents. This is important to ensure that the sub-agent is able to focus on the task at hand and not be distracted by the context of the main agent or other sub-agents.
