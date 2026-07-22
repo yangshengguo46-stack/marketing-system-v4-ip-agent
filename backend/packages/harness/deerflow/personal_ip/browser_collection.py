@@ -6,6 +6,8 @@ import asyncio
 import contextlib
 import hashlib
 import re
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -26,10 +28,86 @@ _BROWSER_DATASETS = {
     "platform_receipts",
     "traffic_sources",
 }
-_COMPACT_COUNT = r"(?:-|[0-9][0-9,.]*(?:万|亿)?)"
+_COMPACT_COUNT = r"(?:-|[0-9][0-9,.]*(?:万|亿|[KkMmBb])?)"
 _CONTENT_DURATION = re.compile(r"(?<!日 )(?<!\d)(?P<minutes>\d{2}):(?P<seconds>\d{2})\s+")
 _CONTENT_PUBLISHED_AT = re.compile(r"(?P<year>\d{4})年(?P<month>\d{2})月(?P<day>\d{2})日\s+(?P<hour>\d{2}):(?P<minute>\d{2})")
 _CONTENT_METRICS = re.compile(rf"播放\s+(?P<views>{_COMPACT_COUNT})\s+点赞\s+(?P<likes>{_COMPACT_COUNT})\s+评论\s+(?P<comments>{_COMPACT_COUNT})\s+分享\s+(?P<shares>{_COMPACT_COUNT})")
+
+
+@dataclass(frozen=True, slots=True)
+class BrowserDashboardMetricAdapter:
+    """Rendered-label adapter; it never reads browser storage or network data."""
+
+    metric_labels: dict[str, tuple[str, ...]]
+
+
+_COMMON_SOCIAL_METRICS = {
+    "comments": ("评论", "Comments"),
+    "likes": ("点赞", "Likes"),
+    "profile_visits": ("主页访问量", "主页访问", "Profile visits", "Profile views"),
+    "shares": ("分享", "Shares"),
+}
+
+_BROWSER_DASHBOARD_METRIC_ADAPTERS: dict[str, BrowserDashboardMetricAdapter] = {
+    "douyin": BrowserDashboardMetricAdapter(
+        {
+            **_COMMON_SOCIAL_METRICS,
+            "views": ("播放量", "视频播放量", "作品播放量"),
+        }
+    ),
+    "wechat_channels": BrowserDashboardMetricAdapter(
+        {
+            **_COMMON_SOCIAL_METRICS,
+            "views": ("播放量", "视频播放次数", "视频播放量", "播放次数"),
+        }
+    ),
+    "wechat_official": BrowserDashboardMetricAdapter(
+        {
+            **_COMMON_SOCIAL_METRICS,
+            "unique_viewers": ("图文阅读人数", "阅读人数"),
+            "views": ("阅读次数", "阅读量", "图文阅读次数"),
+        }
+    ),
+    "xiaohongshu": BrowserDashboardMetricAdapter(
+        {
+            **_COMMON_SOCIAL_METRICS,
+            "impressions": ("曝光量",),
+            "views": ("观看量", "浏览量", "笔记浏览量"),
+        }
+    ),
+    "x": BrowserDashboardMetricAdapter(
+        {
+            **_COMMON_SOCIAL_METRICS,
+            "impressions": ("Impressions",),
+            "views": ("Post views", "Video views", "Views"),
+        }
+    ),
+    "instagram": BrowserDashboardMetricAdapter(
+        {
+            **_COMMON_SOCIAL_METRICS,
+            "impressions": ("Impressions",),
+            "views": ("Content views", "Video views", "Views"),
+        }
+    ),
+    "youtube": BrowserDashboardMetricAdapter(
+        {
+            **_COMMON_SOCIAL_METRICS,
+            "watch_time_seconds": ("Watch time (seconds)",),
+            "views": ("Video views", "Views"),
+        }
+    ),
+    "tiktok": BrowserDashboardMetricAdapter(
+        {
+            **_COMMON_SOCIAL_METRICS,
+            "views": ("Post views", "Video views", "Views"),
+        }
+    ),
+}
+
+_TODAY_WINDOW = re.compile(r"(?:今日|今天|本日|\bToday\b)", re.IGNORECASE)
+_YESTERDAY_WINDOW = re.compile(r"(?:昨日|昨天|\bYesterday\b)", re.IGNORECASE)
+_LAST_7_DAYS_WINDOW = re.compile(r"(?:近\s*7\s*日|过去\s*7\s*天|\bLast\s+7\s+days\b|\b7\s+days\b)", re.IGNORECASE)
+_LAST_28_DAYS_WINDOW = re.compile(r"(?:近\s*28\s*日|过去\s*28\s*天|\bLast\s+28\s+days\b|\b28\s+days\b)", re.IGNORECASE)
 
 
 class BrowserPlatformCollectionError(ValueError):
@@ -127,9 +205,11 @@ def _target_url(value: str, *, platform: str) -> str:
         raise BrowserPlatformCollectionError(f"target_url must be a safe {label} creator URL") from exc
     if parsed.query or parsed.fragment:
         raise BrowserPlatformCollectionError("target_url must not contain a query or fragment")
-    if parsed.scheme != "https" or (parsed.hostname or "").lower() != expected_host or parsed.username or parsed.password:
+    target_host = (parsed.hostname or "").lower()
+    allowed_hosts = {expected_host, *config.creator_hosts}
+    if parsed.scheme != "https" or target_host not in allowed_hosts or parsed.username or parsed.password:
         raise BrowserPlatformCollectionError(f"target_url must be a safe {label} creator URL")
-    return urlunsplit(("https", expected_host, parsed.path or "/", "", ""))
+    return urlunsplit(("https", target_host, parsed.path or "/", "", ""))
 
 
 def _clean_text(value: Any, *, limit: int) -> str:
@@ -147,6 +227,15 @@ def _compact_count(value: str | None) -> int | float | None:
         text = text[:-1]
     elif text.endswith("亿"):
         multiplier = 100_000_000
+        text = text[:-1]
+    elif text[-1:].lower() == "k":
+        multiplier = 1_000
+        text = text[:-1]
+    elif text[-1:].lower() == "m":
+        multiplier = 1_000_000
+        text = text[:-1]
+    elif text[-1:].lower() == "b":
+        multiplier = 1_000_000_000
         text = text[:-1]
     try:
         result = float(text) * multiplier
@@ -241,6 +330,79 @@ def parse_douyin_dashboard_summary(visible_text: str) -> dict[str, Any]:
         if value is not None:
             result[key] = value
     return result
+
+
+def _labeled_count(text: str, labels: tuple[str, ...]) -> tuple[int | float | None, str | None]:
+    for label in sorted(labels, key=len, reverse=True):
+        escaped = re.escape(label)
+        if label.casefold() == "views":
+            escaped = r"(?<!Profile )\bViews\b"
+        elif label == "浏览量":
+            escaped = r"(?<!主页)浏览量"
+        patterns = (
+            rf"{escaped}\s*(?:[:：]|为)?\s*(?P<value>{_COMPACT_COUNT})",
+            rf"(?P<value>{_COMPACT_COUNT})\s*(?:次|个)?\s*{escaped}",
+        )
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match is None:
+                continue
+            value = _compact_count(match.group("value"))
+            if value is not None:
+                return value, label
+    return None, None
+
+
+def _displayed_metric_window(text: str) -> dict[str, str]:
+    douyin_window = parse_douyin_dashboard_summary(text)
+    if douyin_window.get("window_started_on") and douyin_window.get("window_ended_on"):
+        return {
+            "kind": "date_range",
+            "label": str(douyin_window.get("window_label") or "explicit_date_range"),
+            "started_on": str(douyin_window["window_started_on"]),
+            "ended_on": str(douyin_window["window_ended_on"]),
+        }
+    matches: list[tuple[str, re.Match[str]]] = []
+    for kind, pattern in (
+        ("today", _TODAY_WINDOW),
+        ("yesterday", _YESTERDAY_WINDOW),
+        ("last_7_days", _LAST_7_DAYS_WINDOW),
+        ("last_28_days", _LAST_28_DAYS_WINDOW),
+    ):
+        match = pattern.search(text)
+        if match is not None:
+            matches.append((kind, match))
+    if len(matches) == 1:
+        kind, match = matches[0]
+        return {"kind": kind, "label": match.group(0)}
+    if matches:
+        return {"kind": "ambiguous", "label": ",".join(kind for kind, _match in matches)}
+    return {"kind": "unknown", "label": "not_displayed"}
+
+
+def parse_browser_dashboard_metrics(platform: str, visible_text: str) -> dict[str, Any]:
+    """Normalize direct rendered dashboard counts for all browser-first platforms.
+
+    A parsed count remains evidence, not proof of account-window completeness.
+    Portfolio aggregation promotes it only when the page explicitly displays
+    the requested ``today`` window.
+    """
+    adapter = _BROWSER_DASHBOARD_METRIC_ADAPTERS.get(str(platform or "").strip())
+    if adapter is None:
+        return {"metrics": {}, "metric_labels": {}, "window": {"kind": "unknown", "label": "unsupported_platform"}}
+    text = _clean_text(visible_text, limit=60_000)
+    metrics: dict[str, int | float] = {}
+    matched_labels: dict[str, str] = {}
+    for metric, labels in adapter.metric_labels.items():
+        value, label = _labeled_count(text, labels)
+        if value is not None and label is not None:
+            metrics[metric] = value
+            matched_labels[metric] = label
+    return {
+        "metrics": dict(sorted(metrics.items())),
+        "metric_labels": dict(sorted(matched_labels.items())),
+        "window": _displayed_metric_window(text),
+    }
 
 
 def _text_list(value: Any, *, item_limit: int, count_limit: int) -> list[str]:
@@ -438,11 +600,21 @@ class BrowserPlatformCollectionService:
         }
         pagination_state = "single_loaded_page"
         platform_adapter = "generic_rendered_dom"
-        if platform == "douyin" and dataset_key == "dashboard":
-            direct_metrics = parse_douyin_dashboard_summary(visible_text)
-            record["direct_metrics"] = direct_metrics
-            summary.update(direct_metrics)
-            platform_adapter = "douyin_dashboard_v1"
+        if dataset_key == "dashboard":
+            parsed_dashboard = parse_browser_dashboard_metrics(platform, visible_text)
+            record["direct_metrics"] = parsed_dashboard["metrics"]
+            record["metric_labels"] = parsed_dashboard["metric_labels"]
+            record["metric_window"] = parsed_dashboard["window"]
+            summary.update(
+                {
+                    "direct_metrics": parsed_dashboard["metrics"],
+                    "metric_labels": parsed_dashboard["metric_labels"],
+                    "metric_window": parsed_dashboard["window"],
+                }
+            )
+            if platform == "douyin":
+                summary.update(parse_douyin_dashboard_summary(visible_text))
+            platform_adapter = f"{platform}_dashboard_rendered_labels_v1"
         elif platform == "douyin" and dataset_key == "content_inventory":
             parsed_inventory = parse_douyin_content_inventory(visible_text)
             items = parsed_inventory["items"]
@@ -500,6 +672,218 @@ class BrowserPlatformCollectionService:
                 },
             },
         )
+
+
+def _utc_datetime(value: datetime, *, field: str) -> datetime:
+    if not isinstance(value, datetime):
+        raise BrowserPlatformCollectionError(f"{field} must be a datetime")
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def _observation_datetime(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        return _utc_datetime(value, field="observed_at")
+    text = str(value or "").strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise BrowserPlatformCollectionError("Browser observation returned an invalid observed_at") from exc
+    return _utc_datetime(parsed, field="observed_at")
+
+
+def _portfolio_key(prefix: str, *, collection_key: str, account_id: str) -> str:
+    collection = " ".join(str(collection_key or "").split())
+    if not collection or len(collection) > 128:
+        raise BrowserPlatformCollectionError("collection_key must contain 1 to 128 characters")
+    digest = hashlib.sha256(f"{collection}|{account_id}".encode()).hexdigest()
+    return f"{prefix}:{digest}"
+
+
+class BrowserPortfolioMetricCollectionService:
+    """Collect and aggregate today's direct dashboard metrics for every account."""
+
+    def __init__(
+        self,
+        *,
+        accounts,
+        observations,
+        metrics,
+        session_factory: Callable[..., Any] = acquire_account_browser_session,
+        page_collector: BrowserPlatformCollectionService | None = None,
+    ) -> None:
+        self._accounts = accounts
+        self._metrics = metrics
+        self._session_factory = session_factory
+        self._page_collector = page_collector or BrowserPlatformCollectionService(
+            accounts=accounts,
+            observations=observations,
+        )
+
+    async def collect_today(
+        self,
+        *,
+        owner_user_id: str,
+        collection_key: str,
+        window_started_at: datetime,
+        window_ended_at: datetime,
+    ) -> dict[str, Any]:
+        if not isinstance(window_started_at, datetime) or window_started_at.tzinfo is None:
+            raise BrowserPlatformCollectionError("window_started_at must include the local timezone")
+        if any((window_started_at.hour, window_started_at.minute, window_started_at.second, window_started_at.microsecond)):
+            raise BrowserPlatformCollectionError("window_started_at must be local-day midnight")
+        started = _utc_datetime(window_started_at, field="window_started_at")
+        ended = _utc_datetime(window_ended_at, field="window_ended_at")
+        if started >= ended or (ended - started).total_seconds() > 26 * 60 * 60:
+            raise BrowserPlatformCollectionError("today window must be a positive interval no longer than 26 hours")
+        accounts = await self._accounts.list(owner_user_id, include_archived=False)
+        results: list[dict[str, Any]] = []
+        failures: list[dict[str, str]] = []
+        unsupported_account_ids: list[str] = []
+        aggregate_ended_at = ended
+
+        for account in accounts:
+            account_id = str(account.get("id") or "").strip()
+            platform = str(account.get("platform") or "").strip()
+            config = BROWSER_PLATFORMS.get(platform)
+            if not account_id or config is None:
+                if account_id:
+                    unsupported_account_ids.append(account_id)
+                continue
+            observation_key = _portfolio_key(
+                "browser-portfolio-observation",
+                collection_key=collection_key,
+                account_id=account_id,
+            )
+            metric_key = _portfolio_key(
+                "browser-portfolio-metric",
+                collection_key=collection_key,
+                account_id=account_id,
+            )
+            try:
+                with self._session_factory(owner_user_id=owner_user_id, account=account) as session:
+                    observation = await self._page_collector.collect_creator_page(
+                        owner_user_id=owner_user_id,
+                        account_id=account_id,
+                        observation_key=observation_key,
+                        dataset="dashboard",
+                        target_url=config.dashboard_url,
+                        session=session,
+                    )
+                summary = observation.get("summary") if isinstance(observation.get("summary"), dict) else {}
+                direct_metrics = summary.get("direct_metrics") if isinstance(summary.get("direct_metrics"), dict) else {}
+                metric_window = summary.get("metric_window") if isinstance(summary.get("metric_window"), dict) else {}
+                page_status = str(observation.get("status") or "unavailable")
+                reason: str | None = None
+                if page_status == "unavailable":
+                    metric_status = "unavailable"
+                    metrics: dict[str, int | float] = {}
+                    observation_coverage = observation.get("coverage") if isinstance(observation.get("coverage"), dict) else {}
+                    reason = str(observation_coverage.get("reason") or "browser_page_unavailable")
+                elif metric_window.get("kind") != "today":
+                    metric_status = "unavailable"
+                    metrics = {}
+                    reason = "today_window_not_displayed"
+                elif not isinstance(direct_metrics.get("views"), (int, float)) or isinstance(direct_metrics.get("views"), bool):
+                    metric_status = "unavailable"
+                    metrics = {}
+                    reason = "today_views_not_extracted"
+                else:
+                    metric_status = "partial"
+                    metrics = {key: value for key, value in direct_metrics.items() if isinstance(value, (int, float)) and not isinstance(value, bool)}
+                observed_at = _observation_datetime(observation.get("observed_at"))
+                if observed_at <= started or (observed_at - started).total_seconds() > 26 * 60 * 60:
+                    raise BrowserPlatformCollectionError("Browser observation falls outside the requested today interval")
+                aggregate_ended_at = max(aggregate_ended_at, observed_at)
+                coverage = {
+                    "collection": "browser_rendered_dashboard",
+                    "complete_account_window": False,
+                    "displayed_window": metric_window,
+                    "platform_observation_id": observation.get("id"),
+                    "platform_observation_status": page_status,
+                    "requested_window_ended_at": ended.isoformat(),
+                    "requested_window_kind": "today",
+                }
+                if reason is not None:
+                    coverage["reason"] = reason
+                metric = await self._metrics.record(
+                    owner_user_id=owner_user_id,
+                    observation_key=metric_key,
+                    series_key=f"browser-dashboard:{platform}:{account_id}",
+                    account_id=account_id,
+                    receipt_id=None,
+                    scope="account",
+                    metric_mode="window_total",
+                    source="browser",
+                    status=metric_status,
+                    window_started_at=started,
+                    window_ended_at=observed_at,
+                    observed_at=observed_at,
+                    metrics=metrics,
+                    coverage=coverage,
+                )
+                results.append(
+                    {
+                        "account_id": account_id,
+                        "platform": platform,
+                        "status": metric_status,
+                        "reason": reason,
+                        "platform_observation_id": observation.get("id"),
+                        "metric_observation_id": metric.get("id"),
+                    }
+                )
+            except BrowserPlatformCollectionError:
+                failures.append({"account_id": account_id, "platform": platform, "category": "collection_unavailable"})
+            except (RuntimeError, TypeError, ValueError):
+                failures.append({"account_id": account_id, "platform": platform, "category": "invalid_collection_result"})
+            except Exception:
+                failures.append({"account_id": account_id, "platform": platform, "category": "internal"})
+
+        aggregate = await self._metrics.aggregate(
+            owner_user_id=owner_user_id,
+            window_started_at=started,
+            window_ended_at=aggregate_ended_at,
+        )
+        account_statuses = aggregate.get("coverage", {}).get("by_account_status", {})
+        platform_coverage: dict[str, dict[str, Any]] = {}
+        for platform in BROWSER_PLATFORMS:
+            platform_account_ids = sorted(str(account.get("id")) for account in accounts if account.get("platform") == platform and account.get("id"))
+            statuses = {str(account_statuses.get(account_id) or "missing") for account_id in platform_account_ids}
+            if not platform_account_ids:
+                status = "not_configured"
+            elif statuses == {"observed"}:
+                status = "observed"
+            elif statuses == {"unavailable"}:
+                status = "unavailable"
+            elif statuses == {"missing"}:
+                status = "missing"
+            else:
+                status = "partial"
+            platform_coverage[platform] = {
+                "status": status,
+                "active_account_ids": platform_account_ids,
+            }
+
+        coverage = aggregate.get("coverage", {})
+        incomplete = bool(coverage.get("partial_account_ids") or coverage.get("unavailable_account_ids") or coverage.get("missing_account_ids"))
+        return {
+            "status": "partial" if incomplete else ("complete" if accounts else "unavailable"),
+            "collection_key": " ".join(str(collection_key or "").split()),
+            "requested_window_ended_at": ended.isoformat(),
+            "account_count": len(accounts),
+            "collected_count": len(results),
+            "failure_count": len(failures),
+            "results": results,
+            "failures": failures,
+            "coverage": {
+                "unsupported_account_ids": sorted(unsupported_account_ids),
+                "platforms": platform_coverage,
+            },
+            "aggregate": aggregate,
+        }
 
 
 DouyinBrowserCollectionService = BrowserPlatformCollectionService

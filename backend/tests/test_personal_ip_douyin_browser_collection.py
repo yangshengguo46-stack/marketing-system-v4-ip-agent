@@ -10,9 +10,65 @@ from deerflow.personal_ip.browser_collection import (
     BrowserPlatformCollectionService,
     DouyinBrowserCollectionError,
     DouyinBrowserCollectionService,
+    parse_browser_dashboard_metrics,
     parse_douyin_content_inventory,
     parse_douyin_dashboard_summary,
 )
+
+
+@pytest.mark.parametrize(
+    ("platform", "text", "expected"),
+    [
+        ("douyin", "今日 播放量 1.2万 点赞 80", {"views": 12_000, "likes": 80}),
+        ("wechat_channels", "今日 视频播放次数 320 评论 4", {"views": 320, "comments": 4}),
+        ("wechat_official", "今日 阅读次数 2,345 分享 12", {"views": 2_345, "shares": 12}),
+        ("xiaohongshu", "今日 笔记浏览量 4.5万 点赞 600", {"views": 45_000, "likes": 600}),
+        ("x", "Today Views 1.2K Impressions 4.5K", {"views": 1_200, "impressions": 4_500}),
+        ("instagram", "Today Content views 3.4K Profile visits 120", {"views": 3_400, "profile_visits": 120}),
+        ("youtube", "Today Views 8.6K Comments 41", {"views": 8_600, "comments": 41}),
+        ("tiktok", "Today Post views 6.7K Shares 22", {"views": 6_700, "shares": 22}),
+    ],
+)
+def test_browser_dashboard_metric_adapters_cover_all_eight_platforms(platform: str, text: str, expected: dict[str, int]) -> None:
+    parsed = parse_browser_dashboard_metrics(platform, text)
+
+    assert parsed["metrics"] == expected
+    assert parsed["window"]["kind"] == "today"
+
+
+def test_browser_dashboard_metric_adapter_does_not_relabel_longer_window_as_today() -> None:
+    parsed = parse_browser_dashboard_metrics("x", "Analytics 28 days Impressions 12,345 Views 4,321")
+
+    assert parsed["metrics"] == {"impressions": 12_345, "views": 4_321}
+    assert parsed["window"]["kind"] == "last_28_days"
+
+
+def test_browser_dashboard_metric_adapter_does_not_treat_profile_views_as_content_views() -> None:
+    parsed = parse_browser_dashboard_metrics("instagram", "Today Profile views 120")
+
+    assert parsed["metrics"] == {"profile_visits": 120}
+    assert "views" not in parsed["metrics"]
+
+
+@pytest.mark.parametrize(
+    ("platform", "text", "expected"),
+    [
+        ("wechat_official", "今日 图文阅读人数 120", {"unique_viewers": 120}),
+        ("xiaohongshu", "今日 曝光量 4500", {"impressions": 4500}),
+    ],
+)
+def test_browser_dashboard_metric_adapter_does_not_relabel_reach_as_views(platform: str, text: str, expected: dict[str, int]) -> None:
+    parsed = parse_browser_dashboard_metrics(platform, text)
+
+    assert parsed["metrics"] == expected
+    assert "views" not in parsed["metrics"]
+
+
+def test_browser_dashboard_metric_adapter_fails_closed_on_ambiguous_window_controls() -> None:
+    parsed = parse_browser_dashboard_metrics("youtube", "Today Last 7 days Views 900")
+
+    assert parsed["metrics"]["views"] == 900
+    assert parsed["window"]["kind"] == "ambiguous"
 
 
 @pytest.mark.asyncio
@@ -51,7 +107,9 @@ async def test_browser_platform_collection_captures_generic_rendered_business_da
     assert kwargs["status"] == "partial"
     assert kwargs["source_url"] == "https://x.com/home"
     assert kwargs["records"][0]["links"][0]["href"] == "https://x.com/i/account_analytics"
-    assert kwargs["coverage"]["platform_adapter"] == "generic_rendered_dom"
+    assert kwargs["coverage"]["platform_adapter"] == "x_dashboard_rendered_labels_v1"
+    assert kwargs["summary"]["direct_metrics"] == {"impressions": 12_345}
+    assert kwargs["summary"]["metric_window"]["kind"] == "last_28_days"
     session.navigate.assert_not_awaited()
 
 

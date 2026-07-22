@@ -10,11 +10,17 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.gateway.deps import (
     get_current_user_from_request,
+    get_personal_ip_account_repo,
     get_personal_ip_metric_repo,
     get_personal_ip_platform_connection_repo,
+    get_personal_ip_platform_observation_repo,
     get_personal_ip_publish_receipt_repo,
 )
 from app.gateway.douyin_oauth import get_douyin_mini_app_oauth_client
+from deerflow.personal_ip.browser_collection import (
+    BrowserPlatformCollectionError,
+    BrowserPortfolioMetricCollectionService,
+)
 from deerflow.personal_ip.douyin_oauth import DouyinOAuthError
 from deerflow.personal_ip.platform_metrics import (
     DouyinAuthorizedMetricCollectionService,
@@ -56,6 +62,17 @@ class DouyinMetricCollectionRequest(BaseModel):
         return value.strip()
 
 
+class BrowserPortfolioTodayCollectionRequest(BaseModel):
+    collection_key: str = Field(min_length=1, max_length=128)
+    window_started_at: datetime
+    window_ended_at: datetime
+
+    @field_validator("collection_key")
+    @classmethod
+    def strip_browser_collection_key(cls, value: str) -> str:
+        return value.strip()
+
+
 async def _current_user_id(request: Request) -> str:
     user = await get_current_user_from_request(request)
     return str(user.id)
@@ -77,6 +94,32 @@ def _get_authorized_douyin_service(request: Request) -> DouyinAuthorizedMetricCo
         publish_receipts=get_personal_ip_publish_receipt_repo(request),
         oauth_client=get_douyin_mini_app_oauth_client(),
     )
+
+
+def _get_browser_portfolio_service(request: Request) -> BrowserPortfolioMetricCollectionService:
+    return BrowserPortfolioMetricCollectionService(
+        accounts=get_personal_ip_account_repo(request),
+        observations=get_personal_ip_platform_observation_repo(request),
+        metrics=get_personal_ip_metric_repo(request),
+    )
+
+
+@router.post("/collect/browser-portfolio-today", status_code=201)
+async def collect_browser_portfolio_today_metrics(
+    body: BrowserPortfolioTodayCollectionRequest,
+    request: Request,
+) -> dict[str, Any]:
+    try:
+        return await _get_browser_portfolio_service(request).collect_today(
+            owner_user_id=await _current_user_id(request),
+            collection_key=body.collection_key,
+            window_started_at=body.window_started_at,
+            window_ended_at=body.window_ended_at,
+        )
+    except BrowserPlatformCollectionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise _repository_error(exc) from exc
 
 
 @router.post("/collect/douyin", status_code=201)

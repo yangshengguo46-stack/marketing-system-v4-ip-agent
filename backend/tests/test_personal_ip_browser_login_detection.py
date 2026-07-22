@@ -15,6 +15,7 @@ def test_verified_platform_dashboard_urls_are_authenticated():
     assert browser_login_succeeded("x", "https://x.com/home")
     assert browser_login_succeeded("youtube", "https://studio.youtube.com/channel/channel-id")
     assert browser_login_succeeded("tiktok", "https://www.tiktok.com/tiktokstudio/content")
+    assert browser_login_succeeded("x", "https://analytics.x.com/")
 
 
 def test_start_page_is_not_mistaken_for_success_before_a_login_challenge():

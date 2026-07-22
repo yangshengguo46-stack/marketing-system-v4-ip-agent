@@ -78,8 +78,12 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > now seals rendered creator pages from all eight account families into the
 > same immutable evidence contract; unverified platform pages remain explicitly
 > partial, while the real-tested Douyin adapter parses dashboard and complete
-> content-inventory evidence. Native inventory/read tools keep those detailed,
-> credential-free records available to later agent analysis. See
+> content-inventory evidence. A separate owner-wide today collector scans every
+> active browser account, promotes only counts whose rendered page explicitly
+> says 今日/今天/Today into additive window metrics, and returns per-account,
+> per-platform and per-metric missing/partial/unavailable coverage. It never
+> turns a missing `views` field into zero. Native inventory/read tools keep the
+> detailed, credential-free records available to later agent analysis. See
 > [docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md](docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md).
 >
 > The Personal-IP workspace now reads one whole-portfolio operating cockpit:

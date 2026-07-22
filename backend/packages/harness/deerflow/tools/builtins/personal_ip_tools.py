@@ -13,6 +13,7 @@ from deerflow.config.paths import get_paths
 from deerflow.personal_ip.browser_collection import (
     BrowserPlatformCollectionError,
     BrowserPlatformCollectionService,
+    BrowserPortfolioMetricCollectionService,
     DouyinBrowserCollectionError,
     DouyinBrowserCollectionService,
     acquire_account_browser_session,
@@ -60,6 +61,19 @@ def _parse_datetime(value: str, *, field: str) -> datetime:
     return parsed.astimezone(UTC)
 
 
+def _parse_datetime_with_timezone(value: str, *, field: str) -> datetime:
+    text = str(value or "").strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError(f"{field} must be an ISO-8601 datetime with timezone") from exc
+    if parsed.tzinfo is None:
+        raise ValueError(f"{field} must include a timezone")
+    return parsed
+
+
 def _authorized_douyin_service(services: PersonalIPRuntimeServices) -> DouyinAuthorizedMetricCollectionService:
     app_id = os.environ.get("DOUYIN_MINI_APP_ID", "").strip()
     app_secret = os.environ.get("DOUYIN_MINI_APP_SECRET", "").strip()
@@ -88,6 +102,16 @@ def _browser_platform_collection_service(services: PersonalIPRuntimeServices) ->
     return BrowserPlatformCollectionService(
         accounts=services.accounts,
         observations=services.platform_observations,
+    )
+
+
+def _browser_portfolio_metric_service(services: PersonalIPRuntimeServices) -> BrowserPortfolioMetricCollectionService:
+    if services.accounts is None or services.platform_observations is None:
+        raise ValueError("Personal-IP browser portfolio collection is not available")
+    return BrowserPortfolioMetricCollectionService(
+        accounts=services.accounts,
+        observations=services.platform_observations,
+        metrics=services.metrics,
     )
 
 
@@ -379,6 +403,45 @@ async def _personal_ip_metrics_aggregate(
         return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
     except Exception:
         return _json({"status": "error", "category": "internal", "message": "Portfolio metrics are unavailable"})
+
+
+async def _personal_ip_collect_browser_portfolio_today(
+    runtime: Runtime,
+    collection_key: str,
+    window_started_at: str,
+    window_ended_at: str,
+) -> str:
+    """Collect and aggregate today's views across the user's whole browser portfolio.
+
+    This scans every active account for Douyin, WeChat Channels, WeChat Official
+    Accounts, Xiaohongshu, X, Instagram, YouTube and TikTok. It reuses each
+    isolated login profile, seals detailed rendered-page evidence, and writes a
+    window metric only when the page explicitly labels the displayed data as
+    today. Missing, partial and unavailable accounts remain explicit, and the
+    output omits a views total when no supported account supplied one. This tool
+    intentionally has no account filter and never reads cookies or tokens.
+
+    Args:
+        collection_key: Stable idempotency key for this portfolio collection instant.
+        window_started_at: Inclusive ISO-8601 start of today with timezone.
+        window_ended_at: Exclusive ISO-8601 collection cutoff with timezone.
+
+    Returns:
+        JSON per-account collection receipts, eight-platform coverage and the
+        resulting whole-portfolio aggregate.
+    """
+    try:
+        result = await _browser_portfolio_metric_service(get_personal_ip_runtime()).collect_today(
+            owner_user_id=resolve_runtime_user_id(runtime),
+            collection_key=collection_key,
+            window_started_at=_parse_datetime_with_timezone(window_started_at, field="window_started_at"),
+            window_ended_at=_parse_datetime(window_ended_at, field="window_ended_at"),
+        )
+        return _json(result)
+    except (BrowserPlatformCollectionError, RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Browser portfolio collection is unavailable"})
 
 
 async def _personal_ip_sync_douyin_post(
@@ -1011,6 +1074,11 @@ personal_ip_metrics_aggregate_tool = tool(
     "personal_ip_metrics_aggregate",
     parse_docstring=True,
 )(_personal_ip_metrics_aggregate)
+
+personal_ip_collect_browser_portfolio_today_tool = tool(
+    "personal_ip_collect_browser_portfolio_today",
+    parse_docstring=True,
+)(_personal_ip_collect_browser_portfolio_today)
 
 personal_ip_operating_cockpit_tool = tool(
     "personal_ip_operating_cockpit",

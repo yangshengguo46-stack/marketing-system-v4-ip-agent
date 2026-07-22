@@ -97,6 +97,17 @@ async def test_metrics_aggregate_all_accounts_with_explicit_coverage(tmp_path) -
     assert result["excluded_snapshot_count"] == 1
     assert result["coverage"]["partial_account_ids"] == [xhs["id"]]
     assert result["coverage"]["missing_account_ids"] == [missing["id"]]
+    assert result["coverage"]["by_account_status"] == {
+        douyin["id"]: "observed",
+        missing["id"]: "missing",
+        xhs["id"]: "partial",
+    }
+    assert result["coverage"]["by_metric"]["views"] == {
+        "observed_account_ids": [douyin["id"]],
+        "partial_account_ids": [xhs["id"]],
+        "unavailable_account_ids": [],
+        "missing_account_ids": [missing["id"]],
+    }
     assert "completion_rate" not in result["totals"]
     assert (await metrics.aggregate(owner_user_id="user-2", window_started_at=START, window_ended_at=END))["totals"] == {}
     await close_engine()
@@ -147,4 +158,78 @@ async def test_metric_observation_is_idempotent_and_validates_publish_receipt_ac
         await metrics.record(**{**kwargs, "observation_key": "wrong-account", "account_id": other["id"]})
     with pytest.raises(ValueError, match="already records a different observation"):
         await metrics.record(**{**kwargs, "metrics": {"views": 2000}})
+    await close_engine()
+
+
+@pytest.mark.asyncio
+async def test_metric_aggregate_excludes_archived_accounts_and_never_materializes_missing_views_as_zero(tmp_path) -> None:
+    await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
+    sf = get_session_factory()
+    assert sf is not None
+    accounts = PersonalIPAccountRepository(sf)
+    metrics = PersonalIPMetricRepository(sf)
+    active = await accounts.create(owner_user_id="user-1", platform="youtube", display_name="Active")
+    archived = await accounts.create(owner_user_id="user-1", platform="tiktok", display_name="Archived")
+    await metrics.record(
+        owner_user_id="user-1",
+        observation_key="archived:today",
+        account_id=archived["id"],
+        receipt_id=None,
+        scope="account",
+        metric_mode="window_total",
+        source="browser",
+        status="observed",
+        window_started_at=START,
+        window_ended_at=END,
+        observed_at=END,
+        metrics={"views": 999},
+        coverage={},
+    )
+    await accounts.update(archived["id"], owner_user_id="user-1", updates={"status": "archived"})
+
+    result = await metrics.aggregate(owner_user_id="user-1", window_started_at=START, window_ended_at=END)
+
+    assert "views" not in result["totals"]
+    assert result["coverage"]["active_account_count"] == 1
+    assert result["coverage"]["missing_account_ids"] == [active["id"]]
+    assert result["coverage"]["by_metric"]["views"]["missing_account_ids"] == [active["id"]]
+    assert archived["id"] not in result["coverage"]["by_account_status"]
+    await close_engine()
+
+
+@pytest.mark.asyncio
+async def test_metric_aggregate_replaces_progressive_window_totals_instead_of_double_counting(tmp_path) -> None:
+    await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
+    sf = get_session_factory()
+    assert sf is not None
+    accounts = PersonalIPAccountRepository(sf)
+    metrics = PersonalIPMetricRepository(sf)
+    account = await accounts.create(owner_user_id="user-1", platform="douyin", display_name="Douyin")
+
+    for suffix, ended, views in (
+        ("morning", datetime(2026, 7, 21, 8, 0, tzinfo=UTC), 100),
+        ("afternoon", datetime(2026, 7, 21, 16, 0, tzinfo=UTC), 175),
+    ):
+        await metrics.record(
+            owner_user_id="user-1",
+            observation_key=f"douyin:today:{suffix}",
+            series_key="browser-dashboard:douyin:account-1",
+            account_id=account["id"],
+            receipt_id=None,
+            scope="account",
+            metric_mode="window_total",
+            source="browser",
+            status="partial",
+            window_started_at=START,
+            window_ended_at=ended,
+            observed_at=ended,
+            metrics={"views": views},
+            coverage={"complete_account_window": False},
+        )
+
+    result = await metrics.aggregate(owner_user_id="user-1", window_started_at=START, window_ended_at=END)
+
+    assert result["observation_count"] == 2
+    assert result["deduplicated_count"] == 1
+    assert result["totals"]["views"] == 175
     await close_engine()

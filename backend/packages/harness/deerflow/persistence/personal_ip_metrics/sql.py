@@ -302,43 +302,46 @@ class PersonalIPMetricRepository:
                 ).scalars()
             )
 
+        active_ids = {account.id for account in accounts}
         window_rows = [
             row
             for row in rows
-            if row.metric_mode in {"window_total", "delta"}
+            if row.account_id in active_ids
+            and row.metric_mode in {"window_total", "delta"}
             and row.window_started_at is not None
             and row.window_ended_at is not None
             and _utc_datetime(row.window_started_at, field="window_started_at") >= started
             and _utc_datetime(row.window_ended_at, field="window_ended_at") <= ended
         ]
-        snapshot_rows = [row for row in rows if row.metric_mode == "snapshot" and _utc_datetime(row.observed_at, field="observed_at") >= started]
+        snapshot_rows = [row for row in rows if row.account_id in active_ids and row.metric_mode == "snapshot" and _utc_datetime(row.observed_at, field="observed_at") >= started]
         latest: dict[tuple[Any, ...], PersonalIPMetricObservationRow] = {}
         for row in window_rows:
             row_started = _utc_datetime(row.window_started_at, field="window_started_at")
             row_ended = _utc_datetime(row.window_ended_at, field="window_ended_at")
             row_observed = _utc_datetime(row.observed_at, field="observed_at")
             row_created = _utc_datetime(row.created_at, field="created_at")
-            key = (row.account_id, row.scope, row.series_key, row.metric_mode, row_started, row_ended)
+            # A window total is a replacement reading for one series/window
+            # start, so a later cutoff must not be added to an earlier poll.
+            # Deltas remain independently additive by their exact interval.
+            key = (row.account_id, row.scope, row.series_key, row.metric_mode, row_started) if row.metric_mode == "window_total" else (row.account_id, row.scope, row.series_key, row.metric_mode, row_started, row_ended)
             previous = latest.get(key)
-            if previous is None or (row_observed, row_created, row.id) > (
-                _utc_datetime(previous.observed_at, field="observed_at"),
-                _utc_datetime(previous.created_at, field="created_at"),
-                previous.id,
-            ):
+            previous_rank = (
+                (
+                    _utc_datetime(previous.window_ended_at, field="window_ended_at"),
+                    _utc_datetime(previous.observed_at, field="observed_at"),
+                    _utc_datetime(previous.created_at, field="created_at"),
+                    previous.id,
+                )
+                if previous is not None
+                else None
+            )
+            if previous_rank is None or (row_ended, row_observed, row_created, row.id) > previous_rank:
                 latest[key] = row
 
         totals: defaultdict[str, int | float] = defaultdict(int)
         by_platform: defaultdict[str, defaultdict[str, int | float]] = defaultdict(lambda: defaultdict(int))
         by_account: defaultdict[str, defaultdict[str, int | float]] = defaultdict(lambda: defaultdict(int))
-        observed_accounts: set[str] = set()
-        partial_accounts: set[str] = set()
-        unavailable_accounts: set[str] = set()
         for row in latest.values():
-            observed_accounts.add(row.account_id)
-            if row.status == "partial":
-                partial_accounts.add(row.account_id)
-            elif row.status == "unavailable":
-                unavailable_accounts.add(row.account_id)
             if row.status == "unavailable":
                 continue
             for metric, value in (row.metrics_json or {}).items():
@@ -348,7 +351,57 @@ class PersonalIPMetricRepository:
                 by_platform[row.platform][metric] += value
                 by_account[row.account_id][metric] += value
 
-        active_ids = {account.id for account in accounts}
+        latest_by_account: defaultdict[str, list[PersonalIPMetricObservationRow]] = defaultdict(list)
+        for row in latest.values():
+            latest_by_account[row.account_id].append(row)
+        by_account_status: dict[str, str] = {}
+        for account_id in sorted(active_ids):
+            account_rows = latest_by_account.get(account_id, [])
+            statuses = {row.status for row in account_rows}
+            if not statuses:
+                by_account_status[account_id] = "missing"
+            elif statuses == {"unavailable"}:
+                by_account_status[account_id] = "unavailable"
+            elif "partial" in statuses or "unavailable" in statuses:
+                by_account_status[account_id] = "partial"
+            else:
+                by_account_status[account_id] = "observed"
+
+        by_platform_status: dict[str, str] = {}
+        for platform in sorted({account.platform for account in accounts}):
+            statuses = {by_account_status[account.id] for account in accounts if account.platform == platform}
+            if statuses == {"observed"}:
+                by_platform_status[platform] = "observed"
+            elif statuses == {"unavailable"}:
+                by_platform_status[platform] = "unavailable"
+            elif statuses == {"missing"}:
+                by_platform_status[platform] = "missing"
+            else:
+                by_platform_status[platform] = "partial"
+
+        by_metric: dict[str, dict[str, list[str]]] = {}
+        returned_metrics = {metric for row in latest.values() for metric in (row.metrics_json or {}) if metric in _ADDITIVE_METRICS}
+        for metric in sorted(returned_metrics | {"views"}):
+            metric_statuses = {"observed": [], "partial": [], "unavailable": [], "missing": []}
+            for account_id in sorted(active_ids):
+                account_rows = latest_by_account.get(account_id, [])
+                metric_rows = [row for row in account_rows if metric in (row.metrics_json or {}) and row.status != "unavailable"]
+                if metric_rows:
+                    status = "observed" if by_account_status[account_id] == "observed" and all(row.status == "observed" for row in metric_rows) else "partial"
+                elif by_account_status[account_id] == "unavailable":
+                    status = "unavailable"
+                else:
+                    status = "missing"
+                metric_statuses[status].append(account_id)
+            by_metric[metric] = {f"{status}_account_ids": values for status, values in metric_statuses.items()}
+
+        observed_accounts = {account_id for account_id, status in by_account_status.items() if status == "observed"}
+        partial_accounts = {account_id for account_id, status in by_account_status.items() if status == "partial"}
+        unavailable_accounts = {account_id for account_id, status in by_account_status.items() if status == "unavailable"}
+        missing_accounts = {account_id for account_id, status in by_account_status.items() if status == "missing"}
+        overall_status = "complete" if active_ids and not (partial_accounts or unavailable_accounts or missing_accounts) else "partial"
+        if not active_ids:
+            overall_status = "unavailable"
         return {
             "window_started_at": coerce_iso(started),
             "window_ended_at": coerce_iso(ended),
@@ -359,10 +412,14 @@ class PersonalIPMetricRepository:
             "deduplicated_count": len(latest),
             "excluded_snapshot_count": len(snapshot_rows),
             "coverage": {
-                "observed_account_ids": sorted(observed_accounts - partial_accounts - unavailable_accounts),
+                "status": overall_status,
+                "observed_account_ids": sorted(observed_accounts),
                 "partial_account_ids": sorted(partial_accounts),
                 "unavailable_account_ids": sorted(unavailable_accounts),
-                "missing_account_ids": sorted(active_ids - observed_accounts),
+                "missing_account_ids": sorted(missing_accounts),
                 "active_account_count": len(active_ids),
+                "by_account_status": by_account_status,
+                "by_platform_status": by_platform_status,
+                "by_metric": by_metric,
             },
         }

@@ -2,6 +2,7 @@ from .clarification_tool import ask_clarification_tool
 from .personal_ip_tools import (
     personal_ip_begin_video_production_tool,
     personal_ip_collect_browser_page_tool,
+    personal_ip_collect_browser_portfolio_today_tool,
     personal_ip_collect_douyin_browser_page_tool,
     personal_ip_ingest_media_execution_tool,
     personal_ip_metrics_aggregate_tool,
@@ -43,6 +44,7 @@ __all__ = [
     "personal_ip_begin_publish_receipt_tool",
     "personal_ip_begin_video_production_tool",
     "personal_ip_collect_browser_page_tool",
+    "personal_ip_collect_browser_portfolio_today_tool",
     "personal_ip_collect_douyin_browser_page_tool",
     "personal_ip_finish_browser_publish_tool",
     "personal_ip_metrics_aggregate_tool",

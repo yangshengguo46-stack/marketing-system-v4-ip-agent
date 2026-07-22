@@ -23,7 +23,7 @@ Minimum account card:
 
 ```yaml
 account_id: stable-slug
-platform: douyin | xiaohongshu | bilibili | wechat_channels | other
+platform: douyin | wechat_channels | wechat_official | xiaohongshu | x | instagram | youtube | tiktok | other
 display_name: ""
 operator: ""
 promise_to_audience: ""
@@ -56,6 +56,12 @@ facts through a Tool/MCP; do not recreate that model in prompts.
    For performance questions, use the native portfolio inventory, sync and
    aggregate tools; preserve their missing/partial coverage instead of treating
    absent data or a cumulative snapshot as today's total.
+   For “today across all platforms”, use
+   `personal_ip_collect_browser_portfolio_today` with the user's local-day
+   start and current cutoff. It discovers every active browser account itself;
+   never loop over an account remembered by the conversation. Report the
+   aggregate's per-metric views coverage and do not print a zero when `views`
+   is absent.
    Use `personal_ip_sync_douyin_portfolio` for recurring or whole-portfolio
    collection. A scheduled task should pass a stable current-hour collection
    key; never bake one account id into its prompt.

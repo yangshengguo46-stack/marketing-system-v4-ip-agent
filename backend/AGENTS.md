@@ -1003,10 +1003,15 @@ manual import. Gateway endpoints are under `/api/personal-ip/metrics`; the
 aggregate endpoint intentionally has no account filter because every
 conversation coordinates the authenticated owner's full active portfolio.
 For a requested window, deduplicate refetches by account/scope/series/mode/exact
-window and take the latest observation, sum only the explicit additive metric allowlist,
+window and take the latest observation. Progressive same-start `window_total`
+polls for one series replace earlier cutoffs instead of being added together.
+Sum only the explicit additive metric allowlist,
 and never interpret a cumulative `snapshot` as a daily increment. Return
 observed, partial, unavailable and missing account ids so the agent cannot
 silently turn missing permissions or failed collection into zero performance.
+Coverage states are mutually exclusive over the owner's active accounts and
+include per-metric account ids; archived-account observations are excluded and
+an absent metric such as `views` remains absent from totals.
 Post observations must reference a publish receipt for the same owner/account.
 
 Migration `0011_personal_ip_retrospectives` and
@@ -1086,6 +1091,14 @@ credential-free records must remain available to the agent: the collector may
 return them directly, `personal_ip_platform_observation_inventory` discovers
 recent evidence portfolio-wide without an account filter, and
 `personal_ip_read_platform_observation` performs the exact owner-scoped read.
+The same module owns the whole-portfolio today collector. Its eight rendered-
+label dashboard adapters retain matched labels/window evidence, but it writes a
+browser `window_total` only when the page explicitly displays 今日/今天/Today.
+`POST /api/personal-ip/metrics/collect/browser-portfolio-today` and
+`personal_ip_collect_browser_portfolio_today` take a collection key plus one
+requested today interval and intentionally no account id. Login/window limits
+become unavailable, collection failures remain missing, and numeric captures
+remain partial until a platform adapter proves full account-window coverage.
 
 `DouyinAuthorizedMetricCollectionService` is the credential-to-evidence
 bridge. `/api/personal-ip/metrics/collect/douyin` accepts only connection,
@@ -1098,7 +1111,8 @@ credential into route responses, tool results, coverage metadata or logs.
 
 Native `deerflow.tools.builtins.personal_ip_tools` provide the agent-facing
 surface: `personal_ip_metrics_aggregate` is portfolio-wide by construction and
-has no account filter; `personal_ip_sync_douyin_post` takes only server-issued
+has no account filter; `personal_ip_collect_browser_portfolio_today` likewise
+discovers all active browser accounts server-side; `personal_ip_sync_douyin_post` takes only server-issued
 connection/receipt/idempotency identifiers;
 `personal_ip_sync_douyin_portfolio` discovers all eligible connections and
 confirmed receipts server-side and has no account filter. Each post failure
