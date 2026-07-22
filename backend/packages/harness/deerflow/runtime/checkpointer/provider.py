@@ -26,11 +26,24 @@ from collections.abc import Iterator
 
 from langgraph.types import Checkpointer
 
-from deerflow.config.app_config import AppConfig, get_app_config
+from deerflow.config.app_config import AppConfig
 from deerflow.config.checkpointer_config import CheckpointerConfig, ensure_config_loaded, get_checkpointer_config
 from deerflow.runtime.store._sqlite_utils import ensure_sqlite_parent_dir, resolve_sqlite_conn_str
 
 logger = logging.getLogger(__name__)
+
+
+def get_app_config() -> AppConfig:
+    """Resolve the application config through its owning module at call time.
+
+    Keeping this small compatibility seam local means both embedded callers
+    that replace ``deerflow.config.app_config.get_app_config`` and callers that
+    patch this provider boundary observe the same loader.
+    """
+    from deerflow.config import app_config as app_config_module
+
+    return app_config_module.get_app_config()
+
 
 # ---------------------------------------------------------------------------
 # Error message constants — imported by aio.provider too

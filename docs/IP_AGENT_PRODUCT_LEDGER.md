@@ -6,27 +6,29 @@ schema, mocked test or configured model is not counted as a finished product
 until its real execution path, evidence and user interaction are usable.
 
 Last audited: 2026-07-22. The baseline audit began at commit `fd78208`; this
-audit includes the five parallel work lines integrated through `0578242` and
-the current ledger change set.
+audit includes the first five parallel work lines through `0578242`, UI-TARS,
+MineContext and the ledger-derived video workbench through `b7df0e9`, plus the
+current acceptance-fix and ledger change set.
 
 ## Current completion
 
-**Weighted product completion: 76%.** The native agent and backend foundation
-are about 86% complete; the lower product number reflects the deliberately
-deferred real-account eight-platform acceptance work, unfinished real
-publishing and the absence of one accepted paid video production.
+**Weighted product completion: 79%.** The native agent and backend foundation
+are about 94% complete. The lower product number reflects the deliberately
+deferred real-account eight-platform acceptance, real UI-TARS/MineContext OS
+permission acceptance, unfinished real publishing and the absence of one
+accepted paid video production.
 
 | Ledger area | Weight | Complete | Current evidence | Completion gate still open |
 |---|---:|---:|---|---|
-| DeerFlow and Volcengine foundation | 10% | 92% | Native DeerFlow runtime; Doubao/Seedream/Seedance routing; vendored MediaKit source and project-local FFmpeg; credential-free clean-room dependency/build acceptance | Full customer-machine launch and a full paid-call acceptance run |
+| DeerFlow and Volcengine foundation | 10% | 95% | Native DeerFlow runtime; Doubao/Seedream/Seedance routing; vendored MediaKit, UI-TARS and MineContext source; project-local FFmpeg; source archive and clean-room acceptance | Real OS-permission/model acceptance, full customer-machine launch and a paid-call acceptance run |
 | Portfolio, accounts and browser login | 10% | 90% | Eight fixed platform entries; owner/account-isolated Chromium profiles; real Douyin login persisted across restart; automatic dialog close; five-state connection summary and recovery UI | Full real-account eight-platform acceptance matrix |
-| Persona/fan modelling and preflight | 20% | 65% | HLLM source pin; HLLM-Lite provider contract; aggregate audience adapter; immutable preflight receipt; native agent tool and detailed receipt view; personality/Maslow/Jung/existence lenses | Detailed real platform inputs and calibrated ranker |
-| Publishing and receipts | 15% | 70% | Immutable publish request; append-only attempts; atomic browser prepare/finish tools; strict eight-platform public-post proof; local recovery/idempotency acceptance matrix | Real per-platform publish and recovery acceptance; official API publishers where available |
+| Persona/fan modelling and preflight | 20% | 70% | HLLM source pin; HLLM-Lite provider contract; aggregate audience adapter; consent-gated MineContext summary evidence; immutable preflight receipt; personality/Maslow/Jung/existence lenses | Real MineContext observation acceptance, detailed platform inputs and calibrated ranker |
+| Publishing and receipts | 15% | 72% | Immutable publish request; append-only attempts; atomic browser prepare/finish tools; strict eight-platform public-post proof; one-step UI-TARS desktop fallback with approval and sanitized receipts | Real UI-TARS desktop acceptance plus per-platform publish/recovery acceptance |
 | Metrics, retrospectives and evidence promotion | 20% | 65% | Normalized observations; exact snapshot deltas; portfolio aggregate; Douyin official post collector; eight-platform browser dashboard adapters with explicit missing/partial/unavailable coverage; real persisted-login Douyin capture; immutable retrospective; automatic evidence promotion | Extend verified real collection across the other seven platforms and scheduled coverage |
-| Video production | 15% | 80% | Recoverable local script-to-delivery acceptance runs through blueprint, assets, storyboard, generation retry, consistency, selection, speech, source-built MediaKit/FFmpeg, delivery QA and immutable receipts; paid checkpoints are approval-gated | Exercise the paid providers and complete one accepted real-generation production |
-| Product UI, packaging and acceptance | 10% | 90% | Five-state eight-platform onboarding and responsive login UI; deterministic credential-free source archive; clean-room dependency install, migrations, doctor and production build; product-aware diagnostics | Full-stack launch on a clean customer machine/VM and real-account acceptance |
+| Video production | 15% | 90% | Recoverable local script-to-delivery acceptance plus a dedicated nine-stage project/asset/storyboard/shot/candidate/timeline/delivery workbench derived only from immutable receipts | Exercise paid providers and complete one accepted real-generation production |
+| Product UI, packaging and acceptance | 10% | 94% | Eight-platform onboarding; MineContext control surface; dedicated video workbench; deterministic source archive containing pinned local-organ source; clean-room install, migrations, doctor and production build | Full-stack launch on a clean customer machine/VM and real-account/OS-permission acceptance |
 
-Weighted score: `9.2 + 9 + 13 + 10.5 + 13 + 12 + 9 = 75.7`, displayed as 76%.
+Weighted score: `9.5 + 9 + 14 + 10.8 + 13 + 13.5 + 9.4 = 79.2`, displayed as 79%.
 
 ## Product truth
 
@@ -99,9 +101,24 @@ coverage evidence.
 - [x] Run the free local script-to-delivery acceptance twice, proving resumable
       generation failure/retry, source-built MediaKit finishing, delivery QA,
       idempotent receipts and identical final hashes without paid calls.
+- [x] Add the dedicated ledger-derived video workbench for projects, assets,
+      storyboard, per-shot tasks/retries, candidates, consistency, voice,
+      timeline, delivery QA and exact receipts without a second state machine.
 - [ ] Exercise real paid Seedance, Seedream, speech and cloud MediaKit calls and
       preserve their returned identifiers and artifacts in the production.
 - [ ] Complete one real Seedance-to-MediaKit/FFmpeg acceptance production.
+
+### P1 — local computer and context organs
+
+- [x] Vendor and pin the source-only UI-TARS SDK/operator subset; expose one
+      allowlisted desktop action per DeerFlow call with approval, privacy and
+      append-only receipt boundaries. Agent TARS is not included.
+- [x] Vendor and pin complete MineContext source; expose an owner-consented,
+      default-off lifecycle and minimized evidence path into HLLM/preflight.
+- [ ] Grant macOS permissions and validate one safe real UI-TARS desktop action
+      against the configured model, including pixelated evidence and receipt.
+- [ ] Validate MineContext start/stop/restart/revoke/delete, one dedicated test
+      directory and one minimized real observation across two isolated owners.
 
 ### P2 — customer delivery
 
