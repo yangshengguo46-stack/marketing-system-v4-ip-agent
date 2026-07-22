@@ -1,8 +1,7 @@
-"""Cross-sample Personal-IP evidence proposal, decision and export endpoints."""
+"""Policy-gated Personal-IP evidence promotion and export endpoints."""
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -13,7 +12,7 @@ from app.gateway.deps import get_current_user_from_request, get_personal_ip_evid
 router = APIRouter(prefix="/api/personal-ip/evidence-promotions", tags=["personal-ip"])
 
 
-class PersonalIPEvidenceProposalRequest(BaseModel):
+class PersonalIPEvidencePromotionRequest(BaseModel):
     proposal_key: str = Field(min_length=1, max_length=256)
     evidence_type: Literal["audience_pattern", "content_pattern", "platform_pattern", "training_cohort"]
     claim: str = Field(min_length=1, max_length=2000)
@@ -26,19 +25,6 @@ class PersonalIPEvidenceProposalRequest(BaseModel):
         return value.strip()
 
 
-class PersonalIPEvidenceDecisionRequest(BaseModel):
-    decision_key: str = Field(min_length=1, max_length=256)
-    decision: Literal["approved", "rejected"]
-    rationale: str = Field(min_length=1, max_length=2000)
-    confirmed_by_user: Literal[True]
-    occurred_at: datetime | None = None
-
-    @field_validator("decision_key", "rationale")
-    @classmethod
-    def strip_decision_text(cls, value: str) -> str:
-        return value.strip()
-
-
 async def _current_user_id(request: Request) -> str:
     user = await get_current_user_from_request(request)
     return str(user.id)
@@ -46,7 +32,7 @@ async def _current_user_id(request: Request) -> str:
 
 def _repository_error(exc: ValueError) -> HTTPException:
     detail = str(exc)
-    if "already records" in detail or "terminal decision" in detail:
+    if "already records" in detail:
         return HTTPException(status_code=409, detail=detail)
     if "not found" in detail:
         return HTTPException(status_code=404, detail=detail)
@@ -54,8 +40,8 @@ def _repository_error(exc: ValueError) -> HTTPException:
 
 
 @router.post("", status_code=201)
-async def propose_personal_ip_evidence(
-    body: PersonalIPEvidenceProposalRequest,
+async def promote_personal_ip_evidence(
+    body: PersonalIPEvidencePromotionRequest,
     request: Request,
 ) -> dict[str, Any]:
     try:
@@ -71,33 +57,10 @@ async def propose_personal_ip_evidence(
         raise _repository_error(exc) from exc
 
 
-@router.post("/{promotion_id}/decisions")
-async def decide_personal_ip_evidence(
-    promotion_id: str,
-    body: PersonalIPEvidenceDecisionRequest,
-    request: Request,
-) -> dict[str, Any]:
-    try:
-        promotion = await get_personal_ip_evidence_promotion_repo(request).decide(
-            promotion_id,
-            owner_user_id=await _current_user_id(request),
-            decision_key=body.decision_key,
-            decision=body.decision,
-            rationale=body.rationale,
-            confirmed_by_user=body.confirmed_by_user,
-            occurred_at=body.occurred_at,
-        )
-    except ValueError as exc:
-        raise _repository_error(exc) from exc
-    if promotion is None:
-        raise HTTPException(status_code=404, detail="Personal-IP evidence promotion not found")
-    return promotion
-
-
 @router.get("")
 async def list_personal_ip_evidence_promotions(
     request: Request,
-    status: Literal["proposed", "approved", "rejected"] | None = Query(default=None),
+    status: Literal["approved"] | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
 ) -> list[dict[str, Any]]:
     return await get_personal_ip_evidence_promotion_repo(request).list(

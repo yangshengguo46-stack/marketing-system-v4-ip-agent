@@ -98,7 +98,7 @@ def _repos():
                         "id": "promotion-1",
                         "evidence_type": "content_pattern",
                         "claim": "开头直给结果提高完播",
-                        "status": "proposed",
+                        "status": "approved",
                         "updated_at": "2026-07-22T04:00:00Z",
                     }
                 ]
@@ -147,10 +147,11 @@ async def test_operating_cockpit_closes_the_portfolio_workflow_read_model() -> N
     assert result["stages"]["performance"]["metric_observations"] == 1
     assert result["stages"]["performance"]["platform_observations"] == 1
     assert result["stages"]["retrospective"]["pending"] == 1
-    assert result["stages"]["evidence"]["pending"] == 1
+    assert result["stages"]["evidence"]["pending"] == 0
+    assert result["stages"]["evidence"]["approved"] == 1
     assert result["queues"]["accounts_needing_model_input"] == ["acct-needs-model"]
     assert result["queues"]["published_receipts_awaiting_retrospective"] == ["receipt-1"]
-    assert result["queues"]["evidence_awaiting_decision"] == ["promotion-1"]
+    assert "evidence_awaiting_decision" not in result["queues"]
     assert result["video"]["production_count"] == 2
     assert result["video"]["blocked_production_ids"] == ["video-production-running"]
     assert result["video"]["stages"]["generation"] == 1

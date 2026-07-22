@@ -122,18 +122,19 @@ publish receipt is confirmed and one or more post-level observations exist.
 The service derives the selected candidate from the immutable publish request,
 finds it in the original provider receipt, snapshots the actual metrics and
 computes an evidence digest. A partial observation remains partial, and a Lite
-candidate without `match_score` remains `unscored`. Every retrospective starts
-as `pending_human_review`; no single post can automatically become a training
-example or rewrite its original prediction.
+candidate without `match_score` remains `unscored`. Partial evidence remains
+`insufficient_evidence`; complete evidence becomes
+`eligible_for_policy_evaluation`. No single post can become a promoted pattern
+or rewrite its original prediction.
 
-Cross-sample rules are proposed through
+Cross-sample rules are promoted through
 `POST /api/personal-ip/evidence-promotions`. At least three complete
 retrospectives from three different published posts must support the claim;
 multiple observation horizons for one post count only once and partial data
-does not fill the quota. The agent may assemble the candidate, but the terminal
-decision endpoint requires an explicit authenticated-user confirmation and
-rationale. Only an approved proposal can be exported as
-`personal-ip-approved-evidence-v1`, with each source's complete/partial and
+does not fill the quota. Passing the rule automatically creates an approved
+promotion with a deterministic policy decision receipt; there is no user
+approval step. It can be exported immediately as
+`personal-ip-approved-evidence-v1`, with each source's completeness and
 scored/unscored provenance intact. Export is a candidate for later dataset or
 model versioning, not an automatic live-model update.
 

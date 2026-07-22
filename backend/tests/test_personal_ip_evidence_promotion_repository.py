@@ -42,7 +42,7 @@ async def _seed_retrospectives(
                 metric_observation_ids_json=[f"metric-{owner_user_id}-{index}"],
                 prediction_json={"variant": {"variant_id": "v1", "text": f"候选 {index}", "match_score": None}},
                 outcome_json={"latest_metrics": {"views": 1000 + index * 100}},
-                training_eligibility_json={"status": "pending_human_review"},
+                training_eligibility_json={"status": "eligible_for_policy_evaluation"},
                 evidence_digest=f"{index + 1:064x}",
                 status="partial" if is_partial else "measured",
                 comparison_state="unscored",
@@ -55,7 +55,7 @@ async def _seed_retrospectives(
 
 
 @pytest.mark.asyncio
-async def test_evidence_promotion_requires_cross_sample_support_and_human_approval(tmp_path) -> None:
+async def test_evidence_promotion_auto_approves_cross_sample_support(tmp_path) -> None:
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None
@@ -70,62 +70,24 @@ async def test_evidence_promotion_requires_cross_sample_support_and_human_approv
         "retrospective_ids": retrospective_ids,
         "minimum_support": 3,
     }
-    proposed = await promotions.propose(**kwargs)
+    promoted = await promotions.propose(**kwargs)
     replayed = await promotions.propose(**kwargs)
 
-    assert replayed == proposed
-    assert proposed["status"] == "proposed"
-    assert proposed["evidence_summary"]["independent_measured_support"] == 3
-    assert proposed["evidence_summary"]["account_count"] == 2
-    assert proposed["decisions"] == []
-    with pytest.raises(ValueError, match="explicit human confirmation"):
-        await promotions.decide(
-            proposed["id"],
-            owner_user_id="user-1",
-            decision_key="approve:v1",
-            decision="approved",
-            rationale="三条独立发布均出现同方向结果。",
-            confirmed_by_user=False,
-        )
-
-    approved = await promotions.decide(
-        proposed["id"],
-        owner_user_id="user-1",
-        decision_key="approve:v1",
-        decision="approved",
-        rationale="三条独立发布均出现同方向结果。",
-        confirmed_by_user=True,
-        occurred_at=datetime(2026, 7, 25, 8, 0, tzinfo=UTC),
-    )
-    duplicate = await promotions.decide(
-        proposed["id"],
-        owner_user_id="user-1",
-        decision_key="approve:v1",
-        decision="approved",
-        rationale="三条独立发布均出现同方向结果。",
-        confirmed_by_user=True,
-        occurred_at=datetime(2026, 7, 25, 8, 0, tzinfo=UTC),
-    )
-
-    assert duplicate == approved
-    assert approved["status"] == "approved"
-    assert approved["decisions"][0]["reviewer_user_id"] == "user-1"
-    manifest = await promotions.export_approved(proposed["id"], owner_user_id="user-1")
+    assert replayed == promoted
+    assert promoted["status"] == "approved"
+    assert promoted["decided_at"] is not None
+    assert promoted["evidence_summary"]["independent_measured_support"] == 3
+    assert promoted["evidence_summary"]["account_count"] == 2
+    assert promoted["decisions"][0]["decision"] == "approved"
+    assert promoted["decisions"][0]["reviewer_source"] == "cross_sample_evidence_policy"
+    assert "reviewer_user_id" not in promoted["decisions"][0]
+    manifest = await promotions.export_approved(promoted["id"], owner_user_id="user-1")
     assert manifest is not None
     assert manifest["contract_version"] == "personal-ip-approved-evidence-v1"
     assert len(manifest["source_examples"]) == 3
     assert manifest["source_examples"][0]["status"] == "measured"
     assert manifest["source_examples"][0]["comparison_state"] == "unscored"
-    assert manifest["promotion"]["evidence_digest"] == proposed["evidence_digest"]
-    with pytest.raises(ValueError, match="terminal decision"):
-        await promotions.decide(
-            proposed["id"],
-            owner_user_id="user-1",
-            decision_key="reject-later",
-            decision="rejected",
-            rationale="反悔",
-            confirmed_by_user=True,
-        )
+    assert manifest["promotion"]["evidence_digest"] == promoted["evidence_digest"]
     await close_engine()
 
 
@@ -146,6 +108,16 @@ async def test_evidence_promotion_rejects_partial_duplicate_or_foreign_support(t
             evidence_type="content_pattern",
             claim="部分数据不能凑样本数。",
             retrospective_ids=partial_ids,
+            minimum_support=3,
+        )
+    mixed_ids = await _seed_retrospectives(sf, owner_user_id="user-4", count=4, partial_indexes={3})
+    with pytest.raises(ValueError, match="only completely measured"):
+        await promotions.propose(
+            owner_user_id="user-4",
+            proposal_key="mixed",
+            evidence_type="content_pattern",
+            claim="部分样本不能混入晋级依据。",
+            retrospective_ids=mixed_ids,
             minimum_support=3,
         )
     with pytest.raises(ValueError, match="independent measured retrospectives"):

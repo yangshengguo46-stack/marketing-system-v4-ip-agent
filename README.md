@@ -45,12 +45,12 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > zero.
 > Retrospectives then seal the selected preflight variant, concrete publish
 > receipt and post-level observations into one digest. They expose calibrated
-> versus unscored predictions and remain pending human review; a single result
-> never promotes itself into model training.
+> versus unscored predictions; a single result never promotes itself into model
+> training.
 > Evidence promotion requires at least three complete retrospectives from
-> different published posts plus an explicit authenticated-user decision.
-> Approved manifests retain partial/scored provenance for downstream training;
-> the agent cannot approve its own proposed pattern.
+> different published posts. Passing that policy automatically stores an
+> approved promotion receipt without user approval. Approved manifests retain
+> completeness/scored provenance for downstream training.
 > The first real platform collector targets Douyin's official authorized-video
 > API and stores current counters as post snapshots. Private/missing videos are
 > unavailable, not zero. Its approved mini-app flow now uses one-use state,

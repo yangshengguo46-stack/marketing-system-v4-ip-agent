@@ -32,6 +32,7 @@ import {
 import {
   AccountBrowserLoginDialog,
   AccountEditorDialog,
+  OperatingReviewPanel,
   SubjectEditorDialog,
 } from "@/components/workspace/personal-ip";
 import {
@@ -342,6 +343,8 @@ export default function PersonalIPPortfolioPage() {
               </CardContent>
             </Card>
           </section>
+
+          {cockpit && <OperatingReviewPanel cockpit={cockpit} />}
 
           <section className="space-y-4">
             <div className="flex items-center justify-between gap-4">

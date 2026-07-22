@@ -176,13 +176,13 @@ class PersonalIPRetrospectiveRepository:
             }
             comparison_state = "scored" if selected_variant.get("match_score") is not None else "unscored"
             status = "partial" if is_partial else "measured"
-            reasons = ["automatic_promotion_disabled"]
+            reasons: list[str] = []
             if is_partial:
                 reasons.append("partial_metric_coverage")
             if comparison_state == "unscored":
                 reasons.append("prediction_has_no_calibrated_score")
             training_eligibility = {
-                "status": "pending_human_review",
+                "status": "insufficient_evidence" if is_partial else "eligible_for_policy_evaluation",
                 "reasons": reasons,
             }
             evidence = {

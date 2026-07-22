@@ -7,11 +7,13 @@ import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
+from deerflow.persistence.personal_ip_platform_observations.sql import validate_credential_free_payload
 from deerflow.persistence.personal_ip_preflights.model import PersonalIPPreflightRow
 from deerflow.persistence.personal_ip_publish_receipts.model import PersonalIPPublishReceiptRow
 from deerflow.utils.time import coerce_iso
@@ -36,6 +38,7 @@ def _clean_required(value: Any, *, field: str, limit: int) -> str:
 
 
 def _json_snapshot(value: Any, *, field: str) -> Any:
+    validate_credential_free_payload(value, field=field)
     try:
         serialized = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     except (TypeError, ValueError) as exc:
@@ -43,6 +46,21 @@ def _json_snapshot(value: Any, *, field: str) -> Any:
     if len(serialized.encode("utf-8")) > 1_000_000:
         raise ValueError(f"{field} exceeds the 1 MB snapshot limit")
     return json.loads(serialized)
+
+
+def _safe_external_url(value: Any) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    if len(raw) > 4096:
+        raise ValueError("external_url is too long")
+    parsed = urlsplit(raw)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("external_url must be an HTTP(S) URL")
+    host = parsed.hostname.lower()
+    if parsed.port is not None:
+        host = f"{host}:{parsed.port}"
+    return urlunsplit((parsed.scheme.lower(), host, parsed.path or "/", "", ""))
 
 
 def _digest(value: Any) -> str:
@@ -142,6 +160,12 @@ class PersonalIPPublishReceiptRepository:
                 targets = list(preflight.target_account_ids_json or [])
                 if targets and account_key not in targets:
                     raise ValueError("publish account is outside the sealed preflight targets")
+                selected_variant_id = str(request_snapshot.get("variant_id") or "").strip()
+                if not selected_variant_id:
+                    raise ValueError("publish request must identify the selected preflight variant")
+                variants = list((preflight.provider_receipt_json or {}).get("variants") or [])
+                if not any(str(variant.get("variant_id") or "") == selected_variant_id for variant in variants):
+                    raise ValueError("publish request selects a variant outside the sealed preflight receipt")
 
             now = datetime.now(UTC)
             row = PersonalIPPublishReceiptRow(
@@ -188,11 +212,9 @@ class PersonalIPPublishReceiptRepository:
             raise ValueError("result_payload must be an object")
         event_time = _utc_datetime(occurred_at)
         post_id = str(external_post_id or "").strip() or None
-        url = str(external_url or "").strip() or None
+        url = _safe_external_url(external_url)
         if post_id is not None and len(post_id) > 256:
             raise ValueError("external_post_id is too long")
-        if url is not None and len(url) > 4096:
-            raise ValueError("external_url is too long")
         event = {
             "attempt_key": attempt,
             "status": status_key,

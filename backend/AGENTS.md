@@ -1018,23 +1018,22 @@ that exists in the sealed provider receipt. Every supplied metric must be a
 same-owner, same-receipt, same-account post observation. Store both the raw
 observation snapshots and a deterministic evidence digest. Partial metric
 coverage stays partial; an absent calibrated `match_score` stays `unscored`.
-All new rows remain `pending_human_review`: this repository is evidence
-settlement, not automatic rubric/model promotion, and it never rewrites the
-preflight.
+Partial rows are `insufficient_evidence`; complete rows are
+`eligible_for_policy_evaluation`. This repository never rewrites the preflight.
 
 Migration `0012_personal_ip_evidence_promotions` and
-`deerflow.persistence.personal_ip_evidence_promotions` own cross-sample pattern
-proposals and terminal user decisions. Gateway endpoints are under
+`deerflow.persistence.personal_ip_evidence_promotions` own policy-gated,
+cross-sample pattern promotions. Gateway endpoints are under
 `/api/personal-ip/evidence-promotions`. `minimum_support` is always at least
 three and counts distinct publish receipts whose retrospective status is
 `measured`; several horizons for one publication count once and partial rows
-never satisfy the threshold. An agent may prepare a proposal, but approval or
-rejection requires `confirmed_by_user=true`, stores authenticated user id,
-rationale and timestamp, and cannot be reversed. Only approved proposals can
-export `personal-ip-approved-evidence-v1`; exports must retain every source's
-status, comparison state and training-eligibility provenance. Approval creates
-a reviewable training candidate—it does not silently mutate a live model or
-rubric version.
+never satisfy the threshold. Every cited row must be fully measured. Passing
+the rule automatically creates an approved promotion plus a deterministic
+policy decision receipt; there is no user decision endpoint. Approved records
+can export `personal-ip-approved-evidence-v1`; exports must retain every
+source's status, comparison state and training-eligibility provenance. A
+promotion creates a reviewable training candidate—it does not silently mutate
+a live model or rubric version.
 
 `deerflow.personal_ip.platform_metrics` owns provider-independent metric
 collector output plus the official Douyin implementation. The Douyin adapter

@@ -40,11 +40,10 @@ describe("personal IP operating cockpit", () => {
         preflights_awaiting_publish: ["preflight-1"],
         published_receipts_awaiting_metrics: ["receipt-1"],
         published_receipts_awaiting_retrospective: ["receipt-1"],
-        evidence_awaiting_decision: ["promotion-1"],
       },
     } as PersonalIPOperatingCockpit;
 
-    expect(countCockpitPending(cockpit)).toBe(5);
+    expect(countCockpitPending(cockpit)).toBe(4);
     expect(countCockpitPending(undefined)).toBe(0);
   });
 });

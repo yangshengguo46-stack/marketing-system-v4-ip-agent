@@ -1,4 +1,4 @@
-"""Cross-sample evidence proposals, authenticated decisions and export."""
+"""Policy-gated cross-sample evidence promotion and export."""
 
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ from deerflow.persistence.personal_ip_retrospectives.model import PersonalIPRetr
 from deerflow.utils.time import coerce_iso
 
 _EVIDENCE_TYPES = {"audience_pattern", "content_pattern", "platform_pattern", "training_cohort"}
-_DECISIONS = {"approved", "rejected"}
 
 
 def _clean_required(value: Any, *, field: str, limit: int) -> str:
@@ -53,7 +52,7 @@ def _digest(value: Any) -> str:
 
 
 class PersonalIPEvidencePromotionRepository:
-    """Require independent measured samples plus a terminal human decision."""
+    """Automatically promote claims backed by independent measured samples."""
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self._sf = session_factory
@@ -128,6 +127,8 @@ class PersonalIPEvidencePromotionRepository:
             measured_publish_ids = {row.publish_receipt_id for row in retrospectives if row.status == "measured"}
             if len(measured_publish_ids) < support_threshold:
                 raise ValueError(f"promotion requires at least {support_threshold} independent measured retrospectives")
+            if any(row.status != "measured" for row in retrospectives):
+                raise ValueError("promotion evidence must contain only completely measured retrospectives")
 
             summary = {
                 "retrospective_count": len(retrospectives),
@@ -156,7 +157,15 @@ class PersonalIPEvidencePromotionRepository:
                 ],
                 "summary": summary,
             }
+            evidence_digest = _digest(evidence_snapshot)
             now = datetime.now(UTC)
+            policy_decision = {
+                "decision_key": f"evidence-policy:{evidence_digest}",
+                "decision": "approved",
+                "reviewer_source": "cross_sample_evidence_policy",
+                "rationale": (f"Automatically promoted after {len(measured_publish_ids)} independent measured publications satisfied the minimum support of {support_threshold}."),
+                "occurred_at": coerce_iso(now),
+            }
             row = PersonalIPEvidencePromotionRow(
                 id=f"promotion-{uuid.uuid4().hex}",
                 owner_user_id=owner,
@@ -165,61 +174,15 @@ class PersonalIPEvidencePromotionRepository:
                 claim=claim_text,
                 retrospective_ids_json=evidence_ids,
                 evidence_summary_json=summary,
-                evidence_digest=_digest(evidence_snapshot),
+                evidence_digest=evidence_digest,
                 minimum_support=support_threshold,
-                status="proposed",
-                decisions_json=[],
+                status="approved",
+                decisions_json=[policy_decision],
+                decided_at=now,
                 created_at=now,
                 updated_at=now,
             )
             session.add(row)
-            await session.commit()
-            await session.refresh(row)
-            return self._to_dict(row)
-
-    async def decide(
-        self,
-        promotion_id: str,
-        *,
-        owner_user_id: str,
-        decision_key: str,
-        decision: str,
-        rationale: str,
-        confirmed_by_user: bool,
-        occurred_at: datetime | None = None,
-    ) -> dict[str, Any] | None:
-        if confirmed_by_user is not True:
-            raise ValueError("evidence promotion requires explicit human confirmation")
-        key = _clean_required(decision_key, field="decision_key", limit=256)
-        decision_value = str(decision or "").strip()
-        if decision_value not in _DECISIONS:
-            raise ValueError("unsupported evidence promotion decision")
-        rationale_text = _clean_required(rationale, field="rationale", limit=2000)
-        event_time = _utc(occurred_at)
-        event = {
-            "decision_key": key,
-            "decision": decision_value,
-            "reviewer_user_id": owner_user_id,
-            "reviewer_source": "authenticated_user_confirmation",
-            "rationale": rationale_text,
-            "occurred_at": coerce_iso(event_time),
-        }
-
-        async with self._sf() as session:
-            row = await session.get(PersonalIPEvidencePromotionRow, promotion_id)
-            if row is None or row.owner_user_id != owner_user_id:
-                return None
-            for existing in row.decisions_json or []:
-                if existing.get("decision_key") == key:
-                    if existing == event:
-                        return self._to_dict(row)
-                    raise ValueError("decision_key already records a different promotion decision")
-            if row.status != "proposed":
-                raise ValueError("evidence promotion already has a terminal decision")
-            row.decisions_json = [*(row.decisions_json or []), event]
-            row.status = decision_value
-            row.decided_at = event_time
-            row.updated_at = datetime.now(UTC)
             await session.commit()
             await session.refresh(row)
             return self._to_dict(row)

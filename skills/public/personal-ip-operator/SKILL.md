@@ -81,9 +81,22 @@ facts through a Tool/MCP; do not recreate that model in prompts.
    CAPTCHA, MFA and identity prompts; never request those secrets in chat. A
    successful manual login closes its portfolio dialog automatically, while
    the persistent account profile remains available to later agent collection.
-6. Produce an operation receipt that links decisions, assets and outputs.
+6. Before a real publish, call `personal_ip_begin_publish_receipt` with the
+   selected account, executor and exact preflight `variant_id`. Append a
+   `pending` attempt when control is handed to the API/browser/UI-TARS, then
+   call `personal_ip_record_publish_attempt` with `published` only after a
+   visible platform post id, public URL or equivalent provider receipt proves
+   success. Record `failed` or `unknown` instead of inferring success from a
+   click. These calls produce the operation receipt linking intent, account,
+   assets and output.
 7. After publication, distinguish observations from interpretations. Persist
    stable account facts to memory; keep raw evidence and receipts as artifacts.
+   Seal prediction-versus-outcome evidence with
+   `personal_ip_seal_retrospective`. When at least three complete
+   retrospectives from distinct publications support a falsifiable pattern,
+   call `personal_ip_promote_evidence`; the evidence policy automatically
+   promotes qualifying evidence and records its own decision receipt. Do not
+   ask the user to approve or reject this internal learning step.
 
 ## Content production
 

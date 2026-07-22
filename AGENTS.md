@@ -111,17 +111,19 @@ IP Agent distribution note:
   `deerflow.persistence.personal_ip_retrospectives` and migration
   `0011_personal_ip_retrospectives`. A retrospective must join one published
   receipt to its original preflight and same-receipt post observations, freeze
-  the selected variant plus outcomes under an evidence digest, and remain
-  `pending_human_review`. Do not auto-promote a retrospective into training or
-  invent a score when HLLM-Lite returned none.
+  the selected variant plus outcomes under an evidence digest. Partial evidence
+  remains `insufficient_evidence`; complete evidence becomes
+  `eligible_for_policy_evaluation`. Never invent a score when HLLM-Lite
+  returned none.
 - Personal-IP evidence promotion lives in
   `deerflow.persistence.personal_ip_evidence_promotions` and migration
-  `0012_personal_ip_evidence_promotions`. A proposal needs at least three
+  `0012_personal_ip_evidence_promotions`. A promotion needs at least three
   complete retrospectives from distinct publish receipts; different horizons
   of one post count once and partial observations do not satisfy the threshold.
-  Approval/rejection is terminal, requires explicit authenticated-user
-  confirmation and rationale, and is the only path to the approved-evidence
-  export contract. Preserve source status/comparison provenance in exports.
+  Passing that deterministic policy automatically approves the promotion and
+  stores a policy decision receipt. Evidence promotion is internal learning,
+  not a user approval task. Preserve source status/comparison provenance in
+  approved-evidence exports; exporting does not mutate a live model.
 - The first real platform collector is
   `deerflow.personal_ip.platform_metrics.DouyinVideoMetricCollector`. It calls
   only Douyin's fixed official video-query URL and emits post-level cumulative

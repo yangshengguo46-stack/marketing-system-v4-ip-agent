@@ -72,8 +72,8 @@ coverage evidence.
 - [ ] Connect real browser publishing attempts to the immutable receipt ledger.
 - [x] Show the six-stage operating line and pending counts in the Personal-IP
       workspace.
-- [ ] Add detailed interactions for preflight, publication attempts, observed
-      metrics, retrospective review and evidence approval.
+- [x] Add detailed read interactions for preflight, publication attempts,
+      observed metrics, retrospectives and automatically promoted evidence.
 - [ ] Run the full portfolio question acceptance case: “今天全平台浏览量多少？”
       The answer must report totals plus missing, partial and unavailable
       coverage instead of saying “不知道” or treating missing data as zero.

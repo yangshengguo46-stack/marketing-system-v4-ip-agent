@@ -113,7 +113,7 @@ async def test_retrospective_seals_prediction_publish_and_actual_evidence(tmp_pa
     assert created["outcome"]["latest_metrics"] == {"likes": 80, "views": 1200}
     assert created["status"] == "partial"
     assert created["comparison_state"] == "unscored"
-    assert created["training_eligibility"]["status"] == "pending_human_review"
+    assert created["training_eligibility"]["status"] == "insufficient_evidence"
     assert len(created["evidence_digest"]) == 64
     assert await retrospectives.get(created["id"], owner_user_id="user-2") is None
     await close_engine()

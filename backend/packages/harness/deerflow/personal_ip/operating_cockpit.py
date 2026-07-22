@@ -108,7 +108,6 @@ class PersonalIPOperatingCockpitService:
         retrospective_receipt_ids = {str(retrospective.get("publish_receipt_id")) for retrospective in retrospectives if retrospective.get("publish_receipt_id")}
         published_awaiting_metrics = sorted(receipt["id"] for receipt in published_receipts if receipt.get("id") not in metric_receipt_ids)
         published_awaiting_retrospective = sorted(receipt["id"] for receipt in published_receipts if receipt.get("id") not in retrospective_receipt_ids)
-        evidence_awaiting_decision = sorted(promotion["id"] for promotion in promotions if promotion.get("status") == "proposed")
         receipt_statuses = Counter(str(receipt.get("status") or "unknown") for receipt in receipts)
         video_statuses = Counter(str(production.get("status") or "unknown") for production in video_productions)
         video_stages = Counter(str(production.get("current_stage") or "intake") for production in video_productions)
@@ -124,6 +123,14 @@ class PersonalIPOperatingCockpitService:
             "evidence_promotions": promotions,
             "video_productions": video_productions,
         }
+        preflight_summaries = [
+            {
+                **preflight,
+                "variant_count": len((preflight.get("provider_receipt") or {}).get("variants") or []),
+            }
+            for preflight in preflights
+        ]
+        receipt_summaries = [{**receipt, "attempt_count": len(receipt.get("attempts") or [])} for receipt in receipts]
         return {
             "contract_version": OPERATING_COCKPIT_CONTRACT_VERSION,
             "generated_at": datetime.now(UTC).isoformat(),
@@ -159,11 +166,12 @@ class PersonalIPOperatingCockpitService:
                 "retrospective": _stage(
                     total=len(retrospectives),
                     pending=len(published_awaiting_retrospective),
-                    pending_human_review=sum(retrospective.get("status") == "pending_human_review" for retrospective in retrospectives),
+                    measured=sum(retrospective.get("status") == "measured" for retrospective in retrospectives),
+                    partial=sum(retrospective.get("status") == "partial" for retrospective in retrospectives),
                 ),
                 "evidence": _stage(
                     total=len(promotions),
-                    pending=len(evidence_awaiting_decision),
+                    pending=0,
                     approved=sum(promotion.get("status") == "approved" for promotion in promotions),
                 ),
             },
@@ -172,20 +180,48 @@ class PersonalIPOperatingCockpitService:
                 "preflights_awaiting_publish": preflights_awaiting_publish,
                 "published_receipts_awaiting_metrics": published_awaiting_metrics,
                 "published_receipts_awaiting_retrospective": published_awaiting_retrospective,
-                "evidence_awaiting_decision": evidence_awaiting_decision,
             },
             "recent": {
                 "preflights": _project(
-                    preflights,
-                    ("id", "status", "target_account_ids", "provider", "model_version", "created_at"),
+                    preflight_summaries,
+                    (
+                        "id",
+                        "status",
+                        "target_account_ids",
+                        "provider",
+                        "model_version",
+                        "variant_count",
+                        "created_at",
+                    ),
                 ),
                 "publish_receipts": _project(
-                    receipts,
-                    ("id", "preflight_id", "account_id", "platform", "executor", "status", "published_at", "updated_at"),
+                    receipt_summaries,
+                    (
+                        "id",
+                        "preflight_id",
+                        "account_id",
+                        "platform",
+                        "executor",
+                        "status",
+                        "attempt_count",
+                        "published_at",
+                        "updated_at",
+                    ),
                 ),
                 "metrics": _project(
                     metrics,
-                    ("id", "receipt_id", "account_id", "platform", "scope", "status", "observed_at", "coverage"),
+                    (
+                        "id",
+                        "receipt_id",
+                        "account_id",
+                        "platform",
+                        "scope",
+                        "metric_mode",
+                        "status",
+                        "observed_at",
+                        "metrics",
+                        "coverage",
+                    ),
                 ),
                 "platform_observations": _project(
                     platform_observations,
@@ -197,7 +233,17 @@ class PersonalIPOperatingCockpitService:
                 ),
                 "evidence_promotions": _project(
                     promotions,
-                    ("id", "evidence_type", "claim", "status", "minimum_support", "created_at", "updated_at"),
+                    (
+                        "id",
+                        "evidence_type",
+                        "claim",
+                        "status",
+                        "minimum_support",
+                        "retrospective_ids",
+                        "evidence_summary",
+                        "created_at",
+                        "updated_at",
+                    ),
                 ),
             },
             "video": {

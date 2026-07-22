@@ -1,4 +1,4 @@
-"""ORM model for cross-sample, human-reviewed evidence promotions."""
+"""ORM model for policy-gated cross-sample evidence promotions."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ def _utc_now() -> datetime:
 
 
 class PersonalIPEvidencePromotionRow(Base):
-    """One proposed pattern and its terminal authenticated-user decision."""
+    """One evidence-backed pattern and its automatic policy decision receipt."""
 
     __tablename__ = "personal_ip_evidence_promotions"
 
@@ -28,7 +28,7 @@ class PersonalIPEvidencePromotionRow(Base):
     evidence_summary_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     evidence_digest: Mapped[str] = mapped_column(String(64), nullable=False)
     minimum_support: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[str] = mapped_column(String(16), nullable=False, default="proposed")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="approved")
     decisions_json: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utc_now)

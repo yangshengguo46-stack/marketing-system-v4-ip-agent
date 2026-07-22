@@ -198,6 +198,26 @@ async def test_publish_receipt_rejects_foreign_or_out_of_preflight_accounts(tmp_
             executor="ui_tars",
             request_payload={"caption": "测试"},
         )
+    with pytest.raises(ValueError, match="selected preflight variant"):
+        await receipts.begin(
+            owner_user_id="user-1",
+            operation_key="publish:missing-variant",
+            idempotency_key="idem-missing-variant",
+            account_id=allowed["id"],
+            preflight_id=preflight["id"],
+            executor="browser",
+            request_payload={"caption": "测试"},
+        )
+    with pytest.raises(ValueError, match="outside the sealed preflight receipt"):
+        await receipts.begin(
+            owner_user_id="user-1",
+            operation_key="publish:foreign-variant",
+            idempotency_key="idem-foreign-variant",
+            account_id=allowed["id"],
+            preflight_id=preflight["id"],
+            executor="browser",
+            request_payload={"variant_id": "not-sealed", "caption": "测试"},
+        )
     with pytest.raises(ValueError, match="target account not found"):
         await receipts.begin(
             owner_user_id="user-1",
@@ -207,6 +227,59 @@ async def test_publish_receipt_rejects_foreign_or_out_of_preflight_accounts(tmp_
             preflight_id=None,
             executor="browser",
             request_payload={"caption": "测试"},
+        )
+    await close_engine()
+
+
+@pytest.mark.asyncio
+async def test_publish_receipt_rejects_credentials_and_sanitizes_external_url(tmp_path) -> None:
+    await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
+    sf = get_session_factory()
+    assert sf is not None
+    accounts = PersonalIPAccountRepository(sf)
+    receipts = PersonalIPPublishReceiptRepository(sf)
+    account = await accounts.create(
+        owner_user_id="user-1",
+        platform="douyin",
+        display_name="凭据边界账号",
+    )
+    with pytest.raises(ValueError, match="credential"):
+        await receipts.begin(
+            owner_user_id="user-1",
+            operation_key="publish:credential",
+            idempotency_key="idem-credential",
+            account_id=account["id"],
+            preflight_id=None,
+            executor="browser",
+            request_payload={"cookie": "session=secret"},
+        )
+    created = await receipts.begin(
+        owner_user_id="user-1",
+        operation_key="publish:safe",
+        idempotency_key="idem-safe",
+        account_id=account["id"],
+        preflight_id=None,
+        executor="browser",
+        request_payload={"caption": "测试"},
+    )
+    published = await receipts.record_attempt(
+        created["id"],
+        owner_user_id="user-1",
+        attempt_key="attempt-safe",
+        status="published",
+        result_payload={"confirmation": "页面显示发布成功"},
+        external_post_id="post-1",
+        external_url="https://example.com/post/1?share_token=secret#fragment",
+    )
+    assert published is not None
+    assert published["external_url"] == "https://example.com/post/1"
+    with pytest.raises(ValueError, match="credential"):
+        await receipts.record_attempt(
+            created["id"],
+            owner_user_id="user-1",
+            attempt_key="attempt-leak",
+            status="published",
+            result_payload={"access_token": "secret"},
         )
     await close_engine()
 

@@ -56,7 +56,6 @@ export type PersonalIPOperatingCockpit = {
     preflights_awaiting_publish: string[];
     published_receipts_awaiting_metrics: string[];
     published_receipts_awaiting_retrospective: string[];
-    evidence_awaiting_decision: string[];
   };
   recent: Record<string, Array<Record<string, unknown>>>;
   video: {
