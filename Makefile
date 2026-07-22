@@ -1,8 +1,9 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify volcengine-install volcengine-doctor hllm-doctor hllm-lite douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify ip-clean-install volcengine-install volcengine-doctor hllm-doctor hllm-lite douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
+PNPM ?= pnpm
 BACKEND_UV_RUN = cd backend && uv run
 
 # Detect OS for Windows compatibility
@@ -22,6 +23,7 @@ help:
 	@echo "  make ip-init         - Install the default local personal-IP Agent"
 	@echo "  make ip-package      - Build and smoke-test the complete source archive"
 	@echo "  make ip-package-verify PACKAGE=... - Verify an existing source archive"
+	@echo "  make ip-clean-install - Validate the source archive in a credential-free clean room"
 	@echo "  make volcengine-install - Build the pinned AI MediaKit CLI from source"
 	@echo "  make volcengine-doctor  - Check the source-built AI MediaKit CLI"
 	@echo "  make hllm-doctor        - Verify the pinned full HLLM-Creator source"
@@ -37,7 +39,7 @@ help:
 	@echo "  make check           - Check if all required tools are installed"
 	@echo "  make detect-thread-boundaries - Inventory async/thread boundary points"
 	@echo "  make detect-blocking-io        - Inventory blocking IO that may block the backend event loop"
-	@echo "  make install         - Install all dependencies (frontend + backend + pre-commit hooks)"
+	@echo "  make install         - Install dependencies (Git checkouts also get pre-commit hooks)"
 	@echo "  make setup-sandbox   - Pre-pull sandbox container image (recommended)"
 	@echo "  make dev             - Start all services in development mode (with hot-reloading)"
 	@echo "  make dev-daemon      - Start dev services in background (daemon mode)"
@@ -73,6 +75,9 @@ ip-package:
 ip-package-verify:
 	@test -n "$(PACKAGE)" || (echo "Set PACKAGE=/path/to/ip-agent-source-*.tar.gz" && exit 2)
 	@$(PYTHON) ./scripts/package_ip_agent.py verify "$(PACKAGE)" --smoke
+
+ip-clean-install:
+	@$(PYTHON) ./scripts/clean_install_ip_agent.py
 
 volcengine-install: ffmpeg-toolchain mediakit-toolchain
 	@$(PYTHON) ./scripts/mediakit_source.py build
@@ -128,10 +133,9 @@ install:
 	@echo "Installing backend dependencies..."
 	@cd backend && uv sync
 	@echo "Installing frontend dependencies..."
-	@cd frontend && pnpm install
-	@echo "Installing pre-commit hooks..."
-	@uv tool install pre-commit
-	@pre-commit install --overwrite
+	@cd frontend && $(PNPM) install
+	@echo "Installing repository-only developer hooks..."
+	@$(PYTHON) ./scripts/install_dev_hooks.py
 	@echo "✓ All dependencies installed"
 	@echo ""
 	@echo "=========================================="

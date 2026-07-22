@@ -225,7 +225,8 @@ make doctor      # Check configuration and system requirements
 make support-bundle  # Generate redacted troubleshooting summary, AI issue draft, and optional zip
 make config      # Generate local config files from the examples
 make check       # Check that required tools are installed
-make install     # Install all dependencies (frontend + backend + pre-commit hooks)
+make install     # Install dependencies; install pre-commit hooks only in a Git checkout
+make ip-clean-install  # Full credential-free source-archive acceptance gate
 make dev         # Start all services with hot-reload (Gateway + Frontend + Nginx)
 make start       # Start all services in production mode (local, optimized)
 make stop        # Stop all running services

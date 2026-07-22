@@ -32,6 +32,11 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > replace the DeerFlow runtime or bind conversations to one account.
 > `make hllm-lite` starts today's local Doubao-backed provider; it does not
 > fabricate ranking scores before outcome-trained calibration exists.
+> Release owners can run `make ip-clean-install` to package the committed tree
+> and validate it with a fresh HOME, dependency caches and allowlisted
+> environment. The clean room covers config bootstrap, IP Agent initialization,
+> backend/frontend dependency installation, doctor, repeatable SQLite schema
+> bootstrap and the production frontend build without reading local secrets.
 > Audience preflights are stored as immutable, owner-scoped request/receipt
 > snapshots so later publishing outcomes can be compared with what the model
 > actually predicted at the time.
@@ -369,8 +374,12 @@ On Windows, run the local development flow from Git Bash. Native `cmd.exe` and P
 
 2. **Install dependencies**:
    ```bash
-   make install  # Install backend + frontend dependencies + pre-commit hooks
+   make install  # Install backend + frontend dependencies; Git checkouts also get pre-commit hooks
    ```
+
+   A source archive has no `.git` metadata, so repository-only pre-commit hooks
+   are skipped automatically. To reproduce the customer clean-room gate from a
+   committed checkout, run `make ip-clean-install`.
 
 3. **(Optional) Pre-pull sandbox image**:
    ```bash

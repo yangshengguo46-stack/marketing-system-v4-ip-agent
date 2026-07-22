@@ -49,6 +49,9 @@ Consider the setup successful when all of the following are true:
   - Run `make check`.
   - If `make check` reports missing system dependencies such as `node`, `pnpm`, `uv`, or `nginx`, stop and report the missing tools instead of attempting privileged installs.
   - If prerequisites are satisfied, run `make install`.
+  - In a source archive without `.git` metadata, `make install` deliberately
+    skips repository-only pre-commit hooks after installing backend and frontend
+    dependencies.
   - Tell the user the recommended next command is `make dev`.
 - Inspect `config.yaml` only for missing model entries or referenced environment variable placeholders. Do not read `.env`, `frontend/.env`, or other secret-bearing files.
 - If no model is configured, tell the user they must add at least one entry under `models` in `config.yaml`.

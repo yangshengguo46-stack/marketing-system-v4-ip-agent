@@ -37,7 +37,10 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0,<3.0",
     "aiosqlite>=0.19",
     "alembic>=1.13",
-    "cryptography>=48.0.1",
+    # cryptography 49 dropped macOS x86_64 wheels. Keep Intel Macs on the
+    # latest release that installs without an implicit Rust toolchain build.
+    "cryptography>=48.0.1,<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "cryptography>=48.0.1; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     "e2b-code-interpreter>=2.8.0",
 ]
 

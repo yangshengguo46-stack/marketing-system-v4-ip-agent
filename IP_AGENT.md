@@ -81,6 +81,22 @@ checksum are written to `dist/`. A recipient can independently verify it with:
 make ip-package-verify PACKAGE=/path/to/ip-agent-source-<commit>.tar.gz
 ```
 
+Before handing the archive to a customer, run the complete clean-room gate from
+a committed checkout:
+
+```bash
+make ip-clean-install
+```
+
+This builds the archive through `scripts/package_ip_agent.py`, extracts it under
+a new temporary directory, supplies only an allowlisted environment with fresh
+HOME and dependency caches, and runs `make config`, `make ip-init`,
+`make install`, `make doctor`, a repeatable SQLite migration/import probe and
+the frontend production build. Missing credentials and optional local media
+toolchains remain explicit doctor diagnostics; no existing secret values are
+read or copied. A source archive skips repository-only pre-commit hooks because
+it intentionally contains no `.git` metadata.
+
 ## Important environment variables
 
 ```dotenv

@@ -32,6 +32,13 @@ DeerFlow Frontend is a Next.js 16 web interface for an AI agent system. It commu
 
 Unit tests live under `tests/unit/` and mirror the `src/` layout (e.g., `tests/unit/core/api/stream-mode.test.ts` tests `src/core/api/stream-mode.ts`). Powered by Rstest; import source modules via the `@/` path alias.
 
+`pnpm-workspace.yaml` preserves the audited ignored-build policy across pnpm 10
+and 11. pnpm 11 defaults `strictDepBuilds` to a hard failure, so the workspace
+sets it false and explicitly denies the existing `esbuild`, `sharp`, and
+`unrs-resolver` build scripts through both the v10 and v11 policy fields. The
+source clean-install gate further lowers registry concurrency and applies one
+bounded network retry; ordinary frontend commands keep their normal defaults.
+
 E2E tests live under `tests/e2e/` and use Playwright with Chromium. They mock all backend APIs via `page.route()` network interception and test real page interactions (navigation, chat input, streaming responses). Config: `playwright.config.ts`.
 
 ## Architecture

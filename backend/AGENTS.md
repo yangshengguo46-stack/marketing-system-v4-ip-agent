@@ -99,6 +99,14 @@ make format             # Format code with ruff
 make migrate-rev MSG="..."  # Autogenerate a new alembic revision (see Schema Migrations section)
 ```
 
+Source-package acceptance honors the tracked `backend/.python-version` and uses
+Python 3.12 for locked dependencies that do not yet publish Python 3.14 wheels.
+The harness keeps macOS Intel on `cryptography` 48 because 49 removed the
+x86_64 wheel and otherwise triggers an implicit Rust source build; other
+platforms retain the normal `>=48.0.1` range. `make doctor` treats a YAML
+`models:` null value as an empty model list, so an unconfigured clean install
+reports the actionable model/setup error without secondary `NoneType` noise.
+
 The `detect-blocking-io` target parses `app/`, `packages/harness/deerflow/`,
 and `scripts/` with AST. By default it reports only blocking IO candidates that
 are inside async code, reachable from async code in the same file, or reachable
