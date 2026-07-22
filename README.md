@@ -97,7 +97,11 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > assets, storyboard, shot jobs and retries, consistency, selection, finishing
 > and delivery. The request is immutable and every provider/model/task/cost or
 > human-review outcome is an append-only receipt; successful delivery is the
-> only completion signal.
+> only completion signal. `make video-e2e-local` provides a credential-free,
+> resumable end-to-end acceptance that uses the pinned local MediaKit/FFmpeg
+> toolchain, re-hashes every successful output and requires probe/spec/full-
+> decode QA before delivery. `make video-e2e-paid-checkpoints` only writes the
+> real provider commands; it never submits a paid call.
 
 ## Official Website
 

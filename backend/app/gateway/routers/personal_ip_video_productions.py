@@ -15,6 +15,9 @@ router = APIRouter(prefix="/api/personal-ip/video-productions", tags=["personal-
 VideoEventType = Literal[
     "blueprint_sealed",
     "asset_registered",
+    "asset_generation_requested",
+    "asset_generation_completed",
+    "asset_generation_failed",
     "storyboard_sealed",
     "shot_generation_requested",
     "shot_generation_completed",
@@ -24,7 +27,12 @@ VideoEventType = Literal[
     "review_requested",
     "review_recorded",
     "voice_generated",
+    "voice_generation_requested",
+    "media_processing_requested",
+    "media_processing_completed",
+    "media_processing_failed",
     "edit_completed",
+    "delivery_qa_completed",
     "delivery_completed",
 ]
 

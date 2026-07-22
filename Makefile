@@ -1,9 +1,11 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify personal-ip-publish-acceptance volcengine-install volcengine-doctor hllm-doctor hllm-lite douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify personal-ip-publish-acceptance video-e2e-local video-e2e-paid-checkpoints volcengine-install volcengine-doctor hllm-doctor hllm-lite douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 BACKEND_UV_RUN = cd backend && uv run
+VIDEO_E2E_DIR ?= .deer-flow/acceptance/video-e2e
+VIDEO_E2E_FINISHER ?= auto
 
 # Detect OS for Windows compatibility
 ifeq ($(OS),Windows_NT)
@@ -23,6 +25,8 @@ help:
 	@echo "  make ip-package      - Build and smoke-test the complete source archive"
 	@echo "  make ip-package-verify PACKAGE=... - Verify an existing source archive"
 	@echo "  make personal-ip-publish-acceptance - Run local-only eight-platform publish recovery checks"
+	@echo "  make video-e2e-local - Run/resume the free local video delivery acceptance"
+	@echo "  make video-e2e-paid-checkpoints - Write paid media commands without running them"
 	@echo "  make volcengine-install - Build the pinned AI MediaKit CLI from source"
 	@echo "  make volcengine-doctor  - Check the source-built AI MediaKit CLI"
 	@echo "  make hllm-doctor        - Verify the pinned full HLLM-Creator source"
@@ -77,6 +81,12 @@ ip-package-verify:
 
 personal-ip-publish-acceptance:
 	@$(MAKE) -C backend personal-ip-publish-acceptance
+
+video-e2e-local:
+	@$(BACKEND_UV_RUN) python ../scripts/personal_ip_video_e2e.py local --work-dir "$(abspath $(VIDEO_E2E_DIR))" --finisher "$(VIDEO_E2E_FINISHER)"
+
+video-e2e-paid-checkpoints:
+	@$(BACKEND_UV_RUN) python ../scripts/personal_ip_video_e2e.py paid-checkpoints --work-dir "$(abspath $(VIDEO_E2E_DIR))"
 
 volcengine-install: ffmpeg-toolchain mediakit-toolchain
 	@$(PYTHON) ./scripts/mediakit_source.py build

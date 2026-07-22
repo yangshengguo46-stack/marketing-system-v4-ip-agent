@@ -67,6 +67,26 @@ For a cloud submission that only returns a task ID, use
 `--status-mode running`, ingest that receipt, then query/download through a
 second wrapped command and ingest the terminal receipt under a new event key.
 
+Declare `--output-source` once per downloaded output so its credential-free
+provider URL and download time survive ingestion. Use `--attempt` and
+`--retry-of` for retries. Use `--resume` only with the same receipt identity and
+declared input/output paths: the wrapper re-hashes every local input and output
+and refuses to reuse failed, missing or changed artifacts. Record authoritative
+charges with
+`--cost-status known|estimated`, `--cost-amount` and `--cost-currency`; otherwise
+leave cost `unknown` with an explicit reason.
+
+The repository-level free acceptance is:
+
+```bash
+make video-e2e-local
+make video-e2e-local  # verifies idempotent recovery
+```
+
+It uses simulated paid-generation results, the real local MediaKit/FFmpeg
+toolchain, immutable receipts and `personal-ip-delivery-qa-v1`. To generate but
+not execute the real paid commands, run `make video-e2e-paid-checkpoints`.
+
 The receipt contract is:
 
 ```yaml

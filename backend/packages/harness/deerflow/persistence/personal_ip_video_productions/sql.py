@@ -43,6 +43,7 @@ VIDEO_EVENT_STAGES: dict[str, str] = {
     "media_processing_completed": "finishing",
     "media_processing_failed": "finishing",
     "edit_completed": "finishing",
+    "delivery_qa_completed": "delivery",
     "delivery_completed": "delivery",
 }
 VIDEO_EVENT_STATUSES = {
@@ -74,6 +75,7 @@ VIDEO_EVENT_ALLOWED_STATUSES: dict[str, set[str]] = {
     "media_processing_completed": {"succeeded"},
     "media_processing_failed": {"failed"},
     "edit_completed": {"succeeded", "failed"},
+    "delivery_qa_completed": {"succeeded", "failed"},
     "delivery_completed": {"succeeded"},
 }
 VIDEO_ENTITY_TYPES = {
@@ -353,6 +355,15 @@ class PersonalIPVideoProductionRepository:
         input_snapshot = _normalized_ids(input_refs, field="input_refs", limit=500, item_limit=2_048)
         output_snapshot = _normalized_ids(output_refs, field="output_refs", limit=500, item_limit=2_048)
         cost_snapshot = _json_snapshot(cost, field="cost", expected=dict, byte_limit=256_000)
+        if event_type_key == "delivery_qa_completed":
+            if payload_snapshot.get("contract_version") != "personal-ip-delivery-qa-v1":
+                raise ValueError("delivery QA payload must use personal-ip-delivery-qa-v1")
+            if payload_snapshot.get("passed") is not (status_key == "succeeded"):
+                raise ValueError("delivery QA payload passed flag must match event status")
+            if not output_snapshot:
+                raise ValueError("delivery QA must reference at least one output")
+        if event_type_key == "delivery_completed" and not output_snapshot:
+            raise ValueError("delivery_completed must reference at least one output")
 
         async with self._sf() as session:
             production_statement = (
@@ -396,6 +407,22 @@ class PersonalIPVideoProductionRepository:
                 return result
             if production.status in {"completed", "cancelled"}:
                 raise ValueError("terminal video production cannot accept new events")
+            if event_type_key == "delivery_completed":
+                qa_statement = (
+                    select(PersonalIPVideoProductionEventRow)
+                    .where(
+                        PersonalIPVideoProductionEventRow.production_id == production.id,
+                        PersonalIPVideoProductionEventRow.event_type == "delivery_qa_completed",
+                        PersonalIPVideoProductionEventRow.status == "succeeded",
+                    )
+                    .order_by(PersonalIPVideoProductionEventRow.sequence.desc())
+                )
+                qa_events = list((await session.execute(qa_statement)).scalars())
+                passed_qa = [event for event in qa_events if (event.payload_json or {}).get("passed") is True]
+                if not passed_qa:
+                    raise ValueError("delivery_completed requires a successful delivery QA event")
+                if not any(set(event.output_refs_json or []) == set(output_snapshot) for event in passed_qa):
+                    raise ValueError("delivery_completed requires QA for the exact delivery outputs")
 
             sequence = production.event_count + 1
             event = PersonalIPVideoProductionEventRow(

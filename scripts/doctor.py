@@ -51,6 +51,8 @@ IP_AGENT_REQUIRED_SOURCE_PATHS = (
     "skills/public/byted-mediakit-image/SKILL.md",
     "skills/public/byted-mediakit-audio/SKILL.md",
     "scripts/package_ip_agent.py",
+    "scripts/personal_ip_video_e2e.py",
+    "backend/packages/harness/deerflow/personal_ip/video_acceptance.py",
     "third_party/volcengine/mediakit-cli/go.mod",
     "third_party/volcengine/mediakit-cli/cmd/mediakit/main.go",
     "third_party/volcengine/mediakit-cli/LICENSE",
@@ -732,11 +734,7 @@ def check_ip_agent_capability_manifest(project_root: Path) -> CheckResult:
         return CheckResult("eight-platform capability manifest", "fail", "manifest missing")
     try:
         manifest = _load_yaml_file(manifest_path)
-        configured = set(
-            manifest.get("capabilities", {})
-            .get("platform_operations", {})
-            .get("platforms", [])
-        )
+        configured = set(manifest.get("capabilities", {}).get("platform_operations", {}).get("platforms", []))
     except Exception as exc:
         return CheckResult("eight-platform capability manifest", "fail", str(exc))
     missing = sorted(IP_AGENT_PLATFORMS - configured)

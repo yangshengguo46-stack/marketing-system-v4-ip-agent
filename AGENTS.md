@@ -207,7 +207,11 @@ IP Agent distribution note:
   storyboard, per-shot generation/failure/retry, consistency, selection,
   finishing and delivery as idempotent append-only events. Providers and model
   versions are receipt fields, not orchestration state. A production completes
-  only through a successful `delivery_completed` event.
+  only through a successful `delivery_completed` event, and that event requires
+  a preceding successful `personal-ip-delivery-qa-v1` receipt for the exact
+  output refs. `scripts/personal_ip_video_e2e.py` is the credential-free local
+  acceptance/resume path; it must keep paid providers simulated unless the
+  active user session explicitly approves the generated paid checkpoints.
 - `deerflow.personal_ip.operating_cockpit` is the owner-scoped read model that
   joins the six-stage operating loop and nine-stage video line. The Gateway
   route and native `personal_ip_operating_cockpit` tool must use the same

@@ -6,6 +6,7 @@ import json
 import math
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from deerflow.persistence.personal_ip_platform_observations.sql import validate_credential_free_payload
 
@@ -87,8 +88,20 @@ def _json_snapshot(value: Any, *, field: str, expected: type, byte_limit: int = 
     return json.loads(serialized)
 
 
+def _artifact_ref(value: Any, *, field: str) -> str:
+    ref = _required_text(value, field=field, limit=2_048)
+    parsed = urlsplit(ref)
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError(f"{field} cannot contain URL credentials")
+    if parsed.scheme in {"http", "https"}:
+        ref = urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
+    return ref
+
+
 def _artifact_list(value: Any, *, field: str, require_verified: bool) -> list[dict[str, Any]]:
-    items = _json_snapshot(value, field=field, expected=list)
+    if not isinstance(value, list):
+        raise ValueError(f"{field} must be an array")
+    items = value
     if len(items) > 500:
         raise ValueError(f"{field} may contain at most 500 artifacts")
     normalized: list[dict[str, Any]] = []
@@ -96,7 +109,7 @@ def _artifact_list(value: Any, *, field: str, require_verified: bool) -> list[di
     for index, raw in enumerate(items):
         if not isinstance(raw, dict):
             raise ValueError(f"{field}[{index}] must be an object")
-        ref = _required_text(raw.get("ref"), field=f"{field}[{index}].ref", limit=2_048)
+        ref = _artifact_ref(raw.get("ref"), field=f"{field}[{index}].ref")
         if ref in seen:
             raise ValueError(f"{field} contains duplicate ref: {ref}")
         seen.add(ref)
@@ -115,9 +128,19 @@ def _artifact_list(value: Any, *, field: str, require_verified: bool) -> list[di
         mime_type = _optional_text(raw.get("mime_type"), field=f"{field}[{index}].mime_type", limit=128)
         if mime_type is not None:
             item["mime_type"] = mime_type
+        source_ref = raw.get("source_ref")
+        if source_ref is not None:
+            item["source_ref"] = _artifact_ref(source_ref, field=f"{field}[{index}].source_ref")
+            item["downloaded_at"] = _timestamp(raw.get("downloaded_at"), field=f"{field}[{index}].downloaded_at").isoformat()
+        elif raw.get("downloaded_at") is not None:
+            raise ValueError(f"{field}[{index}].downloaded_at requires source_ref")
         if require_verified and (digest is None or size is None):
             raise ValueError(f"{field}[{index}] must include sha256 and size_bytes")
+        validate_credential_free_payload(item, field=f"{field}[{index}]")
         normalized.append(item)
+    serialized = json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    if len(serialized.encode("utf-8")) > 1_000_000:
+        raise ValueError(f"{field} exceeds the snapshot limit")
     return normalized
 
 

@@ -38,6 +38,8 @@ REQUIRED_PACKAGE_PATHS = (
     "scripts/install_go_toolchain.py",
     "scripts/mediakit_source.py",
     "scripts/package_ip_agent.py",
+    "scripts/personal_ip_video_e2e.py",
+    "backend/packages/harness/deerflow/personal_ip/video_acceptance.py",
     "skills/public/volcengine-stack/SKILL.md",
     "skills/public/volcengine-stack/scripts/run_media_executor.py",
     "third_party/bytedance/HLLM/VENDORED_VERSION.json",
@@ -243,11 +245,7 @@ def verify_source_package(archive_path: Path) -> dict[str, Any]:
         required_missing = sorted(set(REQUIRED_PACKAGE_PATHS) - set(expected))
         if required_missing:
             raise RuntimeError(f"source package is incomplete: {', '.join(required_missing)}")
-        actual_names = {
-            member.name
-            for member in members
-            if member.name != f"{prefix}/{MANIFEST_NAME}"
-        }
+        actual_names = {member.name for member in members if member.name != f"{prefix}/{MANIFEST_NAME}"}
         expected_names = {f"{prefix}/{relative}" for relative in expected}
         if actual_names != expected_names:
             raise RuntimeError("archive members do not match the signed package manifest")
