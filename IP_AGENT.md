@@ -139,7 +139,9 @@ store lifetime/cumulative counters as `snapshot`. Query
 all active accounts. The result reports totals by platform/account plus
 partial, unavailable and missing account coverage. It deliberately excludes
 cumulative snapshots from daily totals and does not treat unavailable data as
-zero. Post-level observations reference the matching publish receipt, which is
+zero. Repeated same-start `window_total` polls replace the earlier cutoff for
+their series, so a morning count and an afternoon count are not double-counted.
+Post-level observations reference the matching publish receipt, which is
 the bridge to later prediction-versus-actual review.
 
 Seal that review through `POST /api/personal-ip/retrospectives` after the
@@ -186,8 +188,12 @@ construct internal HTTP calls:
   request bodies, executor results and every credential field.
 - `personal_ip_metrics_aggregate` reads the authenticated user's whole active
   portfolio for a time window and has no account-filter argument. Its coverage
-  reports missing, partial and unavailable accounts instead of converting them
-  to zero.
+  reports mutually exclusive missing, partial and unavailable accounts plus
+  per-metric coverage instead of converting absent fields to zero.
+- `personal_ip_collect_browser_portfolio_today` scans every active account in
+  the eight-platform browser registry, seals its detailed dashboard evidence,
+  and returns the resulting aggregate. It accepts no account id and promotes a
+  count only when the rendered page explicitly says 今日/今天/Today.
 - `personal_ip_sync_douyin_post` accepts only a connection id, confirmed
   publish-receipt id and observation idempotency key. Credential resolution,
   refresh and official collection stay server-side.
@@ -232,6 +238,13 @@ All eight browser-first platforms share the direct collector at
 owner-scoped account, reuses the same persistent account profile as manual
 login, captures only rendered DOM business content plus a full-page screenshot
 digest, and records unverified platform pages as partial single-page coverage.
+The dashboard adapters retain direct rendered counts, their matched labels and
+the displayed time-window label for all eight platforms. The owner-wide today
+path is also exposed at
+`POST /api/personal-ip/metrics/collect/browser-portfolio-today`; a longer or
+unknown window is unavailable for today's query, while a collection failure
+stays missing. `totals.views` is omitted when nobody supplied a valid today
+view count.
 The older Douyin endpoint/tool remain compatibility wrappers over the same
 service. Douyin has verified dashboard/content-inventory parsing and may mark a
 listing complete only when the declared count matches parsed items and the page

@@ -12,17 +12,54 @@ from urllib.parse import urlsplit
 class BrowserPlatform:
     label: str
     start_url: str
+    dashboard_url: str
+    creator_hosts: tuple[str, ...] = ()
+    authenticated_hosts: tuple[str, ...] = ()
 
 
 BROWSER_PLATFORMS: dict[str, BrowserPlatform] = {
-    "douyin": BrowserPlatform("抖音", "https://creator.douyin.com/"),
-    "wechat_channels": BrowserPlatform("视频号", "https://channels.weixin.qq.com/platform"),
-    "wechat_official": BrowserPlatform("公众号", "https://mp.weixin.qq.com/"),
-    "xiaohongshu": BrowserPlatform("小红书", "https://creator.xiaohongshu.com/"),
-    "x": BrowserPlatform("X", "https://x.com/"),
-    "instagram": BrowserPlatform("Instagram", "https://www.instagram.com/"),
-    "youtube": BrowserPlatform("YouTube", "https://studio.youtube.com/"),
-    "tiktok": BrowserPlatform("TikTok", "https://www.tiktok.com/tiktokstudio"),
+    "douyin": BrowserPlatform(
+        "抖音",
+        "https://creator.douyin.com/",
+        "https://creator.douyin.com/creator-micro/home",
+    ),
+    "wechat_channels": BrowserPlatform(
+        "视频号",
+        "https://channels.weixin.qq.com/platform",
+        "https://channels.weixin.qq.com/platform/data/overview",
+    ),
+    "wechat_official": BrowserPlatform(
+        "公众号",
+        "https://mp.weixin.qq.com/",
+        "https://mp.weixin.qq.com/",
+    ),
+    "xiaohongshu": BrowserPlatform(
+        "小红书",
+        "https://creator.xiaohongshu.com/",
+        "https://creator.xiaohongshu.com/new/home",
+    ),
+    "x": BrowserPlatform(
+        "X",
+        "https://x.com/",
+        "https://analytics.x.com/",
+        creator_hosts=("analytics.x.com",),
+        authenticated_hosts=("analytics.x.com",),
+    ),
+    "instagram": BrowserPlatform(
+        "Instagram",
+        "https://www.instagram.com/",
+        "https://www.instagram.com/professional_dashboard/",
+    ),
+    "youtube": BrowserPlatform(
+        "YouTube",
+        "https://studio.youtube.com/",
+        "https://studio.youtube.com/",
+    ),
+    "tiktok": BrowserPlatform(
+        "TikTok",
+        "https://www.tiktok.com/tiktokstudio",
+        "https://www.tiktok.com/tiktokstudio/analytics",
+    ),
 }
 
 _LOGIN_SUCCESS_PATH_PREFIXES: dict[str, tuple[str, ...]] = {
@@ -78,7 +115,8 @@ def browser_login_challenge(platform: str, url: str) -> bool:
         return True
     expected_host = (urlsplit(config.start_url).hostname or "").lower()
     path = parsed.path.lower()
-    return host == expected_host and any(marker in path for marker in _LOGIN_CHALLENGE_PATH_MARKERS)
+    allowed_hosts = {expected_host, *config.creator_hosts}
+    return host in allowed_hosts and any(marker in path for marker in _LOGIN_CHALLENGE_PATH_MARKERS)
 
 
 def browser_login_succeeded(platform: str, url: str, *, challenge_seen: bool = False) -> bool:
@@ -91,9 +129,12 @@ def browser_login_succeeded(platform: str, url: str, *, challenge_seen: bool = F
     except ValueError:
         return False
     expected_host = (urlsplit(config.start_url).hostname or "").lower()
-    if (parsed.hostname or "").lower() != expected_host:
+    host = (parsed.hostname or "").lower()
+    if host not in {expected_host, *config.creator_hosts}:
         return False
     path = parsed.path.lower() or "/"
+    if host in config.authenticated_hosts and not browser_login_challenge(platform, url):
+        return True
     if any(_path_matches_prefix(path, prefix) for prefix in _LOGIN_SUCCESS_PATH_PREFIXES.get(platform, ())):
         return True
     return challenge_seen and platform in _CHALLENGE_RETURN_PLATFORMS and not browser_login_challenge(platform, url)

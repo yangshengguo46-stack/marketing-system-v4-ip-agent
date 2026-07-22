@@ -11,6 +11,7 @@ from deerflow.personal_ip.runtime import PersonalIPRuntimeServices, configure_pe
 from deerflow.tools.builtins import (
     personal_ip_begin_video_production_tool,
     personal_ip_collect_browser_page_tool,
+    personal_ip_collect_browser_portfolio_today_tool,
     personal_ip_collect_douyin_browser_page_tool,
     personal_ip_ingest_media_execution_tool,
     personal_ip_metrics_aggregate_tool,
@@ -28,6 +29,7 @@ from deerflow.tools.builtins import (
 from deerflow.tools.builtins.personal_ip_tools import (
     _personal_ip_begin_video_production,
     _personal_ip_collect_browser_page,
+    _personal_ip_collect_browser_portfolio_today,
     _personal_ip_collect_douyin_browser_page,
     _personal_ip_ingest_media_execution,
     _personal_ip_metrics_aggregate,
@@ -129,6 +131,7 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     assert personal_ip_ingest_media_execution_tool.name == "personal_ip_ingest_media_execution"
     assert personal_ip_operating_cockpit_tool.name == "personal_ip_operating_cockpit"
     assert personal_ip_collect_browser_page_tool.name == "personal_ip_collect_browser_page"
+    assert personal_ip_collect_browser_portfolio_today_tool.name == "personal_ip_collect_browser_portfolio_today"
     assert personal_ip_collect_douyin_browser_page_tool.name == "personal_ip_collect_douyin_browser_page"
     assert personal_ip_performance_inventory_tool.name == "personal_ip_performance_inventory"
     assert personal_ip_platform_observation_inventory_tool.name == "personal_ip_platform_observation_inventory"
@@ -146,6 +149,7 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
         "personal_ip_ingest_media_execution",
         "personal_ip_operating_cockpit",
         "personal_ip_collect_browser_page",
+        "personal_ip_collect_browser_portfolio_today",
         "personal_ip_performance_inventory",
         "personal_ip_platform_observation_inventory",
         "personal_ip_read_platform_observation",
@@ -159,6 +163,52 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     } <= names
     schema = personal_ip_metrics_aggregate_tool.tool_call_schema.model_json_schema()
     assert "account_id" not in schema.get("properties", {})
+    browser_portfolio_schema = personal_ip_collect_browser_portfolio_today_tool.tool_call_schema.model_json_schema()
+    assert "account_id" not in browser_portfolio_schema.get("properties", {})
+
+
+@pytest.mark.asyncio
+async def test_browser_today_tool_collects_and_aggregates_owner_whole_portfolio(monkeypatch) -> None:
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            accounts=SimpleNamespace(),
+            connections=SimpleNamespace(),
+            metrics=SimpleNamespace(),
+            publish_receipts=SimpleNamespace(),
+            platform_observations=SimpleNamespace(),
+        )
+    )
+    collect = AsyncMock(
+        return_value={
+            "status": "partial",
+            "aggregate": {
+                "totals": {"views": 200},
+                "coverage": {
+                    "partial_account_ids": ["acct-douyin"],
+                    "unavailable_account_ids": ["acct-instagram"],
+                    "missing_account_ids": ["acct-youtube"],
+                },
+            },
+        }
+    )
+    monkeypatch.setattr(
+        "deerflow.tools.builtins.personal_ip_tools._browser_portfolio_metric_service",
+        lambda _services: SimpleNamespace(collect_today=collect),
+    )
+
+    raw = await _personal_ip_collect_browser_portfolio_today(
+        SimpleNamespace(context={"user_id": "user-1", "thread_id": "thread-does-not-bind-account"}),
+        collection_key="today:2026-07-22T12+08:00",
+        window_started_at="2026-07-22T00:00:00+08:00",
+        window_ended_at="2026-07-22T12:00:00+08:00",
+    )
+    payload = json.loads(raw)
+
+    assert payload["aggregate"]["totals"]["views"] == 200
+    assert payload["aggregate"]["coverage"]["missing_account_ids"] == ["acct-youtube"]
+    kwargs = collect.await_args.kwargs
+    assert kwargs["owner_user_id"] == "user-1"
+    assert "account_id" not in kwargs
 
 
 @pytest.mark.asyncio

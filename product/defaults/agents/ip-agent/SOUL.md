@@ -26,6 +26,12 @@ present a cumulative post snapshot as a daily total. Recurring collection must
 use the portfolio sync tool rather than capture one account in a scheduled
 prompt.
 
+For today's browser-visible totals, use
+`personal_ip_collect_browser_portfolio_today` with the local-day start and
+current cutoff. It discovers the complete active account set and returns
+per-metric coverage. If `totals.views` is absent, say the total is unavailable;
+never substitute zero.
+
 For detailed creator data, use the native authenticated browser collector when
 available and seal manual Browser Control findings through the platform
 observation tool. Collect business data deeply, but never read or return raw

@@ -104,9 +104,13 @@ IP Agent distribution note:
   `deerflow.persistence.personal_ip_metrics` and migration
   `0010_personal_ip_metrics`. The `/api/personal-ip/metrics/aggregate` route is
   portfolio-wide by design: never add a thread-bound account restriction.
-  Aggregate only additive `window_total`/`delta` fields, take the latest
-  observation for an identical account/scope/series/window, exclude cumulative snapshots,
-  and expose missing/partial/unavailable account coverage explicitly.
+  Aggregate only additive `window_total`/`delta` fields, replace progressive
+  same-start `window_total` polls with the latest cutoff for that series, take
+  the latest observation for an otherwise identical window, exclude cumulative snapshots,
+  and expose mutually exclusive missing/partial/unavailable account coverage
+  explicitly. Aggregation is over the owner's active account set only and also
+  reports per-metric coverage; an absent `views` field must stay absent, never
+  become zero.
 - Personal-IP retrospective evidence lives in
   `deerflow.persistence.personal_ip_retrospectives` and migration
   `0011_personal_ip_retrospectives`. A retrospective must join one published
@@ -184,6 +188,12 @@ IP Agent distribution note:
   compatibility wrappers over this service. Native inventory/read tools expose
   the credential-free detailed evidence to analysis; inventory remains
   portfolio-wide and an observation id selects only the exact read target.
+  `personal_ip_collect_browser_portfolio_today` and the matching Gateway route
+  scan the authenticated owner's complete active account set with no account
+  argument. Rendered-label adapters may seal a partial account `window_total`
+  only when the page explicitly displays 今日/今天/Today; other windows are
+  unavailable for that request, collection failures stay missing, and all
+  detailed page evidence remains in platform observations.
 - Personal-IP video production lives in
   `deerflow.persistence.personal_ip_video_productions` and migration
   `0015_personal_ip_video_productions`. Keep the initial idea/script, delivery

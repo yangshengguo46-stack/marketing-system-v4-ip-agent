@@ -132,3 +132,41 @@ async def test_metric_router_collects_with_server_side_connection_without_raw_to
         publish_receipt_id="publish-1",
         observation_key="douyin:item-1:2026-07-21T12:00:00Z",
     )
+
+
+@pytest.mark.asyncio
+async def test_metric_router_collects_browser_today_for_whole_portfolio(monkeypatch) -> None:
+    service = SimpleNamespace(
+        collect_today=AsyncMock(
+            return_value={
+                "status": "partial",
+                "aggregate": {
+                    "totals": {"views": 200},
+                    "coverage": {"missing_account_ids": ["acct-missing"]},
+                },
+            }
+        )
+    )
+    app = FastAPI()
+    app.include_router(router_module.router)
+
+    async def current_user(_request):
+        return SimpleNamespace(id="user-1")
+
+    monkeypatch.setattr(router_module, "get_current_user_from_request", current_user)
+    monkeypatch.setattr(router_module, "_get_browser_portfolio_service", lambda _request: service)
+    async with httpx.AsyncClient(base_url="http://test", transport=httpx.ASGITransport(app=app)) as client:
+        response = await client.post(
+            "/api/personal-ip/metrics/collect/browser-portfolio-today",
+            json={
+                "collection_key": "today:2026-07-22T12+08:00",
+                "window_started_at": "2026-07-22T00:00:00+08:00",
+                "window_ended_at": "2026-07-22T12:00:00+08:00",
+            },
+        )
+
+    assert response.status_code == 201
+    assert response.json()["aggregate"]["totals"]["views"] == 200
+    kwargs = service.collect_today.await_args.kwargs
+    assert kwargs["owner_user_id"] == "user-1"
+    assert "account_id" not in kwargs

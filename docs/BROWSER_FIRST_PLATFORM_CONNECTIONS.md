@@ -50,6 +50,27 @@ matches the parsed items and the page reports that no more works remain. The
 older `personal_ip_collect_douyin_browser_page` entry remains a compatibility
 wrapper, not a second collector.
 
+Dashboard collection also has credential-free rendered-label adapters for all
+eight platforms. They normalize direct counts such as 播放量、阅读次数、Views and
+Post views while retaining the exact matched label and displayed window in the
+platform observation. The adapters do not turn a count into a daily metric by
+themselves: `personal_ip_collect_browser_portfolio_today` scans every active
+account and writes `window_total` rows only when the rendered page explicitly
+labels the data as 今日/今天/Today. A 7-day, 28-day, yesterday or unknown window
+is stored as detailed evidence but recorded as unavailable for the requested
+today window, never silently reinterpreted.
+
+The same whole-portfolio path is available through
+`POST /api/personal-ip/metrics/collect/browser-portfolio-today`. It accepts a
+stable collection key plus the start and collection cutoff of today, but no
+account id. Each account gets its own immutable detailed observation and metric
+observation. The response includes all configured accounts plus an eight-entry
+platform coverage map; collection failures remain missing, login or window
+limitations remain unavailable, and direct rendered counts remain partial
+until platform-specific completeness is proven. The returned aggregate omits
+`totals.views` when no account supplied a valid today view count and includes
+per-metric account coverage, so callers cannot confuse absence with zero.
+
 The native tool returns the captured business records to the agent as well as
 sealing them durably. For later analysis,
 `personal_ip_platform_observation_inventory` lists recent evidence across the
