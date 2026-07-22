@@ -45,7 +45,8 @@ python /mnt/skills/public/video-generation/scripts/generate.py \
   --prompt-file /mnt/user-data/workspace/prompt-file.json \
   --reference-images /path/to/ref1.jpg \
   --output-file /mnt/user-data/outputs/generated-video.mp4 \
-  --aspect-ratio 16:9
+  --aspect-ratio 16:9 \
+  --receipt-file /mnt/user-data/outputs/generated-video.receipt.json
 ```
 
 Parameters:
@@ -54,6 +55,7 @@ Parameters:
 - `--reference-images`: Absolute paths to reference image (optional)
 - `--output-file`: Absolute path to output image file (required)
 - `--aspect-ratio`: Aspect ratio of the generated image (optional, default: 16:9)
+- `--receipt-file`: Standard executor receipt path (required inside a Personal-IP production)
 
 [!NOTE]
 Do NOT read the python file, instead just call it with the parameters.
@@ -118,7 +120,8 @@ python /mnt/skills/public/video-generation/scripts/generate.py \
   --prompt-file /mnt/user-data/workspace/narnia-farewell-scene.json \
   --reference-images /mnt/user-data/outputs/narnia-farewell-scene-01.jpg \
   --output-file /mnt/user-data/outputs/narnia-farewell-scene-01.mp4 \
-  --aspect-ratio 16:9
+  --aspect-ratio 16:9 \
+  --receipt-file /mnt/user-data/outputs/narnia-farewell-scene-01.receipt.json
 ```
 > Do NOT read the python file, just call it with the parameters.
 
@@ -126,6 +129,7 @@ python /mnt/skills/public/video-generation/scripts/generate.py \
 
 After generation:
 
+- In a Personal-IP production, submit the receipt through `personal_ip_ingest_media_execution`; do not manually reconstruct the provider event
 - Videos are typically saved in `/mnt/user-data/outputs/`
 - Share generated videos (come first) with user as well as generated image if applicable, using `present_files` tool
 - Provide brief description of the generation result

@@ -12,6 +12,7 @@ from deerflow.tools.builtins import (
     personal_ip_begin_video_production_tool,
     personal_ip_collect_browser_page_tool,
     personal_ip_collect_douyin_browser_page_tool,
+    personal_ip_ingest_media_execution_tool,
     personal_ip_metrics_aggregate_tool,
     personal_ip_operating_cockpit_tool,
     personal_ip_performance_inventory_tool,
@@ -28,6 +29,7 @@ from deerflow.tools.builtins.personal_ip_tools import (
     _personal_ip_begin_video_production,
     _personal_ip_collect_browser_page,
     _personal_ip_collect_douyin_browser_page,
+    _personal_ip_ingest_media_execution,
     _personal_ip_metrics_aggregate,
     _personal_ip_operating_cockpit,
     _personal_ip_performance_inventory,
@@ -124,6 +126,7 @@ async def test_douyin_sync_tool_uses_connection_reference_without_returning_toke
 def test_personal_ip_native_tools_are_available_without_thread_account_binding() -> None:
     names = {tool.name for tool in BUILTIN_TOOLS}
     assert personal_ip_metrics_aggregate_tool.name == "personal_ip_metrics_aggregate"
+    assert personal_ip_ingest_media_execution_tool.name == "personal_ip_ingest_media_execution"
     assert personal_ip_operating_cockpit_tool.name == "personal_ip_operating_cockpit"
     assert personal_ip_collect_browser_page_tool.name == "personal_ip_collect_browser_page"
     assert personal_ip_collect_douyin_browser_page_tool.name == "personal_ip_collect_douyin_browser_page"
@@ -140,6 +143,7 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     assert personal_ip_collect_browser_page_tool in BUILTIN_TOOLS
     assert {
         "personal_ip_metrics_aggregate",
+        "personal_ip_ingest_media_execution",
         "personal_ip_operating_cockpit",
         "personal_ip_collect_browser_page",
         "personal_ip_performance_inventory",
@@ -242,6 +246,62 @@ async def test_native_cockpit_and_video_tools_use_owner_scoped_product_services(
     assert video_productions.begin.await_args.kwargs["subject_id"] is None
     assert video_productions.append_event.await_args.kwargs["occurred_at"].isoformat() == "2026-07-22T05:00:00+00:00"
     video_productions.get.assert_awaited_once_with("video-production-1", owner_user_id="user-1")
+
+
+@pytest.mark.asyncio
+async def test_media_execution_tool_derives_event_and_preserves_verified_receipt() -> None:
+    video_productions = SimpleNamespace(
+        append_event=AsyncMock(
+            return_value={
+                "id": "video-production-1",
+                "status": "running",
+                "events": [{"event_type": "shot_generation_completed"}],
+            }
+        )
+    )
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            connections=SimpleNamespace(),
+            metrics=SimpleNamespace(),
+            publish_receipts=SimpleNamespace(),
+            video_productions=video_productions,
+        )
+    )
+    runtime = SimpleNamespace(context={"user_id": "user-1"})
+    receipt = {
+        "contract_version": "personal-ip-media-execution-v1",
+        "capability": "video_generation",
+        "provider": "volcengine",
+        "executor": "video-generation-skill",
+        "model": "doubao-seedance-2-0-260128",
+        "status": "succeeded",
+        "task_id": "seedance-task-1",
+        "started_at": "2026-07-22T01:00:00Z",
+        "completed_at": "2026-07-22T01:02:00Z",
+        "parameters": {"ratio": "9:16"},
+        "inputs": [{"ref": "artifact://shots/shot-1.json"}],
+        "outputs": [{"ref": "artifact://shots/shot-1.mp4", "sha256": "b" * 64, "size_bytes": 2048}],
+        "cost": {"status": "unknown", "reason": "billing API unavailable"},
+    }
+
+    payload = json.loads(
+        await _personal_ip_ingest_media_execution(
+            runtime,
+            production_id="video-production-1",
+            event_key="shot-1:seedance-task-1",
+            entity_type="candidate",
+            entity_id="shot-1:candidate-1",
+            receipt=receipt,
+        )
+    )
+
+    assert payload["operation_status"] == "ok"
+    kwargs = video_productions.append_event.await_args.kwargs
+    assert kwargs["event_type"] == "shot_generation_completed"
+    assert kwargs["status"] == "succeeded"
+    assert kwargs["provider_task_id"] == "seedance-task-1"
+    assert kwargs["payload"]["outputs"][0]["sha256"] == "b" * 64
+    assert kwargs["owner_user_id"] == "user-1"
 
 
 @pytest.mark.asyncio

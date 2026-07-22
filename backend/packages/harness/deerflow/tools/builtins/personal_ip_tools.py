@@ -19,6 +19,7 @@ from deerflow.personal_ip.browser_collection import (
 )
 from deerflow.personal_ip.browser_profiles import select_browser_account_target
 from deerflow.personal_ip.douyin_oauth import DouyinMiniAppOAuthClient, DouyinOAuthError
+from deerflow.personal_ip.media_execution import normalize_media_execution_receipt
 from deerflow.personal_ip.operating_cockpit import PersonalIPOperatingCockpitService
 from deerflow.personal_ip.platform_metrics import (
     DouyinAuthorizedMetricCollectionService,
@@ -289,6 +290,63 @@ async def _personal_ip_read_video_production(runtime: Runtime, production_id: st
         return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
     except Exception:
         return _json({"status": "error", "category": "internal", "message": "Video production is unavailable"})
+
+
+async def _personal_ip_ingest_media_execution(
+    runtime: Runtime,
+    production_id: str,
+    event_key: str,
+    entity_type: str,
+    entity_id: str,
+    receipt: dict,
+) -> str:
+    """Validate and append one real media executor receipt to a production.
+
+    Use this after Seedance, Seedream, Doubao Speech, MediaKit or FFmpeg emits a
+    ``personal-ip-media-execution-v1`` receipt. The receipt is credential-free
+    and preserves provider task/request ids, exact executor/model, checksummed
+    outputs, failure state and known/estimated/unknown cost. Event type and
+    status are derived by the server so an agent cannot mislabel execution.
+
+    Args:
+        production_id: Server-issued video production id.
+        event_key: Stable idempotency key for this executor attempt.
+        entity_type: Receipt target such as shot, candidate, audio, timeline or delivery.
+        entity_id: Stable id of the target entity.
+        receipt: Complete personal-ip-media-execution-v1 executor receipt.
+
+    Returns:
+        JSON updated production projection and ordered immutable event history.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.video_productions is None:
+            raise RuntimeError("Personal-IP video production is not available")
+        normalized = normalize_media_execution_receipt(receipt, entity_type=entity_type)
+        result = await services.video_productions.append_event(
+            production_id,
+            owner_user_id=resolve_runtime_user_id(runtime),
+            event_key=event_key,
+            event_type=normalized["event_type"],
+            status=normalized["event_status"],
+            entity_type=entity_type,
+            entity_id=entity_id,
+            payload=normalized["payload"],
+            input_refs=normalized["input_refs"],
+            output_refs=normalized["output_refs"],
+            provider=normalized["provider"],
+            model=normalized["model"],
+            provider_task_id=normalized["provider_task_id"],
+            cost=normalized["cost"],
+            occurred_at=normalized["occurred_at"],
+        )
+        if result is None:
+            return _json({"status": "error", "category": "not_found", "message": "Video production not found"})
+        return _json({"operation_status": "ok", **result})
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Media execution receipt could not be recorded"})
 
 
 async def _personal_ip_metrics_aggregate(
@@ -968,6 +1026,11 @@ personal_ip_record_video_production_event_tool = tool(
     "personal_ip_record_video_production_event",
     parse_docstring=True,
 )(_personal_ip_record_video_production_event)
+
+personal_ip_ingest_media_execution_tool = tool(
+    "personal_ip_ingest_media_execution",
+    parse_docstring=True,
+)(_personal_ip_ingest_media_execution)
 
 personal_ip_read_video_production_tool = tool(
     "personal_ip_read_video_production",

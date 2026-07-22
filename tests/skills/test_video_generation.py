@@ -12,34 +12,52 @@ vid = load("video-generation")
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    for k in ["GEMINI_API_KEY", "MINIMAX_API_KEY", "VOLCENGINE_API_KEY",
-              "VIDEO_GENERATION_PROVIDER", "MINIMAX_API_HOST", "MINIMAX_VIDEO_MODEL",
-              "VOLCENGINE_ARK_BASE_URL", "VOLCENGINE_VIDEO_MODEL",
-              "VOLCENGINE_VIDEO_DURATION", "VOLCENGINE_VIDEO_RESOLUTION",
-              "VOLCENGINE_VIDEO_GENERATE_AUDIO", "VOLCENGINE_VIDEO_WATERMARK",
-              "VOLCENGINE_VIDEO_RETURN_LAST_FRAME"]:
+    for k in [
+        "GEMINI_API_KEY",
+        "MINIMAX_API_KEY",
+        "VOLCENGINE_API_KEY",
+        "VIDEO_GENERATION_PROVIDER",
+        "MINIMAX_API_HOST",
+        "MINIMAX_VIDEO_MODEL",
+        "VOLCENGINE_ARK_BASE_URL",
+        "VOLCENGINE_VIDEO_MODEL",
+        "VOLCENGINE_VIDEO_DURATION",
+        "VOLCENGINE_VIDEO_RESOLUTION",
+        "VOLCENGINE_VIDEO_GENERATE_AUDIO",
+        "VOLCENGINE_VIDEO_WATERMARK",
+        "VOLCENGINE_VIDEO_RETURN_LAST_FRAME",
+    ]:
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setattr(vid.time, "sleep", lambda *_: None)
 
 
 def test_resolve_prefers_gemini():
-    assert vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", True) == "gemini"
+    assert (
+        vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", True) == "gemini"
+    )
 
 
 def test_resolve_prefers_volcengine(monkeypatch):
     monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
-    assert vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", True) == "volcengine"
+    assert (
+        vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", True)
+        == "volcengine"
+    )
 
 
 def test_resolve_falls_back_to_minimax(monkeypatch):
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
-    assert vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", False) == "minimax"
+    assert (
+        vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", False) == "minimax"
+    )
 
 
 def test_resolve_override(monkeypatch):
     monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
     monkeypatch.setenv("VIDEO_GENERATION_PROVIDER", "minimax")
-    assert vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", True) == "minimax"
+    assert (
+        vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", True) == "minimax"
+    )
 
 
 def test_volcengine_seedance_full_flow(monkeypatch, tmp_path):
@@ -53,10 +71,12 @@ def test_volcengine_seedance_full_flow(monkeypatch, tmp_path):
     def fake_get(url, headers=None, **kw):
         calls["gets"].append(url)
         if url.endswith("/contents/generations/tasks/seedance-task-1"):
-            return FakeResp({
-                "status": "succeeded",
-                "content": {"video_url": "https://download/video.mp4"},
-            })
+            return FakeResp(
+                {
+                    "status": "succeeded",
+                    "content": {"video_url": "https://download/video.mp4"},
+                }
+            )
         return FakeResp(content=b"SEEDANCE")
 
     monkeypatch.setattr(vid.requests, "post", fake_post)
@@ -80,6 +100,62 @@ def test_volcengine_seedance_full_flow(monkeypatch, tmp_path):
     assert "seedance-task-1" in msg
 
 
+def test_volcengine_seedance_writes_verified_execution_receipt(monkeypatch, tmp_path):
+    import hashlib
+    import json
+
+    monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
+
+    def fake_post(url, headers=None, json=None, **kw):
+        return FakeResp({"id": "seedance-task-2", "request_id": "ark-request-2"})
+
+    def fake_get(url, headers=None, **kw):
+        if url.endswith("/contents/generations/tasks/seedance-task-2"):
+            return FakeResp(
+                {
+                    "status": "succeeded",
+                    "content": {"video_url": "https://download/video.mp4"},
+                }
+            )
+        return FakeResp(content=b"VERIFIED-SEEDANCE")
+
+    monkeypatch.setattr(vid.requests, "post", fake_post)
+    monkeypatch.setattr(vid.requests, "get", fake_get)
+    prompt_file = tmp_path / "prompt.txt"
+    prompt_file.write_text("统一角色的竖屏镜头", encoding="utf-8")
+    output_file = tmp_path / "shot.mp4"
+    receipt_file = tmp_path / "shot.receipt.json"
+
+    vid.generate_video(
+        str(prompt_file),
+        [],
+        str(output_file),
+        "9:16",
+        str(receipt_file),
+    )
+    receipt = json.loads(receipt_file.read_text(encoding="utf-8"))
+
+    assert receipt["contract_version"] == "personal-ip-media-execution-v1"
+    assert receipt["capability"] == "video_generation"
+    assert receipt["provider"] == "volcengine"
+    assert receipt["model"] == "doubao-seedance-2-0-260128"
+    assert receipt["task_id"] == "seedance-task-2"
+    assert receipt["request_id"] == "ark-request-2"
+    assert receipt["status"] == "succeeded"
+    assert (
+        receipt["outputs"][0]["sha256"]
+        == hashlib.sha256(b"VERIFIED-SEEDANCE").hexdigest()
+    )
+    assert receipt["outputs"][0]["size_bytes"] == len(b"VERIFIED-SEEDANCE")
+    assert receipt["cost"]["status"] == "unknown"
+    assert "VOLCENGINE_API_KEY" not in receipt_file.read_text(encoding="utf-8")
+    from deerflow.personal_ip.media_execution import normalize_media_execution_receipt
+
+    normalized = normalize_media_execution_receipt(receipt, entity_type="candidate")
+    assert normalized["event_type"] == "shot_generation_completed"
+    assert normalized["provider_task_id"] == "seedance-task-2"
+
+
 def test_volcengine_seedance_single_image_is_first_frame(monkeypatch, tmp_path):
     monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
     captured = {}
@@ -90,7 +166,9 @@ def test_volcengine_seedance_single_image_is_first_frame(monkeypatch, tmp_path):
 
     def fake_get(url, headers=None, **kw):
         if url.endswith("/T1"):
-            return FakeResp({"status": "completed", "output": {"video_url": "https://d/v"}})
+            return FakeResp(
+                {"status": "completed", "output": {"video_url": "https://d/v"}}
+            )
         return FakeResp(content=b"V")
 
     monkeypatch.setattr(vid.requests, "post", fake_post)
@@ -157,12 +235,17 @@ def test_minimax_full_flow(monkeypatch, tmp_path):
     def fake_get(url, headers=None, params=None, **kw):
         if url.endswith("/v1/query/video_generation"):
             assert params["task_id"] == "T1"
-            return FakeResp({"status": "Success", "file_id": "F1",
-                             "base_resp": {"status_code": 0}})
+            return FakeResp(
+                {"status": "Success", "file_id": "F1", "base_resp": {"status_code": 0}}
+            )
         if url.endswith("/v1/files/retrieve"):
             assert params["file_id"] == "F1"
-            return FakeResp({"file": {"download_url": "https://dl/v.mp4"},
-                             "base_resp": {"status_code": 0}})
+            return FakeResp(
+                {
+                    "file": {"download_url": "https://dl/v.mp4"},
+                    "base_resp": {"status_code": 0},
+                }
+            )
         return FakeResp(content=b"MP4DATA")  # the actual download
 
     monkeypatch.setattr(vid.requests, "post", fake_post)
@@ -189,9 +272,16 @@ def test_minimax_reference_first_frame(monkeypatch, tmp_path):
 
     def fake_get(url, headers=None, params=None, **kw):
         if url.endswith("/v1/query/video_generation"):
-            return FakeResp({"status": "Success", "file_id": "F1", "base_resp": {"status_code": 0}})
+            return FakeResp(
+                {"status": "Success", "file_id": "F1", "base_resp": {"status_code": 0}}
+            )
         if url.endswith("/v1/files/retrieve"):
-            return FakeResp({"file": {"download_url": "https://dl/v.mp4"}, "base_resp": {"status_code": 0}})
+            return FakeResp(
+                {
+                    "file": {"download_url": "https://dl/v.mp4"},
+                    "base_resp": {"status_code": 0},
+                }
+            )
         return FakeResp(content=b"X")
 
     monkeypatch.setattr(vid.requests, "post", fake_post)
@@ -211,7 +301,12 @@ def test_minimax_task_fail(monkeypatch, tmp_path):
         return FakeResp({"task_id": "T1", "base_resp": {"status_code": 0}})
 
     def fake_get(url, headers=None, params=None, **kw):
-        return FakeResp({"status": "Fail", "base_resp": {"status_code": 1027, "status_msg": "blocked"}})
+        return FakeResp(
+            {
+                "status": "Fail",
+                "base_resp": {"status_code": 1027, "status_msg": "blocked"},
+            }
+        )
 
     monkeypatch.setattr(vid.requests, "post", fake_post)
     monkeypatch.setattr(vid.requests, "get", fake_get)
@@ -240,7 +335,12 @@ def test_minimax_task_fail_keeps_task_context(monkeypatch, tmp_path):
         return FakeResp({"task_id": "T1", "base_resp": {"status_code": 0}})
 
     def fake_get(url, headers=None, params=None, **kw):
-        return FakeResp({"status": "Fail", "base_resp": {"status_code": 1027, "status_msg": "blocked"}})
+        return FakeResp(
+            {
+                "status": "Fail",
+                "base_resp": {"status_code": 1027, "status_msg": "blocked"},
+            }
+        )
 
     monkeypatch.setattr(vid.requests, "post", fake_post)
     monkeypatch.setattr(vid.requests, "get", fake_get)

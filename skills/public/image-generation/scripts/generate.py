@@ -1,6 +1,10 @@
 import base64
+import hashlib
 import json
+import mimetypes
 import os
+from datetime import UTC, datetime
+from pathlib import Path
 
 import requests
 
@@ -10,6 +14,43 @@ VOLCENGINE_IMAGE_DEFAULT_MODEL = "doubao-seedream-5-0-260128"
 # MiniMax image-01 caps the prompt at 1500 characters and rejects longer requests
 # with a generic "invalid params" error, so validate before calling the API.
 MINIMAX_PROMPT_MAX_CHARS = 1500
+MEDIA_EXECUTION_CONTRACT_VERSION = "personal-ip-media-execution-v1"
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _file_artifact(path: str) -> dict:
+    resolved = Path(path).resolve()
+    digest = hashlib.sha256()
+    with resolved.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return {
+        "ref": resolved.as_uri(),
+        "sha256": digest.hexdigest(),
+        "size_bytes": resolved.stat().st_size,
+        "mime_type": mimetypes.guess_type(resolved.name)[0]
+        or "application/octet-stream",
+    }
+
+
+def _write_receipt(path: str | None, receipt: dict) -> None:
+    if not path:
+        return
+    target = Path(path).resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f".{target.name}.tmp")
+    temporary.write_text(
+        json.dumps(receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    os.replace(temporary, target)
+
+
+def _unknown_cost() -> dict:
+    return {"status": "unknown", "reason": "provider billing API is not connected"}
 
 
 def validate_image(image_path: str) -> bool:
@@ -27,7 +68,9 @@ def validate_image(image_path: str) -> bool:
         return False
 
 
-def _resolve_provider(override_env: str, existing_provider: str, has_existing_creds: bool) -> str:
+def _resolve_provider(
+    override_env: str, existing_provider: str, has_existing_creds: bool
+) -> str:
     """Pick the generation provider.
 
     1. Explicit <SKILL>_PROVIDER override wins.
@@ -105,7 +148,13 @@ VOLCENGINE_IMAGE_SIZES = {
 
 
 def _generate_image_volcengine(
-    prompt: str, reference_images: list[str], output_file: str, aspect_ratio: str
+    prompt: str,
+    reference_images: list[str],
+    output_file: str,
+    aspect_ratio: str,
+    *,
+    prompt_file: str | None = None,
+    receipt_file: str | None = None,
 ) -> str:
     """Generate or edit an image through Volcengine Ark Seedream.
 
@@ -118,46 +167,113 @@ def _generate_image_volcengine(
     if not api_key:
         return "VOLCENGINE_API_KEY is not set"
 
-    body = {
-        "model": os.getenv("VOLCENGINE_IMAGE_MODEL", VOLCENGINE_IMAGE_DEFAULT_MODEL),
-        "prompt": _minimax_prompt(prompt),
+    started_at = _utc_now()
+    request_id = None
+    model = os.getenv("VOLCENGINE_IMAGE_MODEL", VOLCENGINE_IMAGE_DEFAULT_MODEL)
+    normalized_prompt = _minimax_prompt(prompt)
+    parameters = {
+        "aspect_ratio": aspect_ratio,
         "size": os.getenv(
             "VOLCENGINE_IMAGE_SIZE",
             VOLCENGINE_IMAGE_SIZES.get(aspect_ratio, "2K"),
         ),
-        "sequential_image_generation": "disabled",
-        "stream": False,
-        "response_format": "url",
         "watermark": os.getenv("VOLCENGINE_IMAGE_WATERMARK", "false").lower()
         in {"1", "true", "yes", "on"},
+        "prompt_sha256": hashlib.sha256(normalized_prompt.encode("utf-8")).hexdigest(),
+        "prompt_characters": len(normalized_prompt),
     }
-    if reference_images:
-        body["image"] = [_to_data_url(path) for path in reference_images]
+    inputs = []
+    if prompt_file:
+        inputs.append(_file_artifact(prompt_file))
+    inputs.extend(_file_artifact(path) for path in reference_images)
+    try:
+        body = {
+            "model": model,
+            "prompt": normalized_prompt,
+            "size": parameters["size"],
+            "sequential_image_generation": "disabled",
+            "stream": False,
+            "response_format": "url",
+            "watermark": parameters["watermark"],
+        }
+        if reference_images:
+            body["image"] = [_to_data_url(path) for path in reference_images]
 
-    response = requests.post(
-        f"{_volcengine_ark_host()}/images/generations",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json=body,
-        timeout=300,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    images = payload.get("data") or []
-    if not images:
-        raise Exception(f"Volcengine Seedream returned no image data: {payload}")
+        response = requests.post(
+            f"{_volcengine_ark_host()}/images/generations",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=body,
+            timeout=300,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        request_id = payload.get("request_id") or payload.get("id")
+        images = payload.get("data") or []
+        if not images:
+            raise Exception("Volcengine Seedream returned no image data")
 
-    first = images[0]
-    if first.get("url"):
-        _download_image(first["url"], output_file)
-    elif first.get("b64_json"):
-        _ensure_output_dir(output_file)
-        with open(output_file, "wb") as f:
-            f.write(base64.b64decode(first["b64_json"]))
-    else:
-        raise Exception(f"Volcengine Seedream returned no downloadable image: {first}")
+        first = images[0]
+        if first.get("url"):
+            _download_image(first["url"], output_file)
+        elif first.get("b64_json"):
+            _ensure_output_dir(output_file)
+            with open(output_file, "wb") as f:
+                f.write(base64.b64decode(first["b64_json"]))
+        else:
+            raise Exception("Volcengine Seedream returned no downloadable image")
+        _write_receipt(
+            receipt_file,
+            {
+                "contract_version": MEDIA_EXECUTION_CONTRACT_VERSION,
+                "capability": "image_generation",
+                "provider": "volcengine",
+                "executor": "image-generation-skill",
+                "model": model,
+                "status": "succeeded",
+                "task_id": None,
+                "request_id": request_id,
+                "started_at": started_at,
+                "completed_at": _utc_now(),
+                "parameters": parameters,
+                "inputs": inputs,
+                "outputs": [_file_artifact(output_file)],
+                "cost": _unknown_cost(),
+            },
+        )
+    except Exception as exc:
+        message = str(exc) or type(exc).__name__
+        retryable = (
+            isinstance(exc, (requests.Timeout, requests.ConnectionError))
+            or "timed out" in message.lower()
+        )
+        _write_receipt(
+            receipt_file,
+            {
+                "contract_version": MEDIA_EXECUTION_CONTRACT_VERSION,
+                "capability": "image_generation",
+                "provider": "volcengine",
+                "executor": "image-generation-skill",
+                "model": model,
+                "status": "failed",
+                "task_id": None,
+                "request_id": request_id,
+                "started_at": started_at,
+                "completed_at": _utc_now(),
+                "parameters": parameters,
+                "inputs": inputs,
+                "outputs": [],
+                "cost": _unknown_cost(),
+                "failure": {
+                    "category": "provider_error",
+                    "message": message[:1000],
+                    "retryable": retryable,
+                },
+            },
+        )
+        raise
     return f"Successfully generated image to {output_file} via Volcengine Seedream"
 
 
@@ -215,11 +331,15 @@ def _generate_image_minimax(
         # Reference images are passed as character subjects as-is; unlike the Gemini
         # path we do not pre-validate them — invalid files surface as a MiniMax API error.
         body["subject_reference"] = [
-            {"type": "character", "image_file": _to_data_url(p)} for p in reference_images
+            {"type": "character", "image_file": _to_data_url(p)}
+            for p in reference_images
         ]
     response = requests.post(
         f"{_minimax_host()}/v1/image_generation",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
         json=body,
         timeout=60,
     )
@@ -247,7 +367,9 @@ def _generate_image_gemini(
             print(f"Skipping invalid reference image: {ref_img}")
     if len(valid_reference_images) < len(reference_images):
         skipped = len(reference_images) - len(valid_reference_images)
-        print(f"Note: {skipped} reference image(s) were skipped due to validation failure.")
+        print(
+            f"Note: {skipped} reference image(s) were skipped due to validation failure."
+        )
 
     for reference_image in valid_reference_images:
         with open(reference_image, "rb") as f:
@@ -283,6 +405,7 @@ def generate_image(
     reference_images: list[str],
     output_file: str,
     aspect_ratio: str = "16:9",
+    receipt_file: str | None = None,
 ) -> str:
     with open(prompt_file, "r", encoding="utf-8") as f:
         prompt = f.read()
@@ -291,12 +414,21 @@ def generate_image(
     )
     if provider in ("volcengine", "volcano", "seedream"):
         return _generate_image_volcengine(
-            prompt, reference_images, output_file, aspect_ratio
+            prompt,
+            reference_images,
+            output_file,
+            aspect_ratio,
+            prompt_file=prompt_file,
+            receipt_file=receipt_file,
         )
     if provider == "minimax":
-        return _generate_image_minimax(prompt, reference_images, output_file, aspect_ratio)
+        return _generate_image_minimax(
+            prompt, reference_images, output_file, aspect_ratio
+        )
     if provider in ("gemini", "google"):
-        return _generate_image_gemini(prompt, reference_images, output_file, aspect_ratio)
+        return _generate_image_gemini(
+            prompt, reference_images, output_file, aspect_ratio
+        )
     raise ValueError(
         f"Unknown image provider: {provider!r} "
         "(use 'volcengine', 'gemini', or 'minimax')"
@@ -309,16 +441,40 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate images using Volcengine Seedream, Gemini, or MiniMax API"
     )
-    parser.add_argument("--prompt-file", required=True, help="Absolute path to JSON prompt file")
-    parser.add_argument("--reference-images", nargs="*", default=[],
-                        help="Absolute paths to reference images (space-separated)")
-    parser.add_argument("--output-file", required=True, help="Output path for generated image")
-    parser.add_argument("--aspect-ratio", required=False, default="16:9",
-                        help="Aspect ratio of the generated image")
+    parser.add_argument(
+        "--prompt-file", required=True, help="Absolute path to JSON prompt file"
+    )
+    parser.add_argument(
+        "--reference-images",
+        nargs="*",
+        default=[],
+        help="Absolute paths to reference images (space-separated)",
+    )
+    parser.add_argument(
+        "--output-file", required=True, help="Output path for generated image"
+    )
+    parser.add_argument(
+        "--aspect-ratio",
+        required=False,
+        default="16:9",
+        help="Aspect ratio of the generated image",
+    )
+    parser.add_argument(
+        "--receipt-file",
+        required=False,
+        help="Write a personal-ip-media-execution-v1 JSON receipt",
+    )
     args = parser.parse_args()
 
     try:
-        print(generate_image(args.prompt_file, args.reference_images,
-                             args.output_file, args.aspect_ratio))
+        print(
+            generate_image(
+                args.prompt_file,
+                args.reference_images,
+                args.output_file,
+                args.aspect_ratio,
+                args.receipt_file,
+            )
+        )
     except Exception as e:
         print(f"Error while generating image: {e}")

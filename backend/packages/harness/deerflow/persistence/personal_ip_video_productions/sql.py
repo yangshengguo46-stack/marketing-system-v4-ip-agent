@@ -26,6 +26,9 @@ VIDEO_PRODUCTION_CONTRACT_VERSION = "personal-ip-video-production-v1"
 VIDEO_EVENT_STAGES: dict[str, str] = {
     "blueprint_sealed": "blueprint",
     "asset_registered": "assets",
+    "asset_generation_requested": "assets",
+    "asset_generation_completed": "assets",
+    "asset_generation_failed": "assets",
     "storyboard_sealed": "storyboard",
     "shot_generation_requested": "generation",
     "shot_generation_completed": "generation",
@@ -35,6 +38,10 @@ VIDEO_EVENT_STAGES: dict[str, str] = {
     "review_requested": "selection",
     "review_recorded": "selection",
     "voice_generated": "finishing",
+    "voice_generation_requested": "finishing",
+    "media_processing_requested": "finishing",
+    "media_processing_completed": "finishing",
+    "media_processing_failed": "finishing",
     "edit_completed": "finishing",
     "delivery_completed": "delivery",
 }
@@ -50,6 +57,9 @@ VIDEO_EVENT_STATUSES = {
 VIDEO_EVENT_ALLOWED_STATUSES: dict[str, set[str]] = {
     "blueprint_sealed": {"succeeded"},
     "asset_registered": {"succeeded"},
+    "asset_generation_requested": {"running"},
+    "asset_generation_completed": {"succeeded"},
+    "asset_generation_failed": {"failed"},
     "storyboard_sealed": {"succeeded"},
     "shot_generation_requested": {"planned", "running"},
     "shot_generation_completed": {"succeeded"},
@@ -59,6 +69,10 @@ VIDEO_EVENT_ALLOWED_STATUSES: dict[str, set[str]] = {
     "review_requested": {"awaiting_review"},
     "review_recorded": {"approved", "rejected"},
     "voice_generated": {"succeeded", "failed"},
+    "voice_generation_requested": {"running"},
+    "media_processing_requested": {"running"},
+    "media_processing_completed": {"succeeded"},
+    "media_processing_failed": {"failed"},
     "edit_completed": {"succeeded", "failed"},
     "delivery_completed": {"succeeded"},
 }
@@ -107,11 +121,11 @@ def _json_snapshot(value: Any, *, field: str, expected: type, byte_limit: int = 
     return json.loads(serialized)
 
 
-def _normalized_ids(values: Sequence[str], *, field: str, limit: int) -> list[str]:
+def _normalized_ids(values: Sequence[str], *, field: str, limit: int, item_limit: int = 128) -> list[str]:
     result: list[str] = []
     seen: set[str] = set()
     for raw in values:
-        value = _clean_required(raw, field=field, limit=128)
+        value = _clean_required(raw, field=field, limit=item_limit)
         if value not in seen:
             seen.add(value)
             result.append(value)
@@ -336,8 +350,8 @@ class PersonalIPVideoProductionRepository:
         model_key = _clean_optional(model, field="model", limit=160)
         provider_task_key = _clean_optional(provider_task_id, field="provider_task_id", limit=256)
         payload_snapshot = _json_snapshot(payload, field="payload", expected=dict)
-        input_snapshot = _normalized_ids(input_refs, field="input_refs", limit=500)
-        output_snapshot = _normalized_ids(output_refs, field="output_refs", limit=500)
+        input_snapshot = _normalized_ids(input_refs, field="input_refs", limit=500, item_limit=2_048)
+        output_snapshot = _normalized_ids(output_refs, field="output_refs", limit=500, item_limit=2_048)
         cost_snapshot = _json_snapshot(cost, field="cost", expected=dict, byte_limit=256_000)
 
         async with self._sf() as session:

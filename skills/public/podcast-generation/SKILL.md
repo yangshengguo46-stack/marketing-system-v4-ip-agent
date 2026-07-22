@@ -50,7 +50,8 @@ Call the Python script:
 python /mnt/skills/public/podcast-generation/scripts/generate.py \
   --script-file /mnt/user-data/workspace/script-file.json \
   --output-file /mnt/user-data/outputs/generated-podcast.mp3 \
-  --transcript-file /mnt/user-data/outputs/generated-podcast-transcript.md
+  --transcript-file /mnt/user-data/outputs/generated-podcast-transcript.md \
+  --receipt-file /mnt/user-data/outputs/generated-podcast.receipt.json
 ```
 
 Parameters:
@@ -58,6 +59,7 @@ Parameters:
 - `--script-file`: Absolute path to JSON script file (required)
 - `--output-file`: Absolute path to output MP3 file (required)
 - `--transcript-file`: Absolute path to output transcript markdown file (optional, but recommended)
+- `--receipt-file`: Standard executor receipt path (required inside a Personal-IP production)
 
 > [!IMPORTANT]
 > - Execute the script in one complete call. Do NOT split the workflow into separate steps.
@@ -139,7 +141,8 @@ Step 2: Execute generation:
 python /mnt/skills/public/podcast-generation/scripts/generate.py \
   --script-file /mnt/user-data/workspace/ai-history-script.json \
   --output-file /mnt/user-data/outputs/ai-history-podcast.mp3 \
-  --transcript-file /mnt/user-data/outputs/ai-history-transcript.md
+  --transcript-file /mnt/user-data/outputs/ai-history-transcript.md \
+  --receipt-file /mnt/user-data/outputs/ai-history-podcast.receipt.json
 ```
 
 This will generate:

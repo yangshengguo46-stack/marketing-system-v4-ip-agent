@@ -10,7 +10,7 @@ checkbox state also includes the current ledger change set.
 
 ## Current completion
 
-**Weighted product completion: 70%.** The native agent and backend foundation
+**Weighted product completion: 71%.** The native agent and backend foundation
 are about 83% complete; the lower product number reflects the deliberately
 deferred eight-platform acceptance work, unfinished real publishing and the
 absence of one accepted paid video production.
@@ -22,10 +22,10 @@ absence of one accepted paid video production.
 | Persona/fan modelling and preflight | 20% | 65% | HLLM source pin; HLLM-Lite provider contract; aggregate audience adapter; immutable preflight receipt; native agent tool and detailed receipt view; personality/Maslow/Jung/existence lenses | Detailed real platform inputs and calibrated ranker |
 | Publishing and receipts | 15% | 70% | Immutable publish request; append-only attempts; atomic browser prepare/finish tools; selected-profile binding; live public-post URL/id verification across eight platform domains | Eight-platform end-to-end execution and recovery verification; official API publishers where available |
 | Metrics, retrospectives and evidence promotion | 20% | 65% | Normalized observations; exact snapshot deltas; portfolio aggregate; Douyin official post collector; detailed browser-evidence contract; real persisted-login Douyin capture; immutable retrospective; policy-gated automatic evidence promotion | Extend detailed collection across the other seven platforms and scheduled coverage |
-| Video production | 15% | 65% | Seedance/Seedream generation Skills; Doubao Speech route; official MediaKit source/Skills; local FFmpeg toolchain; immutable production request plus append-only nine-stage provider/artifact/cost/retry ledger; native begin/event/read tools | Bind real provider executors and complete one accepted script-to-delivery production |
+| Video production | 15% | 72% | Seedance/Seedream/Doubao Speech scripts emit one credential-free executor receipt with task/request ids and checksummed outputs; MediaKit/FFmpeg have a verified execution wrapper; native ingestion derives immutable stage events; nine-stage production ledger remains provider-independent | Exercise the paid providers and complete one accepted script-to-delivery production |
 | Product UI, packaging and acceptance | 10% | 65% | DeerFlow UI skin; Personal-IP portfolio/login workspace; six-stage operating cockpit; detailed read-only receipt/evidence views; nine-stage video-line status; source-distribution bootstrap | Clean-machine package test and customer onboarding |
 
-Weighted score: `9 + 8.5 + 13 + 10.5 + 13 + 9.75 + 6.5 = 70.25`, displayed as 70%.
+Weighted score: `9 + 8.5 + 13 + 10.5 + 13 + 10.8 + 6.5 = 71.3`, displayed as 71%.
 
 ## Product truth
 
@@ -88,8 +88,10 @@ coverage evidence.
       human decisions and final delivery as idempotent append-only receipts.
 - [x] Expose owner-scoped begin/event/read tools natively to DeerFlow and show
       the production line in the Personal-IP cockpit.
-- [ ] Bind the event contract to real Seedance, Seedream, speech,
-      MediaKit/FFmpeg and QA executors.
+- [x] Bind Seedance, Seedream and speech scripts plus MediaKit/FFmpeg execution
+      to one verified receipt contract and native ingestion tool.
+- [ ] Exercise real paid Seedance, Seedream, speech and cloud MediaKit calls and
+      preserve their returned identifiers and artifacts in the production.
 - [ ] Complete one real Seedance-to-MediaKit/FFmpeg acceptance production.
 
 ### P2 — customer delivery

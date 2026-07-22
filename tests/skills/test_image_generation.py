@@ -12,35 +12,52 @@ img = load("image-generation")
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    for k in ["GEMINI_API_KEY", "MINIMAX_API_KEY", "VOLCENGINE_API_KEY",
-              "IMAGE_GENERATION_PROVIDER", "MINIMAX_API_HOST", "MINIMAX_IMAGE_MODEL",
-              "VOLCENGINE_ARK_BASE_URL", "VOLCENGINE_IMAGE_MODEL",
-              "VOLCENGINE_IMAGE_SIZE", "VOLCENGINE_IMAGE_WATERMARK"]:
+    for k in [
+        "GEMINI_API_KEY",
+        "MINIMAX_API_KEY",
+        "VOLCENGINE_API_KEY",
+        "IMAGE_GENERATION_PROVIDER",
+        "MINIMAX_API_HOST",
+        "MINIMAX_IMAGE_MODEL",
+        "VOLCENGINE_ARK_BASE_URL",
+        "VOLCENGINE_IMAGE_MODEL",
+        "VOLCENGINE_IMAGE_SIZE",
+        "VOLCENGINE_IMAGE_WATERMARK",
+    ]:
         monkeypatch.delenv(k, raising=False)
 
 
 def test_resolve_prefers_gemini(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
-    assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True) == "gemini"
+    assert (
+        img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True) == "gemini"
+    )
 
 
 def test_resolve_prefers_volcengine_over_upstream(monkeypatch):
     monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
     monkeypatch.setenv("GEMINI_API_KEY", "g")
-    assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True) == "volcengine"
+    assert (
+        img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True)
+        == "volcengine"
+    )
 
 
 def test_resolve_falls_back_to_minimax(monkeypatch):
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
-    assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", False) == "minimax"
+    assert (
+        img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", False) == "minimax"
+    )
 
 
 def test_resolve_override_wins(monkeypatch):
     monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     monkeypatch.setenv("IMAGE_GENERATION_PROVIDER", "MiniMax")
-    assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True) == "minimax"
+    assert (
+        img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True) == "minimax"
+    )
 
 
 def test_volcengine_seedream_full_flow(monkeypatch, tmp_path):
@@ -73,6 +90,57 @@ def test_volcengine_seedream_full_flow(monkeypatch, tmp_path):
     assert captured["json"]["sequential_image_generation"] == "disabled"
     assert captured["json"]["watermark"] is False
     assert "Seedream" in msg
+
+
+def test_volcengine_seedream_writes_verified_execution_receipt(monkeypatch, tmp_path):
+    import hashlib
+    import json
+
+    monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
+
+    def fake_post(url, headers=None, json=None, **kw):
+        return FakeResp(
+            {
+                "request_id": "seedream-request-1",
+                "data": [{"url": "https://download/image.jpg"}],
+            }
+        )
+
+    def fake_get(url, **kw):
+        return FakeResp(content=b"VERIFIED-SEEDREAM")
+
+    monkeypatch.setattr(img.requests, "post", fake_post)
+    monkeypatch.setattr(img.requests, "get", fake_get)
+    prompt_file = tmp_path / "prompt.txt"
+    prompt_file.write_text("角色设定图", encoding="utf-8")
+    output_file = tmp_path / "character.jpg"
+    receipt_file = tmp_path / "character.receipt.json"
+
+    img.generate_image(
+        str(prompt_file),
+        [],
+        str(output_file),
+        "9:16",
+        str(receipt_file),
+    )
+    receipt = json.loads(receipt_file.read_text(encoding="utf-8"))
+
+    assert receipt["contract_version"] == "personal-ip-media-execution-v1"
+    assert receipt["capability"] == "image_generation"
+    assert receipt["request_id"] == "seedream-request-1"
+    assert receipt["model"] == "doubao-seedream-5-0-260128"
+    assert (
+        receipt["outputs"][0]["sha256"]
+        == hashlib.sha256(b"VERIFIED-SEEDREAM").hexdigest()
+    )
+    assert receipt["outputs"][0]["size_bytes"] == len(b"VERIFIED-SEEDREAM")
+    assert receipt["cost"]["status"] == "unknown"
+    assert "VOLCENGINE_API_KEY" not in receipt_file.read_text(encoding="utf-8")
+    from deerflow.personal_ip.media_execution import normalize_media_execution_receipt
+
+    normalized = normalize_media_execution_receipt(receipt, entity_type="character")
+    assert normalized["event_type"] == "asset_generation_completed"
+    assert normalized["provider_task_id"] == "seedream-request-1"
 
 
 def test_volcengine_seedream_reference_images(monkeypatch, tmp_path):
@@ -110,8 +178,12 @@ def test_minimax_builds_payload_and_writes(monkeypatch, tmp_path):
         captured["url"] = url
         captured["headers"] = headers
         captured["json"] = json
-        return FakeResp({"data": {"image_base64": [base64.b64encode(raw).decode()]},
-                         "base_resp": {"status_code": 0, "status_msg": "success"}})
+        return FakeResp(
+            {
+                "data": {"image_base64": [base64.b64encode(raw).decode()]},
+                "base_resp": {"status_code": 0, "status_msg": "success"},
+            }
+        )
 
     monkeypatch.setattr(img.requests, "post", fake_post)
     out = tmp_path / "o.jpg"
@@ -136,8 +208,12 @@ def test_minimax_reference_image_as_data_url(monkeypatch, tmp_path):
 
     def fake_post(url, headers=None, json=None, **kw):
         captured["json"] = json
-        return FakeResp({"data": {"image_base64": [base64.b64encode(b"x").decode()]},
-                         "base_resp": {"status_code": 0}})
+        return FakeResp(
+            {
+                "data": {"image_base64": [base64.b64encode(b"x").decode()]},
+                "base_resp": {"status_code": 0},
+            }
+        )
 
     monkeypatch.setattr(img.requests, "post", fake_post)
     ref = tmp_path / "ref.jpg"
@@ -150,6 +226,7 @@ def test_minimax_reference_image_as_data_url(monkeypatch, tmp_path):
     assert subj[0]["type"] == "character"
     assert subj[0]["image_file"].startswith("data:image/jpeg;base64,")
     import base64 as _b64
+
     encoded = subj[0]["image_file"].split(",", 1)[1]
     assert _b64.b64decode(encoded) == b"\xff\xd8refbytes"
 
@@ -158,7 +235,9 @@ def test_minimax_raises_on_base_resp_error(monkeypatch, tmp_path):
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
-        return FakeResp({"base_resp": {"status_code": 1004, "status_msg": "auth failed"}})
+        return FakeResp(
+            {"base_resp": {"status_code": 1004, "status_msg": "auth failed"}}
+        )
 
     monkeypatch.setattr(img.requests, "post", fake_post)
     prompt_file = tmp_path / "p.json"
@@ -174,8 +253,12 @@ def test_minimax_extracts_json_prompt_field(monkeypatch, tmp_path):
 
     def fake_post(url, headers=None, json=None, **kw):
         captured["json"] = json
-        return FakeResp({"data": {"image_base64": [base64.b64encode(b"x").decode()]},
-                         "base_resp": {"status_code": 0}})
+        return FakeResp(
+            {
+                "data": {"image_base64": [base64.b64encode(b"x").decode()]},
+                "base_resp": {"status_code": 0},
+            }
+        )
 
     monkeypatch.setattr(img.requests, "post", fake_post)
     prompt_file = tmp_path / "p.json"
@@ -197,8 +280,12 @@ def test_minimax_plaintext_prompt_passes_through(monkeypatch, tmp_path):
 
     def fake_post(url, headers=None, json=None, **kw):
         captured["json"] = json
-        return FakeResp({"data": {"image_base64": [base64.b64encode(b"x").decode()]},
-                         "base_resp": {"status_code": 0}})
+        return FakeResp(
+            {
+                "data": {"image_base64": [base64.b64encode(b"x").decode()]},
+                "base_resp": {"status_code": 0},
+            }
+        )
 
     monkeypatch.setattr(img.requests, "post", fake_post)
     prompt_file = tmp_path / "p.txt"
@@ -229,8 +316,12 @@ def test_minimax_creates_nested_output_dir(monkeypatch, tmp_path):
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
-        return FakeResp({"data": {"image_base64": [base64.b64encode(b"img").decode()]},
-                         "base_resp": {"status_code": 0}})
+        return FakeResp(
+            {
+                "data": {"image_base64": [base64.b64encode(b"img").decode()]},
+                "base_resp": {"status_code": 0},
+            }
+        )
 
     monkeypatch.setattr(img.requests, "post", fake_post)
     prompt_file = tmp_path / "p.txt"

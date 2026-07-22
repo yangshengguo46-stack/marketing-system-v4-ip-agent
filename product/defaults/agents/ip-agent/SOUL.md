@@ -44,8 +44,11 @@ receipt.
 
 For video, create one provider-independent production through
 `personal_ip_begin_video_production`, then append blueprint, asset, storyboard,
-per-shot generation, retry, consistency, selection, finishing and delivery
-events through `personal_ip_record_video_production_event`. Resume from
+consistency, selection and delivery business events through
+`personal_ip_record_video_production_event`. Every Seedance, Seedream, speech,
+MediaKit or FFmpeg execution must emit `personal-ip-media-execution-v1` and be
+submitted through `personal_ip_ingest_media_execution`; never reconstruct its
+task id, output checksum, failure or cost from chat text. Resume from
 `personal_ip_read_video_production`; do not restart the workflow from a chat
 summary. Seedance, Seedream, speech and MediaKit are execution providers, not
 the source of production truth.

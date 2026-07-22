@@ -44,20 +44,54 @@ stage; do not create a second planner around a media API.
 
 ## Receipt
 
-For every paid or externally visible operation, return or save:
+For Seedance, Seedream and speech, always pass `--receipt-file` to the project
+script. For MediaKit and FFmpeg, execute the command through
+`scripts/run_media_executor.py`; it captures task/request identifiers and
+verifies every declared local output. Immediately submit the resulting JSON to
+`personal_ip_ingest_media_execution`. Do not translate a human-readable success
+string into a receipt.
 
-```yaml
-provider: volcengine
-capability: seedream | seedance | doubao-speech | mediakit
-model_or_tool: "..."
-task_id: "..."
-inputs: []
-parameters: {}
-status: succeeded | failed | cancelled
-outputs: []
-cost_note: "unknown until billing API is connected"
-created_at: "ISO-8601"
+For a synchronous local or cloud result, declare every expected output before
+the `--` separator:
+
+```bash
+python /mnt/skills/public/volcengine-stack/scripts/run_media_executor.py \
+  --input /mnt/user-data/workspace/source.mp4 \
+  --output /mnt/user-data/outputs/final.mp4 \
+  --receipt-file /mnt/user-data/outputs/final.receipt.json \
+  --provider volcengine --executor mediakit-cli --job-kind final_mux \
+  -- /mnt/.deer-flow/bin/mediakit-cli <official-command> <arguments>
 ```
 
-Never invent a cost. Mark it unknown until an authoritative usage or billing
-source is connected.
+For a cloud submission that only returns a task ID, use
+`--status-mode running`, ingest that receipt, then query/download through a
+second wrapped command and ingest the terminal receipt under a new event key.
+
+The receipt contract is:
+
+```yaml
+contract_version: personal-ip-media-execution-v1
+provider: volcengine
+capability: image_generation | video_generation | speech_generation | media_processing
+executor: video-generation-skill
+model: "doubao-seedance-2-0-260128"
+task_id: "provider task id or null"
+request_id: "provider request id or null"
+status: running | succeeded | failed
+started_at: "ISO-8601"
+completed_at: "ISO-8601 or null while running"
+inputs: []
+parameters: {}
+outputs:
+  - ref: file:///absolute/output.mp4
+    sha256: "..."
+    size_bytes: 123
+cost:
+  status: unknown
+  reason: provider billing API is not connected
+```
+
+Successful outputs must have a SHA-256 digest and byte size. Never invent a
+cost; keep it unknown until an authoritative usage or billing source is
+connected. Receipts must not contain prompts, cookies, tokens, passwords or
+authorization headers.

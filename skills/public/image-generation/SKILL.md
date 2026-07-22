@@ -39,8 +39,9 @@ Call the Python script:
 python /mnt/skills/public/image-generation/scripts/generate.py \
   --prompt-file /mnt/user-data/workspace/prompt-file.json \
   --reference-images /path/to/ref1.jpg /path/to/ref2.png \
-  --output-file /mnt/user-data/outputs/generated-image.jpg
-  --aspect-ratio 16:9
+  --output-file /mnt/user-data/outputs/generated-image.jpg \
+  --aspect-ratio 16:9 \
+  --receipt-file /mnt/user-data/outputs/generated-image.receipt.json
 ```
 
 Parameters:
@@ -49,6 +50,7 @@ Parameters:
 - `--reference-images`: Absolute paths to reference images (optional, space-separated)
 - `--output-file`: Absolute path to output image file (required)
 - `--aspect-ratio`: Aspect ratio of the generated image (optional, default: 16:9)
+- `--receipt-file`: Standard executor receipt path (required inside a Personal-IP production)
 
 [!NOTE]
 Do NOT read the python file, just call it with the parameters.
