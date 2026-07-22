@@ -1126,7 +1126,12 @@ nine stages from intake through delivery. Provider task ids, model versions,
 artifact refs, costs, QA results, retries and human decisions belong in those
 events. Repeated keys are idempotent only when their digests match, terminal
 productions reject new events, and only successful `delivery_completed` marks
-completion. Native `personal_ip_begin_video_production`,
+completion. `delivery_completed` must reference the exact outputs from an
+earlier successful `personal-ip-delivery-qa-v1` event; QA performs a media
+probe, delivery-spec checks and full local decode before the repository opens
+that gate. Successful local executor receipts are resumed only after their
+declared inputs and outputs are re-hashed. Native
+`personal_ip_begin_video_production`,
 `personal_ip_record_video_production_event` and
 `personal_ip_read_video_production` are the DeerFlow execution surface.
 

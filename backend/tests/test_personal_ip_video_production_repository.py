@@ -109,6 +109,23 @@ async def test_video_production_keeps_immutable_request_and_append_only_stage_re
         cost={"currency": "CNY", "amount": 3.2},
         occurred_at=datetime(2026, 7, 22, 5, 2, tzinfo=UTC),
     )
+    qa = await productions.append_event(
+        created["id"],
+        owner_user_id="user-1",
+        event_key="delivery:qa:v1",
+        event_type="delivery_qa_completed",
+        status="succeeded",
+        entity_type="delivery",
+        entity_id="delivery-v1",
+        payload={"contract_version": "personal-ip-delivery-qa-v1", "passed": True},
+        input_refs=["timeline://final-v1"],
+        output_refs=["artifact://delivery/final-v1.mp4"],
+        provider="ffmpeg_ffprobe",
+        model=None,
+        provider_task_id=None,
+        cost={"status": "known", "currency": "CNY", "amount": 0},
+        occurred_at=datetime(2026, 7, 22, 5, 2, 30, tzinfo=UTC),
+    )
     completed = await productions.append_event(
         created["id"],
         owner_user_id="user-1",
@@ -132,8 +149,9 @@ async def test_video_production_keeps_immutable_request_and_append_only_stage_re
     assert retried is not None and retried["status"] == "running"
     assert completed is not None and completed["status"] == "completed"
     assert completed["current_stage"] == "delivery"
-    assert completed["event_count"] == 4
-    assert [event["sequence"] for event in completed["events"]] == [1, 2, 3, 4]
+    assert qa is not None and qa["current_stage"] == "delivery"
+    assert completed["event_count"] == 5
+    assert [event["sequence"] for event in completed["events"]] == [1, 2, 3, 4, 5]
     assert completed["events"][1]["payload"]["retryable"] is True
     assert await productions.get(created["id"], owner_user_id="user-2") is None
 
@@ -229,4 +247,100 @@ async def test_video_production_rejects_contradictory_event_status(tmp_path) -> 
             provider_task_id="task-1",
             cost={},
         )
+    await close_engine()
+
+
+@pytest.mark.asyncio
+async def test_video_delivery_requires_successful_qa_for_the_exact_outputs(tmp_path) -> None:
+    await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
+    sf = get_session_factory()
+    assert sf is not None
+    productions = PersonalIPVideoProductionRepository(sf)
+    created = await productions.begin(
+        owner_user_id="user-1",
+        operation_key="video:delivery-qa-gate",
+        title="交付 QA 门禁",
+        subject_id=None,
+        target_account_ids=[],
+        source_kind="script",
+        source={"script": "测试"},
+        delivery_spec={"aspect_ratio": "9:16"},
+        provider_policy={},
+        budget={},
+    )
+
+    delivery_kwargs = {
+        "owner_user_id": "user-1",
+        "event_key": "delivery:v1",
+        "event_type": "delivery_completed",
+        "status": "succeeded",
+        "entity_type": "delivery",
+        "entity_id": "delivery-v1",
+        "payload": {"accepted": True},
+        "input_refs": ["timeline://v1"],
+        "output_refs": ["file:///outputs/final.mp4"],
+        "provider": "local",
+        "model": None,
+        "provider_task_id": None,
+        "cost": {"status": "known", "currency": "CNY", "amount": 0},
+    }
+    with pytest.raises(ValueError, match="successful delivery QA"):
+        await productions.append_event(created["id"], **delivery_kwargs)
+
+    await productions.append_event(
+        created["id"],
+        owner_user_id="user-1",
+        event_key="delivery:qa:failed",
+        event_type="delivery_qa_completed",
+        status="failed",
+        entity_type="delivery",
+        entity_id="delivery-v1",
+        payload={"contract_version": "personal-ip-delivery-qa-v1", "passed": False},
+        input_refs=["timeline://v1"],
+        output_refs=["file:///outputs/final.mp4"],
+        provider="ffmpeg_ffprobe",
+        model=None,
+        provider_task_id=None,
+        cost={"status": "known", "currency": "CNY", "amount": 0},
+    )
+    with pytest.raises(ValueError, match="successful delivery QA"):
+        await productions.append_event(created["id"], **delivery_kwargs)
+
+    await productions.append_event(
+        created["id"],
+        owner_user_id="user-1",
+        event_key="delivery:qa:passed",
+        event_type="delivery_qa_completed",
+        status="succeeded",
+        entity_type="delivery",
+        entity_id="delivery-v1",
+        payload={"contract_version": "personal-ip-delivery-qa-v1", "passed": True},
+        input_refs=["timeline://v1"],
+        output_refs=["file:///outputs/another.mp4"],
+        provider="ffmpeg_ffprobe",
+        model=None,
+        provider_task_id=None,
+        cost={"status": "known", "currency": "CNY", "amount": 0},
+    )
+    with pytest.raises(ValueError, match="exact delivery outputs"):
+        await productions.append_event(created["id"], **delivery_kwargs)
+
+    await productions.append_event(
+        created["id"],
+        owner_user_id="user-1",
+        event_key="delivery:qa:passed-v2",
+        event_type="delivery_qa_completed",
+        status="succeeded",
+        entity_type="delivery",
+        entity_id="delivery-v1",
+        payload={"contract_version": "personal-ip-delivery-qa-v1", "passed": True},
+        input_refs=["timeline://v1"],
+        output_refs=["file:///outputs/final.mp4"],
+        provider="ffmpeg_ffprobe",
+        model=None,
+        provider_task_id=None,
+        cost={"status": "known", "currency": "CNY", "amount": 0},
+    )
+    completed = await productions.append_event(created["id"], **delivery_kwargs)
+    assert completed is not None and completed["status"] == "completed"
     await close_engine()

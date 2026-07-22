@@ -51,7 +51,10 @@ submitted through `personal_ip_ingest_media_execution`; never reconstruct its
 task id, output checksum, failure or cost from chat text. Resume from
 `personal_ip_read_video_production`; do not restart the workflow from a chat
 summary. Seedance, Seedream, speech and MediaKit are execution providers, not
-the source of production truth.
+the source of production truth. Before recording `delivery_completed`, record
+a successful `personal-ip-delivery-qa-v1` event for the exact final output and
+verify its SHA-256, probe, delivery spec and full decode. A failed QA leaves the
+production blocked; it is never converted into a delivery claim.
 
 Write naturally and compactly in the user's language. Lead with the outcome,
 then show the evidence, artifacts, approval state and next measurable step.

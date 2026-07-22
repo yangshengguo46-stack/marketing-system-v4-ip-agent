@@ -57,6 +57,37 @@ Both binary directories are added to the service PATH automatically. Cloud
 MediaKit uses its own `MEDIAKIT_API_KEY`; without that key, trim, concat,
 subtitle, mix and probe continue to run locally.
 
+## Video delivery acceptance
+
+Run the complete credential-free acceptance after building the local media
+toolchain:
+
+```bash
+make volcengine-install
+make video-e2e-local
+make video-e2e-local
+```
+
+The second identical run is the recovery check. Successful receipts are
+re-hashed and reused, failed attempts remain immutable, event keys replay
+idempotently, and the final delivery is allowed only after FFprobe,
+delivery-spec and full-decode QA pass for the exact final artifact. Seedream,
+Seedance and speech are simulated in this target; local MediaKit and FFmpeg are
+real. No paid API is called.
+
+To prepare the real-provider boundary without crossing it:
+
+```bash
+make video-e2e-paid-checkpoints
+```
+
+This writes `.deer-flow/acceptance/video-e2e/paid-checkpoints.json` with one
+explicit command per Seedream, Seedance, speech and optional cloud MediaKit
+checkpoint. The file records `executed: false`; obtain explicit approval in the
+active user session before running any listed command. Ingest every emitted
+`personal-ip-media-execution-v1` receipt through
+`personal_ip_ingest_media_execution` immediately after its provider call.
+
 `make doctor` has an IP Agent Product section. It verifies the complete
 ByteDance/Volcengine source bundle, all eight browser-first platform entries,
 Ark and speech credentials, optional cloud MediaKit status, the project-local

@@ -40,6 +40,39 @@ def test_normalize_media_execution_preserves_provider_proof_and_derives_event() 
     assert result["payload"]["outputs"][0]["sha256"] == "b" * 64
 
 
+def test_normalize_media_execution_preserves_download_and_retry_evidence() -> None:
+    result = normalize_media_execution_receipt(
+        _receipt(
+            parameters={
+                "attempt": 2,
+                "retry_of": "shot-1:attempt-1",
+            },
+            outputs=[
+                {
+                    "ref": "file:///outputs/shot-1.mp4",
+                    "source_ref": "https://example.com/results/shot-1.mp4?signature=secret",
+                    "downloaded_at": "2026-07-22T01:01:50Z",
+                    "sha256": "b" * 64,
+                    "size_bytes": 2048,
+                }
+            ],
+            cost={"status": "known", "amount": 3.25, "currency": "cny", "basis": "provider usage receipt"},
+        ),
+        entity_type="candidate",
+    )
+
+    output = result["payload"]["outputs"][0]
+    assert output["source_ref"] == "https://example.com/results/shot-1.mp4"
+    assert output["downloaded_at"] == "2026-07-22T01:01:50+00:00"
+    assert result["payload"]["parameters"]["retry_of"] == "shot-1:attempt-1"
+    assert result["cost"] == {
+        "status": "known",
+        "amount": 3.25,
+        "currency": "CNY",
+        "basis": "provider usage receipt",
+    }
+
+
 @pytest.mark.parametrize(
     ("capability", "status", "entity_type", "event_type"),
     [
