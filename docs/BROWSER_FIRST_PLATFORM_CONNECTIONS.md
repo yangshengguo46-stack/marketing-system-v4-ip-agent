@@ -34,14 +34,29 @@ recursively, including if they are nested inside a captured record. Browser
 Control can seal its authorized findings through the native
 `personal_ip_record_browser_observation` tool.
 
-For Douyin, `personal_ip_collect_douyin_browser_page` automates the first
-collection path. It reuses the account session, optionally navigates only to a
-query-free `https://creator.douyin.com/...` URL, extracts rendered page text,
-headings, tables/grids, metric cards and sanitized links, then seals the page
-with explicit pagination coverage and a screenshot SHA-256 digest. A content
-inventory becomes complete only when its declared count matches the parsed
-items and the page reports that no more works remain. It never
-accesses browser storage, credential headers or network response bodies.
+`personal_ip_collect_browser_page` is the shared direct collection path for all
+eight account families. It derives the platform from the owner-scoped account,
+reuses that account's browser session and optionally navigates only to a
+query-free URL on the platform's registered creator host. It extracts rendered
+page text, headings, tables/grids, metric cards and sanitized links, then seals
+the page with explicit pagination coverage and a screenshot SHA-256 digest. It
+never accesses browser storage, credential headers or network response bodies.
+
+The shared path deliberately reports generic pages as partial. Platform
+adapters establish stronger completeness rules only after their rendered UI has
+been verified. Douyin currently has verified dashboard and content-inventory
+parsers; its content inventory becomes complete only when the declared count
+matches the parsed items and the page reports that no more works remain. The
+older `personal_ip_collect_douyin_browser_page` entry remains a compatibility
+wrapper, not a second collector.
+
+The native tool returns the captured business records to the agent as well as
+sealing them durably. For later analysis,
+`personal_ip_platform_observation_inventory` lists recent evidence across the
+whole portfolio without an account filter, and
+`personal_ip_read_platform_observation` reads one owner-scoped observation with
+its full records and provenance. This makes detailed creator data available for
+analysis without ever making the browser's authentication material readable.
 
 The operating portfolio at `/workspace/personal-ip` always shows all eight
 platforms. A platform with no account offers **登录账号**; clicking it creates a

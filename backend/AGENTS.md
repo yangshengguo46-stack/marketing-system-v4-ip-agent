@@ -1071,14 +1071,22 @@ repository boundaries. Strip source URL queries/fragments, derive platform and
 subject from the owner-scoped account, and do not discard legitimate business
 records merely to reduce model context. Browser Control seals its findings via
 `personal_ip_record_browser_observation`.
-`deerflow.personal_ip.browser_collection` owns the first direct collector. Its
-Douyin path reuses the account-scoped BrowserSession, permits navigation only
-to query-free `creator.douyin.com` URLs, extracts rendered DOM content and a
-full-page screenshot digest, and labels one-page output partial unless a
-declared content count is fully parsed and the platform reports no more items. Keep
-the DOM extractor free of browser-storage, cookie, request-header and network
-response access. The Gateway endpoint and
-`personal_ip_collect_douyin_browser_page` native tool must share this service.
+`deerflow.personal_ip.browser_collection` owns the direct browser-first
+collector for all eight platforms. It derives the platform from the
+owner-scoped account, reuses the account-scoped BrowserSession, permits
+navigation only to a query-free URL on that platform's registered creator host,
+extracts rendered DOM content and a full-page screenshot digest, and labels a
+generic one-page output partial. Platform-specific adapters alone may prove
+stronger completeness; the verified Douyin content adapter requires matching
+declared/parsed counts plus the platform's end-of-list signal. Keep the DOM
+extractor free of browser-storage, cookie, request-header and network-response
+access. The generic Gateway endpoint and
+`personal_ip_collect_browser_page` native tool must share this service; the
+Douyin-specific endpoint/tool are compatibility wrappers only. Detailed
+credential-free records must remain available to the agent: the collector may
+return them directly, `personal_ip_platform_observation_inventory` discovers
+recent evidence portfolio-wide without an account filter, and
+`personal_ip_read_platform_observation` performs the exact owner-scoped read.
 
 `DouyinAuthorizedMetricCollectionService` is the credential-to-evidence
 bridge. `/api/personal-ip/metrics/collect/douyin` accepts only connection,

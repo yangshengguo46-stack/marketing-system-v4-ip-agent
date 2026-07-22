@@ -74,7 +74,12 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > closes the login dialog automatically. Chromium/server connectors use
 > credentials internally without exposing their values to the model, while
 > authorized creator-backend data remains available for detailed evidence
-> collection, receipts and retrospective analysis. See
+> collection, receipts and retrospective analysis. One native direct collector
+> now seals rendered creator pages from all eight account families into the
+> same immutable evidence contract; unverified platform pages remain explicitly
+> partial, while the real-tested Douyin adapter parses dashboard and complete
+> content-inventory evidence. Native inventory/read tools keep those detailed,
+> credential-free records available to later agent analysis. See
 > [docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md](docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md).
 
 ## Official Website

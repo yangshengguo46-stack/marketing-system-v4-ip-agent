@@ -200,15 +200,24 @@ fields are rejected before persistence. After Browser Control reads a page, the
 native `personal_ip_record_browser_observation` tool seals the detailed result
 without reducing the conversation to that account.
 
-Douyin also has a direct browser collector at
-`POST /api/personal-ip/platform-observations/collect/browser/douyin` and the
-native `personal_ip_collect_douyin_browser_page` tool. It reuses the same
-persistent account profile as manual login, captures only rendered DOM business
-content plus a full-page screenshot digest, and records the result as partial
-single-page coverage unless a declared content listing is fully parsed and the
-page explicitly says there are no more works. A real persisted-login acceptance run has captured both
-the creator dashboard and content inventory with per-post metrics; no cookies,
-browser storage or request headers are read by the extractor.
+All eight browser-first platforms share the direct collector at
+`POST /api/personal-ip/platform-observations/collect/browser` and the native
+`personal_ip_collect_browser_page` tool. It derives the platform from the
+owner-scoped account, reuses the same persistent account profile as manual
+login, captures only rendered DOM business content plus a full-page screenshot
+digest, and records unverified platform pages as partial single-page coverage.
+The older Douyin endpoint/tool remain compatibility wrappers over the same
+service. Douyin has verified dashboard/content-inventory parsing and may mark a
+listing complete only when the declared count matches parsed items and the page
+explicitly says there are no more works. A real persisted-login acceptance run
+has captured both pages with per-post metrics; no cookies, browser storage or
+request headers are read by the extractor.
+
+The primary collector returns its credential-free detailed records immediately.
+Later conversations use the whole-portfolio
+`personal_ip_platform_observation_inventory` tool to locate evidence and
+`personal_ip_read_platform_observation` to retrieve the owner-scoped full
+records, summary, coverage and evidence provenance.
 
 ### Browser-first platform accounts
 

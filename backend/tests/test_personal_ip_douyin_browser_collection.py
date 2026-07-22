@@ -6,11 +6,69 @@ from unittest.mock import AsyncMock
 import pytest
 
 from deerflow.personal_ip.browser_collection import (
+    BrowserPlatformCollectionError,
+    BrowserPlatformCollectionService,
     DouyinBrowserCollectionError,
     DouyinBrowserCollectionService,
     parse_douyin_content_inventory,
     parse_douyin_dashboard_summary,
 )
+
+
+@pytest.mark.asyncio
+async def test_browser_platform_collection_captures_generic_rendered_business_data() -> None:
+    accounts = SimpleNamespace(get=AsyncMock(return_value={"id": "acct-x", "platform": "x", "display_name": "X account", "status": "active"}))
+    observations = SimpleNamespace(record=AsyncMock(side_effect=lambda **kwargs: {"id": "platform-observation-x", "platform": "x", **kwargs}))
+    session = SimpleNamespace(
+        current_url=AsyncMock(return_value="https://x.com/home?utm_source=private"),
+        navigate=AsyncMock(),
+        extract_business_page=AsyncMock(
+            return_value={
+                "url": "https://x.com/home?utm_source=private",
+                "title": "Home / X",
+                "visible_text": "Analytics 28 days Impressions 12,345 Engagements 678",
+                "text_truncated": False,
+                "headings": ["Analytics"],
+                "tables": [],
+                "data_blocks": ["Impressions 12,345", "Engagements 678"],
+                "links": [{"text": "Analytics", "href": "https://x.com/i/account_analytics?token=not-persisted"}],
+            }
+        ),
+        screenshot_bytes=AsyncMock(return_value=b"x-page"),
+    )
+    service = BrowserPlatformCollectionService(accounts=accounts, observations=observations, settle_seconds=0)
+
+    result = await service.collect_creator_page(
+        owner_user_id="user-1",
+        account_id="acct-x",
+        observation_key="x:dashboard:2026-07-22T10",
+        dataset="dashboard",
+        session=session,
+    )
+
+    assert result["platform"] == "x"
+    kwargs = observations.record.await_args.kwargs
+    assert kwargs["status"] == "partial"
+    assert kwargs["source_url"] == "https://x.com/home"
+    assert kwargs["records"][0]["links"][0]["href"] == "https://x.com/i/account_analytics"
+    assert kwargs["coverage"]["platform_adapter"] == "generic_rendered_dom"
+    session.navigate.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_browser_platform_collection_rejects_cross_platform_navigation() -> None:
+    accounts = SimpleNamespace(get=AsyncMock(return_value={"id": "acct-x", "platform": "x", "status": "active"}))
+    service = BrowserPlatformCollectionService(accounts=accounts, observations=SimpleNamespace(), settle_seconds=0)
+
+    with pytest.raises(BrowserPlatformCollectionError, match="safe X creator URL"):
+        await service.collect_creator_page(
+            owner_user_id="user-1",
+            account_id="acct-x",
+            observation_key="x:unsafe:1",
+            dataset="dashboard",
+            target_url="https://creator.douyin.com/creator-micro/home",
+            session=SimpleNamespace(),
+        )
 
 
 def test_douyin_content_inventory_parser_normalizes_post_metrics() -> None:
@@ -250,6 +308,42 @@ async def test_douyin_browser_collection_waits_for_creator_spa_data() -> None:
     assert result["coverage"]["render_state"] == "ready"
     assert result["coverage"]["capture_attempts"] == 2
     assert session.extract_business_page.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_browser_collection_does_not_wait_for_unrelated_loading_cards() -> None:
+    accounts = SimpleNamespace(get=AsyncMock(return_value={"id": "acct-1", "platform": "douyin", "status": "active"}))
+    observations = SimpleNamespace(record=AsyncMock(side_effect=lambda **kwargs: {"id": "observation-ready", **kwargs}))
+    session = SimpleNamespace(
+        current_url=AsyncMock(return_value="https://creator.douyin.com/creator-micro/home"),
+        navigate=AsyncMock(),
+        extract_business_page=AsyncMock(
+            return_value={
+                "url": "https://creator.douyin.com/creator-micro/home",
+                "title": "抖音创作者中心",
+                "visible_text": "关注 2 粉丝 4 获赞 56 数据中心 近7日 播放量 900 热门话题 加载中，请稍候...",
+                "text_truncated": False,
+                "headings": [],
+                "tables": [{"rows": [["播放量", "900"]]}],
+                "data_blocks": ["关注 2 粉丝 4 获赞 56"],
+                "links": [],
+            }
+        ),
+        screenshot_bytes=AsyncMock(return_value=b"png"),
+    )
+    service = BrowserPlatformCollectionService(accounts=accounts, observations=observations, settle_seconds=0.001)
+
+    result = await service.collect_creator_page(
+        owner_user_id="user-1",
+        account_id="acct-1",
+        observation_key="douyin:dashboard:partial-widget-loading",
+        dataset="dashboard",
+        session=session,
+    )
+
+    assert result["coverage"]["render_state"] == "ready"
+    assert result["coverage"]["capture_attempts"] == 1
+    session.extract_business_page.assert_awaited_once()
 
 
 @pytest.mark.asyncio

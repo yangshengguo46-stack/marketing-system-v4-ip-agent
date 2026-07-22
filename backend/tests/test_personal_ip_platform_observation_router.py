@@ -173,3 +173,61 @@ async def test_platform_observation_router_collects_current_douyin_creator_page(
         target_url=None,
         session=session,
     )
+
+
+@pytest.mark.asyncio
+async def test_platform_observation_router_collects_any_browser_first_account(monkeypatch) -> None:
+    account_repository = SimpleNamespace(get=AsyncMock(return_value={"id": "acct-youtube", "platform": "youtube", "status": "active"}))
+    collect = AsyncMock(
+        return_value={
+            "id": "platform-observation-youtube",
+            "account_id": "acct-youtube",
+            "platform": "youtube",
+            "dataset": "dashboard",
+            "status": "partial",
+            "records": [],
+        }
+    )
+    app = FastAPI()
+    app.state.personal_ip_account_repo = account_repository
+    app.state.personal_ip_platform_observation_repo = SimpleNamespace()
+    app.include_router(router_module.router)
+
+    async def current_user(_request):
+        return SimpleNamespace(id="user-1")
+
+    monkeypatch.setattr(router_module, "get_current_user_from_request", current_user)
+    monkeypatch.setattr(
+        router_module,
+        "_browser_platform_collection_service",
+        lambda _request: SimpleNamespace(collect_creator_page=collect),
+    )
+    session = SimpleNamespace()
+
+    @contextmanager
+    def acquire(**kwargs):
+        assert kwargs["account"]["platform"] == "youtube"
+        yield session
+
+    monkeypatch.setattr(router_module, "acquire_account_browser_session", acquire)
+
+    async with httpx.AsyncClient(base_url="http://test", transport=httpx.ASGITransport(app=app)) as client:
+        response = await client.post(
+            "/api/personal-ip/platform-observations/collect/browser",
+            json={
+                "account_id": "acct-youtube",
+                "observation_key": "youtube:dashboard:2026-07-22T10",
+                "dataset": "dashboard",
+            },
+        )
+
+    assert response.status_code == 201
+    assert response.json()["platform"] == "youtube"
+    collect.assert_awaited_once_with(
+        owner_user_id="user-1",
+        account_id="acct-youtube",
+        observation_key="youtube:dashboard:2026-07-22T10",
+        dataset="dashboard",
+        target_url=None,
+        session=session,
+    )

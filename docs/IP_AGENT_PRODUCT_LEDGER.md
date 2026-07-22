@@ -5,7 +5,7 @@ operating loop. It is deliberately stricter than source-code completion. A
 schema, mocked test or configured model is not counted as a finished product
 until its real execution path, evidence and user interaction are usable.
 
-Last audited: 2026-07-21. The baseline audit began at commit `fd78208`; the
+Last audited: 2026-07-22. The baseline audit began at commit `fd78208`; the
 checkbox state also includes the current ledger change set.
 
 ## Current completion
@@ -57,6 +57,8 @@ coverage evidence.
 - [x] Expose the collector as a native DeerFlow portfolio tool without returning
       credentials or local profile paths.
 - [x] Verify the collector against the existing real logged-in Douyin profile.
+- [x] Reuse one account-isolated, credential-free direct collector across all
+      eight platforms; keep unverified platform pages explicitly partial.
 - [ ] Extend collection to WeChat Channels, WeChat Official Accounts and
       Xiaohongshu, then X, Instagram, YouTube and TikTok.
 

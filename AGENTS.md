@@ -175,8 +175,13 @@ IP Agent distribution note:
   fragments must not be persisted. `personal_ip_record_browser_observation`
   is the native sealing tool after Browser Control reads an authorized page.
   `deerflow.personal_ip.browser_collection` and
-  `personal_ip_collect_douyin_browser_page` provide the first direct rendered-DOM
-  collector while reusing the same persistent account browser session.
+  `personal_ip_collect_browser_page` provide one rendered-DOM collector for all
+  eight browser-first platforms while reusing the same persistent account
+  browser session. Generic pages remain partial until a verified
+  platform-specific adapter proves completeness; the Douyin endpoint/tool stay
+  compatibility wrappers over this service. Native inventory/read tools expose
+  the credential-free detailed evidence to analysis; inventory remains
+  portfolio-wide and an observation id selects only the exact read target.
 
 Skill quality review note:
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.

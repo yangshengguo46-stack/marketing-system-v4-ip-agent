@@ -11,6 +11,8 @@ from langchain.tools import tool
 
 from deerflow.config.paths import get_paths
 from deerflow.personal_ip.browser_collection import (
+    BrowserPlatformCollectionError,
+    BrowserPlatformCollectionService,
     DouyinBrowserCollectionError,
     DouyinBrowserCollectionService,
     acquire_account_browser_session,
@@ -28,6 +30,19 @@ from deerflow.tools.types import Runtime
 
 def _json(value: dict) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+_PLATFORM_OBSERVATION_DATASETS = {
+    "account_profile",
+    "audience_analytics",
+    "comments",
+    "content_inventory",
+    "content_metrics",
+    "conversions",
+    "dashboard",
+    "platform_receipts",
+    "traffic_sources",
+}
 
 
 def _parse_datetime(value: str, *, field: str) -> datetime:
@@ -60,6 +75,15 @@ def _douyin_browser_collection_service(services: PersonalIPRuntimeServices) -> D
     if services.accounts is None or services.platform_observations is None:
         raise ValueError("Personal-IP browser collection is not available")
     return DouyinBrowserCollectionService(
+        accounts=services.accounts,
+        observations=services.platform_observations,
+    )
+
+
+def _browser_platform_collection_service(services: PersonalIPRuntimeServices) -> BrowserPlatformCollectionService:
+    if services.accounts is None or services.platform_observations is None:
+        raise ValueError("Personal-IP browser collection is not available")
+    return BrowserPlatformCollectionService(
         accounts=services.accounts,
         observations=services.platform_observations,
     )
@@ -205,6 +229,168 @@ async def _personal_ip_collect_douyin_browser_page(
         return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
     except Exception:
         return _json({"status": "error", "category": "internal", "message": "Douyin browser collection is unavailable"})
+
+
+async def _personal_ip_collect_browser_page(
+    runtime: Runtime,
+    account_id: str,
+    observation_key: str,
+    dataset: str,
+    target_url: str = "",
+) -> str:
+    """Capture one authenticated creator page as detailed business evidence.
+
+    This is the shared browser-first collector for Douyin, WeChat Channels,
+    WeChat Official Accounts, Xiaohongshu, X, Instagram, YouTube and TikTok.
+    It reuses the exact account's isolated Chromium profile and reads rendered
+    DOM content plus a screenshot digest. It never reads cookies, browser
+    storage, request headers or network token values. Account ids select only
+    this operation target and never narrow conversation authority.
+
+    Args:
+        account_id: Server-issued Personal-IP account id to inspect.
+        observation_key: Stable idempotency key for this capture.
+        dataset: Business family such as dashboard, content_inventory or audience_analytics.
+        target_url: Optional query-free page on this platform's registered creator host.
+
+    Returns:
+        JSON detailed records, evidence reference, direct summary and collection coverage.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.accounts is None:
+            raise ValueError("Personal-IP accounts are not available")
+        owner_user_id = resolve_runtime_user_id(runtime)
+        account = await services.accounts.get(account_id, owner_user_id=owner_user_id)
+        if account is None or account.get("status") != "active":
+            raise ValueError("Active Personal-IP account not found")
+        with acquire_account_browser_session(owner_user_id=owner_user_id, account=account) as session:
+            result = await _browser_platform_collection_service(services).collect_creator_page(
+                owner_user_id=owner_user_id,
+                account_id=account_id,
+                observation_key=observation_key,
+                dataset=dataset,
+                target_url=str(target_url or "").strip() or None,
+                session=session,
+            )
+        return _json(
+            {
+                "status": result.get("status"),
+                "id": result.get("id"),
+                "account_id": result.get("account_id"),
+                "platform": result.get("platform"),
+                "dataset": result.get("dataset"),
+                "source_url": result.get("source_url"),
+                "record_count": len(result.get("records") or []),
+                "records": result.get("records") or [],
+                "summary": result.get("summary") or {},
+                "coverage": result.get("coverage") or {},
+                "evidence_digest": result.get("evidence_digest"),
+            }
+        )
+    except BrowserPlatformCollectionError as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Browser collection is unavailable"})
+
+
+async def _personal_ip_platform_observation_inventory(
+    runtime: Runtime,
+    dataset: str = "",
+    limit: int = 100,
+) -> str:
+    """List recent detailed evidence across the authenticated user's portfolio.
+
+    This inventory intentionally has no account filter. It returns observation
+    ids, direct summaries and coverage for every account so the agent can find
+    the right evidence without narrowing conversation authority. Call
+    personal_ip_read_platform_observation for the full records of one item.
+
+    Args:
+        dataset: Optional business-data family; empty means every dataset.
+        limit: Maximum recent observations to return, from 1 to 500.
+
+    Returns:
+        JSON portfolio inventory without bulky detailed records.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.platform_observations is None:
+            raise RuntimeError("Personal-IP platform observations are not available")
+        dataset_key = str(dataset or "").strip()
+        if dataset_key and dataset_key not in _PLATFORM_OBSERVATION_DATASETS:
+            raise ValueError("Unsupported platform observation dataset")
+        result_limit = int(limit)
+        if result_limit < 1 or result_limit > 500:
+            raise ValueError("limit must be between 1 and 500")
+        observations = await services.platform_observations.list(
+            resolve_runtime_user_id(runtime),
+            dataset=dataset_key or None,
+            limit=result_limit,
+        )
+        fields = (
+            "id",
+            "account_id",
+            "subject_id",
+            "platform",
+            "dataset",
+            "source",
+            "status",
+            "source_url",
+            "observed_at",
+            "summary",
+            "coverage",
+            "evidence_digest",
+        )
+        return _json(
+            {
+                "status": "ok",
+                "observation_count": len(observations),
+                "observations": [{field: observation.get(field) for field in fields if field in observation} for observation in observations],
+            }
+        )
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Evidence inventory is unavailable"})
+
+
+async def _personal_ip_read_platform_observation(
+    runtime: Runtime,
+    observation_id: str,
+) -> str:
+    """Read the full detailed business records of one immutable observation.
+
+    Credential material cannot be present because the evidence repository
+    rejects it recursively before persistence. The owner-scoped lookup prevents
+    one user from reading another user's creator data.
+
+    Args:
+        observation_id: Server-issued platform observation id from the portfolio inventory.
+
+    Returns:
+        JSON containing full records, summary, coverage and evidence provenance.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.platform_observations is None:
+            raise RuntimeError("Personal-IP platform observations are not available")
+        observation_key = str(observation_id or "").strip()
+        if not observation_key:
+            raise ValueError("observation_id is required")
+        result = await services.platform_observations.get(
+            observation_key,
+            owner_user_id=resolve_runtime_user_id(runtime),
+        )
+        if result is None:
+            return _json({"status": "error", "category": "not_found", "message": "Platform observation not found"})
+        return _json({"status": "ok", **result})
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Platform observation is unavailable"})
 
 
 async def _personal_ip_performance_inventory(
@@ -570,6 +756,21 @@ personal_ip_collect_douyin_browser_page_tool = tool(
     "personal_ip_collect_douyin_browser_page",
     parse_docstring=True,
 )(_personal_ip_collect_douyin_browser_page)
+
+personal_ip_collect_browser_page_tool = tool(
+    "personal_ip_collect_browser_page",
+    parse_docstring=True,
+)(_personal_ip_collect_browser_page)
+
+personal_ip_platform_observation_inventory_tool = tool(
+    "personal_ip_platform_observation_inventory",
+    parse_docstring=True,
+)(_personal_ip_platform_observation_inventory)
+
+personal_ip_read_platform_observation_tool = tool(
+    "personal_ip_read_platform_observation",
+    parse_docstring=True,
+)(_personal_ip_read_platform_observation)
 
 personal_ip_sync_douyin_post_tool = tool(
     "personal_ip_sync_douyin_post",

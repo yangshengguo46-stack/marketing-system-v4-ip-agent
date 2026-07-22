@@ -13,11 +13,9 @@ from urllib.parse import urlsplit, urlunsplit
 from deerflow.community.url_safety import resolve_host_addresses, validate_public_http_url
 from deerflow.config import get_app_config
 from deerflow.config.paths import get_paths
-from deerflow.personal_ip.browser_profiles import browser_login_succeeded, build_browser_account_target
+from deerflow.personal_ip.browser_profiles import BROWSER_PLATFORMS, browser_login_succeeded, build_browser_account_target
 
-_DOUYIN_CREATOR_HOST = "creator.douyin.com"
-_DOUYIN_START_URL = "https://creator.douyin.com/"
-_DOUYIN_DATASETS = {
+_BROWSER_DATASETS = {
     "account_profile",
     "audience_analytics",
     "comments",
@@ -34,8 +32,11 @@ _CONTENT_PUBLISHED_AT = re.compile(r"(?P<year>\d{4})年(?P<month>\d{2})月(?P<da
 _CONTENT_METRICS = re.compile(rf"播放\s+(?P<views>{_COMPACT_COUNT})\s+点赞\s+(?P<likes>{_COMPACT_COUNT})\s+评论\s+(?P<comments>{_COMPACT_COUNT})\s+分享\s+(?P<shares>{_COMPACT_COUNT})")
 
 
-class DouyinBrowserCollectionError(ValueError):
-    """Safe, user-actionable Douyin browser collection failure."""
+class BrowserPlatformCollectionError(ValueError):
+    """Safe, user-actionable browser-first platform collection failure."""
+
+
+DouyinBrowserCollectionError = BrowserPlatformCollectionError
 
 
 def _config_int(extra: dict[str, Any], key: str, default: int) -> int:
@@ -60,7 +61,7 @@ def acquire_account_browser_session(*, owner_user_id: str, account: dict[str, An
 
     account_id = str(account.get("id") or "").strip()
     if not account_id or account.get("status") != "active":
-        raise DouyinBrowserCollectionError("Active Personal-IP account not found")
+        raise BrowserPlatformCollectionError("Active Personal-IP account not found")
     paths = get_paths()
     safe_user_id = paths.prepare_user_dir_for_raw_id(owner_user_id)
     target = build_browser_account_target(
@@ -103,26 +104,32 @@ def _safe_url(value: Any) -> str:
     try:
         parsed = urlsplit(raw)
     except ValueError as exc:
-        raise DouyinBrowserCollectionError("Browser page returned an invalid URL") from exc
+        raise BrowserPlatformCollectionError("Browser page returned an invalid URL") from exc
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise DouyinBrowserCollectionError("Browser page did not return an HTTP(S) URL")
+        raise BrowserPlatformCollectionError("Browser page did not return an HTTP(S) URL")
     host = parsed.hostname.lower()
     if parsed.port is not None:
         host = f"{host}:{parsed.port}"
     return urlunsplit((parsed.scheme.lower(), host, parsed.path or "/", "", ""))
 
 
-def _target_url(value: str) -> str:
+def _target_url(value: str, *, platform: str) -> str:
+    config = BROWSER_PLATFORMS.get(platform)
+    if config is None:
+        raise BrowserPlatformCollectionError("This account does not have a browser-first connector")
+    expected = urlsplit(config.start_url)
+    expected_host = (expected.hostname or "").lower()
+    label = "Douyin" if platform == "douyin" else config.label
     raw = str(value or "").strip()
     try:
         parsed = urlsplit(raw)
     except ValueError as exc:
-        raise DouyinBrowserCollectionError("target_url must be a safe Douyin creator URL") from exc
+        raise BrowserPlatformCollectionError(f"target_url must be a safe {label} creator URL") from exc
     if parsed.query or parsed.fragment:
-        raise DouyinBrowserCollectionError("target_url must not contain a query or fragment")
-    if parsed.scheme != "https" or (parsed.hostname or "").lower() != _DOUYIN_CREATOR_HOST or parsed.username or parsed.password:
-        raise DouyinBrowserCollectionError("target_url must be a safe Douyin creator URL")
-    return urlunsplit(("https", _DOUYIN_CREATOR_HOST, parsed.path or "/", "", ""))
+        raise BrowserPlatformCollectionError("target_url must not contain a query or fragment")
+    if parsed.scheme != "https" or (parsed.hostname or "").lower() != expected_host or parsed.username or parsed.password:
+        raise BrowserPlatformCollectionError(f"target_url must be a safe {label} creator URL")
+    return urlunsplit(("https", expected_host, parsed.path or "/", "", ""))
 
 
 def _clean_text(value: Any, *, limit: int) -> str:
@@ -283,7 +290,7 @@ def _links(value: Any) -> list[dict[str, str]]:
         if raw_link.get("href"):
             try:
                 href = _safe_url(raw_link["href"])
-            except DouyinBrowserCollectionError:
+            except BrowserPlatformCollectionError:
                 href = ""
         if text or href:
             links.append({"text": text, "href": href})
@@ -294,13 +301,15 @@ def _rendered_data_ready(extracted: Any) -> bool:
     if not isinstance(extracted, dict):
         return False
     text = _clean_text(extracted.get("visible_text"), limit=60_000)
-    if "加载中，请稍候" in text or "loading" == text.strip().lower():
+    has_structured_data = bool(extracted.get("tables")) or bool(extracted.get("data_blocks"))
+    loading_only = ("加载中，请稍候" in text or "loading" == text.strip().lower()) and not has_structured_data and len(text) < 100
+    if loading_only:
         return False
-    return len(text) >= 100 or bool(extracted.get("tables")) or bool(extracted.get("data_blocks"))
+    return len(text) >= 100 or has_structured_data
 
 
-class DouyinBrowserCollectionService:
-    """Capture rendered Douyin creator data without touching browser secrets."""
+class BrowserPlatformCollectionService:
+    """Capture rendered creator data for a browser-first account without secrets."""
 
     def __init__(self, *, accounts, observations, settle_seconds: float = 1.5) -> None:
         self._accounts = accounts
@@ -315,6 +324,7 @@ class DouyinBrowserCollectionService:
         observation_key: str,
         dataset: str,
         source_url: str,
+        platform: str,
     ) -> dict[str, Any]:
         return await self._observations.record(
             owner_user_id=owner_user_id,
@@ -332,7 +342,7 @@ class DouyinBrowserCollectionService:
                 "pages_scanned": 0,
                 "records_seen": 0,
             },
-            evidence={"capture_method": "url_state_only"},
+            evidence={"capture_method": "url_state_only", "platform_adapter": platform},
         )
 
     async def collect_creator_page(
@@ -346,37 +356,42 @@ class DouyinBrowserCollectionService:
         target_url: str | None = None,
     ) -> dict[str, Any]:
         account = await self._accounts.get(account_id, owner_user_id=owner_user_id)
-        if account is None or account.get("status") != "active" or account.get("platform") != "douyin":
-            raise DouyinBrowserCollectionError("Active Douyin account not found")
+        if account is None or account.get("status") != "active":
+            raise BrowserPlatformCollectionError("Active Personal-IP account not found")
+        platform = str(account.get("platform") or "").strip()
+        platform_config = BROWSER_PLATFORMS.get(platform)
+        if platform_config is None:
+            raise BrowserPlatformCollectionError("This account does not have a browser-first connector")
         dataset_key = str(dataset or "").strip()
-        if dataset_key not in _DOUYIN_DATASETS:
-            raise DouyinBrowserCollectionError("Unsupported Douyin browser dataset")
+        if dataset_key not in _BROWSER_DATASETS:
+            raise BrowserPlatformCollectionError(f"Unsupported {platform_config.label} browser dataset")
         get_by_key = getattr(self._observations, "get_by_key", None)
         if callable(get_by_key):
             existing = await get_by_key(observation_key, owner_user_id=owner_user_id)
             if existing is not None:
                 if existing.get("account_id") != account_id or existing.get("dataset") != dataset_key:
-                    raise DouyinBrowserCollectionError("observation_key already records a different browser collection")
+                    raise BrowserPlatformCollectionError("observation_key already records a different browser collection")
                 return existing
-        requested_url = _target_url(target_url) if target_url else None
+        requested_url = _target_url(target_url, platform=platform) if target_url else None
 
         before_url = str(await session.current_url() or "")
         if requested_url is not None:
             await session.navigate(requested_url)
-        elif not browser_login_succeeded("douyin", before_url):
-            await session.navigate(_DOUYIN_START_URL)
+        elif not browser_login_succeeded(platform, before_url):
+            await session.navigate(platform_config.start_url)
 
         if self._settle_seconds:
             await asyncio.sleep(self._settle_seconds)
 
-        current_url = str(await session.current_url() or requested_url or _DOUYIN_START_URL)
-        if requested_url is None and not browser_login_succeeded("douyin", current_url):
+        current_url = str(await session.current_url() or requested_url or platform_config.start_url)
+        if requested_url is None and not browser_login_succeeded(platform, current_url):
             return await self._unavailable(
                 owner_user_id=owner_user_id,
                 account_id=account_id,
                 observation_key=observation_key,
                 dataset=dataset_key,
                 source_url=_safe_url(current_url),
+                platform=platform,
             )
 
         extracted = await session.extract_business_page(max_chars=60_000, max_rows=500)
@@ -387,15 +402,16 @@ class DouyinBrowserCollectionService:
             extracted = await session.extract_business_page(max_chars=60_000, max_rows=500)
             capture_attempts += 1
         if not isinstance(extracted, dict):
-            raise DouyinBrowserCollectionError("Douyin creator page extraction returned no structured data")
+            raise BrowserPlatformCollectionError(f"{platform_config.label} creator page extraction returned no structured data")
         source_url = _safe_url(extracted.get("url") or current_url)
-        if not browser_login_succeeded("douyin", source_url):
+        if not browser_login_succeeded(platform, source_url):
             return await self._unavailable(
                 owner_user_id=owner_user_id,
                 account_id=account_id,
                 observation_key=observation_key,
                 dataset=dataset_key,
                 source_url=source_url,
+                platform=platform,
             )
 
         tables = _tables(extracted.get("tables"))
@@ -421,11 +437,13 @@ class DouyinBrowserCollectionService:
             "visible_text_characters": len(visible_text),
         }
         pagination_state = "single_loaded_page"
-        if dataset_key == "dashboard":
+        platform_adapter = "generic_rendered_dom"
+        if platform == "douyin" and dataset_key == "dashboard":
             direct_metrics = parse_douyin_dashboard_summary(visible_text)
             record["direct_metrics"] = direct_metrics
             summary.update(direct_metrics)
-        elif dataset_key == "content_inventory":
+            platform_adapter = "douyin_dashboard_v1"
+        elif platform == "douyin" and dataset_key == "content_inventory":
             parsed_inventory = parse_douyin_content_inventory(visible_text)
             items = parsed_inventory["items"]
             records.extend(items)
@@ -446,6 +464,7 @@ class DouyinBrowserCollectionService:
                 pagination_state = "complete_listing"
             if listing_complete and declared_count is not None and declared_count == len(items):
                 status = "observed"
+            platform_adapter = "douyin_content_inventory_v1"
         screenshot = await session.screenshot_bytes(full_page=True)
         screenshot_digest = hashlib.sha256(bytes(screenshot)).hexdigest()
         observed_at = datetime.now(UTC)
@@ -468,6 +487,7 @@ class DouyinBrowserCollectionService:
                 "capture_attempts": capture_attempts,
                 "text_truncated": bool(extracted.get("text_truncated")),
                 "table_row_limit": 500,
+                "platform_adapter": platform_adapter,
             },
             evidence={
                 "capture_method": "rendered_dom_and_full_page_screenshot_digest",
@@ -480,3 +500,6 @@ class DouyinBrowserCollectionService:
                 },
             },
         )
+
+
+DouyinBrowserCollectionService = BrowserPlatformCollectionService

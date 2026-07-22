@@ -16,10 +16,13 @@ from app.gateway.deps import (
 from deerflow.community.browser_automation.session import BrowserSessionCapacityError
 from deerflow.persistence.personal_ip_platform_observations.sql import validate_credential_free_payload
 from deerflow.personal_ip.browser_collection import (
+    BrowserPlatformCollectionError,
+    BrowserPlatformCollectionService,
     DouyinBrowserCollectionError,
     DouyinBrowserCollectionService,
     acquire_account_browser_session,
 )
+from deerflow.personal_ip.browser_profiles import BROWSER_PLATFORMS
 
 router = APIRouter(prefix="/api/personal-ip/platform-observations", tags=["personal-ip"])
 
@@ -68,7 +71,7 @@ class PersonalIPPlatformObservationRequest(BaseModel):
         return self
 
 
-class DouyinBrowserCollectionRequest(BaseModel):
+class BrowserPlatformCollectionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     account_id: str = Field(min_length=1, max_length=64)
@@ -92,6 +95,9 @@ class DouyinBrowserCollectionRequest(BaseModel):
         return value.strip() if isinstance(value, str) else value
 
 
+DouyinBrowserCollectionRequest = BrowserPlatformCollectionRequest
+
+
 async def _current_user_id(request: Request) -> str:
     user = await get_current_user_from_request(request)
     return str(user.id)
@@ -111,6 +117,40 @@ def _douyin_browser_collection_service(request: Request) -> DouyinBrowserCollect
         accounts=get_personal_ip_account_repo(request),
         observations=get_personal_ip_platform_observation_repo(request),
     )
+
+
+def _browser_platform_collection_service(request: Request) -> BrowserPlatformCollectionService:
+    return BrowserPlatformCollectionService(
+        accounts=get_personal_ip_account_repo(request),
+        observations=get_personal_ip_platform_observation_repo(request),
+    )
+
+
+@router.post("/collect/browser", status_code=201)
+async def collect_browser_platform_observation(
+    body: BrowserPlatformCollectionRequest,
+    request: Request,
+) -> dict[str, Any]:
+    owner_user_id = await _current_user_id(request)
+    account = await get_personal_ip_account_repo(request).get(body.account_id, owner_user_id=owner_user_id)
+    if account is None or account.get("status") != "active" or account.get("platform") not in BROWSER_PLATFORMS:
+        raise HTTPException(status_code=404, detail="Active browser-first account not found")
+    try:
+        with acquire_account_browser_session(owner_user_id=owner_user_id, account=account) as session:
+            return await _browser_platform_collection_service(request).collect_creator_page(
+                owner_user_id=owner_user_id,
+                account_id=body.account_id,
+                observation_key=body.observation_key,
+                dataset=body.dataset,
+                target_url=body.target_url,
+                session=session,
+            )
+    except BrowserSessionCapacityError as exc:
+        raise HTTPException(status_code=429, detail="Browser session capacity is full") from exc
+    except BrowserPlatformCollectionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise _repository_error(exc) from exc
 
 
 @router.post("/collect/browser/douyin", status_code=201)

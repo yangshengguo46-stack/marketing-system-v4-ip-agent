@@ -9,18 +9,24 @@ import pytest
 
 from deerflow.personal_ip.runtime import PersonalIPRuntimeServices, configure_personal_ip_runtime
 from deerflow.tools.builtins import (
+    personal_ip_collect_browser_page_tool,
     personal_ip_collect_douyin_browser_page_tool,
     personal_ip_metrics_aggregate_tool,
     personal_ip_performance_inventory_tool,
+    personal_ip_platform_observation_inventory_tool,
+    personal_ip_read_platform_observation_tool,
     personal_ip_record_browser_observation_tool,
     personal_ip_select_browser_account_tool,
     personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,
 )
 from deerflow.tools.builtins.personal_ip_tools import (
+    _personal_ip_collect_browser_page,
     _personal_ip_collect_douyin_browser_page,
     _personal_ip_metrics_aggregate,
     _personal_ip_performance_inventory,
+    _personal_ip_platform_observation_inventory,
+    _personal_ip_read_platform_observation,
     _personal_ip_record_browser_observation,
     _personal_ip_select_browser_account,
     _personal_ip_sync_douyin_portfolio,
@@ -110,16 +116,22 @@ async def test_douyin_sync_tool_uses_connection_reference_without_returning_toke
 def test_personal_ip_native_tools_are_available_without_thread_account_binding() -> None:
     names = {tool.name for tool in BUILTIN_TOOLS}
     assert personal_ip_metrics_aggregate_tool.name == "personal_ip_metrics_aggregate"
+    assert personal_ip_collect_browser_page_tool.name == "personal_ip_collect_browser_page"
     assert personal_ip_collect_douyin_browser_page_tool.name == "personal_ip_collect_douyin_browser_page"
     assert personal_ip_performance_inventory_tool.name == "personal_ip_performance_inventory"
+    assert personal_ip_platform_observation_inventory_tool.name == "personal_ip_platform_observation_inventory"
+    assert personal_ip_read_platform_observation_tool.name == "personal_ip_read_platform_observation"
     assert personal_ip_record_browser_observation_tool.name == "personal_ip_record_browser_observation"
     assert personal_ip_select_browser_account_tool.name == "personal_ip_select_browser_account"
     assert personal_ip_sync_douyin_portfolio_tool.name == "personal_ip_sync_douyin_portfolio"
     assert personal_ip_sync_douyin_post_tool.name == "personal_ip_sync_douyin_post"
+    assert personal_ip_collect_browser_page_tool in BUILTIN_TOOLS
     assert {
         "personal_ip_metrics_aggregate",
-        "personal_ip_collect_douyin_browser_page",
+        "personal_ip_collect_browser_page",
         "personal_ip_performance_inventory",
+        "personal_ip_platform_observation_inventory",
+        "personal_ip_read_platform_observation",
         "personal_ip_record_browser_observation",
         "personal_ip_select_browser_account",
         "personal_ip_sync_douyin_portfolio",
@@ -200,6 +212,116 @@ async def test_collect_douyin_browser_page_tool_uses_account_profile_and_returns
         target_url=None,
         session=session,
     )
+
+
+@pytest.mark.asyncio
+async def test_collect_browser_page_tool_supports_non_douyin_account(monkeypatch) -> None:
+    accounts = SimpleNamespace(get=AsyncMock(return_value={"id": "acct-xhs", "platform": "xiaohongshu", "status": "active"}))
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            accounts=accounts,
+            connections=SimpleNamespace(),
+            metrics=SimpleNamespace(),
+            publish_receipts=SimpleNamespace(),
+            platform_observations=SimpleNamespace(),
+        )
+    )
+    collect = AsyncMock(
+        return_value={
+            "id": "platform-observation-xhs",
+            "account_id": "acct-xhs",
+            "platform": "xiaohongshu",
+            "dataset": "audience_analytics",
+            "status": "partial",
+            "source_url": "https://creator.xiaohongshu.com/creator/home",
+            "records": [{}],
+            "summary": {"visible_text_characters": 1200},
+            "coverage": {"pages_scanned": 1},
+            "evidence_digest": "c" * 64,
+        }
+    )
+    monkeypatch.setattr(
+        "deerflow.tools.builtins.personal_ip_tools._browser_platform_collection_service",
+        lambda _services: SimpleNamespace(collect_creator_page=collect),
+    )
+
+    @contextmanager
+    def acquire(**_kwargs):
+        yield SimpleNamespace()
+
+    monkeypatch.setattr("deerflow.tools.builtins.personal_ip_tools.acquire_account_browser_session", acquire)
+
+    raw = await _personal_ip_collect_browser_page(
+        SimpleNamespace(context={"user_id": "user-1"}),
+        account_id="acct-xhs",
+        observation_key="xiaohongshu:audience:2026-07-22T10",
+        dataset="audience_analytics",
+        target_url="",
+    )
+    payload = json.loads(raw)
+
+    assert payload["platform"] == "xiaohongshu"
+    assert payload["record_count"] == 1
+    assert payload["records"] == [{}]
+    collect.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_platform_observation_tools_inventory_then_read_full_detailed_evidence() -> None:
+    observations = SimpleNamespace(
+        list=AsyncMock(
+            return_value=[
+                {
+                    "id": "platform-observation-1",
+                    "account_id": "acct-xhs",
+                    "platform": "xiaohongshu",
+                    "dataset": "content_inventory",
+                    "status": "partial",
+                    "source_url": "https://creator.xiaohongshu.com/creator/home",
+                    "observed_at": "2026-07-22T02:00:00+00:00",
+                    "records": [{"title": "一条笔记", "metrics": {"views": 1200}}],
+                    "summary": {"content_count": 1},
+                    "coverage": {"pages_scanned": 1},
+                    "evidence": {"screenshot_sha256": "d" * 64},
+                    "evidence_digest": "e" * 64,
+                }
+            ]
+        ),
+        get=AsyncMock(
+            return_value={
+                "id": "platform-observation-1",
+                "account_id": "acct-xhs",
+                "platform": "xiaohongshu",
+                "dataset": "content_inventory",
+                "status": "partial",
+                "source_url": "https://creator.xiaohongshu.com/creator/home",
+                "records": [{"title": "一条笔记", "metrics": {"views": 1200}}],
+                "summary": {"content_count": 1},
+                "coverage": {"pages_scanned": 1},
+                "evidence": {"screenshot_sha256": "d" * 64},
+                "evidence_digest": "e" * 64,
+            }
+        ),
+    )
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            connections=SimpleNamespace(),
+            metrics=SimpleNamespace(),
+            publish_receipts=SimpleNamespace(),
+            platform_observations=observations,
+        )
+    )
+    runtime = SimpleNamespace(context={"user_id": "user-1"})
+
+    inventory = json.loads(await _personal_ip_platform_observation_inventory(runtime, dataset="content_inventory", limit=25))
+    detail = json.loads(await _personal_ip_read_platform_observation(runtime, "platform-observation-1"))
+
+    assert inventory["observation_count"] == 1
+    assert "records" not in inventory["observations"][0]
+    assert detail["records"][0]["metrics"]["views"] == 1200
+    assert detail["evidence"]["screenshot_sha256"] == "d" * 64
+    observations.list.assert_awaited_once_with("user-1", dataset="content_inventory", limit=25)
+    observations.get.assert_awaited_once_with("platform-observation-1", owner_user_id="user-1")
 
 
 @pytest.mark.asyncio
