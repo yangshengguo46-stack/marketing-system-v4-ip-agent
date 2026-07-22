@@ -22,7 +22,11 @@ import { cn } from "@/lib/utils";
 import { navigateBrowser } from "./api";
 import { useMaybeBrowserView } from "./context";
 import { decideBrowserKeyInput } from "./keyboard";
-import { type BrowserInputEvent, useBrowserStream } from "./use-browser-stream";
+import {
+  type BrowserInputEvent,
+  type BrowserStreamStatus,
+  useBrowserStream,
+} from "./use-browser-stream";
 
 export function BrowserViewPanel({
   threadId,
@@ -30,6 +34,7 @@ export function BrowserViewPanel({
   initialUrl,
   title = "Browser",
   onAccountAuthenticated,
+  onStreamStatusChange,
   onClose,
   className,
 }: {
@@ -38,6 +43,7 @@ export function BrowserViewPanel({
   initialUrl?: string;
   title?: string;
   onAccountAuthenticated?: () => void;
+  onStreamStatusChange?: (status: BrowserStreamStatus) => void;
   onClose?: () => void;
   className?: string;
 }) {
@@ -105,6 +111,10 @@ export function BrowserViewPanel({
       onAccountAuthenticated?.();
     }
   }, [accountAuthenticated, accountMode, onAccountAuthenticated]);
+
+  useEffect(() => {
+    onStreamStatusChange?.(status);
+  }, [onStreamStatusChange, status]);
 
   useEffect(() => {
     if (frame?.url && !urlInput && !liveUrl) {

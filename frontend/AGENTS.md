@@ -103,7 +103,10 @@ Tool-calling AI messages can contain user-visible text as well as `tool_calls`. 
   platforms create a minimal account slot before opening login; QR, CAPTCHA and
   MFA remain user actions. An `account_authenticated` stream event closes the
   login dialog and shows success; it carries no credential or business-data
-  payload. Later detailed collection remains an agent/browser responsibility.
+  payload. The portfolio derives the customer-facing 未添加 / 待登录 / 已登录 /
+  采集受限 / 可执行 states from non-secret account metadata and records only a
+  non-secret login marker after that event. Later detailed collection remains an
+  agent/browser responsibility.
   Never accept or cache an expanded account record as run authority; the Gateway
   resolves it again for the authenticated owner. Keep this page a thin status
   and account surface: DeerFlow conversation tools create and advance business
