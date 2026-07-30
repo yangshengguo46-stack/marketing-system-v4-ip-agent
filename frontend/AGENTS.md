@@ -181,7 +181,12 @@ frozen, while implementation detail remains hidden.
   New-chat welcome copy must ask what the user wants to advance, not which
   account they want to operate. A true first-use customer may start with one
   goal, topic, script, asset or link and must not be told to create/connect an
-  account until the requested operation actually needs one.
+  account until the requested operation actually needs one. First-use
+  incubation stays in the ordinary composer: the backend marks active adaptive
+  narrative-interview replies in `additional_kwargs`, and `InputBox` must
+  suppress generic follow-up-suggestion requests while the latest assistant
+  marker is active. Do not replace the composer with clarification cards,
+  choices, a field-progress surface or a second intake UI.
   Video production is task-native rather than a global customer page.
   `personal_ip_begin_video_production` records the current DeerFlow
   `thread_id`; `/workspace/chats/[thread_id]` detects that owner-scoped binding

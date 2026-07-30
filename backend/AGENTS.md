@@ -1017,20 +1017,24 @@ authenticated owner's full active portfolio, and injects it into runtime
 context. `PersonalIPContextMiddleware` adds an ephemeral model-only portfolio
 message before skill activation; it must not write the expanded records into
 checkpoint history. For the product `ip-agent`, an empty server-validated
-portfolio plus a first-use orientation/incubation request activates a
-deterministic first-reply gate: middleware emits exactly one
-`ask_clarification` request without calling the model, loading Skill files,
-browsing or reading a second startup tool. It gives a provisional roadmap and
-routes the one material question across person, brand/product and organization
-subjects. A structured answer to that first request deterministically emits one
-target-group/core-problem clarification with the same zero-model boundary; an
-answer to the second request reaches the normal model path. Concrete
-script/asset/link operations are excluded from the gate.
+portfolio plus a first-use orientation/incubation request activates a bounded
+narrative-interview gate. Middleware emits a normal assistant opening without
+calling the model, loading Skill files, browsing or reading a second startup
+tool. It gives disclosure control and routes one grand-tour invitation across
+person, brand, product and organization subjects. Later visible user answers
+run through a private forced `personal_ip_narrative_turn` schema with only the
+recent visible dialogue, no operating tools and a compact interviewing prompt.
+The middleware converts that private tool call into ordinary assistant text,
+persists only a version/status/turn/entity marker, and either asks one
+answer-grounded follow-up, stops, or hands sufficient evidence to the full
+agent in the same turn. Concrete script/asset/link/direction operations bypass
+or interrupt the gate.
 Account ids are operation targets and receipt fields only. Keep the middleware
 before `SkillActivationMiddleware`, and preserve tests for owner isolation,
-cross-account portfolio access, the zero-model first reply, entity-sensitive
-question routing, non-repeating first-answer continuation, direct-operation
-bypass, prompt-injection boundaries, and sync/async model calls.
+cross-account portfolio access, the zero-model ordinary first reply,
+entity-sensitive openings, compact tool isolation, reflective result
+conversion, sufficient-evidence transition, stop/direct-operation bypass,
+prompt-injection boundaries, and sync/async model calls.
 
 ByteDance HLLM-Creator is the audience intelligence foundation, not another
 agent runtime. Its complete source lives under `third_party/bytedance/HLLM` and

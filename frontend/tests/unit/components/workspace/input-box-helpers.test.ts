@@ -11,6 +11,7 @@ import {
   getInputSubmitAction,
   getLeadingSlashSkillQuery,
   getMatchingSkillSuggestions,
+  hasActivePersonalIPNarrativeInterview,
   isAbortError,
   isCurrentGoalRequest,
   parseCompactCommand,
@@ -72,6 +73,7 @@ describe("canRequestFollowupSuggestions", () => {
         disabled: false,
         isMock: false,
         hasOpenHumanInput: true,
+        hasActiveNarrativeInterview: false,
       }),
     ).toBe(false);
   });
@@ -82,8 +84,51 @@ describe("canRequestFollowupSuggestions", () => {
         disabled: false,
         isMock: false,
         hasOpenHumanInput: false,
+        hasActiveNarrativeInterview: false,
       }),
     ).toBe(true);
+  });
+
+  it("blocks a second model from proposing answers during narrative intake", () => {
+    const messages = [
+      {
+        type: "ai",
+        additional_kwargs: {
+          personal_ip_narrative_interview: {
+            version: 1,
+            status: "active",
+          },
+        },
+      },
+    ];
+
+    expect(hasActivePersonalIPNarrativeInterview(messages)).toBe(true);
+    expect(
+      canRequestFollowupSuggestions({
+        disabled: false,
+        isMock: false,
+        hasOpenHumanInput: false,
+        hasActiveNarrativeInterview:
+          hasActivePersonalIPNarrativeInterview(messages),
+      }),
+    ).toBe(false);
+  });
+
+  it("stops treating the thread as intake after the latest assistant exits", () => {
+    expect(
+      hasActivePersonalIPNarrativeInterview([
+        {
+          type: "ai",
+          additional_kwargs: {
+            personal_ip_narrative_interview: {
+              version: 1,
+              status: "active",
+            },
+          },
+        },
+        { type: "ai", additional_kwargs: {} },
+      ]),
+    ).toBe(false);
   });
 });
 

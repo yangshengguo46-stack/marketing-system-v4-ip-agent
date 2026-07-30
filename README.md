@@ -137,11 +137,14 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > use the whole-portfolio operating cockpit. When that new owner is asking how
 > to start or position an IP, the server produces the first reply with zero
 > model/provider calls, web research, Skill loading or benchmark selection. It
-> gives a provisional route and asks one material question matched to a person,
-> brand/product or organization. After that answer, a second deterministic
-> question narrows the target group and core problem, still without a model
-> call; the normal incubation model path begins only after both facts are known.
-> Concrete supplied scripts, assets and links remain directly executable.
+> opens an ordinary conversation with disclosure control and one grand-tour
+> invitation matched to a person, brand, product or organization. Later answers
+> use a compact reflective-interview call over recent visible dialogue only:
+> it reflects a user-specific fact, asks at most one answer-grounded question,
+> or stops and hands sufficient evidence to the full operator. It never defaults
+> to earliest memory or sensitive history, and the user can correct, skip,
+> stop or mark material internal-only. Concrete supplied scripts, assets, links
+> and direct strategy requests bypass or interrupt the interview.
 > IP is treated as an influence asset for a person, brand, product or
 > organization: attributable public expectations that can change attention,
 > trust, choice or action. Reach is distribution, not the asset. The private

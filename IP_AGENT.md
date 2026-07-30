@@ -446,10 +446,14 @@ records, summary, coverage and evidence provenance.
 ### Operating cockpit and video ledger
 
 For a server-validated empty portfolio and an orientation/incubation request,
-the first visible reply is emitted before any model or tool call: one
-provisional route and one entity-sensitive material question. Concrete
-script/asset/link work bypasses that boundary. On later or non-orientation
-turns, `personal_ip_startup_context` is the lightweight first read; it checks
+the first visible reply is emitted before any model or tool call as ordinary
+conversation: disclosure control plus one entity-sensitive grand-tour
+invitation. Later intake uses a compact reflective-interview call over recent
+visible dialogue only; it can ask one answer-grounded question, stop or hand
+sufficient evidence to the full operator. It does not expose a card, browse,
+load Skills or inspect ledgers. Concrete script/asset/link/direction work
+bypasses or interrupts that boundary. On later or non-orientation turns,
+`personal_ip_startup_context` is the lightweight first read; it checks
 only whether the authenticated owner has active subjects or accounts. A true
 `new_owner` must not scan empty strategy, publishing, metric, retrospective or
 video ledgers. A `returning_owner`, a resume request or a portfolio operating

@@ -141,6 +141,7 @@ import {
   getInputSubmitAction,
   getLeadingSlashSkillQuery,
   getMatchingSkillSuggestions,
+  hasActivePersonalIPNarrativeInterview,
   type GoalCommand,
   isAbortError,
   isCurrentGoalRequest,
@@ -1235,6 +1236,10 @@ export function InputBox({
       ),
     [thread.messages],
   );
+  const hasActiveNarrativeInterview = useMemo(
+    () => hasActivePersonalIPNarrativeInterview(thread.messages),
+    [thread.messages],
+  );
   const composerLocked = isComposerDisabled || polishingInput;
   const inputPolishUndoAvailable =
     !polishingInput &&
@@ -1881,6 +1886,7 @@ export function InputBox({
         disabled: disabled === true,
         isMock: isMock === true,
         hasOpenHumanInput: hasOpenHumanInputCard,
+        hasActiveNarrativeInterview,
       })
     ) {
       setFollowups([]);
@@ -1959,6 +1965,7 @@ export function InputBox({
   }, [
     context.model_name,
     disabled,
+    hasActiveNarrativeInterview,
     hasOpenHumanInputCard,
     isMock,
     status,

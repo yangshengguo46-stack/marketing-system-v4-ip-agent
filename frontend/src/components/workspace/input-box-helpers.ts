@@ -204,12 +204,44 @@ export function canRequestFollowupSuggestions({
   disabled,
   isMock,
   hasOpenHumanInput,
+  hasActiveNarrativeInterview,
 }: {
   disabled: boolean;
   isMock: boolean;
   hasOpenHumanInput: boolean;
+  hasActiveNarrativeInterview: boolean;
 }): boolean {
-  return !disabled && !isMock && !hasOpenHumanInput;
+  return (
+    !disabled &&
+    !isMock &&
+    !hasOpenHumanInput &&
+    !hasActiveNarrativeInterview
+  );
+}
+
+type MessageWithMetadata = {
+  type?: string;
+  additional_kwargs?: Record<string, unknown>;
+};
+
+export function hasActivePersonalIPNarrativeInterview(
+  messages: MessageWithMetadata[],
+): boolean {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.type !== "ai") {
+      continue;
+    }
+    const marker = message.additional_kwargs?.personal_ip_narrative_interview;
+    if (!marker || typeof marker !== "object") {
+      return false;
+    }
+    return (
+      Reflect.get(marker, "version") === 1 &&
+      Reflect.get(marker, "status") === "active"
+    );
+  }
+  return false;
 }
 
 export function getInputSubmitAction({

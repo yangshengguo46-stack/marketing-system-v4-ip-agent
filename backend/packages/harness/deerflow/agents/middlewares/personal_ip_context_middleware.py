@@ -2,24 +2,31 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from html import escape
 from typing import Any, override
 
 from langchain.agents.middleware import AgentMiddleware
-from langchain.agents.middleware.types import ModelCallResult, ModelRequest, ModelResponse
+from langchain.agents.middleware.types import (
+    ExtendedModelResponse,
+    ModelCallResult,
+    ModelRequest,
+    ModelResponse,
+)
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from deerflow.agents.human_input import read_human_input_response
+from deerflow.agents.middlewares.tool_call_metadata import clone_ai_message_with_tool_calls
+from deerflow.utils.messages import get_original_user_content_text
 
 _PERSONAL_IP_PORTFOLIO_CONTEXT_KEY = "personal_ip_portfolio"
 _PERSONAL_IP_CONTEXT_DATA_KEY = "personal_ip_context_data"
 _CUSTOMER_AGENT_NAME = "ip-agent"
-_FIRST_USE_ALLOWED_TOOLS = frozenset({"ask_clarification"})
-_FIRST_USE_ORIENTATION_CALL_PREFIX = "first_use_orientation_"
-_FIRST_USE_AUDIENCE_CALL_PREFIX = "first_use_audience_"
+_NARRATIVE_INTERVIEW_KEY = "personal_ip_narrative_interview"
+_NARRATIVE_TURN_TOOL_NAME = "personal_ip_narrative_turn"
+_NARRATIVE_INTERVIEW_VERSION = 1
 _AUTHORITY_CONTRACT = "\n".join(
     [
         "## Personal-IP portfolio context contract",
@@ -32,20 +39,76 @@ _AUTHORITY_CONTRACT = "\n".join(
         "Use the dedicated strategy and evidence readers for commercial positioning, content and performance details.",
     ]
 )
-_FIRST_USE_ORIENTATION_CONTRACT = "\n".join(
+_NARRATIVE_INTERVIEW_SYSTEM = "\n".join(
     [
-        "## First-use incubation gate",
-        "The server-validated portfolio is empty and the current request asks how to start or position a new IP.",
-        "This classification already replaces a startup-context tool call for this turn.",
-        "Before your first visible reply, Do not browse, search, load a Skill file, inspect any operating ledger, create an account/subject, or research benchmarks.",
-        "First acknowledge the stated goal, give only a short provisional roadmap, "
-        "label assumptions as provisional, and ask exactly one conversational question "
-        "whose answer can materially change the entity, objective system, buyer, offer, "
-        "proof, or production capacity.",
-        "Do not ask the user to connect a platform account and do not claim that profiling, modeling, positioning, or benchmark selection is complete.",
-        "External research becomes eligible only after later user answers establish enough entity and business truth to make benchmark selection meaningful.",
+        "You are the bounded narrative interviewer for an IP influence-asset strategy.",
+        "Use motivational-interviewing micro-skills such as open invitations, reflective listening and tentative hypotheses, but never claim to be a therapist, diagnose the user or imitate human emotion.",
+        "Your task is to decide whether one more question will materially change entity truth, audience, objective, offer, proof, production capacity or disclosure boundaries.",
+        "Reflect a specific fact or phrase from the user's latest answer before asking anything.",
+        "Treat interpretations as hypotheses and make them easy to correct. Do not praise generically.",
+        "Ask at most one main question. It must follow from the answer, be neutral and be answerable through a concrete event where possible.",
+        "Do not default to earliest memory, childhood, family, trauma, shame, illness, violence or loss. If a sensitive branch is genuinely decision-relevant, explain why and make skipping explicit.",
+        "Do not ask again after the user refuses a branch. Never mine pain for content.",
+        "Do not ask about accounts, platforms or benchmarks yet.",
+        "Return status=ready when the visible history already contains enough entity truth, a concrete proof or event, "
+        "and a target public or intended behavior/economic result to form provisional directions. "
+        "More generic intake then has low information value.",
+        "Return status=stop when the user asks to end the interview without requesting a strategy output.",
+        "Otherwise return status=continue with one reflective statement and one follow-up question.",
+        "Use the required function and put no text outside the function call.",
     ]
 )
+_NARRATIVE_TRANSITION_CONTRACT = "\n".join(
+    [
+        "## Narrative interview transition",
+        "A bounded narrative-interview pass judged the visible conversation sufficient for provisional strategic work.",
+        "Do not ask another broad intake question in this turn.",
+        "Separate user-stated facts, your tentative interpretations and remaining evidence gaps.",
+        "Advance the user's request with two or three materially different provisional directions and the smallest observable pilot, using native strategy/evidence tools when appropriate.",
+        "Do not call profiling or positioning complete, and do not require a platform account unless the concrete next operation needs one.",
+    ]
+)
+_NARRATIVE_TURN_TOOL = {
+    "type": "function",
+    "function": {
+        "name": _NARRATIVE_TURN_TOOL_NAME,
+        "description": "Return one evidence-grounded reflective interview turn or declare the intake sufficient.",
+        "parameters": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "reflection": {
+                    "type": "string",
+                    "description": "One or two concise sentences grounded in the user's latest words. Interpretations must be tentative.",
+                },
+                "question": {
+                    "type": "string",
+                    "description": "Exactly one main follow-up question for continue; empty for ready or stop.",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["continue", "ready", "stop"],
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Private decision reason explaining the information value or why no more intake is needed.",
+                },
+                "control_note": {
+                    "type": "string",
+                    "description": "Optional concise permission, correction or skip cue. Never imply that disclosure is required.",
+                },
+            },
+            "required": [
+                "reflection",
+                "question",
+                "status",
+                "reason",
+                "control_note",
+            ],
+        },
+        "strict": True,
+    },
+}
 _MODEL_FIELDS = (
     "id",
     "subject_id",
@@ -76,6 +139,10 @@ def _runtime_agent_name(request: ModelRequest) -> str | None:
 
 def _message_text(message: object) -> str:
     content = getattr(message, "content", "")
+    if getattr(message, "type", None) == "human":
+        additional_kwargs = getattr(message, "additional_kwargs", {}) or {}
+        if isinstance(additional_kwargs, dict):
+            return get_original_user_content_text(content, additional_kwargs)
     if isinstance(content, str):
         return content
     if not isinstance(content, list):
@@ -110,39 +177,6 @@ def _has_non_text_input(message: object) -> bool:
     return any(isinstance(block, dict) and str(block.get("type") or "").strip().lower() not in {"", "text"} for block in content)
 
 
-def _latest_clarification_tool_call_id(messages: list) -> str | None:
-    latest_user_index = next(
-        (index for index in range(len(messages) - 1, -1, -1) if getattr(messages[index], "type", None) == "human" and read_human_input_response(getattr(messages[index], "additional_kwargs", {}) or {}) is not None),
-        None,
-    )
-    if latest_user_index is None:
-        return None
-    for message in reversed(messages[:latest_user_index]):
-        tool_calls = getattr(message, "tool_calls", None)
-        if not isinstance(tool_calls, list):
-            continue
-        for tool_call in reversed(tool_calls):
-            if not isinstance(tool_call, dict) or tool_call.get("name") != "ask_clarification":
-                continue
-            tool_call_id = tool_call.get("id")
-            if isinstance(tool_call_id, str) and tool_call_id:
-                return tool_call_id
-    return None
-
-
-def _first_visible_user_text(messages: list) -> str:
-    for message in messages:
-        if getattr(message, "type", None) != "human":
-            continue
-        additional_kwargs = getattr(message, "additional_kwargs", {}) or {}
-        if isinstance(additional_kwargs, dict) and additional_kwargs.get("hide_from_ui") is True:
-            continue
-        text = _message_text(message).strip()
-        if text:
-            return text
-    return ""
-
-
 def _is_first_use_orientation_request(messages: list) -> bool:
     message = _latest_real_user_message(messages)
     if message is None or _has_non_text_input(message):
@@ -154,38 +188,7 @@ def _is_first_use_orientation_request(messages: list) -> bool:
     if not text:
         return False
 
-    concrete_operation_signals = (
-        "写成",
-        "写一条",
-        "写个",
-        "帮我写",
-        "替我写",
-        "请写",
-        "直接写",
-        "给我选题",
-        "找选题",
-        "改写",
-        "修改这",
-        "润色",
-        "分析这个",
-        "拆解这个",
-        "发布这",
-        "复盘这",
-        "剪辑这",
-        "生成一",
-        "做一条",
-        "帮我拍",
-        "上传了",
-        "链接是",
-        "http://",
-        "https://",
-        "turn this into",
-        "rewrite this",
-        "edit this",
-        "analyze this",
-        "publish this",
-    )
-    if any(signal in text for signal in concrete_operation_signals):
+    if _has_concrete_operation_signal(text):
         return False
 
     orientation_signals = (
@@ -219,60 +222,51 @@ def _is_first_use_orientation_request(messages: list) -> bool:
     return any(signal in text for signal in orientation_signals)
 
 
+def _has_concrete_operation_signal(text: str) -> bool:
+    normalized = text.strip().lower()
+    concrete_operation_signals = (
+        "写成",
+        "写一条",
+        "写个",
+        "帮我写",
+        "替我写",
+        "请写",
+        "直接写",
+        "给我选题",
+        "找选题",
+        "改写",
+        "修改这",
+        "润色",
+        "分析这个",
+        "拆解这个",
+        "发布这",
+        "复盘这",
+        "剪辑这",
+        "生成一",
+        "做一条",
+        "帮我拍",
+        "直接给方案",
+        "先给方案",
+        "给我方向",
+        "先出方向",
+        "上传了",
+        "链接是",
+        "http://",
+        "https://",
+        "turn this into",
+        "rewrite this",
+        "edit this",
+        "analyze this",
+        "publish this",
+    )
+    return any(signal in normalized for signal in concrete_operation_signals)
+
+
 def _portfolio_experience(portfolio: dict[str, Any]) -> str:
     return "new_owner" if not portfolio["subjects"] and not portfolio["accounts"] else "returning_owner"
 
 
-def _tool_name(tool: object) -> str:
-    if isinstance(tool, dict):
-        value = tool.get("name")
-    else:
-        value = getattr(tool, "name", None)
-    return str(value) if isinstance(value, str) else ""
-
-
-def _first_use_material_question(text: str, *, is_chinese: bool) -> str:
-    normalized = text.lower()
-    product_signals = (
-        "品牌",
-        "产品",
-        "商品",
-        "门店",
-        "电商",
-        "餐饮",
-        "轻食",
-        "brand",
-        "product",
-        "store",
-        "commerce",
-        "restaurant",
-    )
-    organization_signals = (
-        "组织",
-        "机构",
-        "协会",
-        "基金会",
-        "公益",
-        "organization",
-        "institution",
-        "association",
-        "foundation",
-        "nonprofit",
-    )
-    if any(signal in normalized for signal in product_signals):
-        if is_chinese:
-            return "你现在已经能稳定交付或销售的最核心产品或服务是什么？如果还没有，直接回答“还在构思阶段”。"
-        return "What is the single core product or service you can already deliver or sell reliably? If there is none yet, say that it is still at the idea stage."
-    if any(signal in normalized for signal in organization_signals):
-        if is_chinese:
-            return "这个组织现阶段最希望目标人群采取的一个具体行动是什么？"
-        return "What is the one concrete action this organization most needs its target public to take now?"
-    if is_chinese:
-        return "你现在最有证据、也愿意长期公开表达的一项专业能力或真实经历是什么？"
-    return "What is the one well-evidenced professional capability or lived experience you are willing to discuss publicly over the long term?"
-
-
-def _first_use_audience_question(text: str, *, is_chinese: bool) -> str:
+def _narrative_entity_type(text: str) -> str:
     normalized = text.lower()
     organization_signals = (
         "组织",
@@ -286,30 +280,120 @@ def _first_use_audience_question(text: str, *, is_chinese: bool) -> str:
         "foundation",
         "nonprofit",
     )
+    if any(signal in normalized for signal in organization_signals):
+        return "organization"
     product_signals = (
-        "品牌",
         "产品",
         "商品",
+        "服务产品",
+        "product",
+        "offering",
+    )
+    if any(signal in normalized for signal in product_signals):
+        return "product"
+    brand_signals = (
+        "品牌",
         "门店",
         "电商",
         "餐饮",
         "brand",
-        "product",
         "store",
         "commerce",
         "restaurant",
     )
-    if any(signal in normalized for signal in organization_signals):
-        if is_chinese:
-            return "为了推动刚才这个行动，你最需要影响哪一类人？他们现在不行动的一个主要阻力是什么？"
-        return "Which group must you influence to drive that action, and what is the main reason they do not act today?"
-    if any(signal in normalized for signal in product_signals):
-        if is_chinese:
-            return "谁最可能购买或使用这个产品/服务？他们最愿意为解决哪一个具体问题采取行动或付费？"
-        return "Who is most likely to buy or use this product or service, and which specific problem would make them act or pay?"
+    return "brand" if any(signal in normalized for signal in brand_signals) else "person"
+
+
+def _narrative_opening_question(entity_type: str, *, is_chinese: bool) -> str:
     if is_chinese:
-        return "你希望用这项能力主要服务哪一类人？他们最愿意为解决哪一个具体问题采取行动或付费？"
-    return "Which group do you most want to serve with this capability, and which specific problem would make them act or pay?"
+        if entity_type == "organization":
+            return "如果把这个组织走到今天分成几章，最初大家为什么聚在一起，后来哪几次变化真正改写了共同目标？"
+        if entity_type == "product":
+            return "这个产品最初是被什么真实问题逼出来的，从第一版到现在，哪一次变化最关键？"
+        if entity_type == "brand":
+            return "如果把这个品牌从最初的念头到今天分成几章，哪些阶段真正改变了它的承诺或活法？"
+        return "如果把你走到今天的经历分成几章，你会怎么给它们起名字，哪几段真正改变了你？"
+    if entity_type == "organization":
+        return "If this organization's journey were a few chapters, why did people first come together, and which later change rewrote the shared goal?"
+    if entity_type == "product":
+        return "What real problem forced this product into existence, and which change from the first version to today mattered most?"
+    if entity_type == "brand":
+        return "If this brand's journey from its first idea to today were a few chapters, which chapter truly changed its promise or way of operating?"
+    return "If the experiences that brought you here were a few chapters, what would you call them, and which chapters truly changed you?"
+
+
+def _latest_narrative_marker(messages: list) -> dict[str, Any] | None:
+    for message in reversed(messages):
+        if getattr(message, "type", None) != "ai":
+            continue
+        additional_kwargs = getattr(message, "additional_kwargs", {}) or {}
+        marker = additional_kwargs.get(_NARRATIVE_INTERVIEW_KEY) if isinstance(additional_kwargs, dict) else None
+        if not isinstance(marker, dict):
+            return None
+        if marker.get("version") != _NARRATIVE_INTERVIEW_VERSION or marker.get("status") != "active":
+            return None
+        return marker
+    return None
+
+
+def _compact_visible_dialogue(messages: list, *, limit: int = 8) -> list:
+    compact: list = []
+    for message in messages:
+        message_type = getattr(message, "type", None)
+        if message_type not in {"human", "ai"}:
+            continue
+        additional_kwargs = getattr(message, "additional_kwargs", {}) or {}
+        if isinstance(additional_kwargs, dict) and additional_kwargs.get("hide_from_ui") is True:
+            continue
+        text = _message_text(message).strip()
+        if not text:
+            continue
+        compact.append(HumanMessage(content=text) if message_type == "human" else AIMessage(content=text))
+    return compact[-limit:]
+
+
+def _ai_message_from_result(result: ModelCallResult) -> AIMessage | None:
+    if isinstance(result, AIMessage):
+        return result
+    if isinstance(result, ExtendedModelResponse):
+        return _ai_message_from_result(result.model_response)
+    if isinstance(result, ModelResponse):
+        return next((message for message in reversed(result.result) if isinstance(message, AIMessage)), None)
+    return None
+
+
+def _replace_ai_message(result: ModelCallResult, original: AIMessage, updated: AIMessage) -> ModelCallResult:
+    if isinstance(result, AIMessage):
+        return updated
+    if isinstance(result, ExtendedModelResponse):
+        replaced = _replace_ai_message(result.model_response, original, updated)
+        if isinstance(replaced, ModelResponse):
+            return replace(result, model_response=replaced)
+        return result
+    if isinstance(result, ModelResponse):
+        messages = [updated if message is original else message for message in result.result]
+        return replace(result, result=messages)
+    return result
+
+
+def _narrative_tool_args(message: AIMessage) -> dict[str, Any] | None:
+    for tool_call in message.tool_calls or []:
+        if not isinstance(tool_call, dict) or tool_call.get("name") != _NARRATIVE_TURN_TOOL_NAME:
+            continue
+        args = tool_call.get("args")
+        return args if isinstance(args, dict) else None
+    return None
+
+
+def _fallback_narrative_turn(text: str, entity_type: str, *, is_chinese: bool) -> tuple[str, str]:
+    excerpt = " ".join(text.split())[:100]
+    if is_chinese:
+        reflection = f"我先不替你下结论。你刚才最明确提到的是“{excerpt}”。"
+        question = "能不能挑一件最能证明这句话的具体事情，讲讲当时你做了什么选择？" if entity_type == "person" else "能不能挑一件最能证明这句话的具体事情，讲讲当时发生了什么变化？"
+        return reflection, question
+    reflection = f"I will not turn this into a conclusion yet. The clearest thing you said was: “{excerpt}.”"
+    question = "Which concrete event best demonstrates that, and what changed because of it?"
+    return reflection, question
 
 
 def _project_subject(subject: object) -> dict[str, Any] | None:
@@ -414,98 +498,137 @@ class PersonalIPContextMiddleware(AgentMiddleware):
         message = _latest_real_user_message(list(request.messages))
         text = _message_text(message) if message is not None else ""
         is_chinese = any("\u4e00" <= char <= "\u9fff" for char in text)
+        entity_type = _narrative_entity_type(text)
         if is_chinese:
-            context = "先不用注册账号，也不用急着找对标。暂定路径是：确认真实可交付价值和目标人群 → 提出两到三个定位假设 → 再匹配对标并做首条样片 → 用拍摄与发布结果校准内容方向和真人、数字人或无真人方案；现在还不能把定位当成结论。"
+            context = (
+                "先不急着注册账号，也不急着给你下定位结论。我会先从真正发生过的事里找依据："
+                "事实、转折、被证明过的能力，以及哪些材料不能公开。这不是心理测评，也不要求你从隐私"
+                "或痛苦讲起。我们每次只聊一个方向；你随时可以纠正、跳过，或者说某一段只用于内部理解。"
+                "如果你只想马上完成一个具体任务，也可以直接打断这段梳理。"
+            )
         else:
             context = (
-                "You do not need to create an account or choose benchmarks yet. "
-                "The provisional path is to establish the real deliverable value and audience, "
-                "form two or three positioning hypotheses, then match benchmarks and make one "
-                "pilot video; filming and publication evidence will decide the content direction "
-                "and whether the format should use you on camera, a digital human, or no person. "
-                "Positioning is not a conclusion yet."
+                "There is no need to create an account or force a positioning conclusion yet. "
+                "I will first work from things that actually happened: facts, turning points, "
+                "externally demonstrated ability, and what must remain private. This is not a "
+                "psychological assessment, and you do not have to begin with pain or private history. "
+                "We will take one direction at a time; you can correct me, skip a branch, or mark "
+                "something as internal-only. You can also interrupt this process with a concrete task."
             )
-        question = _first_use_material_question(text, is_chinese=is_chinese)
-        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+        question = _narrative_opening_question(entity_type, is_chinese=is_chinese)
         return AIMessage(
-            content="",
-            tool_calls=[
-                {
-                    "name": "ask_clarification",
-                    "args": {
-                        "question": question,
-                        "clarification_type": "missing_info",
-                        "context": context,
-                        "options": None,
-                    },
-                    "id": f"{_FIRST_USE_ORIENTATION_CALL_PREFIX}{digest}",
-                    "type": "tool_call",
+            content=f"{context}\n\n{question}",
+            additional_kwargs={
+                _NARRATIVE_INTERVIEW_KEY: {
+                    "version": _NARRATIVE_INTERVIEW_VERSION,
+                    "status": "active",
+                    "turn": 0,
+                    "entity_type": entity_type,
                 }
-            ],
-            response_metadata={"finish_reason": "tool_calls"},
+            },
+            response_metadata={"finish_reason": "stop"},
         )
 
     @staticmethod
-    def _first_use_followup_response(request: ModelRequest) -> AIMessage | None:
+    def _active_narrative_marker(request: ModelRequest) -> dict[str, Any] | None:
         portfolio = _runtime_portfolio(request)
         runtime_context = getattr(getattr(request, "runtime", None), "context", None)
-        messages = list(request.messages)
-        latest_message = _latest_real_user_message(messages)
-        additional_kwargs = getattr(latest_message, "additional_kwargs", {}) or {}
-        response = read_human_input_response(additional_kwargs) if isinstance(additional_kwargs, dict) else None
-        if (
-            portfolio is None
-            or not isinstance(runtime_context, dict)
-            or runtime_context.get("disable_clarification")
-            or _runtime_agent_name(request) != _CUSTOMER_AGENT_NAME
-            or _portfolio_experience(portfolio) != "new_owner"
-            or response is None
-            or not (_latest_clarification_tool_call_id(messages) or "").startswith(_FIRST_USE_ORIENTATION_CALL_PREFIX)
-        ):
+        if portfolio is None or not isinstance(runtime_context, dict) or _runtime_agent_name(request) != _CUSTOMER_AGENT_NAME or _portfolio_experience(portfolio) != "new_owner":
             return None
+        marker = _latest_narrative_marker(list(request.messages))
+        latest_message = _latest_real_user_message(list(request.messages))
+        if marker is None or latest_message is None or _has_non_text_input(latest_message):
+            return None
+        if _has_concrete_operation_signal(_message_text(latest_message)):
+            return None
+        return marker
 
-        original_text = _first_visible_user_text(messages)
-        is_chinese = any("\u4e00" <= char <= "\u9fff" for char in original_text + response["value"])
-        if is_chinese:
-            context = "已经确认第一条真实能力、产品或行动证据；下一步只收窄目标人群和核心问题。回答后才能提出两到三个定位假设，现在仍不是定位结论。"
-        else:
-            context = (
-                "The first real capability, product, or action evidence is now established. "
-                "Next we only narrow the target group and core problem. Two or three positioning "
-                "hypotheses come after that answer; positioning is still not a conclusion."
-            )
-        question = _first_use_audience_question(original_text, is_chinese=is_chinese)
-        digest = hashlib.sha256(response["value"].encode("utf-8")).hexdigest()[:16]
-        return AIMessage(
-            content="",
-            tool_calls=[
-                {
-                    "name": "ask_clarification",
-                    "args": {
-                        "question": question,
-                        "clarification_type": "missing_info",
-                        "context": context,
-                        "options": None,
-                    },
-                    "id": f"{_FIRST_USE_AUDIENCE_CALL_PREFIX}{digest}",
-                    "type": "tool_call",
-                }
-            ],
-            response_metadata={"finish_reason": "tool_calls"},
+    @staticmethod
+    def _compact_narrative_request(request: ModelRequest, marker: dict[str, Any]) -> ModelRequest:
+        entity_type = str(marker.get("entity_type") or "person")
+        system_message = SystemMessage(content=f"{_NARRATIVE_INTERVIEW_SYSTEM}\nThe current entity type is {entity_type}.")
+        return request.override(
+            system_message=system_message,
+            messages=_compact_visible_dialogue(list(request.messages)),
+            tools=[_NARRATIVE_TURN_TOOL],
+            tool_choice=_NARRATIVE_TURN_TOOL_NAME,
+            response_format=None,
         )
+
+    @staticmethod
+    def _render_narrative_result(
+        result: ModelCallResult,
+        request: ModelRequest,
+        marker: dict[str, Any],
+    ) -> tuple[str, ModelCallResult]:
+        message = _ai_message_from_result(result)
+        args = _narrative_tool_args(message) if message is not None else None
+        status = str((args or {}).get("status") or "continue").strip().lower()
+        if status not in {"continue", "ready", "stop"}:
+            status = "continue"
+        if status == "ready":
+            return status, result
+
+        latest_user = _latest_real_user_message(list(request.messages))
+        latest_text = _message_text(latest_user).strip() if latest_user is not None else ""
+        is_chinese = any("\u4e00" <= char <= "\u9fff" for char in latest_text)
+        entity_type = str(marker.get("entity_type") or "person")
+        reflection = str((args or {}).get("reflection") or "").strip()
+        question = str((args or {}).get("question") or "").strip()
+        control_note = str((args or {}).get("control_note") or "").strip()
+        if not reflection or (status == "continue" and not question):
+            fallback_reflection, fallback_question = _fallback_narrative_turn(
+                latest_text,
+                entity_type,
+                is_chinese=is_chinese,
+            )
+            reflection = reflection or fallback_reflection
+            question = question or fallback_question
+
+        parts = [reflection]
+        if control_note:
+            parts.append(control_note)
+        if status == "continue" and question:
+            parts.append(question)
+        elif status == "stop":
+            parts.append("好，我们停在这里。之后想继续或直接做具体任务都可以。" if is_chinese else "Understood. We can stop here and resume later, or move directly to a concrete task.")
+        content = "\n\n".join(part for part in parts if part)
+
+        base_message = message or AIMessage(content="")
+        updated = clone_ai_message_with_tool_calls(base_message, [], content=content)
+        additional_kwargs = dict(updated.additional_kwargs or {})
+        additional_kwargs[_NARRATIVE_INTERVIEW_KEY] = {
+            "version": _NARRATIVE_INTERVIEW_VERSION,
+            "status": "active" if status == "continue" else "stopped",
+            "turn": int(marker.get("turn") or 0) + 1,
+            "entity_type": entity_type,
+        }
+        updated = updated.model_copy(
+            update={
+                "additional_kwargs": additional_kwargs,
+                "invalid_tool_calls": [],
+            }
+        )
+        if message is None:
+            return status, updated
+        return status, _replace_ai_message(result, message, updated)
+
+    def _transition_request(self, request: ModelRequest) -> ModelRequest:
+        injected = self._inject(request)
+        messages = _insert_after_leading_system_messages(
+            list(injected.messages),
+            [SystemMessage(content=_NARRATIVE_TRANSITION_CONTRACT)],
+        )
+        return injected.override(messages=messages)
 
     def _inject(self, request: ModelRequest) -> ModelRequest:
         portfolio = _runtime_portfolio(request)
         if portfolio is None:
             return request
-        first_use_orientation = self._is_first_use_orientation(request, portfolio)
-        authority_contract = _AUTHORITY_CONTRACT
-        if first_use_orientation:
-            authority_contract += "\n\n" + _FIRST_USE_ORIENTATION_CONTRACT
         messages = _insert_after_leading_system_messages(
             list(request.messages),
             [
-                SystemMessage(content=authority_contract),
+                SystemMessage(content=_AUTHORITY_CONTRACT),
                 HumanMessage(
                     content=_render_portfolio(portfolio),
                     additional_kwargs={
@@ -515,13 +638,7 @@ class PersonalIPContextMiddleware(AgentMiddleware):
                 ),
             ],
         )
-        if not first_use_orientation:
-            return request.override(messages=messages)
-        tools = [tool for tool in request.tools if _tool_name(tool) in _FIRST_USE_ALLOWED_TOOLS] if request.tools is not None else None
-        return request.override(
-            messages=messages,
-            tools=tools,
-        )
+        return request.override(messages=messages)
 
     @override
     def wrap_model_call(
@@ -529,10 +646,14 @@ class PersonalIPContextMiddleware(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        if response := self._first_use_followup_response(request):
-            return response
         if response := self._first_use_response(request):
             return response
+        if marker := self._active_narrative_marker(request):
+            result = handler(self._compact_narrative_request(request, marker))
+            status, rendered = self._render_narrative_result(result, request, marker)
+            if status == "ready":
+                return handler(self._transition_request(request))
+            return rendered
         return handler(self._inject(request))
 
     @override
@@ -541,8 +662,12 @@ class PersonalIPContextMiddleware(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        if response := self._first_use_followup_response(request):
-            return response
         if response := self._first_use_response(request):
             return response
+        if marker := self._active_narrative_marker(request):
+            result = await handler(self._compact_narrative_request(request, marker))
+            status, rendered = self._render_narrative_result(result, request, marker)
+            if status == "ready":
+                return await handler(self._transition_request(request))
+            return rendered
         return await handler(self._inject(request))

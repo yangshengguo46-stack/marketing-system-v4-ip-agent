@@ -89,7 +89,9 @@ test.describe("real backend render (replay, no API key)", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(
+      /(?:how can i assist you|name the account|告诉我账号)/i,
+    );
     await expect(textarea).toBeVisible({ timeout: 30_000 });
     await textarea.fill(PROMPT);
     await textarea.press("Enter");
@@ -129,5 +131,72 @@ test.describe("real backend render (replay, no API key)", () => {
         fullPage: true,
       });
     }
+  });
+
+  test("keeps first-use incubation conversational and follows three different answers", async ({
+    page,
+  }) => {
+    let suggestionRequests = 0;
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname.endsWith("/suggestions")) {
+        suggestionRequests += 1;
+      }
+    });
+
+    const scenarios = [
+      {
+        answer:
+          "我做了十年供应链采购，最难的一次是在工厂断供时把交付救了回来。",
+        expected: "工厂断供和交付被救回来的具体危机",
+        question: "哪一个关键选择最直接改变了最后的交付结果",
+      },
+      {
+        answer:
+          "这个轻食品牌是我母亲血糖出问题后才开始做的，第一批客户都是附近写字楼的上班族。",
+        expected: "母亲血糖变化带来的真实问题",
+        question: "第一批写字楼客户第一次愿意购买时",
+      },
+      {
+        answer:
+          "我原本只是想卖好看的沙拉，但连续三个月复购最高的其实是夜班护士，她们要的是凌晨也能吃到的热食。",
+        expected: "连续三个月的复购",
+        question: "夜班护士选择并复购热食时",
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      await page.goto("/workspace/chats/new");
+      const textarea = page.getByPlaceholder(
+        /(?:how can i assist you|name the account|告诉我账号)/i,
+      );
+      await expect(textarea).toBeVisible({ timeout: 30_000 });
+      await textarea.fill("我是第一次使用，想从零做一个品牌 IP。");
+      await textarea.press("Enter");
+
+      await expect(
+        page.getByText("如果把这个品牌从最初的念头到今天分成几章", {
+          exact: false,
+        }),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(textarea).toBeEnabled();
+      await expect(page.getByTestId("human-input-card")).toHaveCount(0);
+
+      await textarea.fill(scenario.answer);
+      await textarea.press("Enter");
+
+      await expect(
+        page.getByText(scenario.expected, { exact: false }),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        page.getByText(scenario.question, { exact: false }),
+      ).toBeVisible();
+      await expect(textarea).toBeEnabled();
+    }
+
+    await page.waitForTimeout(1_000);
+    expect(
+      suggestionRequests,
+      "the generic suggestion model must not compete with active narrative intake",
+    ).toBe(0);
   });
 });

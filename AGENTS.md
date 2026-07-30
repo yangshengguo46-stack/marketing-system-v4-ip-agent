@@ -422,10 +422,15 @@ IP Agent distribution note:
   are the agent's write/resume surface; chat history is never the production
   ledger.
 - A server-validated empty Personal-IP portfolio plus an orientation/incubation
-  request is a deterministic first-reply boundary. It emits one
-  `ask_clarification` with a provisional route and one entity-sensitive
-  material question, using zero provider calls and zero web/Skill/ledger reads.
-  Supplied script, asset and link operations bypass this boundary.
+  request is a bounded narrative-interview boundary. Its first reply is normal
+  conversation with one entity-sensitive grand-tour invitation, using zero
+  provider calls and zero web/Skill/ledger reads. Later intake turns use only
+  recent visible dialogue plus a private forced response schema: reflect a
+  user-specific fact, keep meaning hypotheses correctable, ask at most one
+  material question, and declare when evidence is ready for the full agent.
+  Do not default to earliest memory or sensitive history; skip/stop/correct and
+  internal-only boundaries belong to the user. Supplied script, asset, link and
+  direct-strategy operations bypass or interrupt this boundary.
 - `deerflow.personal_ip.video_method_distillation` adapts the MIT-licensed
   Cangjie RIA-TV++ workflow for long-form video, recorded courses, interviews
   and podcasts. It may consume only a sealed `personal-ip-video-pattern-v1`
@@ -453,10 +458,12 @@ IP Agent distribution note:
   creator/audience profile is forbidden. First-use incubation is a natural
   `ip-agent` conversation, not a customer questionnaire surface. For a
   server-validated empty portfolio and an orientation/incubation request,
-  `PersonalIPContextMiddleware` must hide research and execution tools until
-  the first visible reply; that reply gives a provisional roadmap and asks one
-  material question. Concrete supplied scripts, assets and links bypass this
-  delay. Strategy
+  `PersonalIPContextMiddleware` must open with an ordinary entity-appropriate
+  grand-tour question and then run bounded reflective follow-ups without
+  exposing or enabling research/execution tools. The ordinary composer remains
+  available, and the frontend must suppress generic follow-up suggestions while
+  the versioned narrative-interview marker is active. Concrete supplied scripts,
+  assets, links and direct requests bypass or interrupt this delay. Strategy
   versions must cover
   entity evidence, commercial design, real benchmarks, two-to-three positioning
   alternatives, name/avatar/bio launch assets, pilot experiments and observed

@@ -134,11 +134,15 @@ coverage evidence.
 - [x] Split first-use orientation from returning-owner recovery. A lightweight
       server-validated subject/account existence check routes a true new owner
       directly from the current request without scanning empty operating
-      ledgers. Orientation emits one provisional route plus a
-      person/brand-product/organization-sensitive evidence question; the first
-      answer deterministically advances to target group and core problem. Both
-      turns use zero model, web, Skill or ledger calls; concrete
-      script/asset/link work bypasses them.
+      ledgers. Orientation now opens an ordinary, entity-sensitive grand-tour
+      conversation with zero model calls; it does not render intake cards or
+      require an earliest memory. Later turns use a bounded private
+      reflection-and-question schema over recent visible dialogue, so the
+      user's actual answer changes the next question while correction,
+      skip/private/stop control remains explicit. Concrete script/asset/link
+      work bypasses incubation, and a real Next.js + Gateway + SQLite replay
+      proved three different stories produce three different grounded
+      follow-ups without a suggestion side channel.
 - [x] Upgrade launch pilots and audience preflights to evidence-graded,
       falsifiable behavior hypotheses with predicted/failure signals,
       distribution assumptions and uncertainty. Reject viral guarantees and

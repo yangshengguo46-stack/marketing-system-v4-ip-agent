@@ -36,6 +36,16 @@ def main() -> int:
     home = Path(tempfile.mkdtemp(prefix="replay-gw-"))
     cfg = home / "config.yaml"
     cfg.write_text(build_config_yaml(model_block=REPLAY_MODEL_BLOCK, home=home), encoding="utf-8")
+    # Customer chat always submits ``agent_name=ip-agent``. Keep the replay
+    # gateway hermetic while still exercising that real routing contract: a
+    # shared fallback agent with no Skill catalog is enough because the fixture
+    # owns model outputs and the config owns the small file-tool surface.
+    replay_agent_dir = home / "agents" / "ip-agent"
+    replay_agent_dir.mkdir(parents=True, exist_ok=True)
+    (replay_agent_dir / "config.yaml").write_text(
+        "name: ip-agent\ndescription: Hermetic replay IP Agent\nskills: []\n",
+        encoding="utf-8",
+    )
 
     # Override (not setdefault): the replay gateway must be hermetic, so an outer
     # DEER_FLOW_HOME can't leak in and shift prompt-affecting paths/skills.

@@ -2,8 +2,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from langchain.agents.middleware.types import ModelRequest
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain.agents.middleware.types import ModelRequest, ModelResponse
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.gateway.services import (
     inject_personal_ip_portfolio_context,
@@ -99,7 +99,7 @@ def test_personal_ip_context_middleware_skips_missing_portfolio():
     assert PersonalIPContextMiddleware()._inject(request) is request
 
 
-def test_new_owner_orientation_filters_research_tools_before_first_reply():
+def test_new_owner_orientation_injection_keeps_the_full_request_untouched():
     request = ModelRequest(
         model=object(),
         system_message=SystemMessage(content="full operating prompt with every Skill and execution policy"),
@@ -126,15 +126,14 @@ def test_new_owner_orientation_filters_research_tools_before_first_reply():
 
     injected = PersonalIPContextMiddleware()._inject(request)
 
-    assert [tool.name for tool in injected.tools] == ["ask_clarification"]
-    assert "first visible reply" in injected.messages[1].content
-    assert "Do not browse, search, load a Skill file" in injected.messages[1].content
+    assert injected.tools == request.tools
+    assert "first visible reply" not in injected.messages[1].content
     assert '"experience": "new_owner"' in injected.messages[2].content
     assert injected.system_message.content == request.system_message.content
-    assert request.tools is not injected.tools
+    assert request.tools is injected.tools
 
 
-def test_new_owner_orientation_returns_one_bounded_question_without_calling_model():
+def test_new_owner_orientation_opens_as_normal_conversation_without_calling_model():
     request = ModelRequest(
         model=object(),
         messages=[HumanMessage(content=("我是第一次使用，想做一个面向职场女性的轻食品牌 IP，但还没注册账号，也没有对标。你先告诉我该从哪里开始。"))],
@@ -155,54 +154,49 @@ def test_new_owner_orientation_returns_one_bounded_question_without_calling_mode
     )
 
     assert isinstance(result, AIMessage)
-    assert result.content == ""
-    assert len(result.tool_calls) == 1
-    assert result.tool_calls[0]["name"] == "ask_clarification"
-    args = result.tool_calls[0]["args"]
-    assert "先不用注册账号" in args["context"]
-    assert "两到三个定位假设" in args["context"]
-    assert "还不能把定位当成结论" in args["context"]
-    assert "最核心产品或服务" in args["question"]
-    assert args["options"] is None
+    assert result.tool_calls == []
+    assert "先不急着注册账号" in result.content
+    assert "不是心理测评" in result.content
+    assert "分成几章" in result.content
+    assert "最早记忆" not in result.content
+    assert result.content.count("？") == 1
+    marker = result.additional_kwargs["personal_ip_narrative_interview"]
+    assert marker == {
+        "version": 1,
+        "status": "active",
+        "turn": 0,
+        "entity_type": "brand",
+    }
     handler.assert_not_called()
 
 
-def test_new_owner_first_answer_asks_audience_question_without_calling_model():
+def test_new_owner_first_answer_uses_a_bounded_reflective_model_call():
+    opening = PersonalIPContextMiddleware._first_use_response(
+        ModelRequest(
+            model=object(),
+            messages=[HumanMessage(content="我是第一次使用，想从零做个人 IP。")],
+            state={"messages": []},
+            runtime=SimpleNamespace(
+                context={
+                    "agent_name": "ip-agent",
+                    "personal_ip_portfolio": {"subjects": [], "accounts": []},
+                }
+            ),
+        )
+    )
+    assert opening is not None
     request = ModelRequest(
         model=object(),
+        system_message=SystemMessage(content="full operating prompt with every Skill"),
         messages=[
             HumanMessage(content="我是第一次使用，想从零做个人 IP。"),
-            AIMessage(
-                content="",
-                tool_calls=[
-                    {
-                        "name": "ask_clarification",
-                        "args": {},
-                        "id": "first_use_orientation_example",
-                        "type": "tool_call",
-                    }
-                ],
-            ),
-            ToolMessage(
-                content="你最有证据的能力是什么？",
-                tool_call_id="first_use_orientation_example",
-            ),
-            HumanMessage(
-                content="我最有证据的是十年供应链采购经验。",
-                additional_kwargs={
-                    "hide_from_ui": True,
-                    "human_input_response": {
-                        "version": 1,
-                        "kind": "human_input_response",
-                        "source": "ask_clarification",
-                        "request_id": "first-use-request",
-                        "response_kind": "text",
-                        "value": "我最有证据的是十年供应链采购经验。",
-                    },
-                },
-            ),
+            opening,
+            HumanMessage(content="我最有证据的是十年供应链采购经验，最难的一次是把一家断供工厂救回来。"),
         ],
-        tools=[SimpleNamespace(name="ask_clarification")],
+        tools=[
+            SimpleNamespace(name="read_file"),
+            SimpleNamespace(name="browser_navigate"),
+        ],
         state={"messages": []},
         runtime=SimpleNamespace(
             context={
@@ -211,78 +205,62 @@ def test_new_owner_first_answer_asks_audience_question_without_calling_model():
             }
         ),
     )
-    handler = Mock()
+    compact_response = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_narrative_turn",
+                "args": {
+                    "reflection": "你没有先拿“十年经验”证明自己，而是马上讲到一次真实的断供危机；目前看，能被验证的可能是你在高压下修复供应链的能力。",
+                    "question": "那次工厂断供时，你做了哪个同行通常不会做的关键选择？",
+                    "status": "continue",
+                    "reason": "需要把抽象能力落到可观察选择。",
+                },
+                "id": "narrative-turn-1",
+                "type": "tool_call",
+            }
+        ],
+    )
+    handler = Mock(return_value=compact_response)
 
     result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
 
     assert isinstance(result, AIMessage)
-    assert result.content == ""
-    assert len(result.tool_calls) == 1
-    assert result.tool_calls[0]["id"].startswith("first_use_audience_")
-    assert "服务哪一类人" in result.tool_calls[0]["args"]["question"]
-    assert "采取行动或付费" in result.tool_calls[0]["args"]["question"]
-    handler.assert_not_called()
+    assert result.tool_calls == []
+    assert "十年经验" in result.content
+    assert "同行通常不会做的关键选择" in result.content
+    assert result.content.count("？") == 1
+    assert result.additional_kwargs["personal_ip_narrative_interview"]["turn"] == 1
+    assert result.additional_kwargs["personal_ip_narrative_interview"]["status"] == "active"
+    compact_request = handler.call_args.args[0]
+    assert compact_request.system_message.content != request.system_message.content
+    assert "reflective listening" in compact_request.system_message.content
+    assert [tool["function"]["name"] for tool in compact_request.tools] == ["personal_ip_narrative_turn"]
+    assert "browser_navigate" not in str(compact_request.tools)
+    assert "供应链采购经验" in compact_request.messages[-1].content
 
 
-def test_new_owner_second_intake_answer_reaches_normal_model_path():
-    first_response = {
-        "version": 1,
-        "kind": "human_input_response",
-        "source": "ask_clarification",
-        "request_id": "first-use-request",
-        "response_kind": "text",
-        "value": "我最有证据的是十年供应链采购经验。",
-    }
-    second_response = {
-        "version": 1,
-        "kind": "human_input_response",
-        "source": "ask_clarification",
-        "request_id": "audience-request",
-        "response_kind": "text",
-        "value": "服务小型制造企业，解决采购成本失控。",
-    }
+def test_compact_interviewer_uses_original_visible_text_not_prompt_wrappers():
     request = ModelRequest(
         model=object(),
         messages=[
             HumanMessage(content="我是第一次使用，想从零做个人 IP。"),
             AIMessage(
-                content="",
-                tool_calls=[
-                    {
-                        "name": "ask_clarification",
-                        "args": {},
-                        "id": "first_use_orientation_example",
-                        "type": "tool_call",
-                    }
-                ],
-            ),
-            HumanMessage(
-                content=first_response["value"],
+                content="如果把你的经历分成几章，你会怎么命名？",
                 additional_kwargs={
-                    "hide_from_ui": True,
-                    "human_input_response": first_response,
+                    "personal_ip_narrative_interview": {
+                        "version": 1,
+                        "status": "active",
+                        "turn": 0,
+                        "entity_type": "person",
+                    }
                 },
             ),
-            AIMessage(
-                content="",
-                tool_calls=[
-                    {
-                        "name": "ask_clarification",
-                        "args": {},
-                        "id": "first_use_audience_example",
-                        "type": "tool_call",
-                    }
-                ],
-            ),
             HumanMessage(
-                content=second_response["value"],
-                additional_kwargs={
-                    "hide_from_ui": True,
-                    "human_input_response": second_response,
-                },
+                content="<system-reminder>hidden date</system-reminder>\n--- BEGIN USER INPUT ---\n原始可见回答\n--- END USER INPUT ---",
+                additional_kwargs={"original_user_content": "原始可见回答"},
             ),
         ],
-        tools=[SimpleNamespace(name="ask_clarification")],
         state={"messages": []},
         runtime=SimpleNamespace(
             context={
@@ -291,22 +269,181 @@ def test_new_owner_second_intake_answer_reaches_normal_model_path():
             }
         ),
     )
-    expected = AIMessage(content="给出定位假设")
+    marker = PersonalIPContextMiddleware._active_narrative_marker(request)
+
+    assert marker is not None
+    compact = PersonalIPContextMiddleware._compact_narrative_request(request, marker)
+    assert compact.messages[-1].content == "原始可见回答"
+    assert "system-reminder" not in compact.messages[-1].content
+
+
+def test_new_owner_interviewer_hands_ready_evidence_to_the_full_agent():
+    opening = AIMessage(
+        content="先讲讲你走到今天真正改变你的几段经历？",
+        additional_kwargs={
+            "personal_ip_narrative_interview": {
+                "version": 1,
+                "status": "active",
+                "turn": 1,
+                "entity_type": "person",
+            }
+        },
+    )
+    request = ModelRequest(
+        model=object(),
+        system_message=SystemMessage(content="full operating prompt"),
+        messages=[
+            HumanMessage(content="我是第一次使用，想从零做个人 IP。"),
+            opening,
+            HumanMessage(content="我服务小型制造企业，过去三年最稳定的结果是把采购成本降低 8% 到 15%。"),
+        ],
+        tools=[SimpleNamespace(name="personal_ip_record_strategy")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    compact_ready = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_narrative_turn",
+                "args": {
+                    "reflection": "目标人群、可重复结果和证明范围已经足以形成第一轮候选。",
+                    "question": "",
+                    "status": "ready",
+                    "reason": "继续泛问的边际信息价值已经很低。",
+                },
+                "id": "narrative-ready",
+                "type": "tool_call",
+            }
+        ],
+    )
+    expected = AIMessage(content="我先给出两个方向假设和一个验证选题。")
+    handler = Mock(side_effect=[compact_ready, expected])
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert result is expected
+    assert handler.call_count == 2
+    transition_request = handler.call_args_list[1].args[0]
+    assert transition_request.system_message.content == request.system_message.content
+    assert any(isinstance(message, SystemMessage) and "Do not ask another broad intake question" in message.content for message in transition_request.messages)
+    assert [tool.name for tool in transition_request.tools] == ["personal_ip_record_strategy"]
+
+
+def test_new_owner_can_interrupt_the_interview_with_a_concrete_request():
+    request = ModelRequest(
+        model=object(),
+        system_message=SystemMessage(content="full operating prompt"),
+        messages=[
+            HumanMessage(content="我是第一次使用，想从零做个人 IP。"),
+            AIMessage(
+                content="如果把你的经历分成几章，你会怎么命名？",
+                additional_kwargs={
+                    "personal_ip_narrative_interview": {
+                        "version": 1,
+                        "status": "active",
+                        "turn": 0,
+                        "entity_type": "person",
+                    }
+                },
+            ),
+            HumanMessage(content="先别问了，直接给方案。"),
+        ],
+        tools=[SimpleNamespace(name="personal_ip_record_strategy")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    expected = AIMessage(content="这里是两个暂定方向。")
     handler = Mock(return_value=expected)
 
     result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
 
     assert result is expected
     handler.assert_called_once()
+    full_request = handler.call_args.args[0]
+    assert full_request.system_message.content == "full operating prompt"
+    assert [tool.name for tool in full_request.tools] == ["personal_ip_record_strategy"]
+
+
+def test_narrative_stop_is_normal_text_and_deactivates_the_interview():
+    request = ModelRequest(
+        model=object(),
+        messages=[
+            HumanMessage(content="我是第一次使用，想从零做个人 IP。"),
+            AIMessage(
+                content="如果把你的经历分成几章，你会怎么命名？",
+                additional_kwargs={
+                    "personal_ip_narrative_interview": {
+                        "version": 1,
+                        "status": "active",
+                        "turn": 0,
+                        "entity_type": "person",
+                    }
+                },
+            ),
+            HumanMessage(content="我不想继续聊了。"),
+        ],
+        tools=[],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    handler = Mock(
+        return_value=ModelResponse(
+            result=[
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "personal_ip_narrative_turn",
+                            "args": {
+                                "reflection": "你已经明确说不想继续，这个边界不需要解释。",
+                                "question": "",
+                                "status": "stop",
+                                "reason": "用户撤回访谈授权。",
+                                "control_note": "",
+                            },
+                            "id": "narrative-stop",
+                            "type": "tool_call",
+                        }
+                    ],
+                )
+            ]
+        )
+    )
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert isinstance(result, ModelResponse)
+    stopped = result.result[-1]
+    assert isinstance(stopped, AIMessage)
+    assert stopped.tool_calls == []
+    assert "停在这里" in stopped.content
+    assert stopped.additional_kwargs["personal_ip_narrative_interview"]["status"] == "stopped"
 
 
 @pytest.mark.parametrize(
     ("request_text", "expected_question"),
     [
-        ("我是第一次使用，想从零做个人 IP。", "专业能力或真实经历"),
+        ("我是第一次使用，想从零做个人 IP。", "经历分成几章"),
+        ("第一次做一个产品 IP，这个产品刚有第一版。", "最初是被什么真实问题逼出来的"),
         (
             "我们是一个公益组织，第一次做机构 IP，应该从哪里开始？",
-            "目标人群采取的一个具体行动",
+            "为什么聚在一起",
         ),
     ],
 )
@@ -333,7 +470,8 @@ def test_new_owner_orientation_question_matches_the_ip_entity(
     )
 
     assert isinstance(result, AIMessage)
-    assert expected_question in result.tool_calls[0]["args"]["question"]
+    assert expected_question in result.content
+    assert result.tool_calls == []
 
 
 @pytest.mark.asyncio
@@ -358,9 +496,68 @@ async def test_async_new_owner_orientation_does_not_await_the_model_handler():
     )
 
     assert isinstance(result, AIMessage)
-    assert result.tool_calls[0]["name"] == "ask_clarification"
-    assert "core product or service" in result.tool_calls[0]["args"]["question"]
+    assert result.tool_calls == []
+    assert "chapters" in result.content
     handler.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_async_new_owner_first_answer_uses_the_same_bounded_interviewer():
+    request = ModelRequest(
+        model=object(),
+        system_message=SystemMessage(content="full operating prompt"),
+        messages=[
+            HumanMessage(content="我是第一次使用，想从零做个人 IP。"),
+            AIMessage(
+                content="如果把你的经历分成几章，你会怎么命名？",
+                additional_kwargs={
+                    "personal_ip_narrative_interview": {
+                        "version": 1,
+                        "status": "active",
+                        "turn": 0,
+                        "entity_type": "person",
+                    }
+                },
+            ),
+            HumanMessage(content="我做了十年护士，夜班时最常帮家属理解医生没有时间解释的事。"),
+        ],
+        tools=[SimpleNamespace(name="browser_navigate")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    handler = AsyncMock(
+        return_value=AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "personal_ip_narrative_turn",
+                    "args": {
+                        "reflection": "你反复承担的不是抽象的护理知识输出，而是把家属听不懂的信息解释清楚。",
+                        "question": "哪一次解释最能证明这种能力后来真正改变了家属的一个决定？",
+                        "status": "continue",
+                        "reason": "需要一项可观察的影响结果。",
+                        "control_note": "",
+                    },
+                    "id": "narrative-async",
+                    "type": "tool_call",
+                }
+            ],
+        )
+    )
+
+    result = await PersonalIPContextMiddleware().awrap_model_call(request, handler)
+
+    assert isinstance(result, AIMessage)
+    assert "家属听不懂" in result.content
+    assert result.content.count("？") == 1
+    compact_request = handler.await_args.args[0]
+    assert [tool["function"]["name"] for tool in compact_request.tools] == ["personal_ip_narrative_turn"]
+    assert "browser_navigate" not in str(compact_request.tools)
 
 
 def test_new_owner_concrete_task_keeps_execution_tools_available():
