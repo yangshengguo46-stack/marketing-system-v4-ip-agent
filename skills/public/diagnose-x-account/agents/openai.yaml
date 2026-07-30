@@ -1,0 +1,4 @@
+interface:
+  display_name: "X账号诊断"
+  short_description: "基于内容、商业漏斗和一手平台证据判断X账号继续运营、调整或换号"
+  default_prompt: "Use $diagnose-x-account to diagnose this X account from current evidence."

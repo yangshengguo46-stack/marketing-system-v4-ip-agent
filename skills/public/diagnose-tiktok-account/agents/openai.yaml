@@ -1,0 +1,4 @@
+interface:
+  display_name: "TikTok账号诊断"
+  short_description: "基于内容、商业漏斗和一手平台证据判断TikTok账号继续、调整或换号"
+  default_prompt: "Use $diagnose-tiktok-account to diagnose this TikTok account from current evidence."

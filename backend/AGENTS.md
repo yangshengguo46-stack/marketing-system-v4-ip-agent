@@ -138,6 +138,16 @@ Regression tests related to Docker/provisioner behavior:
   endpoints as sync FastAPI handlers so synchronous K8s client calls run in the
   Starlette worker pool instead of on the ASGI event loop)
 
+Backend unit tests deliberately remove `DEER_FLOW_AUTH_DISABLED` in the
+autouse test fixture. A developer's repository-root `.env` may enable the local
+anonymous-admin bypass, but it must not rewrite auth-enabled or owner-isolation
+test contracts. Tests for the bypass opt in explicitly with `monkeypatch`.
+Real-model tests are opt-in: use `RUN_DEERFLOW_CLIENT_LIVE=1` for
+`test_client_live.py`, `RUN_DEERFLOW_CLIENT_E2E=1` for the LLM-marked client
+E2E cases and `RUN_DEERFLOW_AGENT_LIVE=1` for the agent-factory live cases.
+Ordinary `make test` never spends provider credentials merely because a local
+`.env` or `config.yaml` exists.
+
 Blocking-IO runtime gate (`tests/blocking_io/`):
 - Wraps every item under `tests/blocking_io/` with a strict Blockbuster
   context scoped to `app.*` and `deerflow.*` (see
@@ -983,6 +993,17 @@ See [docs/summarization.md](docs/summarization.md) for details.
 
 ### Personal-IP Operating Portfolio Context
 
+`deerflow.personal_ip.data_lifecycle.PersonalIPDataLifecycleService` owns the
+credential-safe whole-domain backup/restore/delete boundary. Its export-table
+registry is checked against `Base.metadata`, so a newly added
+`personal_ip_*` table cannot silently fall outside lifecycle coverage.
+Restore accepts only the authenticated backup owner into an empty owner scope,
+verifies canonical SHA-256 dataset and manifest digests after insertion, and
+never restores credentials or live authorization. Destructive deletion locks
+and re-reads owner state, rejects stale previews, removes credential/OAuth
+rows, and clears MineContext. Run
+`make personal-ip-data-lifecycle-acceptance`.
+
 The IP Agent distribution stores operated people/brands/organizations in
 `deerflow.persistence.personal_ip_subjects` and their platform accounts in
 `deerflow.persistence.personal_ip_accounts`. Gateway routes under
@@ -995,10 +1016,21 @@ DeerFlow toolset or execution authority. Run admission in
 authenticated owner's full active portfolio, and injects it into runtime
 context. `PersonalIPContextMiddleware` adds an ephemeral model-only portfolio
 message before skill activation; it must not write the expanded records into
-checkpoint history. Account ids are operation targets and receipt fields only.
-Keep the middleware before `SkillActivationMiddleware`, and preserve tests for
-owner isolation, cross-account portfolio access, prompt-injection boundaries,
-and sync/async model calls.
+checkpoint history. For the product `ip-agent`, an empty server-validated
+portfolio plus a first-use orientation/incubation request activates a
+deterministic first-reply gate: middleware emits exactly one
+`ask_clarification` request without calling the model, loading Skill files,
+browsing or reading a second startup tool. It gives a provisional roadmap and
+routes the one material question across person, brand/product and organization
+subjects. A structured answer to that first request deterministically emits one
+target-group/core-problem clarification with the same zero-model boundary; an
+answer to the second request reaches the normal model path. Concrete
+script/asset/link operations are excluded from the gate.
+Account ids are operation targets and receipt fields only. Keep the middleware
+before `SkillActivationMiddleware`, and preserve tests for owner isolation,
+cross-account portfolio access, the zero-model first reply, entity-sensitive
+question routing, non-repeating first-answer continuation, direct-operation
+bypass, prompt-injection boundaries, and sync/async model calls.
 
 ByteDance HLLM-Creator is the audience intelligence foundation, not another
 agent runtime. Its complete source lives under `third_party/bytedance/HLLM` and
@@ -1051,6 +1083,18 @@ requests plus append-only executor attempts. Gateway endpoints are under
 `/api/personal-ip/publish-receipts`. Derive platform and subject from the
 owner-scoped target account, enforce sealed preflight targets when supplied,
 and never downgrade a confirmed `published` result to `failed` or `unknown`.
+The repository is also the compliance boundary: begin requires
+`personal-ip-publish-compliance-v1`, validates rights, passed moderation and
+the exact commercial/AI disclosure set for the derived one-of-eight platform,
+and seals a server-owned versioned policy receipt with source URLs and review
+date inside the immutable request. Reject any caller-supplied policy receipt.
+A `published` attempt must carry
+`personal-ip-publish-compliance-evidence-v1` with the matching receipt digest,
+the exact applied disclosures and non-empty credential-free evidence refs.
+Sensitive health, finance, election, conflict, disaster, minors or
+regulated-goods declarations require documented human review. Do not make this
+an advisory prompt-only check or accept an upload/provider success as proof
+that a platform disclosure was applied.
 
 Migration `0010_personal_ip_metrics` and
 `deerflow.persistence.personal_ip_metrics` store immutable, owner-scoped
@@ -1182,13 +1226,24 @@ errors must stay sanitized.
 only sanitized connection and confirmed-publication fields—never forward full
 publish request/attempt payloads into model context.
 
-`deerflow.personal_ip.operating_cockpit.PersonalIPOperatingCockpitService`
-joins subjects/accounts, preflights, publish receipts, metrics, detailed
+`deerflow.personal_ip.operating_cockpit.PersonalIPStartupContextService`
+checks only active subject/account existence at the beginning of a new
+conversation. The native `personal_ip_startup_context` tool returns
+`new_owner` or `returning_owner`; a true new owner must continue from the
+current request without reading empty workflow ledgers. This lightweight
+classification is separate from
+`deerflow.personal_ip.operating_cockpit.PersonalIPOperatingCockpitService`,
+which joins subjects/accounts, preflights, publish receipts, metrics, detailed
 platform observations, retrospectives, evidence promotions and video
 productions for one authenticated owner. The Gateway route and native
 `personal_ip_operating_cockpit` tool must share it. It is intentionally
 portfolio-wide, returns explicit pending ids, and labels history truncation;
-never reconstruct this state from a conversation or add an account filter.
+never reconstruct this state from a conversation or add an account filter. Its
+v6 `alerts` compile sanitized loop, video-provider and cost failures from the
+same durable receipts and active production event ledgers. Do not persist a
+second alert table or forward provider payloads. An over-budget admission must
+append `personal-ip-video-budget-rejection-v1` with a stable reason and
+credential-free amounts before it raises.
 The public `personal-ip-operator` skill explicitly declares its native
 `personal_ip_*`, browser, UI-TARS and file/media tools because MediaKit skills
 activate the restrictive `allowed-tools: [bash]` policy. Their union must keep
@@ -1210,6 +1265,22 @@ declared inputs and outputs are re-hashed. Native
 `personal_ip_begin_video_production`,
 `personal_ip_record_video_production_event` and
 `personal_ip_read_video_production` are the DeerFlow execution surface.
+`deerflow.personal_ip.video_budget` and the repository's reserve/settle/release
+methods enforce the immutable `hard_limit` without a second state store.
+Reservations, settlements and releases are server-owned append-only video
+events; the current balance is a pure fold exposed as `budget_state`. Use
+`BEGIN IMMEDIATE` before the SQLite balance read and row locking on other
+databases so concurrent reservations serialize. Admission compares accumulated
+settled cost plus every active maximum with the hard limit. A reservation is
+idempotent by attempt key, a retry requires a new key, actual settlement may
+not exceed its reserved maximum, and release is only for a call that never
+reached the provider. If billing is unknown the maximum remains reserved.
+When explicit approval is enabled, the approved `review_recorded` event must
+come through the authenticated Gateway human-confirmation path and reference a
+matching paid-call request; the native generic event tool cannot forge it.
+Provider-request events are also repository-gated: `billing_mode: paid`
+requires an active matching reservation plus an estimate within its maximum,
+while `billing_mode: free` requires known zero cost.
 `personal_ip_compile_video_timeline_revision` is the only typed edit-decision
 surface for both conversational Agent edits and direct workbench edits. It
 seals a complete video/dialogue/music/subtitle snapshot plus typed operations
@@ -1255,11 +1326,14 @@ decreasing counters remain coverage metadata. The first snapshot is a baseline
 only and must not be aggregated as a daily total.
 
 `deerflow.persistence.personal_ip_brand` owns the subject-level operating
-strategy. `personal_ip_strategy_versions` is the immutable truth: person
+strategy. `personal_ip_strategy_versions` is the immutable truth: entity
 evidence, business design, real benchmarks, positioning
 alternatives, launch package and pilot validation advance one stage at a time.
-The default mode is `monetization_first`; `influence_first` is explicit and
-still requires reserved monetization paths. Historical retired tables may
+Influence is the common IP asset mechanism, not a mode competing with
+monetization. Strategy v4 requires separate influence, behavioral and economic
+goals, time horizons, priority order, guardrails and deliberate non-goals.
+The old `monetization_first` / `influence_first` value remains a read/write
+compatibility field only and must not drive product decisions. Historical retired tables may
 remain physically present for migration compatibility, but repositories,
 routers, context, preflight and customer UI must not expose or consume them.
 Native preflight resolves the latest launch-ready strategy for every subject
@@ -1270,6 +1344,64 @@ customer must never receive a fixed questionnaire, stage name or internal
 dimension list. The agent asks one relevant natural question at a time, reuses
 existing evidence and does not claim completion before a real pilot and
 validation decision.
+Strategy method v3 validates creator evidence separately from brand, product
+and organization evidence; non-person entities use category/lifecycle/
+operating facts, capability evidence, public interfaces, stakeholders,
+boundaries and capacity rather than invented demographics. It also validates
+each launch pilot as a falsifiable behavior
+hypothesis: target audience, role, evidence level, mechanism layer, predicted
+signal, failure condition, distribution assumptions, observation window and
+uncertainty are mandatory. The formal contract rejects viral guarantees and
+dopamine/mirror-neuron/Zeigarnik shorthand. Audience preflight v2 preserves
+the same fields per candidate so later retrospectives compare an observable
+prediction rather than only creative text.
+
+Migration `0020_personal_ip_differentiation` and
+`deerflow.persistence.personal_ip_differentiation` own immutable
+`ip-differentiation-thesis-v1` versions plus IP-asset observations. Subjects
+may be creators, brands, products or organizations. Thesis statuses are
+candidate, pilot, provisionally adopted, validated and retired. A new
+`thesis_key` restarts at candidate; versions and observations are append-only.
+Pilot promotion requires a complete contrast field, proprietary truth,
+strategic choice/sacrifice, dramatic engine, distinctive encoding, operating
+fit and falsifiable validation plan. Provisionally adopted requires one
+complete supportive observation; validated requires at least three complete
+supportive observations across two effect classes and one
+intent/adoption/conversion/economic effect. Contradictory, mixed and
+inconclusive observations remain immutable evidence but never promote status.
+`personal_ip_record_differentiation`,
+`personal_ip_read_differentiation` and
+`personal_ip_record_asset_observation` are the native write/read surfaces.
+Strategy positioning onward stores the exact differentiation version id;
+preflight strips local ids but retains its semantic contents. The operating
+cockpit and account diagnosis read the same repository.
+
+`deerflow.personal_ip.account_diagnosis` owns connected-account go/adjust/new
+judgment. `PersonalIPAccountDiagnosticContextService` loads only the
+authenticated owner's exact operation target and returns compact strategy,
+sample, coverage and immutable evidence references. The native
+`personal_ip_account_diagnostic_context` and
+`personal_ip_compile_account_diagnosis` tools must re-read this server context;
+callers cannot inject an expanded account or arbitrary evidence. Every
+assessment covers the seven observable content-mechanism layers plus
+reach/trust/intent/conversion. Content remains primary; platform rules may
+prove recommendation eligibility and structural constraints, but low reach
+alone can never justify a new account. A new account requires a supported
+structural issue and platform-observation reference. Account diagnosis v2
+compiles influence, behavioral and economic outcome states from fresh sealed
+asset observations and commercial evidence. `self_entertainment` requires a
+decision-ready sample of at least three distinct posts and complete failure
+across all three axes; any successful recognition, trust, adoption, conversion
+or economic outcome is active IP operation, while missing axes remain
+unproven. The 30-day window is a conservative product freshness gate, not a
+platform rule. Persistent
+recommendation ineligibility must bind one normalized restriction reason
+across at least seven days;
+the latest account status must be observed within 24 hours, still be restricted
+and carry the exhausted
+repair/appeal result.
+The eight `diagnose-*-account` Skills own platform-specific current-official
+evidence and must mark undisclosed ranking weights unknown.
 
 Personal-IP browser-first operation uses
 `deerflow.personal_ip.browser_profiles`. The native selection tool validates
@@ -1300,6 +1432,9 @@ owner/account profile, freezes the request and appends the pending handoff;
 finish requires that same live browser to show the declared platform post
 URL/id before it can append `published`. Persist only the normalized public URL,
 page title and visible-text digest, never query credentials or raw page secrets.
+Prepare also compiles and freezes the publication-compliance receipt. Finish
+must bind credential-free proof of every required commercial/AI disclosure to
+that receipt; browser post proof cannot substitute for disclosure evidence.
 Public proof is route-specific for all eight platforms: creator dashboards,
 home pages and same-host content lists do not qualify. A receipt in `failed` or
 `unknown` may be prepared again with a new pending attempt key. Exact finish

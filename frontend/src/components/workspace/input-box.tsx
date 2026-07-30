@@ -134,6 +134,7 @@ import {
   abortGoalRequest,
   beginGoalRequest,
   canPolishInput,
+  canRequestFollowupSuggestions,
   createGoalRequestState,
   findSuggestionTemplatePlaceholder,
   finishGoalRequest,
@@ -1875,7 +1876,15 @@ export function InputBox({
       return;
     }
 
-    if (disabled || isMock) {
+    if (
+      !canRequestFollowupSuggestions({
+        disabled: disabled === true,
+        isMock: isMock === true,
+        hasOpenHumanInput: hasOpenHumanInputCard,
+      })
+    ) {
+      setFollowups([]);
+      setFollowupsLoading(false);
       return;
     }
 
@@ -1950,6 +1959,7 @@ export function InputBox({
   }, [
     context.model_name,
     disabled,
+    hasOpenHumanInputCard,
     isMock,
     status,
     suggestionsConfigLoaded,

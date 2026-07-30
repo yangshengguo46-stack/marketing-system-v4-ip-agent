@@ -4,6 +4,7 @@ import {
   BellIcon,
   CableIcon,
   DatabaseIcon,
+  HardDriveIcon,
   PaletteIcon,
   UserIcon,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import { AppearanceSettingsPage } from "@/components/workspace/settings/appearan
 import { ChannelsSettingsPage } from "@/components/workspace/settings/channels-settings-page";
 import { LocalContextSettingsPage } from "@/components/workspace/settings/local-context-settings-page";
 import { NotificationSettingsPage } from "@/components/workspace/settings/notification-settings-page";
+import { PersonalIPDataSettingsPage } from "@/components/workspace/settings/personal-ip-data-settings-page";
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +31,7 @@ type SettingsSection =
   | "appearance"
   | "channels"
   | "local-context"
+  | "personal-ip-data"
   | "notification";
 
 type SettingsDialogProps = React.ComponentProps<typeof Dialog> & {
@@ -76,6 +79,11 @@ export function SettingsDialog(props: SettingsDialogProps) {
         label: t.settings.sections.localContext,
         icon: DatabaseIcon,
       },
+      {
+        id: "personal-ip-data",
+        label: t.settings.sections.personalIPData,
+        icon: HardDriveIcon,
+      },
     ],
     [
       t.settings.sections.account,
@@ -83,6 +91,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
       t.settings.sections.channels,
       t.settings.sections.localContext,
       t.settings.sections.notification,
+      t.settings.sections.personalIPData,
     ],
   );
   return (
@@ -131,6 +140,9 @@ export function SettingsDialog(props: SettingsDialogProps) {
               {activeSection === "appearance" && <AppearanceSettingsPage />}
               {activeSection === "local-context" && (
                 <LocalContextSettingsPage />
+              )}
+              {activeSection === "personal-ip-data" && (
+                <PersonalIPDataSettingsPage />
               )}
               {activeSection === "notification" && <NotificationSettingsPage />}
               {activeSection === "channels" && <ChannelsSettingsPage />}

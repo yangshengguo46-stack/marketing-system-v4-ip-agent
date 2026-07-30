@@ -1,0 +1,4 @@
+interface:
+  display_name: "视频号账号诊断"
+  short_description: "基于内容、商业漏斗和一手平台证据判断视频号账号继续、调整或换号"
+  default_prompt: "Use $diagnose-wechat-channels-account to diagnose this WeChat Channels account from current evidence."

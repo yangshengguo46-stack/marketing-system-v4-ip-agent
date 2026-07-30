@@ -78,6 +78,6 @@ async def test_upgrade_converts_legacy_proposal_to_policy_approval(tmp_path: Pat
         assert decisions[0]["decision"] == "approved"
         assert decisions[0]["reviewer_source"] == "cross_sample_evidence_policy"
         assert row[2] is not None
-        assert version == "0019_personal_ip_strategy_versions"
+        assert version == "0020_personal_ip_differentiation"
     finally:
         await close_engine()

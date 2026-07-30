@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
@@ -18,6 +18,17 @@ from deerflow.persistence.personal_ip_subjects.model import PersonalIPSubjectRow
 from deerflow.persistence.personal_ip_video_productions.model import (
     PersonalIPVideoProductionEventRow,
     PersonalIPVideoProductionRow,
+)
+from deerflow.personal_ip.video_budget import (
+    VIDEO_BUDGET_REJECTION_CONTRACT_VERSION,
+    VIDEO_BUDGET_RELEASE_CONTRACT_VERSION,
+    VIDEO_BUDGET_RESERVATION_CONTRACT_VERSION,
+    VIDEO_BUDGET_SETTLEMENT_CONTRACT_VERSION,
+    amount_to_micros,
+    budget_limit,
+    fold_video_budget,
+    micros_to_amount,
+    public_budget_state,
 )
 from deerflow.personal_ip.video_contracts import normalize_production_mode, validate_compiled_video_contract
 from deerflow.utils.time import coerce_iso
@@ -221,6 +232,18 @@ class PersonalIPVideoProductionRepository:
                 data[field] = coerce_iso(data[field])
         return data
 
+    @classmethod
+    def _attach_budget_state(
+        cls,
+        production: dict[str, Any],
+        events: list[dict[str, Any]],
+    ) -> None:
+        try:
+            state = fold_video_budget(production.get("budget") or {}, events)
+        except ValueError:
+            return
+        production["budget_state"] = public_budget_state(state)
+
     @staticmethod
     async def _validate_targets(
         session: AsyncSession,
@@ -302,6 +325,7 @@ class PersonalIPVideoProductionRepository:
                     raise ValueError("operation_key already records a different video production")
                 result = self._production_dict(existing)
                 result["events"] = await self._events(session, existing.id)
+                self._attach_budget_state(result, result["events"])
                 return result
             await self._validate_targets(
                 session,
@@ -336,6 +360,7 @@ class PersonalIPVideoProductionRepository:
             await session.refresh(row)
             result = self._production_dict(row)
             result["events"] = []
+            self._attach_budget_state(result, [])
             return result
 
     async def _events(self, session: AsyncSession, production_id: str) -> list[dict[str, Any]]:
@@ -350,6 +375,7 @@ class PersonalIPVideoProductionRepository:
                 return None
             result = self._production_dict(row)
             result["events"] = await self._events(session, row.id)
+            self._attach_budget_state(result, result["events"])
             return result
 
     async def list(
@@ -408,7 +434,676 @@ class PersonalIPVideoProductionRepository:
                 await session.refresh(row)
             result = self._production_dict(row)
             result["events"] = await self._events(session, row.id)
+            self._attach_budget_state(result, result["events"])
             return result
+
+    @staticmethod
+    async def _lock_budget_production(
+        session: AsyncSession,
+        *,
+        production_id: str,
+        owner_user_id: str,
+    ) -> PersonalIPVideoProductionRow | None:
+        """Serialize admission on SQLite and row-lock it on other databases."""
+
+        if session.get_bind().dialect.name == "sqlite":
+            await session.execute(text("BEGIN IMMEDIATE"))
+        statement = select(PersonalIPVideoProductionRow).where(
+            PersonalIPVideoProductionRow.id == production_id,
+            PersonalIPVideoProductionRow.owner_user_id == owner_user_id,
+        )
+        if session.get_bind().dialect.name != "sqlite":
+            statement = statement.with_for_update()
+        return (await session.execute(statement)).scalar_one_or_none()
+
+    @staticmethod
+    def _budget_event(
+        production: PersonalIPVideoProductionRow,
+        *,
+        owner_user_id: str,
+        event_key: str,
+        event_type: str,
+        status: str,
+        entity_type: str,
+        entity_id: str,
+        payload: dict[str, Any],
+        input_refs: list[str],
+        output_refs: list[str],
+        cost: dict[str, Any],
+    ) -> PersonalIPVideoProductionEventRow:
+        occurred_at = datetime.now(UTC)
+        event_payload = {
+            "cost": cost,
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "event_type": event_type,
+            "input_refs": input_refs,
+            "model": None,
+            "occurred_at": coerce_iso(occurred_at),
+            "output_refs": output_refs,
+            "payload": payload,
+            "provider": "deerflow_budget_guard",
+            "provider_task_id": None,
+            "stage": production.current_stage,
+            "status": status,
+        }
+        sequence = production.event_count + 1
+        event = PersonalIPVideoProductionEventRow(
+            id=f"video-event-{uuid.uuid4().hex}",
+            owner_user_id=owner_user_id,
+            production_id=production.id,
+            event_key=event_key,
+            event_digest=_digest(event_payload),
+            sequence=sequence,
+            event_type=event_type,
+            stage=production.current_stage,
+            status=status,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            provider="deerflow_budget_guard",
+            model=None,
+            provider_task_id=None,
+            payload_json=payload,
+            input_refs_json=input_refs,
+            output_refs_json=output_refs,
+            cost_json=cost,
+            occurred_at=occurred_at,
+            created_at=occurred_at,
+        )
+        production.event_count = sequence
+        production.updated_at = occurred_at
+        return event
+
+    async def _budget_result(
+        self,
+        session: AsyncSession,
+        production: PersonalIPVideoProductionRow,
+        *,
+        operation: dict[str, Any],
+    ) -> dict[str, Any]:
+        result = self._production_dict(production)
+        result["events"] = await self._events(session, production.id)
+        self._attach_budget_state(result, result["events"])
+        result["budget_operation"] = operation
+        return result
+
+    @staticmethod
+    async def _validate_paid_approval(
+        session: AsyncSession,
+        *,
+        production: PersonalIPVideoProductionRow,
+        approval_event_key: str | None,
+        expected_request: dict[str, Any],
+    ) -> None:
+        if (production.budget_json or {}).get(
+            "paid_calls_require_explicit_approval",
+            True,
+        ) is not True:
+            return
+        if not approval_event_key:
+            raise ValueError("video budget reservation requires an approved paid-provider review")
+        approval = (
+            await session.execute(
+                select(PersonalIPVideoProductionEventRow).where(
+                    PersonalIPVideoProductionEventRow.production_id == production.id,
+                    PersonalIPVideoProductionEventRow.event_key == approval_event_key,
+                )
+            )
+        ).scalar_one_or_none()
+        approval_payload = approval.payload_json if approval is not None else {}
+        if approval is None or approval.event_type != "review_recorded" or approval.status != "approved" or approval_payload.get("review_kind") != "paid_provider_call":
+            raise ValueError("video budget reservation requires an approved paid-provider review")
+        request_event_key = str(approval_payload.get("request_event_key") or "").strip()
+        request = (
+            await session.execute(
+                select(PersonalIPVideoProductionEventRow).where(
+                    PersonalIPVideoProductionEventRow.production_id == production.id,
+                    PersonalIPVideoProductionEventRow.event_key == request_event_key,
+                )
+            )
+        ).scalar_one_or_none()
+        request_payload = request.payload_json if request is not None else {}
+        if request is None or request.event_type != "review_requested" or request_payload.get("review_kind") != "paid_provider_call" or request_payload.get("budget_request") != expected_request:
+            raise ValueError("approved paid-provider review does not match this budget reservation")
+
+    @staticmethod
+    def _validate_provider_request_budget(
+        *,
+        event_type: str,
+        entity_type: str,
+        entity_id: str,
+        provider: str,
+        payload: dict[str, Any],
+        cost: dict[str, Any],
+        events: list[dict[str, Any]],
+    ) -> None:
+        capability_by_event = {
+            "asset_generation_requested": "image_generation",
+            "shot_generation_requested": "video_generation",
+            "voice_generation_requested": "speech_generation",
+            "media_processing_requested": "media_processing",
+        }
+        capability = capability_by_event.get(event_type)
+        if capability is None:
+            return
+        parameters = payload.get("parameters")
+        if not isinstance(parameters, dict):
+            parameters = {}
+        billing_mode = str(payload.get("billing_mode") or parameters.get("billing_mode") or "").strip()
+        if billing_mode not in {"free", "paid"}:
+            raise ValueError(f"{event_type} payload.billing_mode must be free or paid")
+        cost_status = str(cost.get("status") or "").strip()
+        cost_currency = str(cost.get("currency") or "").strip().upper()
+        if billing_mode == "free":
+            if (
+                cost_status != "known"
+                or amount_to_micros(
+                    cost.get("amount"),
+                    field="free provider request cost.amount",
+                )
+                != 0
+            ):
+                raise ValueError("free provider requests require a known zero cost receipt")
+            return
+
+        reservation_id = str(payload.get("budget_reservation_id") or parameters.get("budget_reservation_id") or "").strip()
+        if not reservation_id:
+            raise ValueError("paid provider requests require budget_reservation_id")
+        if cost_status != "estimated":
+            raise ValueError("paid provider requests require an estimated cost before submission")
+        estimated_micros = amount_to_micros(
+            cost.get("amount"),
+            field="paid provider request cost.amount",
+            allow_zero=False,
+        )
+        reservation = next(
+            (event for event in events if event.get("event_type") == "budget_reserved" and (event.get("payload") or {}).get("reservation_id") == reservation_id),
+            None,
+        )
+        if reservation is None:
+            raise ValueError("paid provider budget reservation not found")
+        if any(event.get("event_type") in {"budget_settled", "budget_released"} and (event.get("payload") or {}).get("reservation_id") == reservation_id for event in events):
+            raise ValueError("paid provider budget reservation is no longer active")
+        request = (reservation.get("payload") or {}).get("request")
+        if not isinstance(request, dict):
+            raise ValueError("paid provider budget reservation is invalid")
+        if request.get("capability") != capability or request.get("provider") != provider or request.get("entity_type") != entity_type or request.get("entity_id") != entity_id:
+            raise ValueError("paid provider request does not match its budget reservation")
+        maximum_micros = amount_to_micros(
+            request.get("maximum_amount"),
+            field="budget reservation maximum_amount",
+            allow_zero=False,
+        )
+        if estimated_micros > maximum_micros:
+            raise ValueError("paid provider estimate exceeds the reserved maximum")
+        if cost_currency != request.get("currency"):
+            raise ValueError("paid provider request currency does not match its reservation")
+
+        def _event_reservation_id(event: dict[str, Any]) -> str:
+            event_payload = event.get("payload")
+            if not isinstance(event_payload, dict):
+                return ""
+            event_parameters = event_payload.get("parameters")
+            if not isinstance(event_parameters, dict):
+                event_parameters = {}
+            return str(event_payload.get("budget_reservation_id") or event_parameters.get("budget_reservation_id") or "").strip()
+
+        if any(event.get("event_type") in capability_by_event and _event_reservation_id(event) == reservation_id for event in events):
+            raise ValueError("budget reservation already admitted another provider request")
+
+    async def reserve_budget(
+        self,
+        production_id: str,
+        *,
+        owner_user_id: str,
+        reservation_key: str,
+        capability: str,
+        provider: str,
+        entity_type: str,
+        entity_id: str,
+        maximum_amount: Any,
+        currency: str,
+        approval_event_key: str | None,
+        request_ref: str,
+    ) -> dict[str, Any] | None:
+        """Atomically reserve a paid-call maximum before provider submission."""
+
+        owner = _clean_required(owner_user_id, field="owner_user_id", limit=64)
+        reservation_key_value = _clean_required(
+            reservation_key,
+            field="reservation_key",
+            limit=220,
+        )
+        capability_value = _clean_required(
+            capability,
+            field="capability",
+            limit=80,
+        )
+        provider_value = _clean_required(provider, field="provider", limit=80)
+        if entity_type not in VIDEO_ENTITY_TYPES:
+            raise ValueError("unsupported video budget entity_type")
+        entity_id_value = _clean_required(entity_id, field="entity_id", limit=128)
+        maximum_micros = amount_to_micros(
+            maximum_amount,
+            field="maximum_amount",
+            allow_zero=False,
+        )
+        currency_value = _clean_required(
+            currency,
+            field="currency",
+            limit=8,
+        ).upper()
+        request_ref_value = _clean_required(
+            request_ref,
+            field="request_ref",
+            limit=2_048,
+        )
+        validate_credential_free_payload(request_ref_value, field="request_ref")
+        approval_key = _clean_optional(
+            approval_event_key,
+            field="approval_event_key",
+            limit=256,
+        )
+        request = {
+            "reservation_key": reservation_key_value,
+            "provider": provider_value,
+            "capability": capability_value,
+            "maximum_amount": micros_to_amount(maximum_micros),
+            "currency": currency_value,
+            "entity_type": entity_type,
+            "entity_id": entity_id_value,
+        }
+        event_key = f"budget-reserve:{reservation_key_value}"
+        rejection_event_key = f"budget-reject:{reservation_key_value}"
+
+        async with self._sf() as session:
+            production = await self._lock_budget_production(
+                session,
+                production_id=production_id,
+                owner_user_id=owner,
+            )
+            if production is None:
+                return None
+            if production.status in {"completed", "cancelled"}:
+                raise ValueError("terminal video production cannot reserve provider budget")
+            events = await self._events(session, production.id)
+            existing = next(
+                (event for event in events if event.get("event_key") == event_key),
+                None,
+            )
+            if existing is not None:
+                payload = existing.get("payload") or {}
+                if payload.get("request") != request:
+                    raise ValueError("reservation_key already records a different budget request")
+                operation = {
+                    "contract_version": VIDEO_BUDGET_RESERVATION_CONTRACT_VERSION,
+                    "operation": "reserved",
+                    "reservation_id": payload["reservation_id"],
+                    "reservation_event_key": event_key,
+                    **request,
+                }
+                return await self._budget_result(
+                    session,
+                    production,
+                    operation=operation,
+                )
+            existing_rejection = next(
+                (event for event in events if event.get("event_key") == rejection_event_key),
+                None,
+            )
+            if existing_rejection is not None:
+                payload = existing_rejection.get("payload") or {}
+                if payload.get("request") != request:
+                    raise ValueError("reservation_key already records a different budget request")
+                raise ValueError("budget reservation exceeds the remaining video budget")
+
+            budget_currency, _ = budget_limit(production.budget_json or {})
+            if currency_value != budget_currency:
+                raise ValueError("budget reservation currency does not match the video budget")
+            await self._validate_paid_approval(
+                session,
+                production=production,
+                approval_event_key=approval_key,
+                expected_request=request,
+            )
+            state = fold_video_budget(production.budget_json or {}, events)
+            if maximum_micros > state["_available_micros"]:
+                payload = {
+                    "contract_version": VIDEO_BUDGET_REJECTION_CONTRACT_VERSION,
+                    "request": request,
+                    "available_amount": micros_to_amount(state["_available_micros"]),
+                    "currency": currency_value,
+                    "decision": "rejected",
+                    "reason_code": "hard_limit_exceeded",
+                }
+                event = self._budget_event(
+                    production,
+                    owner_user_id=owner,
+                    event_key=rejection_event_key,
+                    event_type="budget_reservation_rejected",
+                    status="rejected",
+                    entity_type=entity_type,
+                    entity_id=entity_id_value,
+                    payload=payload,
+                    input_refs=[],
+                    output_refs=[],
+                    cost={
+                        "status": "estimated",
+                        "amount": request["maximum_amount"],
+                        "currency": currency_value,
+                        "basis": "rejected hard budget admission",
+                    },
+                )
+                session.add(event)
+                await session.commit()
+                raise ValueError("budget reservation exceeds the remaining video budget")
+
+            reservation_id = f"video-budget-reservation-{uuid.uuid4().hex}"
+            payload = {
+                "contract_version": VIDEO_BUDGET_RESERVATION_CONTRACT_VERSION,
+                "reservation_id": reservation_id,
+                "request": request,
+                "maximum_amount": request["maximum_amount"],
+                "currency": currency_value,
+                "approval_event_key": approval_key,
+                "request_ref": request_ref_value,
+                "decision": "reserved",
+            }
+            cost = {
+                "status": "estimated",
+                "amount": request["maximum_amount"],
+                "currency": currency_value,
+                "basis": "hard budget reservation",
+            }
+            event = self._budget_event(
+                production,
+                owner_user_id=owner,
+                event_key=event_key,
+                event_type="budget_reserved",
+                status="running",
+                entity_type=entity_type,
+                entity_id=entity_id_value,
+                payload=payload,
+                input_refs=[request_ref_value],
+                output_refs=[f"budget-reservation://{reservation_id}"],
+                cost=cost,
+            )
+            session.add(event)
+            await session.commit()
+            await session.refresh(production)
+            operation = {
+                "contract_version": VIDEO_BUDGET_RESERVATION_CONTRACT_VERSION,
+                "operation": "reserved",
+                "reservation_id": reservation_id,
+                "reservation_event_key": event_key,
+                **request,
+            }
+            return await self._budget_result(
+                session,
+                production,
+                operation=operation,
+            )
+
+    async def settle_budget(
+        self,
+        production_id: str,
+        *,
+        owner_user_id: str,
+        reservation_id: str,
+        settlement_key: str,
+        actual_amount: Any,
+        currency: str,
+        provider_receipt_ref: str,
+    ) -> dict[str, Any] | None:
+        """Convert one active maximum reservation into accumulated actual cost."""
+
+        owner = _clean_required(owner_user_id, field="owner_user_id", limit=64)
+        reservation_id_value = _clean_required(
+            reservation_id,
+            field="reservation_id",
+            limit=96,
+        )
+        settlement_key_value = _clean_required(
+            settlement_key,
+            field="settlement_key",
+            limit=220,
+        )
+        actual_micros = amount_to_micros(
+            actual_amount,
+            field="actual_amount",
+        )
+        currency_value = _clean_required(
+            currency,
+            field="currency",
+            limit=8,
+        ).upper()
+        receipt_ref = _clean_required(
+            provider_receipt_ref,
+            field="provider_receipt_ref",
+            limit=2_048,
+        )
+        validate_credential_free_payload(
+            receipt_ref,
+            field="provider_receipt_ref",
+        )
+        event_key = f"budget-settle:{settlement_key_value}"
+
+        async with self._sf() as session:
+            production = await self._lock_budget_production(
+                session,
+                production_id=production_id,
+                owner_user_id=owner,
+            )
+            if production is None:
+                return None
+            events = await self._events(session, production.id)
+            reservation = next(
+                (event for event in events if event.get("event_type") == "budget_reserved" and (event.get("payload") or {}).get("reservation_id") == reservation_id_value),
+                None,
+            )
+            if reservation is None:
+                raise ValueError("video budget reservation not found")
+            reservation_payload = reservation.get("payload") or {}
+            maximum_micros = amount_to_micros(
+                reservation_payload.get("maximum_amount"),
+                field="reserved maximum_amount",
+                allow_zero=False,
+            )
+            if actual_micros > maximum_micros:
+                raise ValueError("actual cost exceeds the reserved maximum")
+            if currency_value != reservation_payload.get("currency"):
+                raise ValueError("budget settlement currency does not match the reservation")
+            operation_payload = {
+                "contract_version": VIDEO_BUDGET_SETTLEMENT_CONTRACT_VERSION,
+                "reservation_id": reservation_id_value,
+                "reservation_event_key": reservation["event_key"],
+                "actual_amount": micros_to_amount(actual_micros),
+                "currency": currency_value,
+                "provider_receipt_ref": receipt_ref,
+                "decision": "settled",
+            }
+            existing = next(
+                (event for event in events if event.get("event_key") == event_key),
+                None,
+            )
+            if existing is not None:
+                if existing.get("payload") != operation_payload:
+                    raise ValueError("settlement_key already records a different budget settlement")
+                return await self._budget_result(
+                    session,
+                    production,
+                    operation={
+                        **operation_payload,
+                        "operation": "settled",
+                        "settlement_event_key": event_key,
+                    },
+                )
+            terminal = next(
+                (event for event in events if event.get("event_type") in {"budget_settled", "budget_released"} and (event.get("payload") or {}).get("reservation_id") == reservation_id_value),
+                None,
+            )
+            if terminal is not None:
+                terminal_word = "released" if terminal.get("event_type") == "budget_released" else "settled"
+                raise ValueError(f"video budget reservation is already {terminal_word}")
+            cost = {
+                "status": "known",
+                "amount": operation_payload["actual_amount"],
+                "currency": currency_value,
+                "basis": "provider receipt settlement",
+            }
+            event = self._budget_event(
+                production,
+                owner_user_id=owner,
+                event_key=event_key,
+                event_type="budget_settled",
+                status="succeeded",
+                entity_type=reservation["entity_type"],
+                entity_id=reservation["entity_id"],
+                payload=operation_payload,
+                input_refs=[
+                    f"event://{reservation['event_key']}",
+                    receipt_ref,
+                ],
+                output_refs=[f"budget-settlement://{reservation_id_value}"],
+                cost=cost,
+            )
+            session.add(event)
+            await session.commit()
+            await session.refresh(production)
+            return await self._budget_result(
+                session,
+                production,
+                operation={
+                    **operation_payload,
+                    "operation": "settled",
+                    "settlement_event_key": event_key,
+                },
+            )
+
+    async def release_budget(
+        self,
+        production_id: str,
+        *,
+        owner_user_id: str,
+        reservation_id: str,
+        release_key: str,
+        reason: str,
+    ) -> dict[str, Any] | None:
+        """Release an active reservation only when the provider was not called."""
+
+        owner = _clean_required(owner_user_id, field="owner_user_id", limit=64)
+        reservation_id_value = _clean_required(
+            reservation_id,
+            field="reservation_id",
+            limit=96,
+        )
+        release_key_value = _clean_required(
+            release_key,
+            field="release_key",
+            limit=220,
+        )
+        reason_value = _clean_required(reason, field="reason", limit=1_000)
+        event_key = f"budget-release:{release_key_value}"
+
+        async with self._sf() as session:
+            production = await self._lock_budget_production(
+                session,
+                production_id=production_id,
+                owner_user_id=owner,
+            )
+            if production is None:
+                return None
+            events = await self._events(session, production.id)
+            reservation = next(
+                (event for event in events if event.get("event_type") == "budget_reserved" and (event.get("payload") or {}).get("reservation_id") == reservation_id_value),
+                None,
+            )
+            if reservation is None:
+                raise ValueError("video budget reservation not found")
+            operation_payload = {
+                "contract_version": VIDEO_BUDGET_RELEASE_CONTRACT_VERSION,
+                "reservation_id": reservation_id_value,
+                "reservation_event_key": reservation["event_key"],
+                "reason": reason_value,
+                "decision": "released",
+            }
+            existing = next(
+                (event for event in events if event.get("event_key") == event_key),
+                None,
+            )
+            if existing is not None:
+                if existing.get("payload") != operation_payload:
+                    raise ValueError("release_key already records a different budget release")
+                return await self._budget_result(
+                    session,
+                    production,
+                    operation={
+                        **operation_payload,
+                        "operation": "released",
+                        "release_event_key": event_key,
+                    },
+                )
+            terminal = next(
+                (event for event in events if event.get("event_type") in {"budget_settled", "budget_released"} and (event.get("payload") or {}).get("reservation_id") == reservation_id_value),
+                None,
+            )
+            if terminal is not None:
+                terminal_word = "released" if terminal.get("event_type") == "budget_released" else "settled"
+                raise ValueError(f"video budget reservation is already {terminal_word}")
+            if any(
+                event.get("event_type")
+                in {
+                    "asset_generation_requested",
+                    "shot_generation_requested",
+                    "voice_generation_requested",
+                    "media_processing_requested",
+                }
+                and (
+                    (event.get("payload") or {}).get("budget_reservation_id")
+                    or (
+                        (event.get("payload") or {}).get("parameters")
+                        if isinstance(
+                            (event.get("payload") or {}).get("parameters"),
+                            dict,
+                        )
+                        else {}
+                    ).get("budget_reservation_id")
+                )
+                == reservation_id_value
+                for event in events
+            ):
+                raise ValueError("provider request was admitted; settle the reservation instead")
+            currency, _ = budget_limit(production.budget_json or {})
+            event = self._budget_event(
+                production,
+                owner_user_id=owner,
+                event_key=event_key,
+                event_type="budget_released",
+                status="succeeded",
+                entity_type=reservation["entity_type"],
+                entity_id=reservation["entity_id"],
+                payload=operation_payload,
+                input_refs=[f"event://{reservation['event_key']}"],
+                output_refs=[f"budget-release://{reservation_id_value}"],
+                cost={
+                    "status": "known",
+                    "amount": 0.0,
+                    "currency": currency,
+                    "basis": "provider not called; reservation released",
+                },
+            )
+            session.add(event)
+            await session.commit()
+            await session.refresh(production)
+            return await self._budget_result(
+                session,
+                production,
+                operation={
+                    **operation_payload,
+                    "operation": "released",
+                    "release_event_key": event_key,
+                },
+            )
 
     async def append_event(
         self,
@@ -428,6 +1123,7 @@ class PersonalIPVideoProductionRepository:
         provider_task_id: str | None,
         cost: dict[str, Any],
         occurred_at: datetime | None = None,
+        trusted_human_confirmation: bool = False,
     ) -> dict[str, Any] | None:
         owner = _clean_required(owner_user_id, field="owner_user_id", limit=64)
         event_key_value = _clean_required(event_key, field="event_key", limit=256)
@@ -449,6 +1145,8 @@ class PersonalIPVideoProductionRepository:
         model_key = _clean_optional(model, field="model", limit=160)
         provider_task_key = _clean_optional(provider_task_id, field="provider_task_id", limit=256)
         payload_snapshot = _json_snapshot(payload, field="payload", expected=dict)
+        if event_type_key == "review_recorded" and payload_snapshot.get("review_kind") in {"candidate_selection", "paid_provider_call", "real_publish"} and trusted_human_confirmation is not True:
+            raise ValueError("meaningful review decisions require a trusted human confirmation")
         input_snapshot = _normalized_ids(input_refs, field="input_refs", limit=500, item_limit=2_048)
         output_snapshot = _normalized_ids(output_refs, field="output_refs", limit=500, item_limit=2_048)
         cost_snapshot = _json_snapshot(cost, field="cost", expected=dict, byte_limit=256_000)
@@ -484,15 +1182,27 @@ class PersonalIPVideoProductionRepository:
                 raise ValueError("material inspection asset_id must match its event entity")
 
         async with self._sf() as session:
-            production_statement = (
-                select(PersonalIPVideoProductionRow)
-                .where(
-                    PersonalIPVideoProductionRow.id == production_id,
-                    PersonalIPVideoProductionRow.owner_user_id == owner,
+            if event_type_key in {
+                "asset_generation_requested",
+                "shot_generation_requested",
+                "voice_generation_requested",
+                "media_processing_requested",
+            }:
+                production = await self._lock_budget_production(
+                    session,
+                    production_id=production_id,
+                    owner_user_id=owner,
                 )
-                .with_for_update()
-            )
-            production = (await session.execute(production_statement)).scalar_one_or_none()
+            else:
+                production_statement = (
+                    select(PersonalIPVideoProductionRow)
+                    .where(
+                        PersonalIPVideoProductionRow.id == production_id,
+                        PersonalIPVideoProductionRow.owner_user_id == owner,
+                    )
+                    .with_for_update()
+                )
+                production = (await session.execute(production_statement)).scalar_one_or_none()
             if production is None or production.owner_user_id != owner:
                 return None
             if compiled_contract is not None:
@@ -531,9 +1241,20 @@ class PersonalIPVideoProductionRepository:
                     raise ValueError("event_key already records a different video production event")
                 result = self._production_dict(production)
                 result["events"] = await self._events(session, production.id)
+                self._attach_budget_state(result, result["events"])
                 return result
             if production.status in {"completed", "cancelled"}:
                 raise ValueError("terminal video production cannot accept new events")
+            events = await self._events(session, production.id)
+            self._validate_provider_request_budget(
+                event_type=event_type_key,
+                entity_type=entity_type_key,
+                entity_id=entity_id_key,
+                provider=provider_key,
+                payload=payload_snapshot,
+                cost=cost_snapshot,
+                events=events,
+            )
             latest_lock: PersonalIPVideoProductionEventRow | None = None
             if event_type_key in {"delivery_qa_completed", "delivery_completed"}:
                 latest_revision_statement = (
@@ -621,4 +1342,5 @@ class PersonalIPVideoProductionRepository:
             await session.refresh(production)
             result = self._production_dict(production)
             result["events"] = await self._events(session, production.id)
+            self._attach_budget_state(result, result["events"])
             return result

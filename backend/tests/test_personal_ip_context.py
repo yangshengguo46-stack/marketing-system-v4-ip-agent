@@ -1,9 +1,9 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from langchain.agents.middleware.types import ModelRequest
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app.gateway.services import (
     inject_personal_ip_portfolio_context,
@@ -97,6 +97,366 @@ def test_personal_ip_context_middleware_skips_missing_portfolio():
         runtime=SimpleNamespace(context={}),
     )
     assert PersonalIPContextMiddleware()._inject(request) is request
+
+
+def test_new_owner_orientation_filters_research_tools_before_first_reply():
+    request = ModelRequest(
+        model=object(),
+        system_message=SystemMessage(content="full operating prompt with every Skill and execution policy"),
+        messages=[
+            SystemMessage(content="base"),
+            HumanMessage(content=("我是第一次使用，想做一个面向职场女性的轻食品牌 IP，但还没注册账号，也没有对标。你先告诉我该从哪里开始。")),
+        ],
+        tools=[
+            SimpleNamespace(name="ask_clarification"),
+            SimpleNamespace(name="personal_ip_startup_context"),
+            SimpleNamespace(name="read_file"),
+            SimpleNamespace(name="browser_navigate"),
+            SimpleNamespace(name="browser_get_text"),
+            SimpleNamespace(name="task"),
+        ],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+
+    injected = PersonalIPContextMiddleware()._inject(request)
+
+    assert [tool.name for tool in injected.tools] == ["ask_clarification"]
+    assert "first visible reply" in injected.messages[1].content
+    assert "Do not browse, search, load a Skill file" in injected.messages[1].content
+    assert '"experience": "new_owner"' in injected.messages[2].content
+    assert injected.system_message.content == request.system_message.content
+    assert request.tools is not injected.tools
+
+
+def test_new_owner_orientation_returns_one_bounded_question_without_calling_model():
+    request = ModelRequest(
+        model=object(),
+        messages=[HumanMessage(content=("我是第一次使用，想做一个面向职场女性的轻食品牌 IP，但还没注册账号，也没有对标。你先告诉我该从哪里开始。"))],
+        tools=[SimpleNamespace(name="ask_clarification")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    handler = Mock()
+
+    result = PersonalIPContextMiddleware().wrap_model_call(
+        request,
+        handler,
+    )
+
+    assert isinstance(result, AIMessage)
+    assert result.content == ""
+    assert len(result.tool_calls) == 1
+    assert result.tool_calls[0]["name"] == "ask_clarification"
+    args = result.tool_calls[0]["args"]
+    assert "先不用注册账号" in args["context"]
+    assert "两到三个定位假设" in args["context"]
+    assert "还不能把定位当成结论" in args["context"]
+    assert "最核心产品或服务" in args["question"]
+    assert args["options"] is None
+    handler.assert_not_called()
+
+
+def test_new_owner_first_answer_asks_audience_question_without_calling_model():
+    request = ModelRequest(
+        model=object(),
+        messages=[
+            HumanMessage(content="我是第一次使用，想从零做个人 IP。"),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "ask_clarification",
+                        "args": {},
+                        "id": "first_use_orientation_example",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            ToolMessage(
+                content="你最有证据的能力是什么？",
+                tool_call_id="first_use_orientation_example",
+            ),
+            HumanMessage(
+                content="我最有证据的是十年供应链采购经验。",
+                additional_kwargs={
+                    "hide_from_ui": True,
+                    "human_input_response": {
+                        "version": 1,
+                        "kind": "human_input_response",
+                        "source": "ask_clarification",
+                        "request_id": "first-use-request",
+                        "response_kind": "text",
+                        "value": "我最有证据的是十年供应链采购经验。",
+                    },
+                },
+            ),
+        ],
+        tools=[SimpleNamespace(name="ask_clarification")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    handler = Mock()
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert isinstance(result, AIMessage)
+    assert result.content == ""
+    assert len(result.tool_calls) == 1
+    assert result.tool_calls[0]["id"].startswith("first_use_audience_")
+    assert "服务哪一类人" in result.tool_calls[0]["args"]["question"]
+    assert "采取行动或付费" in result.tool_calls[0]["args"]["question"]
+    handler.assert_not_called()
+
+
+def test_new_owner_second_intake_answer_reaches_normal_model_path():
+    first_response = {
+        "version": 1,
+        "kind": "human_input_response",
+        "source": "ask_clarification",
+        "request_id": "first-use-request",
+        "response_kind": "text",
+        "value": "我最有证据的是十年供应链采购经验。",
+    }
+    second_response = {
+        "version": 1,
+        "kind": "human_input_response",
+        "source": "ask_clarification",
+        "request_id": "audience-request",
+        "response_kind": "text",
+        "value": "服务小型制造企业，解决采购成本失控。",
+    }
+    request = ModelRequest(
+        model=object(),
+        messages=[
+            HumanMessage(content="我是第一次使用，想从零做个人 IP。"),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "ask_clarification",
+                        "args": {},
+                        "id": "first_use_orientation_example",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            HumanMessage(
+                content=first_response["value"],
+                additional_kwargs={
+                    "hide_from_ui": True,
+                    "human_input_response": first_response,
+                },
+            ),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "ask_clarification",
+                        "args": {},
+                        "id": "first_use_audience_example",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            HumanMessage(
+                content=second_response["value"],
+                additional_kwargs={
+                    "hide_from_ui": True,
+                    "human_input_response": second_response,
+                },
+            ),
+        ],
+        tools=[SimpleNamespace(name="ask_clarification")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    expected = AIMessage(content="给出定位假设")
+    handler = Mock(return_value=expected)
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert result is expected
+    handler.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ("request_text", "expected_question"),
+    [
+        ("我是第一次使用，想从零做个人 IP。", "专业能力或真实经历"),
+        (
+            "我们是一个公益组织，第一次做机构 IP，应该从哪里开始？",
+            "目标人群采取的一个具体行动",
+        ),
+    ],
+)
+def test_new_owner_orientation_question_matches_the_ip_entity(
+    request_text,
+    expected_question,
+):
+    request = ModelRequest(
+        model=object(),
+        messages=[HumanMessage(content=request_text)],
+        tools=[SimpleNamespace(name="ask_clarification")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+
+    result = PersonalIPContextMiddleware().wrap_model_call(
+        request,
+        Mock(),
+    )
+
+    assert isinstance(result, AIMessage)
+    assert expected_question in result.tool_calls[0]["args"]["question"]
+
+
+@pytest.mark.asyncio
+async def test_async_new_owner_orientation_does_not_await_the_model_handler():
+    request = ModelRequest(
+        model=object(),
+        messages=[HumanMessage(content="This is my first time. I want to build a brand from scratch.")],
+        tools=[SimpleNamespace(name="ask_clarification")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    handler = AsyncMock()
+
+    result = await PersonalIPContextMiddleware().awrap_model_call(
+        request,
+        handler,
+    )
+
+    assert isinstance(result, AIMessage)
+    assert result.tool_calls[0]["name"] == "ask_clarification"
+    assert "core product or service" in result.tool_calls[0]["args"]["question"]
+    handler.assert_not_awaited()
+
+
+def test_new_owner_concrete_task_keeps_execution_tools_available():
+    tools = [
+        SimpleNamespace(name="ask_clarification"),
+        SimpleNamespace(name="read_file"),
+        SimpleNamespace(name="browser_navigate"),
+    ]
+    request = ModelRequest(
+        model=object(),
+        messages=[HumanMessage(content=("我是第一次使用。请直接把下面这个选题写成60秒口播脚本：为什么上班族总在下午三点想吃甜食？"))],
+        tools=tools,
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+
+    injected = PersonalIPContextMiddleware()._inject(request)
+
+    assert injected.tools == tools
+    assert "first visible reply" not in injected.messages[0].content
+    assert '"experience": "new_owner"' in injected.messages[1].content
+
+
+def test_new_owner_concrete_task_still_calls_the_model_handler():
+    request = ModelRequest(
+        model=object(),
+        messages=[HumanMessage(content=("我是第一次使用。请直接把下面这个选题写成60秒口播脚本：为什么上班族总在下午三点想吃甜食？"))],
+        tools=[SimpleNamespace(name="ask_clarification")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    expected = AIMessage(content="脚本结果")
+
+    result = PersonalIPContextMiddleware().wrap_model_call(
+        request,
+        lambda _: expected,
+    )
+
+    assert result is expected
+
+
+def test_new_owner_plain_script_request_bypasses_first_use_orientation():
+    request = ModelRequest(
+        model=object(),
+        messages=[HumanMessage(content="我是第一次使用，想做一个下午茶短视频，帮我写脚本。")],
+        tools=[SimpleNamespace(name="ask_clarification")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    expected = AIMessage(content="脚本结果")
+    handler = Mock(return_value=expected)
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert result is expected
+    handler.assert_called_once()
+
+
+def test_returning_owner_orientation_keeps_research_tools_available():
+    tools = [
+        SimpleNamespace(name="ask_clarification"),
+        SimpleNamespace(name="read_file"),
+        SimpleNamespace(name="browser_navigate"),
+    ]
+    request = ModelRequest(
+        model=object(),
+        messages=[HumanMessage(content="我想重新梳理品牌 IP，应该从哪里开始？")],
+        tools=tools,
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": _portfolio(),
+            }
+        ),
+    )
+
+    injected = PersonalIPContextMiddleware()._inject(request)
+
+    assert injected.tools == tools
+    assert '"experience": "returning_owner"' in injected.messages[1].content
 
 
 @pytest.mark.asyncio

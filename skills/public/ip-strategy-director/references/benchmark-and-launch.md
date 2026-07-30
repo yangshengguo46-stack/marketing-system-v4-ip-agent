@@ -43,3 +43,17 @@ Start with a small portfolio of experiments:
 Set cadence from production capacity. Define the comparison, observation
 horizon, required evidence and failure rule before publishing. Do not promise a
 follower count or deadline that the evidence cannot support.
+
+Each pilot experiment must record:
+
+- one target audience and one primary role;
+- evidence level: general prior, market-referenced, account-observed or
+  promoted rule;
+- one or more observable mechanism hypotheses with predicted signals and
+  failure conditions;
+- platform-distribution and audience-matching assumptions;
+- an observation window, uncertainty statement and change rule.
+
+Use observable behavior, not neuroscience shorthand. A market pattern can
+justify a test, but only the operated account's measured publications can
+validate it.

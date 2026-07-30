@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify ip-clean-install personal-ip-publish-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor hllm-lite ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor hllm-lite ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 PNPM ?= pnpm
@@ -26,6 +26,9 @@ help:
 	@echo "  make ip-package      - Build and smoke-test the complete source archive"
 	@echo "  make ip-package-verify PACKAGE=... - Verify an existing source archive"
 	@echo "  make personal-ip-publish-acceptance - Run local-only eight-platform publish recovery checks"
+	@echo "  make personal-ip-cost-acceptance - Run video hard-budget reservation/retry/concurrency checks"
+	@echo "  make personal-ip-data-lifecycle-acceptance - Verify credential-safe backup, restore and whole-domain deletion"
+	@echo "  make personal-ip-observability-acceptance - Verify runtime profiles and sanitized operating alerts"
 	@echo "  make video-e2e-local - Run/resume the free local video delivery acceptance"
 	@echo "  make video-e2e-paid-checkpoints - Write paid media commands without running them"
 	@echo "  make video-renderers-install - Install exact source-owned HyperFrames dependencies"
@@ -57,6 +60,7 @@ help:
 	@echo "  make install         - Install dependencies (Git checkouts also get pre-commit hooks)"
 	@echo "  make setup-sandbox   - Pre-pull sandbox container image (recommended)"
 	@echo "  make dev             - Start all services in development mode (with hot-reloading)"
+	@echo "  make dev-direct      - Start local frontend + Gateway without host nginx"
 	@echo "  make dev-daemon      - Start dev services in background (daemon mode)"
 	@echo "  make start           - Start all services in production mode (optimized, no hot-reloading)"
 	@echo "  make start-daemon    - Start prod services in background (daemon mode)"
@@ -84,6 +88,9 @@ setup:
 ip-init:
 	@$(PYTHON) ./scripts/init_ip_agent.py
 
+ip-refresh:
+	@$(PYTHON) ./scripts/init_ip_agent.py --refresh-product-agent
+
 ip-package:
 	@$(PYTHON) ./scripts/package_ip_agent.py build --smoke
 
@@ -93,6 +100,18 @@ ip-package-verify:
 
 personal-ip-publish-acceptance:
 	@$(MAKE) -C backend personal-ip-publish-acceptance
+
+personal-ip-cost-acceptance:
+	@$(MAKE) -C backend personal-ip-cost-acceptance
+
+personal-ip-data-lifecycle-acceptance:
+	@$(MAKE) -C backend personal-ip-data-lifecycle-acceptance
+	@cd frontend && $(PNPM) exec rstest tests/unit/core/personal-ip-data-lifecycle.test.ts
+
+personal-ip-observability-acceptance:
+	@$(MAKE) -C backend personal-ip-observability-acceptance
+	@cd frontend && $(PNPM) exec rstest run tests/unit/core/personal-ip-cockpit.test.ts
+	@cd frontend && $(PNPM) check
 
 video-e2e-local:
 	@$(BACKEND_UV_RUN) python ../scripts/personal_ip_video_e2e.py local --work-dir "$(abspath $(VIDEO_E2E_DIR))" --finisher "$(VIDEO_E2E_FINISHER)"
@@ -161,7 +180,7 @@ mediakit-test:
 	@$(PYTHON) ./scripts/mediakit_source.py test
 
 doctor:
-	@$(BACKEND_UV_RUN) python ../scripts/doctor.py
+	@$(BACKEND_UV_RUN) python ../scripts/doctor.py --profile $(or $(PROFILE),auto)
 
 support-bundle:
 	@$(BACKEND_UV_RUN) python ../scripts/support_bundle.py --include-doctor
@@ -210,6 +229,11 @@ setup-sandbox:
 dev:
 	@$(PYTHON) ./scripts/check.py
 	@$(RUN_WITH_GIT_BASH) ./scripts/serve.sh --dev
+
+# Start the supported local direct profile without requiring host nginx
+dev-direct:
+	@$(MAKE) doctor PROFILE=local-direct
+	@$(RUN_WITH_GIT_BASH) ./scripts/serve.sh --dev --no-nginx
 
 # Start all services in production mode (with optimizations)
 start:

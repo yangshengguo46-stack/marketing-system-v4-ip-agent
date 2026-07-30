@@ -111,6 +111,9 @@ DeerFlow 新近集成了 BytePlus 自研的智能搜索与抓取工具集——[
    这会启动一个交互式向导，引导你选择 LLM provider、可选的 web 搜索工具，以及 sandbox 模式、bash 权限、文件写入等执行/安全偏好。它会生成一份最小化的 `config.yaml`，并把 API key 写入 `.env`，大约 2 分钟完成。
 
    随时可以运行 `make doctor` 检查配置和系统环境，并获得可执行的修复建议。
+   源码更新后，如果 `make doctor` 提示产品 IP Agent 已过期，运行
+   `make ip-refresh`；它只更新产品托管的 `ip-agent` 指令和配置，不会覆盖
+   用户的 `USER.md`。
    如果你要提交本地安装、配置或运行问题，可以执行 `make support-bundle`。
    命令会直接打印 reporter 下一步建议，并在 `.deer-flow/support-bundles/` 下生成
    `*-issue-summary.md`、面向 AI 辅助提 issue 的 `*-issue-draft.md`，以及可选证据
@@ -250,7 +253,18 @@ make down   # 停止并移除容器
 
 如果你更希望直接在本地启动各个服务：
 
-前提：先完成上面的“配置”步骤（`make setup`）。`make dev` 需要有效配置文件，默认读取项目根目录下的 `config.yaml`。可以用 `DEER_FLOW_PROJECT_ROOT` 显式指定项目根目录，也可以用 `DEER_FLOW_CONFIG_PATH` 指向某个具体配置文件。运行期状态默认写到项目根目录下的 `.deer-flow`，可用 `DEER_FLOW_HOME` 覆盖；skills 默认读取项目根目录下的 `skills/`，可用 `DEER_FLOW_SKILLS_PATH` 覆盖。启动前先运行 `make doctor` 校验配置。
+前提：先完成上面的“配置”步骤（`make setup`）。`make dev` 需要有效配置文件，默认读取项目根目录下的 `config.yaml`。可以用 `DEER_FLOW_PROJECT_ROOT` 显式指定项目根目录，也可以用 `DEER_FLOW_CONFIG_PATH` 指向某个具体配置文件。本地源码启动器默认把 Gateway 运行期状态写到 `backend/.deer-flow`，可用 `DEER_FLOW_HOME` 覆盖；项目内工具链仍位于根目录 `.deer-flow`。skills 默认读取项目根目录下的 `skills/`，可用 `DEER_FLOW_SKILLS_PATH` 覆盖。启动前先运行 `make doctor` 校验配置。
+首次使用且只是在询问如何起步或定位时，IP Agent 的第一条可见回复会先给出
+暂定路线，并按个人、品牌/产品或组织只追问一个会改变方向的事实；这一步由
+服务端确定性完成，模型调用、联网找对标、Skill 加载和经营账本读取均为零。
+用户回答后，服务端会继续用零模型调用追问目标人群与核心问题；两项事实齐备
+后才进入正常孵化模型路径。
+用户已经提供脚本、素材或链接的具体任务不受这道门禁影响。
+可信本机没有安装 nginx 时，受支持的 `local-direct` 模式使用
+`make doctor` 和 `make dev-direct`，访问 `http://localhost:3000`。
+`make dev` 仍是通过 nginx 的 `local-proxy` 模式，访问
+`http://localhost:2026`；生产环境必须使用受管理的入口或项目自带的
+Docker 栈。完整定义见 [docs/RUNTIME_PROFILES.md](docs/RUNTIME_PROFILES.md)。
 在 Windows 上，请使用 Git Bash 运行本地开发流程。基于 bash 的服务脚本不支持直接在原生 `cmd.exe` 或 PowerShell 中执行，且 WSL 也不保证可用，因为部分脚本依赖 Git for Windows 的 `cygpath` 等工具。
 
 1. **检查依赖环境**：
@@ -546,7 +560,7 @@ Skills 采用按需渐进加载，不会一次性把所有内容都塞进上下�
 
 Tools 也是同样的思路。DeerFlow 自带一组核心工具：网页搜索、网页抓取、网页渲染截图、文件操作、bash 执行；同时也支持通过 MCP Server 和 Python 函数扩展自定义工具。你可以替换任何一项，也可以继续往里加。
 
-Gateway 生成后续建议时，现在会先把普通字符串输出和 block/list 风格的富文本内容统一归一化，再去解析 JSON 数组响应，因此不同 provider 的内容包装方式不会再悄悄把建议吞掉。
+Gateway 生成后续建议时，现在会先把普通字符串输出和 block/list 风格的富文本内容统一归一化，再去解析 JSON 数组响应，因此不同 provider 的内容包装方式不会再悄悄把建议吞掉。未回答的人工输入卡片存在时，Web UI 不会请求这类建议，因为下一步应由该卡片接收用户的明确回答。
 
 Web UI 支持从已完成的 assistant 回复分叉出一个新的主对话。新 thread 会从该回复对应的 checkpoint 开始，并尽力复制当前 thread 的工作区文件。
 

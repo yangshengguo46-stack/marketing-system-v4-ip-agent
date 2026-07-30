@@ -26,6 +26,8 @@ test.describe("Personal-IP portfolio (real backend)", () => {
 
     await page.getByRole("button", { name: "新建主体" }).click();
     await page.getByLabel("主体名称").fill(subjectName);
+    await page.getByLabel("主体类型").click();
+    await page.getByRole("option", { name: "产品" }).click();
     const createSubjectResponse = page.waitForResponse(
       (response) =>
         response.request().method() === "POST" &&
@@ -48,6 +50,7 @@ test.describe("Personal-IP portfolio (real backend)", () => {
     const subjects = (await subjectsResponse.json()) as Array<{
       id: string;
       display_name: string;
+      subject_type: string;
     }>;
     const subject = subjects.find(
       (candidate) => candidate.display_name === subjectName,
@@ -56,6 +59,7 @@ test.describe("Personal-IP portfolio (real backend)", () => {
       subject,
       "UI-created subject must be persisted by the gateway",
     ).toBeTruthy();
+    expect(subject!.subject_type).toBe("product");
 
     const accountResponse = await context.request.post(
       `${APP}/api/personal-ip/accounts`,

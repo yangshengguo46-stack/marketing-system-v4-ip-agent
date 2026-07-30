@@ -5,6 +5,10 @@ from datetime import UTC, datetime
 
 import httpx
 import pytest
+from support.personal_ip_publish import (
+    compliant_publish_request,
+    compliant_publish_result,
+)
 
 from deerflow.config.database_config import DatabaseConfig
 from deerflow.persistence.channel_connections.sql import ChannelCredentialCipher
@@ -125,14 +129,20 @@ async def test_collection_service_writes_official_snapshot_to_existing_receipt(t
         account_id=account["id"],
         preflight_id=None,
         executor="platform_api",
-        request_payload={"caption": "测试"},
+        request_payload=compliant_publish_request(
+            "douyin",
+            caption="测试",
+        ),
     )
     await receipts.record_attempt(
         receipt["id"],
         owner_user_id="user-1",
         attempt_key="published",
         status="published",
-        result_payload={"item_id": "item-1"},
+        result_payload=compliant_publish_result(
+            receipt,
+            item_id="item-1",
+        ),
         external_post_id="item-1",
         occurred_at=datetime(2026, 7, 21, 8, 0, tzinfo=UTC),
     )
@@ -196,14 +206,20 @@ async def test_authorized_collection_refreshes_expired_token_server_side_and_ret
         account_id=account["id"],
         preflight_id=None,
         executor="platform_api",
-        request_payload={"caption": "测试"},
+        request_payload=compliant_publish_request(
+            "douyin",
+            caption="测试",
+        ),
     )
     await receipts.record_attempt(
         receipt["id"],
         owner_user_id="user-1",
         attempt_key="published",
         status="published",
-        result_payload={"item_id": "item-1"},
+        result_payload=compliant_publish_result(
+            receipt,
+            item_id="item-1",
+        ),
         external_post_id="item-1",
         occurred_at=datetime(2026, 7, 21, 8, 0, tzinfo=UTC),
     )
@@ -320,14 +336,20 @@ async def test_consecutive_official_snapshots_derive_a_partial_exact_interval_de
         account_id=account["id"],
         preflight_id=None,
         executor="platform_api",
-        request_payload={"caption": "测试"},
+        request_payload=compliant_publish_request(
+            "douyin",
+            caption="测试",
+        ),
     )
     await receipts.record_attempt(
         receipt["id"],
         owner_user_id="user-1",
         attempt_key="published",
         status="published",
-        result_payload={"item_id": "item-1"},
+        result_payload=compliant_publish_result(
+            receipt,
+            item_id="item-1",
+        ),
         external_post_id="item-1",
         occurred_at=datetime(2026, 7, 21, 0, 0, tzinfo=UTC),
     )

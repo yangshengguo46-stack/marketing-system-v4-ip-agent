@@ -16,6 +16,10 @@ from deerflow.persistence.personal_ip_platform_observations.sql import validate_
 from deerflow.persistence.personal_ip_preflights.model import PersonalIPPreflightRow
 from deerflow.persistence.personal_ip_publish_receipts.model import PersonalIPPublishReceiptRow
 from deerflow.personal_ip.browser_publishing import normalize_publication_url, platform_publication_url_allowed
+from deerflow.personal_ip.publish_compliance import (
+    compile_publish_compliance,
+    validate_publish_compliance_evidence,
+)
 from deerflow.utils.time import coerce_iso
 
 _EXECUTORS = {"platform_api", "ui_tars", "browser", "manual"}
@@ -123,8 +127,22 @@ class PersonalIPPublishReceiptRepository:
         request_snapshot = _json_snapshot(request_payload, field="request_payload")
         if not isinstance(request_snapshot, dict) or not request_snapshot:
             raise ValueError("request_payload must be a non-empty object")
+        if "compliance_receipt" in request_snapshot:
+            raise ValueError("compliance_receipt is server-owned")
 
         async with self._sf() as session:
+            account = await session.get(PersonalIPAccountRow, account_key)
+            if account is None or account.owner_user_id != owner or account.status != "active":
+                raise ValueError("Personal-IP publish target account not found")
+            compliance, compliance_receipt = compile_publish_compliance(
+                account.platform,
+                request_snapshot.get("compliance"),
+            )
+            request_snapshot = {
+                **request_snapshot,
+                "compliance": compliance,
+                "compliance_receipt": compliance_receipt,
+            }
             existing_statement = select(PersonalIPPublishReceiptRow).where(
                 PersonalIPPublishReceiptRow.owner_user_id == owner,
                 or_(
@@ -146,9 +164,6 @@ class PersonalIPPublishReceiptRepository:
                     return self._to_dict(existing)
                 raise ValueError("operation or idempotency key already records a different publish request")
 
-            account = await session.get(PersonalIPAccountRow, account_key)
-            if account is None or account.owner_user_id != owner or account.status != "active":
-                raise ValueError("Personal-IP publish target account not found")
             preflight = None
             if preflight_key is not None:
                 preflight = await session.get(PersonalIPPreflightRow, preflight_key)
@@ -216,6 +231,15 @@ class PersonalIPPublishReceiptRepository:
             row = await session.get(PersonalIPPublishReceiptRow, receipt_id)
             if row is None or row.owner_user_id != owner_user_id:
                 return None
+            if status_key == "published":
+                compliance_evidence = validate_publish_compliance_evidence(
+                    row.request_json,
+                    result_snapshot,
+                )
+                result_snapshot = {
+                    **result_snapshot,
+                    "compliance_evidence": compliance_evidence,
+                }
             url = _safe_external_url(external_url, platform=row.platform)
             if status_key == "published" and post_id is None and url is None:
                 raise ValueError("published attempts require an external post id or URL")

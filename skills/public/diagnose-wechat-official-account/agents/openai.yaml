@@ -1,0 +1,4 @@
+interface:
+  display_name: "公众号账号诊断"
+  short_description: "基于内容、商业漏斗和一手平台证据判断公众号继续运营、调整或重开"
+  default_prompt: "Use $diagnose-wechat-official-account to diagnose this WeChat Official Account from current evidence."

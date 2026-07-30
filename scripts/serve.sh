@@ -3,12 +3,13 @@
 # serve.sh — Unified DeerFlow service launcher
 #
 # Usage:
-#   ./scripts/serve.sh [--dev|--prod] [--daemon] [--stop|--restart]
+#   ./scripts/serve.sh [--dev|--prod] [--daemon] [--no-nginx] [--stop|--restart]
 #
 # Modes:
 #   --dev       Development mode with hot-reload (default)
 #   --prod      Production mode, pre-built frontend, no hot-reload
 #   --daemon    Run all services in background (nohup), exit after startup
+#   --no-nginx  Local development only: expose frontend :3000 and Gateway :8001 directly
 #
 # Actions:
 #   --skip-install  Skip dependency installation (faster restart)
@@ -54,6 +55,7 @@ _pick_python() {
 DEV_MODE=true
 DAEMON_MODE=false
 SKIP_INSTALL=false
+NO_NGINX=false
 ACTION="start"   # start | stop | restart
 
 for arg in "$@"; do
@@ -62,15 +64,21 @@ for arg in "$@"; do
         --prod)    DEV_MODE=false ;;
         --daemon)  DAEMON_MODE=true ;;
         --skip-install) SKIP_INSTALL=true ;;
+        --no-nginx) NO_NGINX=true ;;
         --stop)    ACTION="stop" ;;
         --restart) ACTION="restart" ;;
         *)
             echo "Unknown argument: $arg"
-            echo "Usage: $0 [--dev|--prod] [--daemon] [--skip-install] [--stop|--restart]"
+            echo "Usage: $0 [--dev|--prod] [--daemon] [--no-nginx] [--skip-install] [--stop|--restart]"
             exit 1
             ;;
     esac
 done
+
+if $NO_NGINX && ! $DEV_MODE; then
+    echo "--no-nginx is supported only with --dev; production requires managed ingress."
+    exit 1
+fi
 
 # ── Stop helper ──────────────────────────────────────────────────────────────
 
@@ -293,6 +301,9 @@ fi
 if $DAEMON_MODE; then
     MODE_LABEL="$MODE_LABEL [daemon]"
 fi
+if $NO_NGINX; then
+    MODE_LABEL="$MODE_LABEL [local-direct]"
+fi
 
 # Frontend command
 if $DEV_MODE; then
@@ -405,7 +416,9 @@ echo ""
 echo "  Services:"
 echo "    Gateway     → localhost:8001  (REST API + agent runtime)"
 echo "    Frontend    → localhost:3000  (Next.js)"
-echo "    Nginx       → localhost:2026  (reverse proxy)"
+if ! $NO_NGINX; then
+    echo "    Nginx       → localhost:2026  (reverse proxy)"
+fi
 echo ""
 
 # ── Cleanup handler ──────────────────────────────────────────────────────────
@@ -468,10 +481,12 @@ run_service "Frontend" \
     "cd frontend && $FRONTEND_CMD > ../logs/frontend.log 2>&1" \
     3000 120
 
-# 3. Nginx
-run_service "Nginx" \
-    "nginx -g 'daemon off;' -c '$REPO_ROOT/docker/nginx/nginx.local.conf' -p '$REPO_ROOT' > logs/nginx.log 2>&1" \
-    2026 10
+# 3. Nginx (proxy and production profiles only)
+if ! $NO_NGINX; then
+    run_service "Nginx" \
+        "nginx -g 'daemon off;' -c '$REPO_ROOT/docker/nginx/nginx.local.conf' -p '$REPO_ROOT' > logs/nginx.log 2>&1" \
+        2026 10
+fi
 
 # ── Ready ────────────────────────────────────────────────────────────────────
 
@@ -480,13 +495,25 @@ echo "=========================================="
 echo "  ✓ DeerFlow is running!  [$MODE_LABEL]"
 echo "=========================================="
 echo ""
-echo "  🌐 http://localhost:2026"
+if $NO_NGINX; then
+    echo "  🌐 http://localhost:3000"
+else
+    echo "  🌐 http://localhost:2026"
+fi
 echo ""
-echo "  Routing: Frontend → Nginx → Gateway"
-echo "  API:     /api/langgraph/*  →  Gateway agent runtime"
-echo "           /api/*              →  Gateway REST API (8001)"
+if $NO_NGINX; then
+    echo "  Routing: Frontend :3000 → Gateway :8001 (configured in frontend/.env)"
+else
+    echo "  Routing: Frontend → Nginx → Gateway"
+    echo "  API:     /api/langgraph/*  →  Gateway agent runtime"
+    echo "           /api/*              →  Gateway REST API (8001)"
+fi
 echo ""
-echo "  📋 Logs: logs/{gateway,frontend,nginx}.log"
+if $NO_NGINX; then
+    echo "  📋 Logs: logs/{gateway,frontend}.log"
+else
+    echo "  📋 Logs: logs/{gateway,frontend,nginx}.log"
+fi
 echo ""
 
 if $DAEMON_MODE; then

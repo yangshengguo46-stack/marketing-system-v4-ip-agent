@@ -9,15 +9,16 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from deerflow.personal_ip.hllm_creator import HLLM_CREATOR_FIELDS
 
-AUDIENCE_PREFLIGHT_CONTRACT_VERSION = "personal-ip-audience-preflight-v1"
+AUDIENCE_PREFLIGHT_CONTRACT_VERSION = "personal-ip-audience-preflight-v2"
+AUDIENCE_BASES = {"cold_start_hypothesis", "aggregate_account_cohort"}
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 _LOCAL_IDENTITY_KEYS = {
     "account_id",
@@ -60,17 +61,19 @@ class AudiencePreflightRequest:
         except (TypeError, json.JSONDecodeError) as exc:
             raise ValueError("example.user_profile must contain JSON") from exc
         _reject_local_identity(profile, field="example.user_profile")
-        if profile.get("audience_basis") != "aggregate_account_cohort":
-            raise ValueError("audience preflight requires aggregate_account_cohort data")
+        audience_basis = str(profile.get("audience_basis") or "").strip()
+        if audience_basis not in AUDIENCE_BASES:
+            raise ValueError("audience preflight requires cold_start_hypothesis or aggregate_account_cohort data")
         if str(copied.get("response") or "").strip():
             raise ValueError("audience preflight examples cannot contain a training response")
         self._example = copied
+        self.audience_basis = audience_basis
         self.variant_count = variant_count
 
     def to_payload(self) -> dict[str, Any]:
         return {
             "contract_version": AUDIENCE_PREFLIGHT_CONTRACT_VERSION,
-            "audience_basis": "aggregate_account_cohort",
+            "audience_basis": self.audience_basis,
             "variant_count": self.variant_count,
             "example": json.loads(_canonical_json(self._example)),
         }
@@ -80,12 +83,51 @@ class AudiencePreflightRequest:
         return hashlib.sha256(_canonical_json(self.to_payload()).encode("utf-8")).hexdigest()
 
 
+class AudienceMechanismHypothesis(BaseModel):
+    """One observable, falsifiable content mechanism—not a neural claim."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    layer: Literal[
+        "processing_access",
+        "attention_prediction",
+        "emotion_identity",
+        "narrative_consumption",
+        "social_transmission",
+        "behavior_conversion",
+        "platform_distribution",
+    ]
+    claim: str = Field(min_length=1, max_length=2000)
+    predicted_signal: str = Field(min_length=1, max_length=1000)
+    failure_condition: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("claim")
+    @classmethod
+    def validate_claim(cls, value: str) -> str:
+        text = " ".join(value.split())
+        unsupported = [term for term in ("多巴胺", "镜像神经元", "蔡格尼克") if term in text]
+        if unsupported:
+            raise ValueError("mechanism claims must describe observable audience behavior instead of unsupported causal shorthand")
+        if any(phrase in text for phrase in ("必爆", "一定会火", "一定能火", "保证完播", "保证涨粉")):
+            raise ValueError("mechanism claims cannot guarantee a viral outcome")
+        return text
+
+
 class AudienceCreativeVariant(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     variant_id: str = Field(min_length=1, max_length=128)
     text: str = Field(min_length=1, max_length=12_000)
     match_score: float | None = Field(default=None, ge=0, le=1)
+    evidence_level: Literal[
+        "unmeasured_hypothesis",
+        "market_referenced_hypothesis",
+        "account_history_conditioned",
+        "promoted_rule",
+    ]
+    mechanism_hypotheses: list[AudienceMechanismHypothesis] = Field(min_length=1, max_length=8)
+    distribution_assumptions: list[str] = Field(min_length=1, max_length=8)
+    uncertainty: str = Field(min_length=1, max_length=1000)
     tags: list[str] = Field(default_factory=list, max_length=32)
 
 
@@ -96,16 +138,24 @@ class AudiencePreflightResult(BaseModel):
 
     contract_version: str = Field(
         default=AUDIENCE_PREFLIGHT_CONTRACT_VERSION,
-        pattern=r"^personal-ip-audience-preflight-v1$",
+        pattern=r"^personal-ip-audience-preflight-v2$",
     )
     provider: str = Field(min_length=1, max_length=80)
     model_version: str = Field(min_length=1, max_length=160)
     algorithm_version: str = Field(min_length=1, max_length=160)
     request_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
-    audience_basis: str = Field(pattern=r"^aggregate_account_cohort$")
+    audience_basis: Literal["cold_start_hypothesis", "aggregate_account_cohort"]
     audience_embedding_ref: str | None = Field(default=None, max_length=512)
     variants: list[AudienceCreativeVariant] = Field(min_length=1, max_length=8)
     warnings: list[str] = Field(default_factory=list, max_length=32)
+
+    @model_validator(mode="after")
+    def validate_evidence_basis(self) -> AudiencePreflightResult:
+        if self.audience_basis == "cold_start_hypothesis":
+            inflated = [variant.variant_id for variant in self.variants if variant.evidence_level in {"account_history_conditioned", "promoted_rule"}]
+            if inflated:
+                raise ValueError("cold-start variants cannot claim account-history or promoted-rule evidence")
+        return self
 
 
 class HLLMCreatorHTTPProvider:
@@ -151,4 +201,6 @@ class HLLMCreatorHTTPProvider:
         result = AudiencePreflightResult.model_validate(response.json())
         if result.request_digest != request.request_digest:
             raise RuntimeError("HLLM provider receipt does not match the request")
+        if result.audience_basis != request.audience_basis:
+            raise RuntimeError("HLLM provider receipt uses a different audience basis")
         return result

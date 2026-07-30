@@ -16,6 +16,15 @@ test-blocking-io:
 personal-ip-publish-acceptance:
 	PYTHONPATH=. PYTHONIOENCODING=utf-8 PYTHONUTF8=1 uv run python -m pytest tests/test_personal_ip_browser_publishing.py tests/test_personal_ip_publish_receipt_repository.py tests/test_personal_ip_publish_receipt_router.py tests/test_personal_ip_publish_recovery_e2e.py tests/test_personal_ip_workflow_tools.py -q --tb=short
 
+personal-ip-cost-acceptance:
+	PYTHONPATH=. PYTHONIOENCODING=utf-8 PYTHONUTF8=1 uv run python -m pytest tests/test_personal_ip_video_budget.py tests/test_personal_ip_video_production_repository.py tests/test_personal_ip_tools.py tests/test_media_executor_script.py -q --tb=short
+
+personal-ip-data-lifecycle-acceptance:
+	PYTHONPATH=. PYTHONIOENCODING=utf-8 PYTHONUTF8=1 uv run python -m pytest tests/test_personal_ip_data_lifecycle.py tests/test_personal_ip_data_lifecycle_router.py tests/test_personal_ip_platform_connection_repository.py -q --tb=short
+
+personal-ip-observability-acceptance:
+	PYTHONPATH=. PYTHONIOENCODING=utf-8 PYTHONUTF8=1 uv run python -m pytest tests/test_doctor.py tests/test_personal_ip_operating_cockpit.py tests/test_personal_ip_video_budget.py -q --tb=short
+
 lint:
 	uvx ruff check .
 	uvx ruff format --check .

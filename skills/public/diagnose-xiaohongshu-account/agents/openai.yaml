@@ -1,0 +1,4 @@
+interface:
+  display_name: "小红书账号诊断"
+  short_description: "基于内容、商业漏斗和一手平台证据判断小红书账号继续、调整或换号"
+  default_prompt: "Use $diagnose-xiaohongshu-account to diagnose this Xiaohongshu account from current evidence."

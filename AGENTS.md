@@ -78,8 +78,14 @@ IP Agent distribution note:
 - `product/defaults/` owns the product agent/owner defaults, while
   `product/volcengine/capabilities.yaml` is the auditable media routing policy.
 - `scripts/init_ip_agent.py` installs those defaults into a normal DeerFlow
-  workspace. Keep this as a source distribution: integrate upstream DeerFlow
-  changes without replacing native source modules with binary wrappers.
+  workspace. `make ip-refresh` updates only the product-owned `ip-agent`
+  `SOUL.md`/`config.yaml` and preserves `USER.md`; `make doctor` must warn when
+  an installed product agent is stale. Both commands must resolve the same
+  `DEER_FLOW_HOME` as the local launcher, defaulting to
+  `backend/.deer-flow`; root `.deer-flow` remains the project-local toolchain
+  location. Keep this as a source distribution:
+  integrate upstream DeerFlow changes without replacing native source modules
+  with binary wrappers.
 - `third_party/volcengine/mediakit-cli` is the pinned MediaKit Go source.
   `scripts/mediakit_source.py` builds it into ignored `.deer-flow/bin`; do not
   reintroduce the upstream prebuilt `mediakit` file or a global npm installer.
@@ -141,6 +147,15 @@ IP Agent distribution note:
 - Personal-IP account data is the product-owned domain boundary. It must remain
   owner-scoped, enter runs through validated server context, and never be trusted
   from a caller-supplied expanded object.
+- Whole-domain Personal-IP data lifecycle is owned by
+  `deerflow.personal_ip.data_lifecycle`. Every `personal_ip_*` table must be
+  classified as an exported dataset or an explicit secret/deletion-only table.
+  Never export credential ciphertext or one-use OAuth state. Restore is
+  same-owner and empty-scope only, verifies dataset plus manifest digests, and
+  restores platform connections revoked so reauthorization is mandatory.
+  Permanent deletion requires a fresh server preview, the exact confirmation
+  phrase, backup acknowledgement and MineContext deletion; stale state digests
+  fail closed. Run `make personal-ip-data-lifecycle-acceptance`.
 - Keep the Chinese workspace sidebar distinction explicit: `新对话` creates a
   thread, while `历史对话` opens the complete thread index from immediately
   below `定时任务`. Do not label both entries simply as `对话`.
@@ -172,6 +187,15 @@ IP Agent distribution note:
   `0009_personal_ip_publish_receipts`. Keep the initial request immutable,
   attempts append-only and terminal publication status monotonic. API,
   UI-TARS, browser and manual executors share this one receipt contract.
+  Every new request must carry a
+  `personal-ip-publish-compliance-v1` declaration. The repository derives the
+  target platform, validates rights, moderation and the exact
+  commercial/AI-disclosure plan, then seals its own versioned policy receipt;
+  callers may not supply that receipt. A `published` attempt additionally
+  requires `personal-ip-publish-compliance-evidence-v1` bound to the sealed
+  receipt with evidence refs for the applied disclosures. Sensitive-topic
+  declarations require documented human review. Keep policy source URLs and
+  review dates in the receipt and fail closed when the contract is missing.
   Browser proof must identify a post-specific public URL on the selected one
   of eight platforms; a creator dashboard, home page or same-host list is not
   success evidence. Prepare may append a new pending handoff after `failed` or
@@ -315,6 +339,19 @@ IP Agent distribution note:
   Its `ingest-real` command verifies already-emitted real provider, finishing
   and QA receipts and idempotently seals them into a production; it must never
   make or reconstruct a provider call.
+  `deerflow.personal_ip.video_budget` owns paid-call admission on that same
+  event ledger. A paid production freezes currency and `hard_limit`; each
+  provider attempt needs a distinct server reservation before submission.
+  Reservation is serialized against spent plus all active reservations, so
+  retries and concurrent calls cannot overbook the limit. A trusted workbench
+  approval must match the exact reservation request when approval is enabled;
+  generic agent events cannot mint that approval. Settle every called attempt,
+  including failures and proven zero cost, from a provider receipt. Unknown
+  cost stays reserved; release is allowed only when no provider call occurred.
+  Provider-request events declare `billing_mode`; paid requests bind the active
+  reservation and an estimate within its maximum, while free requests require
+  known zero cost. Keep reservation/settlement/release receipts append-only and
+  do not create a mutable parallel cost ledger.
   New requests must declare `faceless_material` or `generative_cinematic`.
   `deerflow.personal_ip.video_contracts` owns the pure, server-validated plan,
   rights manifest, storyboard, material selection, narration/TTS timing,
@@ -367,13 +404,28 @@ IP Agent distribution note:
   hashes and publish checkpoints remain internal or in receipts.
   Shot/timeline conversations use ordinary DeerFlow threads;
   exact ids are operation targets only and never conversation authority.
-- `deerflow.personal_ip.operating_cockpit` is the owner-scoped read model that
+- `deerflow.personal_ip.operating_cockpit.PersonalIPStartupContextService` is
+  the first new-conversation read and may inspect only active subject/account
+  existence. `new_owner` must continue from the user's current request without
+  scanning empty workflow ledgers; `returning_owner`, resume and portfolio
+  work may proceed to the full cockpit. `deerflow.personal_ip.operating_cockpit`
+  is the owner-scoped read model that
   joins the six-stage operating loop and nine-stage video line. The Gateway
   route and native `personal_ip_operating_cockpit` tool must use the same
   service, stay whole-portfolio, expose explicit pending queues and report
-  bounded-history coverage. The native begin/compile/execute/read video tools
+  bounded-history coverage. Its v6 alert surface derives sanitized loop,
+  provider and cost failures from authoritative receipts and the video ledger;
+  never forward raw provider payloads or create a parallel alert store. Budget
+  admission rejection is an append-only
+  `personal-ip-video-budget-rejection-v1` event. The native
+  begin/compile/execute/read video tools
   are the agent's write/resume surface; chat history is never the production
   ledger.
+- A server-validated empty Personal-IP portfolio plus an orientation/incubation
+  request is a deterministic first-reply boundary. It emits one
+  `ask_clarification` with a provisional route and one entity-sensitive
+  material question, using zero provider calls and zero web/Skill/ledger reads.
+  Supplied script, asset and link operations bypass this boundary.
 - `deerflow.personal_ip.video_method_distillation` adapts the MIT-licensed
   Cangjie RIA-TV++ workflow for long-form video, recorded courses, interviews
   and podcasts. It may consume only a sealed `personal-ip-video-pattern-v1`
@@ -399,18 +451,69 @@ IP Agent distribution note:
   fields in API, UI, agent context or readiness gates. Preflight loads the
   latest launch-ready strategy server-side; a caller-provided parallel
   creator/audience profile is forbidden. First-use incubation is a natural
-  `ip-agent` conversation, not a customer questionnaire surface. Strategy
+  `ip-agent` conversation, not a customer questionnaire surface. For a
+  server-validated empty portfolio and an orientation/incubation request,
+  `PersonalIPContextMiddleware` must hide research and execution tools until
+  the first visible reply; that reply gives a provisional roadmap and asks one
+  material question. Concrete supplied scripts, assets and links bypass this
+  delay. Strategy
   versions must cover
-  person evidence, commercial design, real benchmarks, two-to-three positioning
+  entity evidence, commercial design, real benchmarks, two-to-three positioning
   alternatives, name/avatar/bio launch assets, pilot experiments and observed
-  validation evidence. `monetization_first` is the default; `influence_first`
-  requires explicit user intent and still reserves monetization routes. The
+  validation evidence. Influence is the common IP asset mechanism, never a mode
+  competing with monetization. Strategy v4 must store separate influence,
+  behavioral and economic goals, time horizons, priority order, guardrails and
+  deliberate non-goals. The legacy `monetization_first` / `influence_first`
+  field remains storage compatibility only and must not drive decisions. The
   agent surface uses `personal_ip_record_strategy` and
   `personal_ip_read_strategy_context`. Customer copy may say current
   judgment/candidate/pilot before observed validation, never “建模完成” or
-  “定位完成”. Internal stages and fields stay private. Repeated content
+  “定位完成”. Launch pilots must carry evidence level, target audience,
+  observable mechanism hypotheses, predicted signals, failure conditions,
+  distribution assumptions, observation window and uncertainty. Formal
+  hypotheses reject viral guarantees and dopamine/mirror-neuron/Zeigarnik
+  causal shorthand; platform allocation, competition, timing and stochastic
+  feedback remain explicit. Internal stages and fields stay private. Repeated content
   outcomes become revisable versioned rules through blind prediction,
   retrospective and evidence promotion; one viral post is not permanent truth.
+- Personal-IP subjects support `creator`, `brand`, `product` and
+  `organization`. Migration `0020_personal_ip_differentiation` and
+  `deerflow.persistence.personal_ip_differentiation` own the immutable
+  `ip-differentiation-thesis-v1` lineage plus recognition/trust/intent/adoption/
+  conversion/economic/extension observations. A candidate must bind intended
+  influence and real alternatives to proprietary evidence, choice and belief
+  reasons and explicit sacrifice. Pilot status additionally requires the
+  recurring dramatic engine, stable/variable distinctive encoding, operating
+  fit and falsifiable tests. Provisionally adopted requires one complete
+  supportive observation; validated requires three complete supportive
+  observations across two effect classes including a downstream action.
+  Contradictory, mixed and inconclusive results remain evidence but cannot
+  promote status. Strategy positioning onward
+  must reference a pilot or adopted differentiation version. Native tools,
+  preflight, account diagnosis and the owner-wide cockpit must consume the
+  same owner-scoped repository; never reconstruct this thesis in a script,
+  series bible, account record or chat.
+- Connected-account diagnosis is content-first and evidence-bound.
+  `deerflow.personal_ip.account_diagnosis` loads the authenticated account's
+  current strategy, publications, metrics, creator-backend observations and
+  retrospectives, then compiles one direct
+  `insufficient_evidence`/`continue_current_account`/`adjust_and_retest`/
+  `start_new_account` decision. Platform mechanics are recommendation
+  eligibility constraints and distribution amplifiers, never the primary
+  content thesis. Low reach alone must never trigger a new-account decision.
+  Starting over requires platform-observed structural evidence;
+  `self_entertainment` requires at least three distinct measured posts plus
+  fresh, complete server evidence that influence, behavioral and economic
+  outcomes all failed. A successful recognition, trust, adoption or economic
+  outcome proves active IP operation even when another axis is weak; missing
+  axes remain unproven. The 30-day window is an internal conservative freshness
+  gate, not a platform rule. Persistent
+  recommendation ineligibility requires the same normalized restriction
+  reason across at least seven days, the latest status observed within 24
+  hours still
+  restricted and exhausted repair/appeal evidence. Keep the eight matching internal platform
+  diagnosis Skills and their dated first-party evidence references aligned
+  with this compiler; unpublished ranking weights remain explicitly unknown.
 - `skills/public/personal-ip-operator/SKILL.md` must explicitly allow every
   native `personal_ip_*` tool plus the browser/media execution surfaces it
   directs the agent to use. MediaKit skills declare restrictive
@@ -445,6 +548,7 @@ Scheduled-task note:
 ```bash
 make setup       # Interactive setup wizard (recommended for new users)
 make doctor      # Check configuration and system requirements
+make dev-direct  # Start trusted local frontend + Gateway without host nginx
 make support-bundle  # Generate redacted troubleshooting summary, AI issue draft, and optional zip
 make config      # Generate local config files from the examples
 make check       # Check that required tools are installed
@@ -458,6 +562,8 @@ make docker-start / docker-stop / docker-logs   # Docker development environment
 ```
 
 Run `make help` for the full list.
+Supported ingress and doctor profiles are defined in
+[docs/RUNTIME_PROFILES.md](docs/RUNTIME_PROFILES.md).
 
 **Per-module commands drive a single module** (run inside that module):
 

@@ -358,6 +358,7 @@ async def append_personal_ip_video_production_event(
         production = await get_personal_ip_video_production_repo(request).append_event(
             production_id,
             owner_user_id=await _current_user_id(request),
+            trusted_human_confirmation=(body.event_type == "review_recorded"),
             **body.model_dump(),
         )
     except ValueError as exc:

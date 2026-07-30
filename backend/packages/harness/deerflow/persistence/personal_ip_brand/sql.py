@@ -12,10 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.personal_ip_brand.model import PersonalIPStrategyVersionRow
+from deerflow.persistence.personal_ip_differentiation.model import PersonalIPDifferentiationVersionRow
 from deerflow.persistence.personal_ip_subjects.model import PersonalIPSubjectRow
 from deerflow.personal_ip.strategy_methodology import (
     PERSONAL_IP_STRATEGY_METHOD_VERSION,
     normalize_evidence_refs,
+    strategy_stage_index,
     validate_strategy_snapshot,
     validate_strategy_transition,
 )
@@ -81,6 +83,7 @@ class PersonalIPBrandRepository:
         launch_package: dict[str, Any] | None = None,
         validation: dict[str, Any] | None = None,
         evidence_refs: list[dict[str, Any]] | None = None,
+        differentiation_version_id: str | None = None,
     ) -> dict[str, Any]:
         """Append one immutable strategy snapshot, merging omitted documents."""
 
@@ -108,17 +111,31 @@ class PersonalIPBrandRepository:
                     "launch_package": launch_package,
                     "validation": validation,
                 }
+                requested_differentiation_id = (
+                    _clean_required(
+                        differentiation_version_id,
+                        field="differentiation_version_id",
+                        limit=64,
+                    )
+                    if differentiation_version_id is not None
+                    else existing_data.get("differentiation_version_id")
+                )
                 normalized_evidence = normalize_evidence_refs(evidence_refs, required=True) if evidence_refs is not None else existing_data["evidence_refs"]
                 if (
                     existing.stage != str(stage or "").strip()
                     or existing.mode != mode_key
                     or any(value is not None and existing_data[field] != value for field, value in requested.items())
+                    or existing_data.get("differentiation_version_id") != requested_differentiation_id
                     or existing_data["evidence_refs"] != normalized_evidence
                 ):
                     raise ValueError("operation_key already records a different Personal-IP strategy version")
                 return existing_data
 
-            await self._require_subject(session, subject_id=subject_key, owner_user_id=owner)
+            subject = await self._require_subject(
+                session,
+                subject_id=subject_key,
+                owner_user_id=owner,
+            )
             latest = (
                 await session.execute(
                     select(PersonalIPStrategyVersionRow)
@@ -142,6 +159,24 @@ class PersonalIPBrandRepository:
                 evidence_refs if evidence_refs is not None else list(latest_data.get("evidence_refs") or []),
                 required=True,
             )
+            merged_differentiation_id = (
+                _clean_required(
+                    differentiation_version_id,
+                    field="differentiation_version_id",
+                    limit=64,
+                )
+                if differentiation_version_id is not None
+                else latest_data.get("differentiation_version_id")
+            )
+            if target_stage and strategy_stage_index(target_stage) >= strategy_stage_index("positioning_candidates"):
+                if not merged_differentiation_id:
+                    raise ValueError("positioning requires a pilot or adopted differentiation thesis")
+                differentiation = await session.get(
+                    PersonalIPDifferentiationVersionRow,
+                    merged_differentiation_id,
+                )
+                if differentiation is None or differentiation.owner_user_id != owner or differentiation.subject_id != subject_key or differentiation.status not in {"pilot", "provisionally_adopted", "validated"}:
+                    raise ValueError("positioning requires a pilot or adopted differentiation thesis")
             validate_strategy_snapshot(
                 stage=target_stage,
                 mode=mode_key,
@@ -152,6 +187,7 @@ class PersonalIPBrandRepository:
                 launch_package=merged_launch,
                 validation=merged_validation,
                 evidence_refs=merged_evidence,
+                subject_type=subject.subject_type,
             )
             snapshot = {
                 "method_version": PERSONAL_IP_STRATEGY_METHOD_VERSION,
@@ -165,6 +201,7 @@ class PersonalIPBrandRepository:
                 "launch_package": merged_launch,
                 "validation": merged_validation,
                 "evidence_refs": merged_evidence,
+                "differentiation_version_id": merged_differentiation_id,
             }
             row = PersonalIPStrategyVersionRow(
                 id=f"strategy-{uuid.uuid4().hex}",
@@ -175,6 +212,7 @@ class PersonalIPBrandRepository:
                 stage=target_stage,
                 mode=mode_key,
                 method_version=PERSONAL_IP_STRATEGY_METHOD_VERSION,
+                differentiation_version_id=merged_differentiation_id,
                 person_model_json=merged_person,
                 business_model_json=merged_business,
                 benchmark_research_json=merged_benchmarks,

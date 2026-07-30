@@ -93,6 +93,8 @@ Auth UI note: the login page's "keep me signed in" option submits only `remember
 
 Human input requests are a structured message protocol layered on normal chat history. The backend writes request payloads to `ToolMessage.artifact.human_input`, `src/core/messages/human-input.ts` owns the runtime validators/types, and `src/components/workspace/messages/human-input-card.tsx` renders the reusable card. `MessageList` owns answered/latest/pending state for visible cards, but derives answered responses from raw `thread.messages` because replies are hidden; pending cards clear when the hidden reply appears, when dispatch is dropped, or when a new `thread.error` reports an async stream failure. Page-level submit callbacks must send a normal human message and put `hide_from_ui: true` plus the response payload in the fourth `sendMessage(..., options)` argument as `options.additionalKwargs`; the third argument remains run context such as `{ agent_name }`. Composer entry points should disable normal bottom input while `hasOpenHumanInputRequest(...)` is true so users answer through the card and preserve response metadata.
 
+Follow-up suggestion generation must also stay disabled while an unanswered human-input card is open. The card already owns the next user decision; calling `POST /api/threads/{id}/suggestions` in parallel would spend an unrelated model request and compete with that required answer. Keep this guard in the pure input-box helper and cover both the blocked-card and ordinary-completed-turn cases with unit tests.
+
 Tool-calling AI messages stay in an `assistant:processing` group, but the
 customer UI must not render their free-form assistant text, raw reasoning, raw
 tool names, Skill names, commands or local paths. `message-list.tsx` mounts
@@ -148,6 +150,14 @@ frozen, while implementation detail remains hidden.
   evidence count, one persistent opt-out action and one all-local-data deletion
   action. The product default enables bounded screen summaries, while file
   watching remains off unless an exact directory is configured.
+  Whole Personal-IP portability and erasure live in the separate
+  `数据与备份` Settings section. Export downloads the versioned credential-free
+  owner backup; restore accepts that file only through the server's
+  same-owner/empty-scope digest verification. Permanent deletion must first
+  fetch a fresh server preview and keep its exact phrase, backup
+  acknowledgement and state digest visible in the confirmation surface.
+  Never implement deletion as a one-click action or cache a confirmation
+  across state changes.
   The Skill catalog is not a customer surface: omit the Skills Settings
   section, Skill autocomplete/chips, agent Skill badges, and internal Skill
   tool/path steps from conversations, subtask timelines, copy and exports.
@@ -155,17 +165,23 @@ frozen, while implementation detail remains hidden.
   execution and persistence remain unchanged.
   Never accept or cache an expanded account record as run authority; the Gateway
   resolves it again for the authenticated owner. Keep the portfolio page a thin
-  subject and account surface: DeerFlow conversation tools create and advance business
+  subject and account surface: subjects may be people, brands, products or
+  organizations, and DeerFlow conversation tools create and advance business
   or video workflows instead of duplicating them as form-heavy applications.
   The account editor contains only subject assignment, platform identity and
   login metadata. Never restore per-account audience, promise, content-pillar,
   voice or business-goal fields: canonical operating strategy is subject-level
-  and versioned. First-use person/business discovery, benchmark research,
-  positioning alternatives, name/avatar/bio decisions and pilot validation
+  and versioned. First-use entity/business discovery, benchmark research,
+  differentiation thesis, positioning alternatives, name/avatar/bio decisions
+  and pilot validation
   belong to the natural Agent conversation and private backend strategy ledger;
   never add a questionnaire, stage-field inspector or “建模完成” shortcut to
   the customer UI. The operating dashboard shows useful business outcomes and
   queues, not private strategy documents or a second editable modeling form.
+  New-chat welcome copy must ask what the user wants to advance, not which
+  account they want to operate. A true first-use customer may start with one
+  goal, topic, script, asset or link and must not be told to create/connect an
+  account until the requested operation actually needs one.
   Video production is task-native rather than a global customer page.
   `personal_ip_begin_video_production` records the current DeerFlow
   `thread_id`; `/workspace/chats/[thread_id]` detects that owner-scoped binding
@@ -275,3 +291,8 @@ When adding features:
    `tests/e2e-real-backend/`
 4. Run `pnpm check` before committing
 5. Update this `AGENTS.md` when architecture, commands, or conventions change
+
+Mock artifact Route Handlers must keep dynamic paths statically anchored below
+`public/demo/threads`, reject traversal segments, and verify the resolved real path
+remains inside the selected thread. Do not resolve a caller-controlled suffix directly
+against `process.cwd()`: that can leak files and makes Next.js trace the whole project.

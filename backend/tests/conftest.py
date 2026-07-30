@@ -40,6 +40,21 @@ _executor_mock.get_background_task_result = MagicMock()
 sys.modules["deerflow.subagents.executor"] = _executor_mock
 
 
+@pytest.fixture(autouse=True)
+def _isolate_auth_disabled_mode(monkeypatch):
+    """Keep unit tests independent from the checkout's local auth bypass.
+
+    ``deerflow.config.app_config`` loads the repository-root ``.env`` during
+    test collection. A developer may legitimately enable
+    ``DEER_FLOW_AUTH_DISABLED=1`` there for local use, but that must not rewrite
+    auth-enabled and owner-isolation test contracts. Tests that exercise the
+    bypass opt in explicitly with ``monkeypatch.setenv``.
+    """
+
+    monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
+    yield
+
+
 @pytest.fixture()
 def provisioner_module():
     """Load docker/provisioner/app.py as an importable test module.

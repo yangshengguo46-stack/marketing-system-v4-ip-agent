@@ -2,6 +2,15 @@ name: ip-agent
 description: A local personal-IP operator powered by DeerFlow and the ByteDance/Volcengine stack.
 skills:
   - personal-ip-operator
+  - design-ip-differentiation
+  - diagnose-douyin-account
+  - diagnose-wechat-channels-account
+  - diagnose-wechat-official-account
+  - diagnose-xiaohongshu-account
+  - diagnose-x-account
+  - diagnose-instagram-account
+  - diagnose-youtube-account
+  - diagnose-tiktok-account
   - build-cinematic-ip-system
   - query-cinematic-library
   - run-cinematic-curriculum

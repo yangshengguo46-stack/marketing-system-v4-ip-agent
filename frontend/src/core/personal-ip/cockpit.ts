@@ -11,7 +11,7 @@ export const PERSONAL_IP_COCKPIT_QUERY_KEY = [
 ] as const;
 
 export const PERSONAL_IP_OPERATING_STAGES = [
-  { id: "modeling", label: "定位与商业验证" },
+  { id: "modeling", label: "影响力方向与商业验证" },
   { id: "preflight", label: "发布前预演" },
   { id: "publishing", label: "发布回执" },
   { id: "performance", label: "实绩回收" },
@@ -41,8 +41,24 @@ export type PersonalIPOperatingStage = {
   [key: string]: number | string;
 };
 
+export type PersonalIPOperationalAlert = {
+  alert_id: string;
+  category: "loop" | "provider" | "cost";
+  severity: "blocking" | "warning";
+  code: string;
+  source_type: string;
+  source_id: string;
+  title: string;
+  action: string;
+  occurred_at?: string;
+  production_id?: string;
+  thread_id?: string;
+  provider?: string;
+  stage?: string;
+};
+
 export type PersonalIPOperatingCockpit = {
-  contract_version: "personal-ip-operating-cockpit-v4";
+  contract_version: "personal-ip-operating-cockpit-v6";
   generated_at: string;
   portfolio: {
     subject_count: number;
@@ -53,9 +69,23 @@ export type PersonalIPOperatingCockpit = {
   stages: Record<PersonalIPOperatingStageId, PersonalIPOperatingStage>;
   queues: {
     subjects_needing_strategy_validation: string[];
+    subjects_needing_differentiation_validation: string[];
     preflights_awaiting_publish: string[];
     published_receipts_awaiting_metrics: string[];
     published_receipts_awaiting_retrospective: string[];
+  };
+  alerts: {
+    summary: {
+      total: number;
+      blocking: number;
+      warning: number;
+      by_category: {
+        loop: number;
+        provider: number;
+        cost: number;
+      };
+    };
+    items: PersonalIPOperationalAlert[];
   };
   recent: Record<string, Array<Record<string, unknown>>>;
   video: {
@@ -70,6 +100,7 @@ export type PersonalIPOperatingCockpit = {
   };
   coverage: {
     history_limit: number;
+    video_alert_detail_limit: number;
     possibly_truncated: string[];
   };
 };
@@ -82,6 +113,12 @@ export function countCockpitPending(
     (total, queue) => total + queue.length,
     0,
   );
+}
+
+export function countOperationalAlerts(
+  cockpit: PersonalIPOperatingCockpit | undefined,
+) {
+  return cockpit?.alerts.summary.total ?? 0;
 }
 
 async function requestCockpit(): Promise<PersonalIPOperatingCockpit> {

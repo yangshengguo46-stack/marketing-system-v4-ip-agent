@@ -2,7 +2,11 @@
 
 ## Evidence classes
 
-- **Experimental** — one benchmark, one post or an unmeasured hypothesis.
+- **General prior** — a behavioral or craft hypothesis with no market or
+  account evidence yet.
+- **Market-referenced hypothesis** — current benchmarks support relevance, but
+  the operated account has not validated it.
+- **Experimental** — one account publication has tested the hypothesis.
 - **Account candidate** — repeated observation on one account, not yet fully
   measured.
 - **Account rule** — at least three distinct complete retrospectives support a
@@ -26,3 +30,9 @@
 Benchmark patterns should fade as the account accumulates its own reliable
 evidence. Retire obsolete rules from the active workbench while preserving
 their version history and the reason for retirement.
+
+Never promote a neurotransmitter, brain-region, mirror-neuron or named
+cognitive-effect explanation from platform metrics. Promote only an observable
+`if—then—because—exceptions—validation_check` claim scoped to audience,
+platform and format. Quality reduces some failure modes; it does not remove
+recommendation, competition, timing or stochastic social uncertainty.

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangleIcon,
   ArrowUpRightIcon,
   BarChart3Icon,
   BotIcon,
@@ -38,11 +39,14 @@ import {
 import {
   buildPersonalIPDashboardView,
   countCockpitPending,
+  countOperationalAlerts,
+  type PersonalIPOperationalAlert,
   PERSONAL_IP_OPERATING_STAGES,
   usePersonalIPAccounts,
   usePersonalIPMetrics,
   usePersonalIPOperatingCockpit,
 } from "@/core/personal-ip";
+import { pathOfThread } from "@/core/threads/utils";
 
 const COMPACT_NUMBER = new Intl.NumberFormat("zh-CN", {
   notation: "compact",
@@ -217,6 +221,80 @@ function PlatformGrowth({
   );
 }
 
+const ALERT_CATEGORY_LABELS: Record<
+  PersonalIPOperationalAlert["category"],
+  string
+> = {
+  loop: "经营闭环",
+  provider: "供应商",
+  cost: "成本",
+};
+
+function OperationalAlerts({
+  alerts,
+}: {
+  alerts: PersonalIPOperationalAlert[];
+}) {
+  if (alerts.length === 0) return null;
+  return (
+    <Card className="border-amber-500/35 bg-amber-500/5">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <AlertTriangleIcon className="size-4 text-amber-600" />
+          运行异常
+        </CardTitle>
+        <CardDescription>
+          只展示可执行的闭环、供应商和成本问题，不包含密钥或供应商原始报错。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 lg:grid-cols-2">
+        {alerts.slice(0, 6).map((alert) => (
+          <div
+            key={alert.alert_id}
+            className="bg-background flex min-w-0 items-start justify-between gap-4 rounded-xl border p-4"
+          >
+            <div className="min-w-0 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant={
+                    alert.severity === "blocking" ? "destructive" : "secondary"
+                  }
+                >
+                  {alert.severity === "blocking" ? "阻塞" : "警告"}
+                </Badge>
+                <Badge variant="outline">
+                  {ALERT_CATEGORY_LABELS[alert.category]}
+                </Badge>
+                {alert.provider && (
+                  <span className="text-muted-foreground text-xs">
+                    {alert.provider}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm font-medium">{alert.title}</p>
+              <p className="text-muted-foreground text-xs leading-5">
+                {alert.action}
+              </p>
+            </div>
+            <Button size="sm" variant="outline" asChild>
+              <Link
+                href={
+                  alert.thread_id
+                    ? pathOfThread(alert.thread_id)
+                    : "/workspace/chats/new"
+                }
+              >
+                处理
+                <ArrowUpRightIcon />
+              </Link>
+            </Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function PersonalIPDashboardPage() {
   const accountsQuery = usePersonalIPAccounts();
   const cockpitQuery = usePersonalIPOperatingCockpit();
@@ -232,6 +310,7 @@ export default function PersonalIPDashboardPage() {
   );
   const cockpit = cockpitQuery.data;
   const pendingCount = countCockpitPending(cockpit);
+  const operationalAlertCount = countOperationalAlerts(cockpit);
   const isLoading =
     accountsQuery.isLoading || cockpitQuery.isLoading || metricsQuery.isLoading;
   const hasError =
@@ -319,6 +398,10 @@ export default function PersonalIPDashboardPage() {
                 部分经营数据暂时无法读取；页面只展示已经取得的真实观测。
               </CardContent>
             </Card>
+          )}
+
+          {cockpit && operationalAlertCount > 0 && (
+            <OperationalAlerts alerts={cockpit.alerts.items} />
           )}
 
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

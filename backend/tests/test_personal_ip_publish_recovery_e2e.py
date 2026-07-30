@@ -5,6 +5,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from support.personal_ip_publish import (
+    compliant_publish_request,
+    compliant_publish_result,
+)
 
 from deerflow.config.database_config import DatabaseConfig
 from deerflow.config.paths import Paths
@@ -81,7 +85,11 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 pending_attempt_key="handoff-1",
                 account_id=account["id"],
                 preflight_id="",
-                request={"caption": "已批准发布", "media_refs": ["artifact://video-1"]},
+                request=compliant_publish_request(
+                    platform,
+                    caption="已批准发布",
+                    media_refs=["artifact://video-1"],
+                ),
             )
         )
         receipt_id = prepared["receipt"]["id"]
@@ -96,7 +104,11 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 pending_attempt_key="handoff-wrong-account",
                 account_id=wrong_account["id"],
                 preflight_id="",
-                request={"caption": "已批准发布", "media_refs": ["artifact://video-1"]},
+                request=compliant_publish_request(
+                    platform,
+                    caption="已批准发布",
+                    media_refs=["artifact://video-1"],
+                ),
             )
         )
         assert conflicting_target["category"] == "invalid_request"
@@ -114,7 +126,10 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 receipt_id=receipt_id,
                 attempt_key="result-before-navigation",
                 status="published",
-                evidence={"confirmation": "点击已返回"},
+                evidence=compliant_publish_result(
+                    prepared["receipt"],
+                    confirmation="点击已返回",
+                ),
                 occurred_at="2026-07-22T05:01:00Z",
                 external_post_id=post_id,
                 external_url="",
@@ -153,7 +168,11 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 pending_attempt_key="handoff-1",
                 account_id=account["id"],
                 preflight_id="",
-                request={"caption": "已批准发布", "media_refs": ["artifact://video-1"]},
+                request=compliant_publish_request(
+                    platform,
+                    caption="已批准发布",
+                    media_refs=["artifact://video-1"],
+                ),
             )
         )
         assert len(replayed_prepare["receipt"]["attempts"]) == 1
@@ -189,7 +208,11 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 pending_attempt_key="handoff-1",
                 account_id=account["id"],
                 preflight_id="",
-                request={"caption": "已批准发布", "media_refs": ["artifact://video-1"]},
+                request=compliant_publish_request(
+                    platform,
+                    caption="已批准发布",
+                    media_refs=["artifact://video-1"],
+                ),
             )
         )
         assert len(replayed_prepare["receipt"]["attempts"]) == 1
@@ -202,7 +225,10 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 receipt_id=receipt_id,
                 attempt_key="result-wrong-platform",
                 status="published",
-                evidence={"confirmation": "错误页面"},
+                evidence=compliant_publish_result(
+                    prepared["receipt"],
+                    confirmation="错误页面",
+                ),
                 occurred_at="2026-07-22T05:03:00Z",
                 external_post_id="wrong-platform",
                 external_url="",
@@ -232,7 +258,11 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 pending_attempt_key="handoff-2",
                 account_id=account["id"],
                 preflight_id="",
-                request={"caption": "已批准发布", "media_refs": ["artifact://video-1"]},
+                request=compliant_publish_request(
+                    platform,
+                    caption="已批准发布",
+                    media_refs=["artifact://video-1"],
+                ),
             )
         )
         assert retried["receipt"]["status"] == "pending"
@@ -244,7 +274,10 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 receipt_id=receipt_id,
                 attempt_key="result-published",
                 status="published",
-                evidence={"confirmation": "public page visible"},
+                evidence=compliant_publish_result(
+                    prepared["receipt"],
+                    confirmation="public page visible",
+                ),
                 occurred_at="2026-07-22T05:05:00Z",
                 external_post_id=post_id,
                 external_url=public_url,
@@ -260,7 +293,10 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 receipt_id=receipt_id,
                 attempt_key="result-published",
                 status="published",
-                evidence={"confirmation": "public page visible"},
+                evidence=compliant_publish_result(
+                    prepared["receipt"],
+                    confirmation="public page visible",
+                ),
                 occurred_at="2026-07-22T05:05:00Z",
                 external_post_id=post_id,
                 external_url=public_url,
@@ -291,7 +327,11 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 pending_attempt_key="handoff-1",
                 account_id=account["id"],
                 preflight_id="",
-                request={"caption": "已批准发布", "media_refs": ["artifact://video-1"]},
+                request=compliant_publish_request(
+                    platform,
+                    caption="已批准发布",
+                    media_refs=["artifact://video-1"],
+                ),
             )
         )
         assert replay_after_success["receipt"]["status"] == "published"

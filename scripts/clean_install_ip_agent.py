@@ -130,11 +130,7 @@ def resolve_tooling() -> Tooling:
         missing.append("pnpm (or corepack)")
         pnpm_command = ()
     if missing:
-        raise SystemDependencyError(
-            "missing required system tools: "
-            + ", ".join(missing)
-            + ". Install Node.js 22+, pnpm/Corepack, uv, Git and Make, then retry."
-        )
+        raise SystemDependencyError("missing required system tools: " + ", ".join(missing) + ". Install Node.js 22+, pnpm/Corepack, uv, Git and Make, then retry.")
     return Tooling(
         python=str(Path(sys.executable).resolve()),
         git=tools["git"] or "",
@@ -145,9 +141,7 @@ def resolve_tooling() -> Tooling:
     )
 
 
-def build_clean_environment(
-    workspace: Path, executable_paths: tuple[str, ...]
-) -> dict[str, str]:
+def build_clean_environment(workspace: Path, executable_paths: tuple[str, ...]) -> dict[str, str]:
     home = workspace / "home"
     cache = workspace / "cache"
     temporary = workspace / "tmp"
@@ -224,18 +218,12 @@ def classify_failure(stage: str, output: str, *, timed_out: bool) -> tuple[str, 
             "docker",
             "Docker is installed but its daemon is unreachable; start Docker and confirm `docker info` succeeds.",
         )
-    if any(
-        marker in lowered
-        for marker in ("permission denied", "operation not permitted", "eacces")
-    ):
+    if any(marker in lowered for marker in ("permission denied", "operation not permitted", "eacces")):
         return (
             "permission",
             "The clean room lacks permission for the reported path or executable; fix that exact ownership/permission without using a broad recursive chmod.",
         )
-    if (
-        "doesn't have a source distribution or wheel for the current platform"
-        in lowered
-    ):
+    if "doesn't have a source distribution or wheel for the current platform" in lowered:
         return (
             "python_abi_compatibility",
             "The selected Python ABI is unsupported by a locked dependency. Confirm the packaged .python-version is honored, or update the dependency/platform constraint before retrying.",
@@ -356,20 +344,13 @@ def _assert_pristine_source_tree(root: Path) -> None:
         if any(part in FORBIDDEN_PARTS for part in relative.parts):
             forbidden.append(relative.as_posix())
             continue
-        if (
-            path.is_file()
-            and path.name.startswith(".env.")
-            and path.name != ".env.example"
-        ):
+        if path.is_file() and path.name.startswith(".env.") and path.name != ".env.example":
             forbidden.append(relative.as_posix())
     for filename in RUNTIME_ROOT_FILES:
         if (root / filename).exists():
             forbidden.append(filename)
     if forbidden:
-        raise RuntimeError(
-            "extracted source archive contains forbidden local/runtime data: "
-            + ", ".join(sorted(set(forbidden))[:20])
-        )
+        raise RuntimeError("extracted source archive contains forbidden local/runtime data: " + ", ".join(sorted(set(forbidden))[:20]))
 
 
 def _extract_archive(archive_path: Path, target: Path, package_root: str) -> Path:
@@ -478,26 +459,14 @@ def _post_install_assertions(root: Path) -> None:
     expected = (
         root / "backend" / ".venv",
         root / "frontend" / "node_modules",
-        root
-        / ".deer-flow"
-        / "toolchains"
-        / "minecontext"
-        / ("Scripts/python.exe" if os.name == "nt" else "bin/python"),
-        root / ".deer-flow" / "USER.md",
-        root / ".deer-flow" / "users" / "default" / "agents" / "ip-agent" / "SOUL.md",
-        root
-        / ".deer-flow"
-        / "users"
-        / "default"
-        / "agents"
-        / "ip-agent"
-        / "config.yaml",
+        root / ".deer-flow" / "toolchains" / "minecontext" / ("Scripts/python.exe" if os.name == "nt" else "bin/python"),
+        root / "backend" / ".deer-flow" / "USER.md",
+        root / "backend" / ".deer-flow" / "users" / "default" / "agents" / "ip-agent" / "SOUL.md",
+        root / "backend" / ".deer-flow" / "users" / "default" / "agents" / "ip-agent" / "config.yaml",
     )
     missing = [str(path.relative_to(root)) for path in expected if not path.exists()]
     if missing:
-        raise RuntimeError(
-            f"clean install did not create required runtime paths: {', '.join(missing)}"
-        )
+        raise RuntimeError(f"clean install did not create required runtime paths: {', '.join(missing)}")
 
 
 def _archive_sha256(path: Path) -> str:
@@ -513,9 +482,7 @@ def _create_workspace(requested: Path | None) -> tuple[Path, bool]:
         return Path(tempfile.mkdtemp(prefix="ip-agent-clean-install-")), True
     workspace = requested.resolve()
     if workspace.exists():
-        raise RuntimeError(
-            f"clean-install workspace must not already exist: {workspace}"
-        )
+        raise RuntimeError(f"clean-install workspace must not already exist: {workspace}")
     workspace.mkdir(parents=True)
     return workspace, False
 
@@ -553,11 +520,7 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
     try:
         tooling = resolve_tooling()
         environment = build_clean_environment(workspace, tooling.executable_paths)
-        archive_path = (
-            args.archive.resolve()
-            if args.archive
-            else workspace / "archive" / "ip-agent-source.tar.gz"
-        )
+        archive_path = args.archive.resolve() if args.archive else workspace / "archive" / "ip-agent-source.tar.gz"
         archive_path.parent.mkdir(parents=True, exist_ok=True)
         if args.archive:
             package_command = (
@@ -618,12 +581,8 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
             if spec.name == "dependency_install":
                 _post_install_assertions(extracted_root)
 
-        has_diagnostics = any(
-            stage["status"] == "diagnostic" for stage in report["stages"]
-        )
-        report["status"] = (
-            "passed_with_doctor_diagnostics" if has_diagnostics else "passed"
-        )
+        has_diagnostics = any(stage["status"] == "diagnostic" for stage in report["stages"])
+        report["status"] = "passed_with_doctor_diagnostics" if has_diagnostics else "passed"
     except SystemDependencyError as exc:
         report["status"] = "failed"
         report["failure"] = {
@@ -668,17 +627,13 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--archive", type=Path, help="verify this archive instead of building HEAD"
-    )
+    parser.add_argument("--archive", type=Path, help="verify this archive instead of building HEAD")
     parser.add_argument(
         "--allow-dirty",
         action="store_true",
         help="development-only: package tracked working-tree changes",
     )
-    parser.add_argument(
-        "--workspace", type=Path, help="new directory to use for the isolated install"
-    )
+    parser.add_argument("--workspace", type=Path, help="new directory to use for the isolated install")
     parser.add_argument(
         "--keep-workspace",
         action="store_true",
@@ -689,15 +644,9 @@ def main() -> int:
         type=Path,
         help="write the credential-free JSON acceptance report here",
     )
-    parser.add_argument(
-        "--step-timeout", type=int, default=DEFAULT_STEP_TIMEOUT_SECONDS
-    )
-    parser.add_argument(
-        "--install-timeout", type=int, default=DEFAULT_INSTALL_TIMEOUT_SECONDS
-    )
-    parser.add_argument(
-        "--frontend-timeout", type=int, default=DEFAULT_FRONTEND_TIMEOUT_SECONDS
-    )
+    parser.add_argument("--step-timeout", type=int, default=DEFAULT_STEP_TIMEOUT_SECONDS)
+    parser.add_argument("--install-timeout", type=int, default=DEFAULT_INSTALL_TIMEOUT_SECONDS)
+    parser.add_argument("--frontend-timeout", type=int, default=DEFAULT_FRONTEND_TIMEOUT_SECONDS)
     args = parser.parse_args()
     if min(args.step_timeout, args.install_timeout, args.frontend_timeout) <= 0:
         parser.error("timeouts must be positive seconds")

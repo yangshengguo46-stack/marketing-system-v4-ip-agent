@@ -50,6 +50,8 @@ def _validated_model_contract(
     result = AudiencePreflightResult.model_validate(body.provider_receipt)
     if result.request_digest != request.request_digest:
         raise ValueError("Audience provider receipt does not match its request")
+    if result.audience_basis != request.audience_basis:
+        raise ValueError("Audience provider receipt uses a different audience basis")
     return request, result
 
 

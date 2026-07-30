@@ -1,14 +1,15 @@
 # IP Agent product ledger
 
-This ledger measures whether an ordinary customer can complete the Personal-IP
-operating loop. It is deliberately stricter than source-code completion. A
+This ledger measures whether an ordinary customer can build and operate an IP
+influence asset carried by a person, brand, product or organization. It is
+deliberately stricter than source-code completion. A
 schema, mocked test or configured model is not counted as a finished product
 until its real execution path, evidence and user interaction are usable.
 
 Concrete findings, gates and execution order from the 2026-07-29 audit live in
 [IP_AGENT_AUDIT_REMEDIATION_LEDGER.md](IP_AGENT_AUDIT_REMEDIATION_LEDGER.md).
 
-Last audited: 2026-07-29. The baseline audit began at commit `fd78208`; this
+Last audited: 2026-07-30. The baseline audit began at commit `fd78208`; this
 audit includes the first five parallel work lines through `0578242`, UI-TARS,
 MineContext and the ledger-derived video workbench through `b7df0e9`, plus the
 current acceptance-fix and ledger change set.
@@ -26,7 +27,7 @@ Personal-IP incubation conversation.
 | ---------------------------------------------- | -----: | -------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | DeerFlow and Volcengine foundation             |    10% |      97% | Native DeerFlow runtime; Doubao/Seedream/Seedance routing; vendored MediaKit, UI-TARS and MineContext source; project-local FFmpeg; source archive and clean-room acceptance; minimal paid Seedream/Seedance/Speech route accepted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Real UI-TARS/MineContext OS-permission acceptance, Doubao reasoning/vision acceptance and full customer-machine launch                                                                                                                                                                                                                                                  |
 | Portfolio, accounts and browser login          |    10% |      90% | Eight fixed platform entries; owner/account-isolated Chromium profiles; real Douyin login persisted across restart; automatic dialog close; five-state connection summary and recovery UI                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Full real-account eight-platform acceptance matrix                                                                                                                                                                                                                                                                                                                      |
-| Persona/business modelling and preflight       |    20% |      64% | Immutable strategy versions preserve person evidence, business truth, real benchmark research, two-to-three positioning alternatives, naming/avatar/bio launch package, pilot experiments and validation evidence; monetization-first is the default while influence-first retains reserved monetization paths; HLLM source pin, MineContext evidence and server-owned preflight remain intact                                                                                                                                                                                                                                                                                                                                                                              | Run one real natural incubation end to end with photo/voice consent handling, live benchmark pages, candidate choice, name/handle checks, pilot publication and commercial evidence; then prove the blind-prediction, publish and retrospective calibration loop                                                                                                                                                  |
+| Entity/business modelling and preflight        |    20% |      64% | Immutable strategy v4 versions preserve person/brand/product/organization evidence, an explicit influence/behavioral/economic objective system, real benchmark research, two-to-three positioning alternatives, a bound differentiation thesis, naming/avatar/bio launch package, pilot experiments and validation evidence; HLLM source pin, MineContext evidence and server-owned preflight remain intact                                                                                                                                                                                                                                                                                                                                                                              | Run real natural incubation paths for a person, brand and product with live benchmark pages, candidate choice, launch assets, pilot publication and observed influence/behavioral/economic evidence; then prove the blind-prediction, publish and retrospective calibration loop                                                                                                                                                  |
 | Publishing and receipts                        |    15% |      72% | Immutable publish request; append-only attempts; atomic browser prepare/finish tools; strict eight-platform public-post proof; one-step UI-TARS desktop fallback with approval and sanitized receipts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Real UI-TARS desktop acceptance plus per-platform publish/recovery acceptance                                                                                                                                                                                                                                                                                           |
 | Metrics, retrospectives and evidence promotion |    20% |      70% | Normalized observations; exact snapshot deltas; portfolio aggregate; owner-wide customer workbench with seven-day growth, platform contribution, recent-work ranking and conservative paid-traffic candidates; immutable retrospective and automatic evidence promotion                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Extend verified real collection across the other seven platforms and prove that repeated outcomes promote a reusable topic/script/audience rule without overfitting one post                                                                                                                                                                                             |
 | Video production                               |    15% |      82% | One ledger and workbench; two typed modes; server-validated plan/assets/storyboard/material-inspection/selection/narration/timing/continuity/shot-QA/assembly contracts; recoverable local script-to-delivery acceptance; project-pinned local material-frame and generated-shot QA executors with motion-cadence evidence; non-overwriting motion-compensated 48/60fps candidate tool; deterministic Remotion candidate tool; checked HyperFrames preview path; one real paid Seedream-to-Seedance-to-Speech-to-local-MediaKit/FFmpeg generative production; visible one-shot human trim/save/lock followed by embedded-Agent local re-render, exact QA and immutable delivery receipts; evidence-bound video-pattern and Skill candidate compiler with account/portable scope policy; one real user-owned film measured and installed through `skill_manage` as an enabled experimental per-user Skill | Connect owned/open material search/acquisition; obtain explicit HyperFrames preview approval and render; accept a full multi-shot generative production and one real material-video production; use the installed learned Skill in a new production, publish and retrospect before any promotion claim; exercise cloud MediaKit only if that optional route is retained |
@@ -38,15 +39,16 @@ Weighted score: `9.7 + 9 + 12.8 + 10.8 + 14 + 12.3 + 9.2 = 77.8`, displayed as 7
 
 The product-owned business loop is:
 
-`person evidence -> business model -> real benchmarks -> positioning alternatives -> name/avatar/bio launch package -> pilot -> observed commercial signal -> validated operating strategy -> blind prediction/preflight -> publish receipt -> observed outcome -> retrospective -> evidence promotion -> reusable content rule`
+`entity evidence -> influence/behavioral/economic objective system -> proprietary truth and differentiation thesis -> real contrast benchmarks -> positioning alternatives -> launch package -> pilot -> observed asset and commercial outcomes -> validated operating strategy -> blind prediction/preflight -> publish receipt -> retrospective -> evidence promotion -> reusable content rule`
 
 Before a strategy is validated, customer-facing language may say current
 judgment, candidate direction or pilot plan. It must never say modeling or
 positioning is complete. A large follower target is not an
-operating plan. Default planning starts from buyer, paid problem, credible
-outcome, offer and conversion path; reach, trust, proof and conversion content
-then serve that business design. Influence-first is an explicit user choice,
-not the silent default.
+operating plan. Influence is the common IP asset mechanism, not a mode that
+competes with monetization. Planning states influence, behavioral and economic
+goals separately, with time horizons, priority order, guardrails and explicit
+non-goals. Buyer, paid problem, credible outcome, offer and conversion path
+remain mandatory commercial truth rather than the definition of IP itself.
 
 The subject-level strategy is the only source of person, business, positioning,
 naming, biography, content direction and monetization truth. Platform accounts
@@ -118,12 +120,41 @@ coverage evidence.
 ### P1 — execute and show the loop
 
 - [x] Add immutable strategy snapshots with monotonic stage gates:
-      person evidence -> business model -> three-role benchmark coverage ->
+      entity evidence -> business model -> three-role benchmark coverage ->
       two-to-three positioning alternatives -> naming/avatar/bio launch package
       -> pilot -> commercial signal -> validation.
-- [x] Make monetization-first the default and require buyer, paid problem,
-      offer and conversion path. Influence-first still reserves monetization
-      routes.
+- [x] Make people, brands, products and organizations first-class operated
+      subjects; add immutable `ip-differentiation-thesis-v1` versions and
+      recognition/trust/intent/adoption/conversion/economic/extension
+      observations. Positioning, preflight, account diagnosis, cinematic
+      handoff and the owner-wide cockpit consume the same version.
+- [ ] Accept one real differentiation lineage from candidate through pilot,
+      three complete supportive cross-effect observations and a downstream
+      adoption or economic result before calling it validated.
+- [x] Split first-use orientation from returning-owner recovery. A lightweight
+      server-validated subject/account existence check routes a true new owner
+      directly from the current request without scanning empty operating
+      ledgers. Orientation emits one provisional route plus a
+      person/brand-product/organization-sensitive evidence question; the first
+      answer deterministically advances to target group and core problem. Both
+      turns use zero model, web, Skill or ledger calls; concrete
+      script/asset/link work bypasses them.
+- [x] Upgrade launch pilots and audience preflights to evidence-graded,
+      falsifiable behavior hypotheses with predicted/failure signals,
+      distribution assumptions and uncertainty. Reject viral guarantees and
+      unsupported neural shorthand in formal predictions.
+- [x] Add an owner-scoped, content-first connected-account diagnostic. It
+      compiles direct continue/adjust/new-account decisions from seven content
+      layers, the reach/trust/intent/conversion funnel and current platform
+      evidence; low reach alone cannot trigger a new account and content or
+      commercial observations older than 30 days cannot prove the current
+      operating condition. Eight internal platform Skills retain dated
+      first-party evidence and explicitly mark unpublished ranking weights
+      unknown.
+- [x] Replace the false monetization-first/influence-first product decision
+      with strategy v4's independent influence, behavioral and economic goals,
+      time horizons, priority order, guardrails and explicit non-goals. Keep
+      the old mode column only so historical rows remain readable.
 - [x] Retire the separate identity/expression/reputation subsystem from active
       repositories, API, tools, preflight, context and customer UI; preserve
       only historical migration tables so existing account data is not damaged.
@@ -141,6 +172,8 @@ coverage evidence.
 - [x] Add one owner-scoped operating cockpit shared by the Gateway, user
       workspace and native DeerFlow tool. It joins all six business stages,
       exposes explicit queues and never filters conversation scope by account.
+      Its v6 alert projection surfaces sanitized loop, provider and cost
+      failures from the authoritative receipts and video ledger.
 - [x] Bind Browser Control publication to an immutable pending receipt and
       require a live selected-platform post URL/id before sealing success.
 - [x] Show the six-stage operating line and pending counts in the Personal-IP
@@ -320,6 +353,11 @@ coverage evidence.
 
 - [x] Add a private strategy-director Skill for monetization, proof, benchmark,
       positioning, naming, identity package and capacity-based launch judgment.
+- [x] Add one private differentiation-design Skill for people, brands,
+      products and organizations. It compiles owned truth, alternatives,
+      reason-to-choose/believe, sacrifice, dramatic engine, distinctive
+      encoding and falsifiable tests into the native versioned thesis rather
+      than creating another filesystem ledger.
 - [x] Add a native content-calibration Skill over the existing immutable
       preflight, publication receipt, retrospective and evidence-promotion
       stores. Do not create a second filesystem truth.

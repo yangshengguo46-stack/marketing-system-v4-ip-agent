@@ -9,6 +9,7 @@ from __future__ import annotations
 import sys
 
 import doctor
+import pytest
 
 
 class TestUITarsDoctor:
@@ -587,6 +588,55 @@ class TestCheckFrontendEnv:
         assert result.status == "ok"
 
 
+class TestRuntimeProfiles:
+    def test_local_direct_requires_matching_frontend_and_cors(self, tmp_path):
+        (tmp_path / "frontend").mkdir()
+        (tmp_path / "frontend" / ".env").write_text(
+            "NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8001\nNEXT_PUBLIC_LANGGRAPH_BASE_URL=http://localhost:8001/api\n",
+            encoding="utf-8",
+        )
+        (tmp_path / ".env").write_text(
+            "GATEWAY_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000\n",
+            encoding="utf-8",
+        )
+
+        result = doctor.check_local_direct_routing(tmp_path)
+
+        assert result.status == "ok"
+        assert "3000" in result.detail
+        assert "8001" in result.detail
+
+    def test_local_direct_rejects_proxy_frontend_urls(self, tmp_path):
+        (tmp_path / "frontend").mkdir()
+        (tmp_path / "frontend" / ".env").write_text(
+            "NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:2026\nNEXT_PUBLIC_LANGGRAPH_BASE_URL=http://localhost:2026/api/langgraph\n",
+            encoding="utf-8",
+        )
+        (tmp_path / ".env").write_text(
+            "GATEWAY_CORS_ORIGINS=http://localhost:3000\n",
+            encoding="utf-8",
+        )
+
+        result = doctor.check_local_direct_routing(tmp_path)
+
+        assert result.status == "fail"
+        assert result.fix is not None
+
+    def test_profile_resolution_is_explicit(self, monkeypatch):
+        monkeypatch.delenv("DEERFLOW_RUNTIME_PROFILE", raising=False)
+        assert doctor.resolve_runtime_profile(None) == "local-direct"
+        monkeypatch.setenv("DEERFLOW_RUNTIME_PROFILE", "local-proxy")
+        assert doctor.resolve_runtime_profile(None) == "local-proxy"
+        with pytest.raises(ValueError, match="runtime profile"):
+            doctor.resolve_runtime_profile("mystery")
+
+    def test_optional_capability_is_not_a_health_warning(self):
+        result = doctor.as_optional_capability(doctor.CheckResult("web fetch configured", "warn", "not configured"))
+
+        assert result.status == "skip"
+        assert "optional" in result.detail
+
+
 # ---------------------------------------------------------------------------
 # check_sandbox
 # ---------------------------------------------------------------------------
@@ -787,6 +837,52 @@ class TestIPAgentProductChecks:
         assert "1 user" in results[0].detail
         assert results[1].status == "ok"
         assert "1 persisted" in results[1].detail
+
+    def test_local_state_warns_when_product_agent_is_stale(self, tmp_path, monkeypatch):
+        product_agent = (
+            tmp_path / "product" / "defaults" / "agents" / "ip-agent"
+        )
+        product_agent.mkdir(parents=True)
+        (product_agent / "SOUL.md").write_text("current soul")
+        (product_agent / "config.yaml").write_text("name: ip-agent")
+        state = tmp_path / "state"
+        installed = state / "users" / "user-1" / "agents" / "ip-agent"
+        installed.mkdir(parents=True)
+        (installed / "SOUL.md").write_text("old soul")
+        (installed / "config.yaml").write_text("name: ip-agent")
+        monkeypatch.setenv("DEER_FLOW_HOME", str(state))
+
+        results = doctor.check_ip_agent_local_state(tmp_path)
+
+        assert results[0].status == "warn"
+        assert "1 stale" in results[0].detail
+        assert "make ip-refresh" in (results[0].fix or "")
+
+    def test_local_state_defaults_to_backend_runtime_home(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("DEER_FLOW_HOME", raising=False)
+        product_agent = (
+            tmp_path / "product" / "defaults" / "agents" / "ip-agent"
+        )
+        product_agent.mkdir(parents=True)
+        (product_agent / "SOUL.md").write_text("current soul")
+        (product_agent / "config.yaml").write_text("name: ip-agent")
+        installed = (
+            tmp_path
+            / "backend"
+            / ".deer-flow"
+            / "users"
+            / "default"
+            / "agents"
+            / "ip-agent"
+        )
+        installed.mkdir(parents=True)
+        (installed / "SOUL.md").write_text("current soul")
+        (installed / "config.yaml").write_text("name: ip-agent")
+
+        results = doctor.check_ip_agent_local_state(tmp_path)
+
+        assert results[0].status == "ok"
+        assert "1 user" in results[0].detail
 
 
 # ---------------------------------------------------------------------------

@@ -22,6 +22,11 @@ ByteDance/Volcengine stack as its default capability layer.
   cards.
 - A default `ip-agent` with portfolio-wide coordination, approval and receipt
   rules.
+- Settings → Data & backup provides a credential-free owner export, verified
+  same-owner restore into an empty scope, and strongly confirmed whole-domain
+  deletion. Permanent deletion is never inferred from ordinary conversation:
+  it requires a fresh server preview, backup acknowledgement, the exact
+  confirmation phrase and local-context deletion.
 
 UI-TARS is a default-off, source-auditable local computer organ. DeerFlow calls
 it for one visual desktop step only after native Browser Control cannot finish
@@ -40,6 +45,17 @@ the existing Personal-IP native services. The bundled curriculum CLI is
 read-only and may generate plans or assessment templates, but it cannot create
 a parallel project or completion ledger.
 
+The operating entity may be a person, brand, product or organization. IP is
+modeled as an influence asset rather than a synonym for a creator account:
+the product stores an immutable `ip-differentiation-thesis-v1` lineage with
+the intended public influence, choice field, proprietary truth, reason to
+choose and believe, explicit sacrifice, recurring dramatic engine,
+distinctive encoding and falsifiable validation. Strategy positioning and
+launch work must reference a pilot or adopted differentiation version.
+Recognition, trust, intent, adoption, conversion, economic and extension
+effects are sealed as owner-scoped observations; missing coverage remains
+missing. A product is a first-class subject in the Gateway and portfolio UI.
+
 ## First run
 
 ```bash
@@ -53,6 +69,10 @@ make dev
 
 Choose Volcengine in the setup wizard and place your Ark API key in
 `VOLCENGINE_API_KEY`.
+
+After a source update, `make doctor` reports whether the installed product
+agent is stale. Run `make ip-refresh` to update the managed `ip-agent`
+instructions and configuration without replacing `USER.md`.
 
 To build the pinned AI MediaKit CLI source used by the bundled Skills:
 
@@ -287,6 +307,15 @@ append every attempt with its platform task/post id and result. Operation and
 idempotency keys cannot be reused for different requests; attempt keys cannot
 be rewritten, and a confirmed publication cannot later be downgraded to a
 failure. The selected account is recorded as this operation's target only.
+Every begin request must include `personal-ip-publish-compliance-v1` with the
+commercial relationship, synthetic-media state, sensitive topics, confirmed
+rights, passed moderation and the exact disclosure plan for that platform.
+The server derives the platform from the account and freezes its own
+source-linked policy receipt. A `published` attempt must provide
+`personal-ip-publish-compliance-evidence-v1`, bind it to that receipt and cite
+credential-free proof that every required disclosure was applied. Sensitive
+topics require documented human review; a successful upload alone cannot
+satisfy this gate.
 
 Observed performance enters through `POST /api/personal-ip/metrics`. Use
 `window_total` or `delta` only when the collector knows the exact interval;
@@ -416,12 +445,76 @@ records, summary, coverage and evidence provenance.
 
 ### Operating cockpit and video ledger
 
+For a server-validated empty portfolio and an orientation/incubation request,
+the first visible reply is emitted before any model or tool call: one
+provisional route and one entity-sensitive material question. Concrete
+script/asset/link work bypasses that boundary. On later or non-orientation
+turns, `personal_ip_startup_context` is the lightweight first read; it checks
+only whether the authenticated owner has active subjects or accounts. A true
+`new_owner` must not scan empty strategy, publishing, metric, retrospective or
+video ledgers. A `returning_owner`, a resume request or a portfolio operating
+question proceeds to the complete cockpit.
+
 `GET /api/personal-ip/cockpit` is the shared whole-portfolio read model. It
 joins the durable six-step operating loop—modeling, preflight, publish receipt,
 observed performance, retrospective and evidence promotion—with explicit work
 queues and bounded-history coverage. The native
 `personal_ip_operating_cockpit` tool gives DeerFlow the same view; it never
-takes an account filter.
+takes an account filter. The cockpit also exposes sanitized blocking/warning
+alerts for operating-loop failures, video-provider failures and budget
+rejection/exhaustion. These are projections of existing immutable receipts and
+video events, not a second mutable alert store.
+
+### Content-first account diagnosis
+
+After a user connects an existing account, the Agent can issue a direct
+continue, adjust or new-account conclusion without mistaking platform folklore
+for evidence. `personal_ip_account_diagnostic_context` loads that account's
+latest strategy, published samples, metrics, creator-backend observations,
+commercial outcomes and retrospectives from the authenticated owner stores.
+The account id is only the diagnosis target.
+
+Diagnosis begins with seven observable layers: processing access,
+attention/prediction, emotion/identity, narrative/consumption, social
+transmission, behavior/conversion and platform distribution. It then evaluates
+the operating funnel `reach -> trust -> intent -> conversion`. Platform
+mechanics are a constraint and amplifier: recommendation eligibility, surface
+mix and current rules can explain distribution, but unpublished live weights
+remain unknown and low reach alone can never prove that an account is dead.
+
+`personal_ip_compile_account_diagnosis` enforces the decision gates. Starting a
+new account requires current platform-observed evidence of a persistent
+recommendation restriction, legacy audience-positioning lock,
+identity/business conflict or unrecoverable compliance history. Otherwise weak
+content or conversion produces an adjust-and-retest experiment on the current
+account. Persistent recommendation ineligibility is an internal conservative
+decision gate: the same reason must remain restricted across at least seven
+days, the latest status must be collected within 24 hours and still be
+restricted, and repair or appeal must be exhausted. It is not a claimed
+platform ranking rule. “Self-entertainment” is an operating classification
+only after at least three distinct measured posts and fresh, complete IP-asset
+evidence show that influence, behavioral and economic outcomes all failed.
+If brand recognition, trust, product adoption or an economic outcome succeeds,
+the work is operating an asset even when another outcome is still weak.
+Unmeasured outcomes remain unproven. The 30-day window is an internal
+conservative freshness gate, not a platform rule; this classification is not a
+tone of voice for insulting the user.
+
+Eight internal platform diagnosis Skills cover Douyin, WeChat Channels, WeChat
+Official Accounts, Xiaohongshu, X, Instagram, YouTube and TikTok. Their dated
+references use first-party rules, transparency pages, creator documentation
+and official algorithm filings or source code. They adapt evidence collection
+and surface interpretation while keeping content as the main thesis.
+
+Audience preflight uses `personal-ip-audience-preflight-v2`. Every candidate
+freezes an evidence level, observable mechanism hypotheses, predicted signals,
+failure conditions, distribution assumptions and uncertainty. Formal
+predictions reject viral guarantees and dopamine/mirror-neuron/Zeigarnik
+shortcuts. Platform allocation, audience match, competition, timing and
+stochastic social feedback remain explicit outcome uncertainty. The first
+pilot may preflight with no account history only as
+`cold_start_hypothesis`; its history remains empty and its variants remain
+unmeasured.
 
 Video production uses `personal-ip-video-production-v1`. Begin one immutable
 idea/script request through `personal_ip_begin_video_production`, then append
@@ -431,6 +524,16 @@ selection/review, voice/edit and delivery events through
 model, task id, artifacts and cost without making any provider the workflow
 owner. `personal_ip_read_video_production` resumes from the complete ordered
 ledger; only a successful delivery event marks the project complete.
+For paid providers, freeze `currency`, `hard_limit` and the approval policy in
+that request. Create a paid-call review request and obtain the authenticated
+workbench decision when required, then call
+`personal_ip_reserve_video_budget` before each submission. The server
+atomically rejects any maximum that would make settled spend plus active
+reservations exceed the limit. Bind the provider request to that reservation,
+then settle its authoritative actual cost with
+`personal_ip_settle_video_budget`; failed attempts still count and every retry
+needs a new reservation. Unknown billing leaves the maximum reserved. Use
+`personal_ip_release_video_budget` only when no provider call occurred.
 
 Long-form video, recorded-course, interview and podcast methods use the same
 evidence boundary. Parse and seal a `personal-ip-video-pattern-v1` first, then

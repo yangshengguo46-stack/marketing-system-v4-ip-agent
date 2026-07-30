@@ -3,7 +3,7 @@
 These tests require a working config.yaml with valid API credentials.
 They are skipped in CI and must be run explicitly:
 
-    PYTHONPATH=. uv run pytest tests/test_client_live.py -v -s
+    RUN_DEERFLOW_CLIENT_LIVE=1 PYTHONPATH=. uv run pytest tests/test_client_live.py -v -s
 """
 
 import json
@@ -17,14 +17,18 @@ from deerflow.sandbox.security import is_host_bash_allowed
 from deerflow.uploads.manager import PathTraversalError
 
 # Skip entire module in CI or when no config.yaml exists
-_skip_reason = None
+_skip_reason: str | None = None
 if os.environ.get("CI"):
     _skip_reason = "Live tests skipped in CI"
+elif os.environ.get("RUN_DEERFLOW_CLIENT_LIVE") != "1":
+    _skip_reason = "Set RUN_DEERFLOW_CLIENT_LIVE=1 to run this real-model test"
 elif not Path(__file__).resolve().parents[2].joinpath("config.yaml").exists():
     _skip_reason = "No config.yaml found — live tests require valid API credentials"
 
-if _skip_reason:
-    pytest.skip(_skip_reason, allow_module_level=True)
+pytestmark = pytest.mark.skipif(
+    _skip_reason is not None,
+    reason=_skip_reason or "Live client tests are enabled",
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures

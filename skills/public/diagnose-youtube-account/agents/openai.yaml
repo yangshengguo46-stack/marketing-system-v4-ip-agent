@@ -1,0 +1,4 @@
+interface:
+  display_name: "YouTube账号诊断"
+  short_description: "基于内容、漏斗与平台证据判断YouTube账号去留"
+  default_prompt: "Use $diagnose-youtube-account to diagnose this YouTube account from current evidence."

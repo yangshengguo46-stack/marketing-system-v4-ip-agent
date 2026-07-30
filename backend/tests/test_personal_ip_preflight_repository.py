@@ -30,16 +30,34 @@ def _model_request(*, title: str = "待发布内容") -> AudiencePreflightReques
     return AudiencePreflightRequest(example=example, variant_count=2)
 
 
+def _variant(variant_id: str, text: str) -> dict:
+    return {
+        "variant_id": variant_id,
+        "text": text,
+        "evidence_level": "account_history_conditioned",
+        "mechanism_hypotheses": [
+            {
+                "layer": "attention_prediction",
+                "claim": "目标人群识别到相关问题后更可能继续观看",
+                "predicted_signal": "首段继续观看比例提高",
+                "failure_condition": "目标人群无法复述内容承诺",
+            }
+        ],
+        "distribution_assumptions": ["平台分发给相关兴趣人群"],
+        "uncertainty": "历史表现不能保证本次结果",
+    }
+
+
 def _model_result(request: AudiencePreflightRequest) -> AudiencePreflightResult:
     return AudiencePreflightResult(
         provider="hllm-lite",
         model_version="doubao-test",
-        algorithm_version="doubao-profile-conditioned-v0",
+        algorithm_version="doubao-behavioral-hypothesis-v1",
         request_digest=request.request_digest,
         audience_basis="aggregate_account_cohort",
         variants=[
-            {"variant_id": "v1", "text": "候选一"},
-            {"variant_id": "v2", "text": "候选二"},
+            _variant("v1", "候选一"),
+            _variant("v2", "候选二"),
         ],
         warnings=["no learned score"],
     )
@@ -138,5 +156,16 @@ async def test_preflight_rejects_foreign_operation_targets_and_receipts(tmp_path
             target_account_ids=[],
             request=request,
             result=wrong_result,
+        )
+
+    wrong_basis = _model_result(request).model_copy(update={"audience_basis": "cold_start_hypothesis"})
+    with pytest.raises(ValueError, match="different audience basis"):
+        await preflights.seal(
+            owner_user_id="user-1",
+            operation_key="preflight:wrong-basis",
+            subject_ids=[],
+            target_account_ids=[],
+            request=request,
+            result=wrong_basis,
         )
     await close_engine()

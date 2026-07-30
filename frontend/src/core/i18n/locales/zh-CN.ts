@@ -65,9 +65,9 @@ export const zhCN: Translations = {
 
   // Welcome
   welcome: {
-    greeting: "今天想经营哪个账号？",
+    greeting: "今天想先推进哪件事？",
     description:
-      "告诉我账号和目标，或者直接丢一个选题、脚本、素材或链接。IP Agent 会完成研究、创作、视频、电脑操作、发布准备和复盘，需要你决定时再请你确认。",
+      "说出你现在的目标，或者直接丢一个选题、脚本、素材或链接。第一次使用不必先建账号，IP Agent 会从当前任务开始，需要发布、登录或付费时再请你确认。",
 
     createYourOwnSkill: "创建你自己的 Agent SKill",
     createYourOwnSkillDescription:
@@ -652,6 +652,7 @@ export const zhCN: Translations = {
       appearance: "外观",
       channels: "渠道",
       localContext: "本地上下文",
+      personalIPData: "数据与备份",
       memory: "记忆",
       tools: "工具",
       skills: "技能",

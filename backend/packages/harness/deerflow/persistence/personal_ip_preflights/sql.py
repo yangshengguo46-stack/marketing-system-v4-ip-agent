@@ -109,6 +109,8 @@ class PersonalIPPreflightRepository:
         normalized_accounts = _normalized_ids(target_account_ids, field="target_account_ids")
         if result.request_digest != request.request_digest:
             raise ValueError("audience provider receipt does not match its request")
+        if result.audience_basis != request.audience_basis:
+            raise ValueError("audience provider receipt uses a different audience basis")
         request_payload = request.to_payload()
         result_payload = result.model_dump(mode="json")
 

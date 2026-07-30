@@ -7,9 +7,11 @@ from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
 
-OPERATING_COCKPIT_CONTRACT_VERSION = "personal-ip-operating-cockpit-v4"
+OPERATING_COCKPIT_CONTRACT_VERSION = "personal-ip-operating-cockpit-v6"
+STARTUP_CONTEXT_CONTRACT_VERSION = "personal-ip-startup-context-v1"
 _HISTORY_LIMIT = 500
 _RECENT_LIMIT = 20
+_ALERT_DETAIL_LIMIT = 50
 VIDEO_PRODUCTION_STAGES = (
     "intake",
     "blueprint",
@@ -37,6 +39,265 @@ def _project(items: list[dict[str, Any]], fields: tuple[str, ...]) -> list[dict[
     return [{field: item.get(field) for field in fields if field in item} for item in items[:_RECENT_LIMIT]]
 
 
+def _alert(
+    *,
+    alert_id: str,
+    category: str,
+    severity: str,
+    code: str,
+    source_type: str,
+    source_id: str,
+    title: str,
+    action: str,
+    occurred_at: str | None = None,
+    production_id: str | None = None,
+    thread_id: str | None = None,
+    provider: str | None = None,
+    stage: str | None = None,
+) -> dict[str, Any]:
+    item = {
+        "alert_id": alert_id,
+        "category": category,
+        "severity": severity,
+        "code": code,
+        "source_type": source_type,
+        "source_id": source_id,
+        "title": title,
+        "action": action,
+    }
+    optional = {
+        "occurred_at": occurred_at,
+        "production_id": production_id,
+        "thread_id": thread_id,
+        "provider": provider,
+        "stage": stage,
+    }
+    item.update({key: value for key, value in optional.items() if value})
+    return item
+
+
+def _build_operational_alerts(
+    *,
+    receipts: list[dict[str, Any]],
+    metrics: list[dict[str, Any]],
+    platform_observations: list[dict[str, Any]],
+    video_details: list[dict[str, Any]],
+    video_detail_failures: list[str],
+) -> dict[str, Any]:
+    items: list[dict[str, Any]] = []
+    for receipt in receipts:
+        status = str(receipt.get("status") or "")
+        if status not in {"failed", "unknown"}:
+            continue
+        receipt_id = str(receipt.get("id") or "")
+        items.append(
+            _alert(
+                alert_id=f"publish:{receipt_id}:{status}",
+                category="loop",
+                severity="blocking" if status == "failed" else "warning",
+                code="publish_failed" if status == "failed" else "publish_state_unknown",
+                source_type="publish_receipt",
+                source_id=receipt_id,
+                title="发布执行失败" if status == "failed" else "发布结果尚未确认",
+                action="检查该作品的发布回执，修复后重新准备发布。",
+                occurred_at=receipt.get("updated_at") or receipt.get("published_at"),
+            )
+        )
+
+    for source_type, observations, key_fields in (
+        (
+            "metric_observation",
+            metrics,
+            ("receipt_id", "scope", "metric_mode"),
+        ),
+        (
+            "platform_observation",
+            platform_observations,
+            ("account_id", "platform", "dataset"),
+        ),
+    ):
+        latest_by_series: dict[tuple[str, ...], dict[str, Any]] = {}
+        for observation in sorted(
+            observations,
+            key=lambda item: str(item.get("observed_at") or ""),
+            reverse=True,
+        ):
+            series = tuple(str(observation.get(field) or "") for field in key_fields)
+            latest_by_series.setdefault(series, observation)
+        for observation in latest_by_series.values():
+            if observation.get("status") != "unavailable":
+                continue
+            observation_id = str(observation.get("id") or "")
+            items.append(
+                _alert(
+                    alert_id=f"{source_type}:{observation_id}:unavailable",
+                    category="loop",
+                    severity="warning",
+                    code="collection_unavailable",
+                    source_type=source_type,
+                    source_id=observation_id,
+                    title="经营数据采集不可用",
+                    action="重新登录对应平台账号并再次采集；缺失数据不会按零计算。",
+                    occurred_at=observation.get("observed_at"),
+                )
+            )
+
+    for production_id in video_detail_failures:
+        items.append(
+            _alert(
+                alert_id=f"video:{production_id}:detail-unavailable",
+                category="loop",
+                severity="warning",
+                code="video_state_unavailable",
+                source_type="video_production",
+                source_id=production_id,
+                production_id=production_id,
+                title="视频任务状态读取失败",
+                action="刷新工作台；若持续失败，检查 Gateway 和数据库健康状态。",
+            )
+        )
+
+    for production in video_details:
+        production_id = str(production.get("id") or "")
+        thread_id = str(production.get("thread_id") or "") or None
+        actionable_event_found = False
+        events = production.get("events") or []
+        for index, event in enumerate(events):
+            status = str(event.get("status") or "")
+            if status not in {"failed", "rejected"}:
+                continue
+            event_id = str(event.get("id") or event.get("event_key") or "")
+            event_type = str(event.get("event_type") or "")
+            provider = str(event.get("provider") or "")
+            common = {
+                "source_type": "video_event",
+                "source_id": event_id,
+                "occurred_at": event.get("occurred_at"),
+                "production_id": production_id,
+                "thread_id": thread_id,
+                "stage": event.get("stage"),
+            }
+            later_events = events[index + 1 :]
+            if event_type == "budget_reservation_rejected" and provider == "deerflow_budget_guard":
+                if any(later.get("event_type") == "budget_reserved" and later.get("entity_type") == event.get("entity_type") and later.get("entity_id") == event.get("entity_id") for later in later_events):
+                    continue
+                actionable_event_found = True
+                items.append(
+                    _alert(
+                        alert_id=f"cost:{event_id}",
+                        category="cost",
+                        severity="blocking",
+                        code="budget_reservation_rejected",
+                        title="付费调用被预算守卫拒绝",
+                        action="检查剩余预算和未结算预留；调整方案后用新的尝试键重试。",
+                        provider=provider or None,
+                        **common,
+                    )
+                )
+            elif provider not in {"", "deerflow_budget_guard", "human-workbench"}:
+                if any(later.get("status") == "succeeded" and later.get("provider") == provider and later.get("entity_type") == event.get("entity_type") and later.get("entity_id") == event.get("entity_id") for later in later_events):
+                    continue
+                actionable_event_found = True
+                items.append(
+                    _alert(
+                        alert_id=f"provider:{event_id}",
+                        category="provider",
+                        severity="blocking",
+                        code="provider_execution_failed",
+                        title="视频供应商执行失败",
+                        action="检查供应商可用性和回执，修复后从失败镜头继续。",
+                        provider=provider,
+                        **common,
+                    )
+                )
+
+        budget = production.get("budget_state")
+        if isinstance(budget, dict) and production.get("status") not in {"completed", "cancelled"} and budget.get("available") == 0:
+            items.append(
+                _alert(
+                    alert_id=f"cost:{production_id}:exhausted",
+                    category="cost",
+                    severity="warning",
+                    code="budget_exhausted",
+                    source_type="video_production",
+                    source_id=production_id,
+                    production_id=production_id,
+                    thread_id=thread_id,
+                    title="视频预算已全部使用或占用",
+                    action="先结算或释放未完成预留；当前不会继续发起付费调用。",
+                    occurred_at=production.get("updated_at"),
+                    stage=production.get("current_stage"),
+                )
+            )
+        if production.get("status") == "blocked" and not actionable_event_found:
+            items.append(
+                _alert(
+                    alert_id=f"video:{production_id}:blocked",
+                    category="loop",
+                    severity="blocking",
+                    code="video_production_blocked",
+                    source_type="video_production",
+                    source_id=production_id,
+                    production_id=production_id,
+                    thread_id=thread_id,
+                    title="视频生产流程被阻塞",
+                    action="打开该视频任务，处理当前阶段失败后继续。",
+                    occurred_at=production.get("updated_at"),
+                    stage=production.get("current_stage"),
+                )
+            )
+
+    items.sort(
+        key=lambda item: (
+            item.get("occurred_at") or "",
+            item["alert_id"],
+        ),
+        reverse=True,
+    )
+    category_counts = Counter(item["category"] for item in items)
+    return {
+        "summary": {
+            "total": len(items),
+            "blocking": sum(item["severity"] == "blocking" for item in items),
+            "warning": sum(item["severity"] == "warning" for item in items),
+            "by_category": {
+                "loop": category_counts["loop"],
+                "provider": category_counts["provider"],
+                "cost": category_counts["cost"],
+            },
+        },
+        "items": items[:_RECENT_LIMIT],
+    }
+
+
+class PersonalIPStartupContextService:
+    """Distinguish a true cold start without scanning workflow ledgers."""
+
+    def __init__(self, *, subjects, accounts) -> None:
+        self._subjects = subjects
+        self._accounts = accounts
+
+    async def build(self, *, owner_user_id: str) -> dict[str, Any]:
+        owner = str(owner_user_id or "").strip()
+        if not owner:
+            raise ValueError("owner_user_id is required")
+        subjects, accounts = await asyncio.gather(
+            self._subjects.list(owner, include_archived=False),
+            self._accounts.list(owner, include_archived=False),
+        )
+        is_new_owner = not subjects and not accounts
+        return {
+            "contract_version": STARTUP_CONTEXT_CONTRACT_VERSION,
+            "experience": "new_owner" if is_new_owner else "returning_owner",
+            "portfolio": {
+                "subject_count": len(subjects),
+                "account_count": len(accounts),
+            },
+            "should_read_operating_cockpit": not is_new_owner,
+            "next_step": "respond_to_current_request" if is_new_owner else "resume_operating_state",
+        }
+
+
 class PersonalIPOperatingCockpitService:
     """Join immutable workflow ledgers into one customer-facing cockpit."""
 
@@ -46,6 +307,7 @@ class PersonalIPOperatingCockpitService:
         subjects,
         accounts,
         brand,
+        differentiation,
         preflights,
         publish_receipts,
         metrics,
@@ -57,6 +319,7 @@ class PersonalIPOperatingCockpitService:
         self._subjects = subjects
         self._accounts = accounts
         self._brand = brand
+        self._differentiation = differentiation
         self._preflights = preflights
         self._publish_receipts = publish_receipts
         self._metrics = metrics
@@ -73,6 +336,8 @@ class PersonalIPOperatingCockpitService:
             subjects,
             accounts,
             strategies,
+            differentiation_versions,
+            asset_observations,
             preflights,
             receipts,
             metrics,
@@ -84,6 +349,8 @@ class PersonalIPOperatingCockpitService:
             self._subjects.list(owner, include_archived=False),
             self._accounts.list(owner, include_archived=False),
             self._brand.list_strategies(owner, limit=_HISTORY_LIMIT),
+            self._differentiation.list_versions(owner, limit=_HISTORY_LIMIT),
+            self._differentiation.list_observations(owner, limit=_HISTORY_LIMIT),
             self._preflights.list(owner, limit=_HISTORY_LIMIT),
             self._publish_receipts.list(owner, limit=_HISTORY_LIMIT),
             self._metrics.list(owner, limit=_HISTORY_LIMIT),
@@ -92,6 +359,28 @@ class PersonalIPOperatingCockpitService:
             self._evidence_promotions.list(owner, limit=_HISTORY_LIMIT),
             self._video_productions.list(owner, limit=_HISTORY_LIMIT),
         )
+        active_video_productions = [production for production in video_productions if production.get("status") in {"draft", "running", "awaiting_review", "blocked"}][:_ALERT_DETAIL_LIMIT]
+        video_detail_results = await asyncio.gather(
+            *(
+                self._video_productions.get(
+                    str(production["id"]),
+                    owner_user_id=owner,
+                )
+                for production in active_video_productions
+            ),
+            return_exceptions=True,
+        )
+        video_details: list[dict[str, Any]] = []
+        video_detail_failures: list[str] = []
+        for production, result in zip(
+            active_video_productions,
+            video_detail_results,
+            strict=True,
+        ):
+            if isinstance(result, Exception) or result is None:
+                video_detail_failures.append(str(production["id"]))
+            else:
+                video_details.append(result)
 
         latest_strategy_by_subject: dict[str, dict[str, Any]] = {}
         for strategy in strategies:
@@ -99,9 +388,20 @@ class PersonalIPOperatingCockpitService:
             if key and key not in latest_strategy_by_subject:
                 latest_strategy_by_subject[key] = strategy
         validated_strategy_subject_ids = {subject_id for subject_id, strategy in latest_strategy_by_subject.items() if strategy.get("stage") in {"commercial_signal_observed", "scaling"}}
+        latest_differentiation_by_subject: dict[str, dict[str, Any]] = {}
+        for version in differentiation_versions:
+            key = str(version.get("subject_id") or "")
+            if key and key not in latest_differentiation_by_subject:
+                latest_differentiation_by_subject[key] = version
+        validated_differentiation_subject_ids = {subject_id for subject_id, version in latest_differentiation_by_subject.items() if version.get("status") == "validated"}
         subjects_needing_strategy = sorted(str(subject["id"]) for subject in subjects if str(subject.get("id")) not in latest_strategy_by_subject)
         subjects_needing_strategy_validation = sorted(str(subject["id"]) for subject in subjects if str(subject.get("id")) not in validated_strategy_subject_ids)
+        subjects_needing_differentiation = sorted(str(subject["id"]) for subject in subjects if str(subject.get("id")) not in latest_differentiation_by_subject)
+        subjects_needing_differentiation_validation = sorted(str(subject["id"]) for subject in subjects if str(subject.get("id")) not in validated_differentiation_subject_ids)
+        modeling_pending_subject_ids = sorted(set(subjects_needing_strategy_validation) | set(subjects_needing_differentiation_validation))
+        modeling_ready_subject_ids = validated_strategy_subject_ids & validated_differentiation_subject_ids
         strategy_stage_counts = Counter(str(strategy.get("stage") or "evidence_collecting") for strategy in latest_strategy_by_subject.values())
+        differentiation_status_counts = Counter(str(version.get("status") or "candidate") for version in latest_differentiation_by_subject.values())
         receipt_preflight_ids = {str(receipt.get("preflight_id")) for receipt in receipts if receipt.get("preflight_id")}
         preflights_awaiting_publish = sorted(preflight["id"] for preflight in preflights if preflight.get("status") == "sealed" and preflight.get("id") not in receipt_preflight_ids)
         published_receipts = [receipt for receipt in receipts if receipt.get("status") == "published"]
@@ -117,6 +417,8 @@ class PersonalIPOperatingCockpitService:
 
         histories = {
             "strategies": strategies,
+            "differentiation_versions": differentiation_versions,
+            "asset_observations": asset_observations,
             "preflights": preflights,
             "publish_receipts": receipts,
             "metrics": metrics,
@@ -133,6 +435,13 @@ class PersonalIPOperatingCockpitService:
             for preflight in preflights
         ]
         receipt_summaries = [{**receipt, "attempt_count": len(receipt.get("attempts") or [])} for receipt in receipts]
+        alerts = _build_operational_alerts(
+            receipts=receipts,
+            metrics=metrics,
+            platform_observations=platform_observations,
+            video_details=video_details,
+            video_detail_failures=video_detail_failures,
+        )
         return {
             "contract_version": OPERATING_COCKPIT_CONTRACT_VERSION,
             "generated_at": datetime.now(UTC).isoformat(),
@@ -145,14 +454,21 @@ class PersonalIPOperatingCockpitService:
             "stages": {
                 "modeling": _stage(
                     total=len(subjects),
-                    pending=len(subjects_needing_strategy_validation),
-                    ready=len(validated_strategy_subject_ids),
+                    pending=len(modeling_pending_subject_ids),
+                    ready=len(modeling_ready_subject_ids),
                     subjects_needing_strategy=len(subjects_needing_strategy),
+                    subjects_needing_differentiation=len(subjects_needing_differentiation),
                     launch_packages_ready=strategy_stage_counts["launch_package_ready"],
                     pilots_running=strategy_stage_counts["pilot_running"],
                     commercial_signals_observed=strategy_stage_counts["commercial_signal_observed"],
                     strategies_validated=(strategy_stage_counts["commercial_signal_observed"] + strategy_stage_counts["scaling"]),
                     strategy_versions=len(strategies),
+                    differentiation_versions=len(differentiation_versions),
+                    differentiation_candidates=differentiation_status_counts["candidate"],
+                    differentiation_pilots=differentiation_status_counts["pilot"],
+                    differentiation_provisionally_adopted=differentiation_status_counts["provisionally_adopted"],
+                    differentiation_validated=differentiation_status_counts["validated"],
+                    asset_observations=len(asset_observations),
                 ),
                 "preflight": _stage(
                     total=len(preflights),
@@ -185,10 +501,12 @@ class PersonalIPOperatingCockpitService:
             },
             "queues": {
                 "subjects_needing_strategy_validation": subjects_needing_strategy_validation,
+                "subjects_needing_differentiation_validation": subjects_needing_differentiation_validation,
                 "preflights_awaiting_publish": preflights_awaiting_publish,
                 "published_receipts_awaiting_metrics": published_awaiting_metrics,
                 "published_receipts_awaiting_retrospective": published_awaiting_retrospective,
             },
+            "alerts": alerts,
             "recent": {
                 "strategies": _project(
                     strategies,
@@ -197,7 +515,6 @@ class PersonalIPOperatingCockpitService:
                         "subject_id",
                         "version",
                         "stage",
-                        "mode",
                         "method_version",
                         "person_model",
                         "business_model",
@@ -207,6 +524,40 @@ class PersonalIPOperatingCockpitService:
                         "validation",
                         "content_digest",
                         "created_at",
+                    ),
+                ),
+                "differentiation": _project(
+                    differentiation_versions,
+                    (
+                        "id",
+                        "subject_id",
+                        "version",
+                        "thesis_key",
+                        "status",
+                        "method_version",
+                        "primary_entity",
+                        "decision_context",
+                        "strategic_difference",
+                        "dramatic_engine",
+                        "distinctive_encoding",
+                        "validation_summary",
+                        "content_digest",
+                        "created_at",
+                    ),
+                ),
+                "asset_observations": _project(
+                    asset_observations,
+                    (
+                        "id",
+                        "subject_id",
+                        "differentiation_version_id",
+                        "thesis_key",
+                        "observation_type",
+                        "source",
+                        "observed_at",
+                        "coverage_status",
+                        "measures",
+                        "evidence_digest",
                     ),
                 ),
                 "preflights": _project(
@@ -288,6 +639,7 @@ class PersonalIPOperatingCockpitService:
             },
             "coverage": {
                 "history_limit": _HISTORY_LIMIT,
+                "video_alert_detail_limit": _ALERT_DETAIL_LIMIT,
                 "possibly_truncated": sorted(name for name, items in histories.items() if len(items) >= _HISTORY_LIMIT),
             },
         }

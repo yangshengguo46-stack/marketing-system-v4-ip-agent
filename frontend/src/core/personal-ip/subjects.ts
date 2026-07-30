@@ -11,7 +11,7 @@ export type PersonalIPSubject = {
   id: string;
   owner_user_id: string;
   display_name: string;
-  subject_type: "creator" | "brand" | "organization";
+  subject_type: "creator" | "brand" | "product" | "organization";
   relationship: "self" | "client" | "partner";
   description: string;
   status: "active" | "archived";

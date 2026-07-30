@@ -36,6 +36,11 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > replace the DeerFlow runtime or bind conversations to one account.
 > `make hllm-lite` starts today's local Doubao-backed provider; it does not
 > fabricate ranking scores before outcome-trained calibration exists.
+> Settings also provides a whole Personal-IP data backup, verified empty-scope
+> restore and strongly confirmed permanent deletion. Backups cover every
+> Personal-IP business ledger but deliberately exclude passwords, cookies,
+> encrypted platform tokens and one-use OAuth state; restored platform
+> connections require a fresh login.
 > MineContext is included as complete Apache-2.0 source at official commit
 > `171c7a9ea8091e326ddcf0f10718aa1b58c83c65`. `make install` builds its runtime
 > and new owners start with bounded screen summaries enabled; they can opt out
@@ -53,7 +58,12 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > actually predicted at the time.
 > Publishing operations use separate idempotent receipts with append-only API,
 > UI-TARS, browser or manual attempts; account ids remain operation targets,
-> not conversation permissions. Browser success requires the selected live
+> not conversation permissions. Before execution, every request declares
+> rights, moderation, commercial relationships, synthetic-media use and the
+> exact disclosures required for its target platform. The server freezes a
+> versioned policy receipt; a successful attempt must prove that those
+> disclosures were actually applied. Sensitive-topic content requires
+> documented human review. Browser success also requires the selected live
 > browser to show a post-specific public URL for that platform; creator
 > dashboards and home pages are not publication proof. Run the local-only
 > eight-platform recovery gate with `make personal-ip-publish-acceptance`.
@@ -110,17 +120,47 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > may appear only as a clearly dated fallback after a current read fails. The
 > conversation shows customer-safe progress such as “正在读取账号的最新数据”
 > while keeping raw tool names, Skill names and private reasoning hidden.
+> Connected-account diagnosis is content-first. The Agent evaluates seven
+> observable content layers and the reach/trust/intent/conversion funnel before
+> treating platform mechanics as eligibility constraints or distribution
+> amplifiers. Low reach alone cannot trigger a new-account recommendation;
+> starting over requires current platform-observed structural evidence. Eight
+> internal platform adapters retain dated first-party sources and leave
+> unpublished ranking weights explicitly unknown. Operating classifications
+> use content and commercial observations from the last 30 days so old results
+> cannot masquerade as the account's current condition.
 >
-> The Personal-IP workspace now reads one whole-portfolio operating cockpit.
-> Before the first active identity, the private operating truth progresses
-> through person evidence → business model → real benchmarks → positioning
+> A new Personal-IP conversation first reads a lightweight startup context
+> containing only active subject/account existence. A true new owner starts
+> from the current request without scanning empty publishing, metric,
+> retrospective or video ledgers; returning owners and resume/portfolio work
+> use the whole-portfolio operating cockpit. When that new owner is asking how
+> to start or position an IP, the server produces the first reply with zero
+> model/provider calls, web research, Skill loading or benchmark selection. It
+> gives a provisional route and asks one material question matched to a person,
+> brand/product or organization. After that answer, a second deterministic
+> question narrows the target group and core problem, still without a model
+> call; the normal incubation model path begins only after both facts are known.
+> Concrete supplied scripts, assets and links remain directly executable.
+> IP is treated as an influence asset for a person, brand, product or
+> organization: attributable public expectations that can change attention,
+> trust, choice or action. Reach is distribution, not the asset. The private
+> operating truth progresses through entity evidence → business model → real
+> benchmarks → an evidence-bound differentiation thesis → positioning
 > alternatives → name/avatar/bio launch package → pilot → observed commercial
-> signal → validated identity. Monetization-first is the default; an explicit
-> influence-first choice still reserves compatible monetization paths. A short
+> or adoption signal → validated operating direction. The differentiation
+> thesis freezes intended influence, alternatives, proprietary truth, reason
+> to choose and believe, explicit sacrifice, a recurring dramatic engine,
+> distinctive verbal/visual/sonic/behavioral encoding and falsifiable tests.
+> Influence is the common asset mechanism, never a mode competing with
+> monetization. Strategy v4 records influence, behavioral and economic goals
+> separately with time horizons, priority order, guardrails and explicit
+> non-goals. A short
 > self-description can save only a draft and can never claim “建模完成”.
-> The continuing loop is identity → expression intent → preflight → publish
+> The continuing loop is differentiation → expression intent → preflight → publish
 > receipt → observed performance → audience feedback → retrospective →
-> evidence promotion → next identity version. Identity and content strategy are versioned at the
+> recognition/trust/intent/adoption/economic observation → evidence promotion →
+> next version. Differentiation and content strategy are versioned at the
 > subject level. Accounts now contain only platform execution/login identity,
 > so eight platforms do not create eight competing personas. DeerFlow can read the same state through
 > a native tool, so account ids remain operation targets rather than chat
@@ -152,7 +192,12 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > assets, storyboard, shot jobs and retries, consistency, selection, finishing
 > and delivery. The request is immutable and every provider/model/task/cost or
 > human-review outcome is an append-only receipt; successful delivery is the
-> only completion signal. `make video-e2e-local` provides a credential-free,
+> only completion signal. Paid calls are admitted against the immutable hard
+> limit before provider submission: each attempt reserves its maximum
+> atomically, actual cost accumulates on success or failure, unknown cost keeps
+> the reservation occupied, and a retry needs a new reservation. Concurrent
+> calls cannot overbook the balance, and a reservation can be released only
+> when the provider was never called. `make video-e2e-local` provides a credential-free,
 > resumable end-to-end acceptance that uses the pinned local MediaKit/FFmpeg
 > toolchain, re-hashes every successful output and requires probe/spec/full-
 > decode QA before delivery. `make video-e2e-paid-checkpoints` only writes the
@@ -492,7 +537,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed Docker development guide.
 
 If you prefer running services locally:
 
-Prerequisite: complete the "Configuration" steps above first (`make setup`). `make dev` requires a valid `config.yaml` in the project root. Set `DEER_FLOW_PROJECT_ROOT` to define that root explicitly, or `DEER_FLOW_CONFIG_PATH` to point at a specific config file. Runtime state defaults to `.deer-flow` under the project root and can be moved with `DEER_FLOW_HOME`; skills default to `skills/` under the project root and can be moved with `DEER_FLOW_SKILLS_PATH`. Run `make doctor` to verify your setup before starting.
+Prerequisite: complete the "Configuration" steps above first (`make setup`). `make dev` requires a valid `config.yaml` in the project root. Set `DEER_FLOW_PROJECT_ROOT` to define that root explicitly, or `DEER_FLOW_CONFIG_PATH` to point at a specific config file. The local source launcher stores Gateway runtime state in `backend/.deer-flow` by default and it can be moved with `DEER_FLOW_HOME`; project-local toolchains remain under the root `.deer-flow`. Skills default to `skills/` under the project root and can be moved with `DEER_FLOW_SKILLS_PATH`. Run `make doctor` to verify your setup before starting.
+After updating a source checkout, run `make ip-refresh` when `make doctor`
+reports a stale product IP Agent. This refreshes the managed `ip-agent`
+instructions/config while preserving the owner's `USER.md`.
+On a trusted development machine without host nginx, the supported
+`local-direct` profile uses `make doctor` and `make dev-direct`, then opens
+`http://localhost:3000`. `make dev` remains the nginx-backed `local-proxy`
+profile at `http://localhost:2026`; production uses managed ingress or the
+bundled Docker stack. See [docs/RUNTIME_PROFILES.md](docs/RUNTIME_PROFILES.md).
 On Windows, run the local development flow from Git Bash. Native `cmd.exe` and PowerShell shells are not supported for the bash-based service scripts, and WSL is not guaranteed because some scripts rely on Git for Windows utilities such as `cygpath`.
 
 1. **Check prerequisites**:
@@ -895,7 +948,7 @@ Tools follow the same philosophy. DeerFlow comes with a core toolset — web sea
 
 Advanced deployments can also extend the agent runtime itself by declaring zero-argument `AgentMiddleware` classes under `extensions.middlewares` in `config.yaml` or `extensions_config.json`. DeerFlow loads the same configured class list into the lead-agent and subagent pipelines after their built-in runtime middlewares and loop/token guards, but before the terminal-response/safety/clarification tail, so enterprise forks can add domain guardrails, tool-call governance, or observability hooks without patching the built-in middleware builders. Missing packages, invalid classes, and broken modules fail loudly at agent creation. Treat `config.yaml` and `extensions_config.json` as trusted operator-controlled files: middleware paths are code execution, just like custom tool, model, sandbox, guardrail, MCP server, and MCP interceptor declarations. Gateway skill/MCP toggle endpoints preserve this field but do not expose an API write path for `extensions.middlewares`. Per-context parameterization and separate lead-only/subagent-only middleware lists are not supported yet.
 
-Gateway-generated follow-up suggestions now normalize both plain-string model output and block/list-style rich content before parsing the JSON array response, so provider-specific content wrappers do not silently drop suggestions.
+Gateway-generated follow-up suggestions now normalize both plain-string model output and block/list-style rich content before parsing the JSON array response, so provider-specific content wrappers do not silently drop suggestions. The Web UI does not request these suggestions while an unanswered human-input card is open, because that card already owns the next user decision.
 
 The Web UI composer can polish draft input before sending. The rewrite runs as a short Gateway LLM request using the `input_polish` model configuration, keeps slash skill prefixes such as `/data-analysis`, and only replaces the local draft after the user clicks the polish button; it does not create a thread run or persist a message.
 

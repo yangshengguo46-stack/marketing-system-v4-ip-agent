@@ -39,6 +39,41 @@ from deerflow.tools.builtins.personal_ip_workflow_tools import (
 from deerflow.tools.tools import BUILTIN_TOOLS
 
 
+def _variant(variant_id: str, text: str) -> dict:
+    return {
+        "variant_id": variant_id,
+        "text": text,
+        "evidence_level": "account_history_conditioned",
+        "mechanism_hypotheses": [
+            {
+                "layer": "attention_prediction",
+                "claim": "目标人群识别到相关问题后更可能继续观看",
+                "predicted_signal": "首段继续观看比例提高",
+                "failure_condition": "目标人群无法复述内容承诺",
+            }
+        ],
+        "distribution_assumptions": ["平台分发给相关兴趣人群"],
+        "uncertainty": "历史表现不能保证本次结果",
+    }
+
+
+def _pilot_differentiation():
+    return SimpleNamespace(
+        get_version=AsyncMock(
+            return_value={
+                "id": "difference-1",
+                "method_version": "ip-differentiation-thesis-v1",
+                "status": "pilot",
+                "primary_entity": {"entity_type": "product", "name": "IP Agent"},
+                "decision_context": {"target_publics": ["经营者"]},
+                "strategic_difference": {"reason_to_choose": "经营证据闭环"},
+                "dramatic_engine": {"recurring_choice": "公开真实结果还是包装成功"},
+                "distinctive_encoding": {"invariants": ["真实证据优先"]},
+            }
+        )
+    )
+
+
 def test_personal_ip_workflow_tools_are_native_with_policy_promotion() -> None:
     tools = [
         personal_ip_run_preflight_tool,
@@ -196,9 +231,23 @@ async def test_run_preflight_uses_strategy_without_local_ids(monkeypatch) -> Non
         get_latest_strategy=AsyncMock(
             return_value={
                 "stage": "launch_package_ready",
+                "differentiation_version_id": "difference-1",
                 "mode": "monetization_first",
                 "person_model": {"values_boundaries": ["不夸大"]},
-                "business_model": {"primary_goal": "获取付费客户"},
+                "business_model": {
+                    "primary_goal": "获取付费客户",
+                    "objective_system": {
+                        "asset_mechanism": "influence",
+                        "influence_goals": [{"goal": "正确归因"}],
+                        "behavioral_goals": [{"behavior": "申请体验"}],
+                        "economic_goals": [{"outcome": "付费订阅"}],
+                        "priority_order": [
+                            "influence",
+                            "behavioral",
+                            "economic",
+                        ],
+                    },
+                },
                 "positioning_candidates": [{"candidate_id": "a", "promise": "经营结果"}],
                 "launch_package": {"selected_candidate_id": "a", "bio_options": ["真实经营"]},
             }
@@ -211,6 +260,7 @@ async def test_run_preflight_uses_strategy_without_local_ids(monkeypatch) -> Non
             publish_receipts=SimpleNamespace(),
             preflights=preflights,
             brand=brand,
+            differentiation=_pilot_differentiation(),
         )
     )
 
@@ -224,7 +274,7 @@ async def test_run_preflight_uses_strategy_without_local_ids(monkeypatch) -> Non
             algorithm_version="lite-v0",
             request_digest=request.request_digest,
             audience_basis="aggregate_account_cohort",
-            variants=[{"variant_id": "variant-1", "text": "候选文案"}],
+            variants=[_variant("variant-1", "候选文案")],
         )
 
     monkeypatch.setattr(
@@ -264,6 +314,83 @@ async def test_run_preflight_uses_strategy_without_local_ids(monkeypatch) -> Non
     assert kwargs["subject_ids"] == ["subject-1"]
     assert kwargs["target_account_ids"] == ["acct-1"]
     assert kwargs["result"].variants[0].variant_id == "variant-1"
+    request_payload = kwargs["request"].to_payload()
+    creator_prompt = request_payload["example"]["prompt2"]
+    assert '"mode":' not in creator_prompt
+    assert '"objective_system":' in creator_prompt
+    assert '"asset_mechanism":"influence"' in creator_prompt
+
+
+@pytest.mark.asyncio
+async def test_run_preflight_supports_a_first_pilot_without_account_history(monkeypatch) -> None:
+    preflights = SimpleNamespace(seal=AsyncMock(return_value={"id": "preflight-cold", "status": "sealed"}))
+    brand = SimpleNamespace(
+        get_latest_strategy=AsyncMock(
+            return_value={
+                "stage": "launch_package_ready",
+                "differentiation_version_id": "difference-1",
+                "mode": "monetization_first",
+                "person_model": {"values_boundaries": ["不夸大"]},
+                "business_model": {"primary_goal": "验证真实需求"},
+                "positioning_candidates": [{"candidate_id": "a", "promise": "记录真实开店"}],
+                "launch_package": {"selected_candidate_id": "a", "bio_options": ["从零开店"]},
+            }
+        )
+    )
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            connections=SimpleNamespace(),
+            metrics=SimpleNamespace(),
+            publish_receipts=SimpleNamespace(),
+            preflights=preflights,
+            brand=brand,
+            differentiation=_pilot_differentiation(),
+        )
+    )
+
+    async def preflight(request):
+        payload = request.to_payload()
+        assert payload["audience_basis"] == "cold_start_hypothesis"
+        assert payload["example"]["title_list"] == []
+        return AudiencePreflightResult(
+            provider="hllm-lite",
+            model_version="doubao-test",
+            algorithm_version="behavioral-hypothesis-v1",
+            request_digest=request.request_digest,
+            audience_basis="cold_start_hypothesis",
+            variants=[
+                {
+                    **_variant("variant-1", "记录第一次选址判断"),
+                    "evidence_level": "unmeasured_hypothesis",
+                }
+            ],
+        )
+
+    monkeypatch.setattr(
+        "deerflow.tools.builtins.personal_ip_workflow_tools._audience_preflight_provider",
+        lambda: SimpleNamespace(preflight=preflight),
+    )
+
+    result = json.loads(
+        await _personal_ip_run_preflight(
+            SimpleNamespace(context={"user_id": "user-1"}),
+            operation_key="preflight:first-pilot",
+            subject_ids=["subject-1"],
+            target_account_ids=[],
+            history=[],
+            target={
+                "content_id": "pilot-1",
+                "title": "第一次选址",
+                "description": "验证真实开店过程是否值得持续看",
+            },
+        )
+    )
+
+    assert result["id"] == "preflight-cold"
+    sealed = preflights.seal.await_args.kwargs
+    assert sealed["target_account_ids"] == []
+    assert sealed["request"].audience_basis == "cold_start_hypothesis"
+    assert sealed["result"].variants[0].evidence_level == "unmeasured_hypothesis"
 
 
 @pytest.mark.asyncio
@@ -281,6 +408,7 @@ async def test_run_preflight_requires_both_local_evidence_purposes(monkeypatch) 
         get_latest_strategy=AsyncMock(
             return_value={
                 "stage": "launch_package_ready",
+                "differentiation_version_id": "difference-1",
                 "mode": "monetization_first",
                 "person_model": {"values_boundaries": ["不夸大"]},
                 "business_model": {"primary_goal": "获取付费客户"},
@@ -296,6 +424,7 @@ async def test_run_preflight_requires_both_local_evidence_purposes(monkeypatch) 
             publish_receipts=SimpleNamespace(),
             preflights=preflights,
             brand=brand,
+            differentiation=_pilot_differentiation(),
             minecontext=minecontext,
         )
     )
@@ -309,7 +438,7 @@ async def test_run_preflight_requires_both_local_evidence_purposes(monkeypatch) 
             algorithm_version="lite-v0",
             request_digest=request.request_digest,
             audience_basis="aggregate_account_cohort",
-            variants=[{"variant_id": "variant-1", "text": "候选文案"}],
+            variants=[_variant("variant-1", "候选文案")],
         )
 
     monkeypatch.setattr(

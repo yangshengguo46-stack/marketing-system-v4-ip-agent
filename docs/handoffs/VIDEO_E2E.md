@@ -137,7 +137,11 @@ for these checkpoints:
 
 Before approval, report exactly four possible paid calls, the table above, and
 that provider cost is unknown until an authoritative provider receipt or billing
-source is available. After approval, execute one checkpoint at a time from its
+source is available. For a new production, freeze a hard limit and reserve each
+checkpoint's maximum in the video ledger before executing it; unknown billing
+keeps that maximum reserved. The 2026-07-23 historical acceptance predates this
+admission receipt and must not be presented as proof of the new budget gate.
+After approval and reservation, execute one checkpoint at a time from its
 recorded `cwd`. Immediately ingest its emitted receipt through
 `personal_ip_ingest_media_execution`; do not rebuild task IDs, request IDs,
 download evidence, errors or cost from console text. For an asynchronous cloud

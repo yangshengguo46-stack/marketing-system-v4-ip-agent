@@ -155,3 +155,5 @@ def test_paid_checkpoints_are_written_without_executing_provider_calls(tmp_path)
         "mediakit-cloud-submit",
     }
     assert all(item["requires_explicit_user_approval"] is True for item in payload["checkpoints"])
+    assert all(item["requires_budget_reservation_before_execution"] is True for item in payload["checkpoints"])
+    assert "personal_ip_settle_video_budget" in payload["after_each_call"]

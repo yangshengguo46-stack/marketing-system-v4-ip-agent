@@ -685,6 +685,7 @@ export const enUS: Translations = {
       appearance: "Appearance",
       channels: "Channels",
       localContext: "Local context",
+      personalIPData: "Data & backup",
       memory: "Memory",
       tools: "Tools",
       skills: "Skills",

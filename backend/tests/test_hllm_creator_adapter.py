@@ -59,6 +59,21 @@ def test_adapter_builds_upstream_parquet_contract_from_aggregate_history() -> No
     assert json.loads(row["user_profile"])["audience_basis"] == "aggregate_account_cohort"
 
 
+def test_adapter_builds_an_explicit_cold_start_example_without_inventing_history() -> None:
+    row = HLLMCreatorAdapter().build_example(
+        history=[],
+        audience_profile={"hypothesis": "可能关心开店过程的本地顾客"},
+        creator_profile={"voice": ["真实", "具体"]},
+        target={"content_id": "pilot-1", "title": "第一次选址", "description": "记录开店选址过程"},
+    )
+
+    profile = json.loads(row["user_profile"])
+    assert profile["audience_basis"] == "cold_start_hypothesis"
+    assert row["title_list"] == []
+    assert row["item_id_list"] == []
+    assert "没有账号历史" in row["prompt1"]
+
+
 def test_adapter_rejects_individual_viewer_identity() -> None:
     adapter = HLLMCreatorAdapter()
 

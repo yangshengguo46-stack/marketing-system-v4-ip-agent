@@ -9,7 +9,8 @@ Core principle: use the real LLM from config.yaml, let config, middleware
 chain, tool registration, file I/O, and event serialization all run for real.
 Only DEER_FLOW_HOME is redirected to tmp_path for filesystem isolation.
 
-Tests that call the LLM are marked ``requires_llm`` and skipped in CI.
+Tests that call the LLM are marked ``requires_llm`` and require explicit
+``RUN_DEERFLOW_CLIENT_E2E=1`` opt-in in addition to valid credentials.
 File-management tests (upload/list/delete) don't need LLM and run everywhere.
 """
 
@@ -33,8 +34,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 # ---------------------------------------------------------------------------
 
 requires_llm = pytest.mark.skipif(
-    os.getenv("CI", "").lower() in ("true", "1") or not os.getenv("OPENAI_API_KEY"),
-    reason="Requires LLM API key — skipped in CI or when OPENAI_API_KEY is unset",
+    os.getenv("CI", "").lower() in ("true", "1") or os.getenv("RUN_DEERFLOW_CLIENT_E2E") != "1" or not os.getenv("OPENAI_API_KEY"),
+    reason="Requires RUN_DEERFLOW_CLIENT_E2E=1 and an LLM API key; skipped in CI",
 )
 
 

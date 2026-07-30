@@ -21,15 +21,15 @@ The delivery path has two explicit stages:
   deploy the full ByteDance architecture as our product cloud service and
   fine-tune it on approved Personal-IP examples.
 
-Both stages implement `personal-ip-audience-preflight-v1`; upgrading the model
+Both stages implement `personal-ip-audience-preflight-v2`; upgrading the model
 does not change DeerFlow, account coordination or evidence receipts.
 
 ```mermaid
 flowchart LR
     D["DeerFlow agent"] --> P["Full owner portfolio"]
-    P --> A["Aggregate cross-platform content and outcomes"]
+    P --> A["Cold-start assumptions or aggregate outcomes"]
     A --> H["HLLM-Creator audience engine"]
-    H --> E["Audience embedding and content match"]
+    H --> E["Revisable audience/content hypotheses"]
     H --> G["Personalized hook/title/angle variants"]
     E --> R["Preflight snapshot"]
     G --> R
@@ -61,10 +61,13 @@ The upstream training row contract is preserved:
 `prompt2`, `response`, `title_list`, `item_id_list`.
 
 `deerflow.personal_ip.hllm_creator.HLLMCreatorAdapter` produces this contract
-from a chronological sequence of published content and aggregate metrics. The
-adapter declares the result as an `aggregate_account_cohort`; it must never
-claim that platform aggregates are person-level click histories. Raw viewer
-ids, handles, contact details and raw comments are rejected at this boundary.
+either from a chronological sequence of published content and aggregate
+metrics, or with an empty history for a first pilot. The former is declared
+`aggregate_account_cohort`; the latter is explicitly
+`cold_start_hypothesis`, keeps the history arrays empty and may emit only
+unmeasured hypotheses. It must never invent account evidence or claim that
+platform aggregates are person-level click histories. Raw viewer ids, handles,
+contact details and raw comments are rejected at this boundary.
 
 An account id may identify the target of a concrete data fetch or publish
 receipt. It never binds a conversation or narrows the agent's portfolio.
@@ -85,10 +88,11 @@ calls a separately deployed HLLM provider. This is still one product and one
 agent—only the heavy numerical runtime is isolated.
 
 `deerflow.personal_ip.audience_provider` owns the stable service boundary. It
-sends only the model-ready aggregate example, requires HTTPS for non-local
-providers, attaches a deterministic idempotency digest, validates match scores
-and rejects a response whose receipt digest does not match the request. Local
-owner, subject and account ids never leave DeerFlow through this contract.
+sends only the model-ready example, requires HTTPS for non-local providers,
+attaches a deterministic idempotency digest, validates the audience basis and
+structured hypotheses, and rejects a response whose receipt digest or audience
+basis does not match the request. Local owner, subject and account ids never
+leave DeerFlow through this contract.
 
 The first service implementation is `app.audience_lite`. Run it locally with
 `make hllm-lite`; it uses the existing `VOLCENGINE_API_KEY`, Ark base URL and

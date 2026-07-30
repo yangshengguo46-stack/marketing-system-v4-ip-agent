@@ -4,6 +4,10 @@ import asyncio
 from datetime import UTC, datetime
 
 import pytest
+from support.personal_ip_publish import (
+    compliant_publish_request,
+    compliant_publish_result,
+)
 
 from deerflow.config.database_config import DatabaseConfig
 from deerflow.persistence.engine import close_engine, get_session_factory, init_engine_from_config
@@ -13,6 +17,24 @@ from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishR
 from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
 from deerflow.personal_ip.audience_provider import AudiencePreflightRequest, AudiencePreflightResult
 from deerflow.personal_ip.hllm_creator import HLLMCreatorAdapter
+
+
+def _variant(variant_id: str, text: str) -> dict:
+    return {
+        "variant_id": variant_id,
+        "text": text,
+        "evidence_level": "account_history_conditioned",
+        "mechanism_hypotheses": [
+            {
+                "layer": "attention_prediction",
+                "claim": "目标人群识别到相关问题后更可能继续观看",
+                "predicted_signal": "首段继续观看比例提高",
+                "failure_condition": "目标人群无法复述内容承诺",
+            }
+        ],
+        "distribution_assumptions": ["平台分发给相关兴趣人群"],
+        "uncertainty": "历史表现不能保证本次结果",
+    }
 
 
 def _preflight_contract() -> tuple[AudiencePreflightRequest, AudiencePreflightResult]:
@@ -38,7 +60,7 @@ def _preflight_contract() -> tuple[AudiencePreflightRequest, AudiencePreflightRe
         algorithm_version="lite-v0",
         request_digest=request.request_digest,
         audience_basis="aggregate_account_cohort",
-        variants=[{"variant_id": "v1", "text": "候选文案"}],
+        variants=[_variant("v1", "候选文案")],
     )
     return request, result
 
@@ -76,7 +98,11 @@ async def test_publish_receipt_is_idempotent_and_keeps_append_only_attempts(tmp_
         account_id=account["id"],
         preflight_id=preflight["id"],
         executor="platform_api",
-        request_payload={"variant_id": "v1", "caption": "候选文案"},
+        request_payload=compliant_publish_request(
+            "douyin",
+            variant_id="v1",
+            caption="候选文案",
+        ),
     )
     replayed = await receipts.begin(
         owner_user_id="user-1",
@@ -85,7 +111,11 @@ async def test_publish_receipt_is_idempotent_and_keeps_append_only_attempts(tmp_
         account_id=account["id"],
         preflight_id=preflight["id"],
         executor="platform_api",
-        request_payload={"variant_id": "v1", "caption": "候选文案"},
+        request_payload=compliant_publish_request(
+            "douyin",
+            variant_id="v1",
+            caption="候选文案",
+        ),
     )
 
     assert replayed == created
@@ -93,6 +123,9 @@ async def test_publish_receipt_is_idempotent_and_keeps_append_only_attempts(tmp_
     assert created["platform"] == "douyin"
     assert created["subject_id"] == subject["id"]
     assert created["attempts"] == []
+    assert created["request"]["compliance_receipt"]["platform"] == "douyin"
+    assert created["request"]["compliance_receipt"]["decision"] == "ready_for_publish"
+    assert len(created["request"]["compliance_receipt"]["receipt_digest"]) == 64
     assert await receipts.get(created["id"], owner_user_id="user-2") is None
 
     pending = await receipts.record_attempt(
@@ -108,7 +141,10 @@ async def test_publish_receipt_is_idempotent_and_keeps_append_only_attempts(tmp_
         owner_user_id="user-1",
         attempt_key="attempt-2",
         status="published",
-        result_payload={"post_id": "post-456"},
+        result_payload=compliant_publish_result(
+            created,
+            post_id="post-456",
+        ),
         external_post_id="post-456",
         external_url="https://www.douyin.com/video/post-456",
         occurred_at=datetime(2026, 7, 21, 8, 1, tzinfo=UTC),
@@ -118,7 +154,10 @@ async def test_publish_receipt_is_idempotent_and_keeps_append_only_attempts(tmp_
         owner_user_id="user-1",
         attempt_key="attempt-2",
         status="published",
-        result_payload={"post_id": "post-456"},
+        result_payload=compliant_publish_result(
+            created,
+            post_id="post-456",
+        ),
         external_post_id="post-456",
         external_url="https://www.douyin.com/video/post-456",
         occurred_at=datetime(2026, 7, 21, 8, 1, tzinfo=UTC),
@@ -170,7 +209,7 @@ async def test_publish_receipt_rejects_foreign_or_out_of_preflight_accounts(tmp_
     outside = await accounts.create(
         owner_user_id="user-1",
         subject_id=subject["id"],
-        platform="bilibili",
+        platform="xiaohongshu",
         display_name="未预演账号",
     )
     foreign = await accounts.create(
@@ -196,7 +235,10 @@ async def test_publish_receipt_rejects_foreign_or_out_of_preflight_accounts(tmp_
             account_id=outside["id"],
             preflight_id=preflight["id"],
             executor="ui_tars",
-            request_payload={"caption": "测试"},
+            request_payload=compliant_publish_request(
+                "xiaohongshu",
+                caption="测试",
+            ),
         )
     with pytest.raises(ValueError, match="selected preflight variant"):
         await receipts.begin(
@@ -206,7 +248,10 @@ async def test_publish_receipt_rejects_foreign_or_out_of_preflight_accounts(tmp_
             account_id=allowed["id"],
             preflight_id=preflight["id"],
             executor="browser",
-            request_payload={"caption": "测试"},
+            request_payload=compliant_publish_request(
+                "douyin",
+                caption="测试",
+            ),
         )
     with pytest.raises(ValueError, match="outside the sealed preflight receipt"):
         await receipts.begin(
@@ -216,7 +261,11 @@ async def test_publish_receipt_rejects_foreign_or_out_of_preflight_accounts(tmp_
             account_id=allowed["id"],
             preflight_id=preflight["id"],
             executor="browser",
-            request_payload={"variant_id": "not-sealed", "caption": "测试"},
+            request_payload=compliant_publish_request(
+                "douyin",
+                variant_id="not-sealed",
+                caption="测试",
+            ),
         )
     with pytest.raises(ValueError, match="target account not found"):
         await receipts.begin(
@@ -226,7 +275,10 @@ async def test_publish_receipt_rejects_foreign_or_out_of_preflight_accounts(tmp_
             account_id=foreign["id"],
             preflight_id=None,
             executor="browser",
-            request_payload={"caption": "测试"},
+            request_payload=compliant_publish_request(
+                "xiaohongshu",
+                caption="测试",
+            ),
         )
     await close_engine()
 
@@ -243,6 +295,16 @@ async def test_publish_receipt_rejects_credentials_and_sanitizes_external_url(tm
         platform="douyin",
         display_name="凭据边界账号",
     )
+    with pytest.raises(ValueError, match="compliance declaration is required"):
+        await receipts.begin(
+            owner_user_id="user-1",
+            operation_key="publish:no-compliance",
+            idempotency_key="idem-no-compliance",
+            account_id=account["id"],
+            preflight_id=None,
+            executor="browser",
+            request_payload={"caption": "未声明"},
+        )
     with pytest.raises(ValueError, match="credential"):
         await receipts.begin(
             owner_user_id="user-1",
@@ -251,7 +313,10 @@ async def test_publish_receipt_rejects_credentials_and_sanitizes_external_url(tm
             account_id=account["id"],
             preflight_id=None,
             executor="browser",
-            request_payload={"cookie": "session=secret"},
+            request_payload=compliant_publish_request(
+                "douyin",
+                cookie="session=secret",
+            ),
         )
     created = await receipts.begin(
         owner_user_id="user-1",
@@ -260,14 +325,29 @@ async def test_publish_receipt_rejects_credentials_and_sanitizes_external_url(tm
         account_id=account["id"],
         preflight_id=None,
         executor="browser",
-        request_payload={"caption": "测试"},
+        request_payload=compliant_publish_request(
+            "douyin",
+            caption="测试",
+        ),
     )
+    with pytest.raises(ValueError, match="compliance_evidence"):
+        await receipts.record_attempt(
+            created["id"],
+            owner_user_id="user-1",
+            attempt_key="attempt-missing-compliance-evidence",
+            status="published",
+            result_payload={"confirmation": "页面显示发布成功"},
+            external_post_id="post-1",
+        )
     published = await receipts.record_attempt(
         created["id"],
         owner_user_id="user-1",
         attempt_key="attempt-safe",
         status="published",
-        result_payload={"confirmation": "页面显示发布成功"},
+        result_payload=compliant_publish_result(
+            created,
+            confirmation="页面显示发布成功",
+        ),
         external_post_id="post-1",
         external_url="https://www.douyin.com/video/post-1?share_token=secret#fragment",
     )
@@ -279,7 +359,10 @@ async def test_publish_receipt_rejects_credentials_and_sanitizes_external_url(tm
             owner_user_id="user-1",
             attempt_key="attempt-cross-platform",
             status="published",
-            result_payload={"confirmation": "伪造跨平台地址"},
+            result_payload=compliant_publish_result(
+                created,
+                confirmation="伪造跨平台地址",
+            ),
             external_post_id="post-1",
             external_url="https://example.com/post/1",
         )
@@ -289,7 +372,10 @@ async def test_publish_receipt_rejects_credentials_and_sanitizes_external_url(tm
             owner_user_id="user-1",
             attempt_key="attempt-leak",
             status="published",
-            result_payload={"access_token": "secret"},
+            result_payload=compliant_publish_result(
+                created,
+                access_token="secret",
+            ),
         )
     await close_engine()
 
@@ -315,7 +401,10 @@ async def test_concurrent_publish_begin_converges_on_one_idempotent_receipt(tmp_
             account_id=account["id"],
             preflight_id=None,
             executor="platform_api",
-            request_payload={"caption": "同一请求"},
+            request_payload=compliant_publish_request(
+                "douyin",
+                caption="同一请求",
+            ),
         )
 
     results = await asyncio.gather(begin_once(), begin_once())

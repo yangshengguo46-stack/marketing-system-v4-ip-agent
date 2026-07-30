@@ -12,6 +12,24 @@ from deerflow.personal_ip.audience_provider import AudiencePreflightRequest, Aud
 from deerflow.personal_ip.hllm_creator import HLLMCreatorAdapter
 
 
+def _variant(variant_id: str, text: str) -> dict:
+    return {
+        "variant_id": variant_id,
+        "text": text,
+        "evidence_level": "account_history_conditioned",
+        "mechanism_hypotheses": [
+            {
+                "layer": "attention_prediction",
+                "claim": "目标人群识别到相关问题后更可能继续观看",
+                "predicted_signal": "首段继续观看比例提高",
+                "failure_condition": "目标人群无法复述内容承诺",
+            }
+        ],
+        "distribution_assumptions": ["平台分发给相关兴趣人群"],
+        "uncertainty": "历史表现不能保证本次结果",
+    }
+
+
 def _payload() -> tuple[dict, AudiencePreflightRequest, AudiencePreflightResult]:
     example = HLLMCreatorAdapter().build_example(
         history=[
@@ -35,7 +53,7 @@ def _payload() -> tuple[dict, AudiencePreflightRequest, AudiencePreflightResult]
         algorithm_version="lite-v0",
         request_digest=request.request_digest,
         audience_basis="aggregate_account_cohort",
-        variants=[{"variant_id": "v1", "text": "候选"}],
+        variants=[_variant("v1", "候选")],
     )
     return (
         {

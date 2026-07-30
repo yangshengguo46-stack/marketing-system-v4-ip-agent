@@ -3,6 +3,7 @@ import { describe, expect, it } from "@rstest/core";
 import {
   abortGoalRequest,
   beginGoalRequest,
+  canRequestFollowupSuggestions,
   canPolishInput,
   createGoalRequestState,
   findSuggestionTemplatePlaceholder,
@@ -61,6 +62,28 @@ describe("parseGoalCommand", () => {
     expect(parseGoalCommand("/goalkeeper do thing")).toBeNull();
     expect(parseGoalCommand("hello")).toBeNull();
     expect(parseGoalCommand("/new")).toBeNull();
+  });
+});
+
+describe("canRequestFollowupSuggestions", () => {
+  it("blocks background model suggestions while a clarification is unanswered", () => {
+    expect(
+      canRequestFollowupSuggestions({
+        disabled: false,
+        isMock: false,
+        hasOpenHumanInput: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("allows suggestions after an ordinary completed response", () => {
+    expect(
+      canRequestFollowupSuggestions({
+        disabled: false,
+        isMock: false,
+        hasOpenHumanInput: false,
+      }),
+    ).toBe(true);
   });
 });
 

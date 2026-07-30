@@ -15,8 +15,12 @@ and one viral post is not a proven rule.
 
 ## Scope the judgment
 
-1. Read the whole-portfolio cockpit, current strategy, relevant account history
-   and recent platform evidence.
+1. For a new conversation, read startup context first. A true new owner has no
+   account-performance evidence: do not scan the full cockpit and label the
+   first recommendation `unmeasured_hypothesis` or
+   `market_referenced_hypothesis`. For returning owners, read the
+   whole-portfolio cockpit, current strategy, relevant account history and
+   recent platform evidence.
 2. Scope every judgment to `subject × account × platform × content format`.
    Cross-account advice is a hypothesis unless independent evidence supports it.
 3. Label inputs as observed, inferred, experimental or promoted. Do not turn
@@ -30,14 +34,17 @@ and one viral post is not a proven rule.
 1. Before publication, run the native immutable preflight against aggregate
    history and the current strategy. Make a falsifiable prediction about the
    content's role, expected audience response, main risk and useful comparison.
+   Every candidate must seal an evidence level, one or more observable
+   mechanism hypotheses, predicted signals, failure conditions,
+   platform-distribution assumptions and uncertainty.
 2. Tie the selected preflight variant to the exact publication receipt. Never
    edit the prediction after outcome data is visible.
 3. At T+3d, T+7d or the platform-appropriate horizon, collect post-level
    metrics and comments with source, time and coverage, then seal the native
    prediction-versus-outcome retrospective.
 4. Diagnose the earliest failed contract: discovery, stop/hold, consumption,
-   trust/proof, intent or conversion. Change one major variable per experiment
-   when causal learning matters.
+   trust/proof, social transmission, intent, conversion or distribution. Change
+   one major variable per experiment when causal learning matters.
 5. Promote a falsifiable audience, content or platform pattern only after at
    least three complete retrospectives from distinct publications support it.
    Promotion is internal and automatic; do not ask the user to approve it.
@@ -57,3 +64,8 @@ generalizing, replacing or retiring a rule.
 - If evidence is weak, give a small experiment instead of false certainty.
 - Preserve failed predictions. They are training evidence, not embarrassing
   records to delete.
+- Never promise virality or infer a neural cause from platform behavior. Use
+  observable layers—processing access, attention/prediction,
+  emotion/identity, narrative consumption, social transmission, behavior
+  conversion and platform distribution. Dopamine, mirror neurons, the
+  Zeigarnik effect and similar labels are not acceptable evidence.

@@ -8,6 +8,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 CORE_SKILLS = {
+    "design-ip-differentiation",
     "ip-strategy-director",
     "ip-content-calibration",
     "video-pattern-learning",
@@ -89,6 +90,35 @@ def test_private_operating_intelligence_is_enabled() -> None:
         skill = ROOT / "skills" / "public" / name / "SKILL.md"
         assert skill.is_file(), name
         assert "TODO" not in skill.read_text(encoding="utf-8")
+
+
+def test_first_use_orientation_precedes_generic_research() -> None:
+    soul = (
+        ROOT / "product" / "defaults" / "agents" / "ip-agent" / "SOUL.md"
+    ).read_text(encoding="utf-8")
+    operator = (
+        ROOT / "skills" / "public" / "personal-ip-operator" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    strategy = (
+        ROOT / "skills" / "public" / "ip-strategy-director" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    research = (
+        ROOT / "skills" / "public" / "deep-research" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    normalized_soul = " ".join(soul.lower().split())
+    assert "material questions without a model or tool call" in normalized_soul
+    assert "target group and core problem" in normalized_soul
+    assert "preserve the same strict boundary" in normalized_soul
+    assert "do not load a skill file, browse/search" in normalized_soul
+    assert "ask exactly one conversational question" in normalized_soul
+    assert "do not apply this delay to a concrete supplied script, asset or link" in " ".join(
+        operator.lower().split()
+    )
+    assert "do not load another skill" in " ".join(strategy.lower().split())
+    assert "product-specific onboarding gates take precedence" in " ".join(
+        research.lower().split()
+    )
 
 
 def test_upstream_media_skills_keep_hidden_evaluations() -> None:
@@ -211,3 +241,26 @@ def test_cinematic_ip_stack_uses_native_product_state() -> None:
         ROOT / "skills" / "public" / "build-cinematic-ip-system" / "SKILL.md"
     ).read_text(encoding="utf-8")
     assert "客户输出不得出现 Skill 名" in orchestration
+
+
+def test_differentiation_thesis_is_bound_to_strategy_and_cinematic_work() -> None:
+    differentiation = ROOT / "skills" / "public" / "design-ip-differentiation"
+    text = (differentiation / "SKILL.md").read_text(encoding="utf-8")
+    assert "for a person, brand, product, organization or portfolio" in text
+    assert "personal_ip_record_differentiation" in text
+    assert "personal_ip_record_asset_observation" in text
+    assert (differentiation / "references" / "thesis-contract.md").is_file()
+    assert (differentiation / "references" / "decision-judgment.md").is_file()
+
+    strategy = (
+        ROOT / "skills" / "public" / "ip-strategy-director" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    series = (
+        ROOT / "skills" / "public" / "design-ip-series-bible" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    direction = (
+        ROOT / "skills" / "public" / "direct-ip-visual-language" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    assert "design-ip-differentiation" in strategy
+    assert "差异化版本" in series
+    assert "差异化识别系统" in direction

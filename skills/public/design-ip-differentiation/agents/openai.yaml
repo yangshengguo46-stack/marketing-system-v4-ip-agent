@@ -1,0 +1,4 @@
+interface:
+  display_name: "IP差异化设计"
+  short_description: "为个人、品牌、产品或组织建立可验证的差异化影响力方向"
+  default_prompt: "Use $design-ip-differentiation to turn my evidence into a testable IP differentiation thesis."

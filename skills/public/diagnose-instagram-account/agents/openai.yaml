@@ -1,0 +1,4 @@
+interface:
+  display_name: "Instagram账号诊断"
+  short_description: "基于内容、漏斗与平台证据判断Instagram账号去留"
+  default_prompt: "Use $diagnose-instagram-account to diagnose this Instagram account from current evidence."

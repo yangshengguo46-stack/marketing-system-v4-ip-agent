@@ -176,13 +176,12 @@ class HLLMCreatorAdapter:
     ) -> dict[str, Any]:
         """Return one row accepted by upstream ``CreatorProcessor``.
 
-        The history is a chronological proxy built from aggregate account
-        outcomes. It is intentionally not presented as person-level click
-        history, which most creator platforms do not expose.
+        When history exists it is a chronological proxy built from aggregate
+        account outcomes, never person-level click history. With no history,
+        the same row carries an explicit cold-start hypothesis basis so the
+        first pilot can be preflighted without inventing account evidence.
         """
 
-        if not history:
-            raise ValueError("history requires at least one published content item")
         _assert_no_individual_viewer_identity(history, field="history")
         _assert_no_individual_viewer_identity(audience_profile, field="audience_profile")
 
@@ -201,18 +200,22 @@ class HLLMCreatorAdapter:
             feature_text = f"{title} | platform={platform} | type={content_type} | aggregate_metrics={_canonical_json(metrics)}"
             ordered.append((published_at, feature_text[:4096], content_id))
         recent = sorted(ordered, key=lambda item: (item[0], item[2]))[-self.max_history :]
+        audience_basis = "aggregate_account_cohort" if recent else "cold_start_hypothesis"
 
         target_title = _clean_text(target.get("title"), field="target.title", limit=768)
         target_description = _clean_text(target.get("description"), field="target.description", limit=4096)
         profile = {
-            "schema_version": "personal-ip-hllm-aggregate-v1",
-            "audience_basis": "aggregate_account_cohort",
+            "schema_version": "personal-ip-hllm-audience-v2",
+            "audience_basis": audience_basis,
             "privacy": "anonymous_cohort_no_individual_viewer_identity",
             "interpretable_projection": dict(audience_profile),
         }
         if local_context_evidence:
             profile["local_context_evidence"] = model_evidence_projection(local_context_evidence)
-        prompt1 = "你是个人 IP 创意生成器。前面插入的是根据跨平台历史内容及实绩形成的匿名受众群体向量。请在不虚构受众事实、不破坏创作者表达边界的前提下，生成更匹配该受众的创意：\n"
+        if recent:
+            prompt1 = "你是个人 IP 创意生成器。前面插入的是根据跨平台历史内容及实绩形成的匿名受众群体向量。请在不虚构受众事实、不破坏创作者表达边界的前提下，生成更匹配该受众的创意：\n"
+        else:
+            prompt1 = "你是个人 IP 创意生成器。当前没有账号历史，受众描述只是待验证的冷启动假设。请在不虚构受众事实、不破坏创作者表达边界的前提下，生成可被首轮试播验证的创意：\n"
         prompt2 = f"目标内容：{target_title}\n内容说明：{target_description}\n创作者约束：{_canonical_json(dict(creator_profile))}\n只输出最终创意，不要解释："
         values: dict[str, Any] = {
             "user_profile": _canonical_json(profile),

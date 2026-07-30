@@ -32,6 +32,7 @@ class PersonalIPStrategyVersionRow(Base):
     stage: Mapped[str] = mapped_column(String(40), nullable=False)
     mode: Mapped[str] = mapped_column(String(32), nullable=False)
     method_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    differentiation_version_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     person_model_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     business_model_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     benchmark_research_json: Mapped[dict] = mapped_column(JSON, nullable=False)

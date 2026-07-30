@@ -24,6 +24,10 @@ from deerflow.persistence.feedback.model import FeedbackRow
 from deerflow.persistence.models.run_event import RunEventRow
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
 from deerflow.persistence.personal_ip_brand.model import PersonalIPStrategyVersionRow
+from deerflow.persistence.personal_ip_differentiation.model import (
+    PersonalIPAssetObservationRow,
+    PersonalIPDifferentiationVersionRow,
+)
 from deerflow.persistence.personal_ip_evidence_promotions.model import PersonalIPEvidencePromotionRow
 from deerflow.persistence.personal_ip_metrics.model import PersonalIPMetricObservationRow
 from deerflow.persistence.personal_ip_platform_connections.model import (
@@ -53,6 +57,8 @@ __all__ = [
     "ChannelOAuthStateRow",
     "FeedbackRow",
     "PersonalIPAccountRow",
+    "PersonalIPAssetObservationRow",
+    "PersonalIPDifferentiationVersionRow",
     "PersonalIPEvidencePromotionRow",
     "PersonalIPMetricObservationRow",
     "PersonalIPPlatformConnectionRow",

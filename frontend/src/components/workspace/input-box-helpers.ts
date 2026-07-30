@@ -200,6 +200,18 @@ export function canPolishInput(value: string): boolean {
   return parseGoalCommand(trimmed) === null && !parseCompactCommand(trimmed);
 }
 
+export function canRequestFollowupSuggestions({
+  disabled,
+  isMock,
+  hasOpenHumanInput,
+}: {
+  disabled: boolean;
+  isMock: boolean;
+  hasOpenHumanInput: boolean;
+}): boolean {
+  return !disabled && !isMock && !hasOpenHumanInput;
+}
+
 export function getInputSubmitAction({
   text,
   fileCount,

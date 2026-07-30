@@ -25,7 +25,7 @@ const EMPTY_ACCOUNT: PersonalIPAccount = {
 };
 
 const EMPTY_COCKPIT: PersonalIPOperatingCockpit = {
-  contract_version: "personal-ip-operating-cockpit-v4",
+  contract_version: "personal-ip-operating-cockpit-v6",
   generated_at: "2026-07-22T00:00:00Z",
   portfolio: {
     subject_count: 0,
@@ -45,11 +45,21 @@ const EMPTY_COCKPIT: PersonalIPOperatingCockpit = {
   ) as PersonalIPOperatingCockpit["stages"],
   queues: {
     subjects_needing_strategy_validation: [],
+    subjects_needing_differentiation_validation: [],
     preflights_awaiting_publish: [],
     published_receipts_awaiting_metrics: [],
     published_receipts_awaiting_retrospective: [],
   },
   recent: {},
+  alerts: {
+    summary: {
+      total: 0,
+      blocking: 0,
+      warning: 0,
+      by_category: { loop: 0, provider: 0, cost: 0 },
+    },
+    items: [],
+  },
   video: {
     contract_version: "personal-ip-video-production-v1",
     production_count: 0,
@@ -72,7 +82,11 @@ const EMPTY_COCKPIT: PersonalIPOperatingCockpit = {
     ) as PersonalIPOperatingCockpit["video"]["stages"],
     recent: [],
   },
-  coverage: { history_limit: 20, possibly_truncated: [] },
+  coverage: {
+    history_limit: 20,
+    video_alert_detail_limit: 50,
+    possibly_truncated: [],
+  },
 };
 
 test("portfolio shows all eight platforms and opens manual login", async ({

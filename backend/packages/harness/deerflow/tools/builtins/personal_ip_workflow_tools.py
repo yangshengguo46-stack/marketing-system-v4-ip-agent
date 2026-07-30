@@ -114,15 +114,17 @@ async def _personal_ip_run_preflight(
 ) -> str:
     """Run HLLM-Lite/full HLLM preflight and seal its immutable receipt.
 
-    Use aggregate published-content history and audience evidence only. The
-    adapter rejects individual viewer identities, and local subject/account ids
-    stay in DeerFlow rather than being sent to the model provider.
+    Use aggregate published-content history when it exists. For a first pilot,
+    history may be empty and the sealed basis remains an unmeasured cold-start
+    hypothesis. The adapter rejects individual viewer identities, and local
+    subject/account ids stay in DeerFlow rather than being sent to the model
+    provider.
 
     Args:
         operation_key: Stable idempotency key for this exact preflight.
         subject_ids: Owner-scoped subjects represented by the preflight.
         target_account_ids: Accounts this prediction may later publish to.
-        history: Chronological published content with aggregate metrics.
+        history: Chronological published content with aggregate metrics, or an empty list for a first pilot.
         target: Draft content id, title, description and content type to evaluate.
         variant_count: Number of creative variants, from 1 to 8.
         local_context_evidence_ids: Optional sealed MineContext evidence ids; both preflight and HLLM-profile purposes must already be authorized.
@@ -136,6 +138,8 @@ async def _personal_ip_run_preflight(
             raise RuntimeError("Personal-IP preflight persistence is not available")
         if services.brand is None:
             raise RuntimeError("Personal-IP brand persistence is not available")
+        if services.differentiation is None:
+            raise RuntimeError("Personal-IP differentiation persistence is not available")
         owner_user_id = resolve_runtime_user_id(runtime)
         normalized_subject_ids = list(dict.fromkeys(subject_ids))
         if not normalized_subject_ids:
@@ -150,14 +154,35 @@ async def _personal_ip_run_preflight(
                 raise ValueError(f"Personal-IP strategy not found for subject {subject_id}")
             if strategy_stage_index(strategy["stage"]) < strategy_stage_index("launch_package_ready"):
                 raise ValueError(f"Personal-IP launch package is not ready for subject {subject_id}")
+            differentiation_version_id = str(strategy.get("differentiation_version_id") or "").strip()
+            if not differentiation_version_id:
+                raise ValueError(f"Personal-IP differentiation thesis is not ready for subject {subject_id}")
+            differentiation = await services.differentiation.get_version(
+                differentiation_version_id,
+                owner_user_id=owner_user_id,
+            )
+            if differentiation is None or differentiation.get("status") not in {
+                "pilot",
+                "provisionally_adopted",
+                "validated",
+            }:
+                raise ValueError(f"Personal-IP differentiation thesis is not ready for subject {subject_id}")
             strategy_contexts.append(
                 {
                     "stage": strategy["stage"],
-                    "mode": strategy["mode"],
                     "person_model": strategy["person_model"],
                     "business_model": strategy["business_model"],
                     "positioning_candidates": strategy["positioning_candidates"],
                     "launch_package": strategy["launch_package"],
+                    "differentiation": {
+                        "method_version": differentiation["method_version"],
+                        "status": differentiation["status"],
+                        "primary_entity": differentiation["primary_entity"],
+                        "decision_context": differentiation["decision_context"],
+                        "strategic_difference": differentiation["strategic_difference"],
+                        "dramatic_engine": differentiation["dramatic_engine"],
+                        "distinctive_encoding": differentiation["distinctive_encoding"],
+                    },
                 }
             )
         creator_profile = {
@@ -165,7 +190,7 @@ async def _personal_ip_run_preflight(
             "operating_strategies": strategy_contexts,
         }
         audience_profile = {
-            "epistemic_status": "aggregate_history_only_revisable",
+            "epistemic_status": ("aggregate_history_only_revisable" if history else "cold_start_unmeasured_revisable"),
             "published_sample_count": len(history),
         }
         local_context_evidence: list[dict] = []
@@ -261,9 +286,12 @@ async def _personal_ip_begin_publish_receipt(
 ) -> str:
     """Seal the exact request before a browser, UI-TARS, API or manual publish.
 
-    This tool records intent but does not publish. When preflight_id is present,
-    request must contain a variant_id sealed by that preflight. Call it only
-    after the user has approved the consequential publish operation.
+    This tool records intent but does not publish. The request must include a
+    personal-ip-publish-compliance-v1 declaration; the server validates the
+    target platform's disclosure plan and seals its own policy receipt. When
+    preflight_id is present, request must also contain a variant_id sealed by
+    that preflight. Call it only after the user has approved the consequential
+    publish operation.
 
     Args:
         operation_key: Stable business operation key.
@@ -271,7 +299,7 @@ async def _personal_ip_begin_publish_receipt(
         account_id: Exact owner-scoped platform account to publish through.
         preflight_id: Optional preflight id; pass an empty string when absent.
         executor: platform_api, ui_tars or manual. Browser must use prepare.
-        request: Exact caption/media/options and selected variant snapshot.
+        request: Exact caption/media/options, selected variant and compliance declaration.
 
     Returns:
         JSON planned publication receipt and its immutable request digest.
@@ -309,8 +337,9 @@ async def _personal_ip_prepare_browser_publish(
 
     Call this after the user has requested or confirmed publication, before any
     browser click that submits content. It selects the owner/account-isolated
-    profile, seals the exact request and appends a pending browser handoff in
-    one idempotent operation.
+    profile, validates the personal-ip-publish-compliance-v1 declaration,
+    seals the exact request and server policy receipt, then appends a pending
+    browser handoff in one idempotent operation.
 
     Args:
         operation_key: Stable business operation key.
@@ -318,7 +347,7 @@ async def _personal_ip_prepare_browser_publish(
         pending_attempt_key: Stable key for the browser handoff attempt.
         account_id: Exact owner-scoped platform account to publish through.
         preflight_id: Optional preflight id; pass an empty string when absent.
-        request: Exact caption, media, options and selected variant snapshot.
+        request: Exact caption, media, options, selected variant and compliance declaration.
 
     Returns:
         JSON receipt plus the selected platform start URL for Browser Control.
@@ -414,7 +443,9 @@ async def _personal_ip_finish_browser_publish(
     """Seal the outcome of the currently selected account's browser publish.
 
     A published outcome is accepted only when the live browser is open on the
-    declared platform post, or the declared post id is visible there. Query
+    declared platform post, or the declared post id is visible there. The
+    evidence must include personal-ip-publish-compliance-evidence-v1 bound to
+    the sealed policy receipt and identify the applied disclosures. Query
     credentials and fragments are removed; only a page-title and text digest
     are persisted with caller-supplied credential-free evidence.
 
@@ -422,7 +453,7 @@ async def _personal_ip_finish_browser_publish(
         receipt_id: Browser publish receipt returned by prepare.
         attempt_key: Stable key for this terminal browser observation.
         status: published, failed or unknown.
-        evidence: Credential-free visible confirmation or failure context.
+        evidence: Credential-free confirmation/failure context and compliance evidence on success.
         occurred_at: Optional ISO-8601 time with timezone; empty uses server time.
         external_post_id: Platform post id; empty when unavailable.
         external_url: Public post URL; empty when unavailable.
@@ -505,13 +536,15 @@ async def _personal_ip_record_publish_attempt(
 
     Record pending before handing control to a provider when possible, then
     append a new published, failed or unknown attempt from observed evidence.
-    Browser receipts must use the composite prepare/finish tools.
+    A published result must include personal-ip-publish-compliance-evidence-v1
+    bound to the request's server receipt. Browser receipts must use the
+    composite prepare/finish tools.
 
     Args:
         receipt_id: Planned publication receipt id.
         attempt_key: Stable id for this exact attempt or callback.
         status: pending, published, failed, unknown or deleted.
-        result: Sanitized visible/API evidence; never credentials.
+        result: Sanitized visible/API evidence and compliance evidence on success; never credentials.
         occurred_at: Optional ISO-8601 time with timezone; empty uses server time.
         external_post_id: Confirmed platform post id, or empty when unavailable.
         external_url: Confirmed public post URL, or empty when unavailable.

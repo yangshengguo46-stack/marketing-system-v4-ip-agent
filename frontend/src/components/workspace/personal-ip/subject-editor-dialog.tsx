@@ -77,7 +77,7 @@ export function SubjectEditorDialog({
               {subject ? "编辑经营主体" : "新建经营主体"}
             </DialogTitle>
             <DialogDescription>
-              主体可以是你自己、客户、品牌或组织；一个主体可关联多个平台账号。
+              主体可以是个人、品牌、产品或组织；一个主体可关联多个平台账号。
             </DialogDescription>
           </DialogHeader>
           <label className="block space-y-1.5 text-sm font-medium">
@@ -110,6 +110,7 @@ export function SubjectEditorDialog({
                 <SelectContent>
                   <SelectItem value="creator">个人创作者</SelectItem>
                   <SelectItem value="brand">品牌</SelectItem>
+                  <SelectItem value="product">产品</SelectItem>
                   <SelectItem value="organization">组织</SelectItem>
                 </SelectContent>
               </Select>

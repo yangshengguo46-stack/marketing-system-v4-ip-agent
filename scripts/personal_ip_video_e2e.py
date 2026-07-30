@@ -35,20 +35,8 @@ from deerflow.personal_ip.video_acceptance import (  # noqa: E402
     verify_local_receipt_outputs,
 )
 
-MEDIA_EXECUTOR = (
-    ROOT
-    / "skills"
-    / "public"
-    / "volcengine-stack"
-    / "scripts"
-    / "run_media_executor.py"
-)
-PROJECT_MEDIAKIT = (
-    ROOT
-    / ".deer-flow"
-    / "bin"
-    / ("mediakit-cli.exe" if os.name == "nt" else "mediakit-cli")
-)
+MEDIA_EXECUTOR = ROOT / "skills" / "public" / "volcengine-stack" / "scripts" / "run_media_executor.py"
+PROJECT_MEDIAKIT = ROOT / ".deer-flow" / "bin" / ("mediakit-cli.exe" if os.name == "nt" else "mediakit-cli")
 PROJECT_FFMPEG_DIR = ROOT / ".deer-flow" / "toolchains" / "ffmpeg" / "bin"
 KNOWN_ZERO_COST = {
     "status": "known",
@@ -125,9 +113,7 @@ def _run_receipt_command(
         existing = _load_json(receipt_file)
         if existing.get("status") == "failed":
             if not expect_failure:
-                raise RuntimeError(
-                    f"failed receipt requires a new retry receipt: {receipt_file}"
-                )
+                raise RuntimeError(f"failed receipt requires a new retry receipt: {receipt_file}")
             return existing
     argv = [
         sys.executable,
@@ -182,16 +168,12 @@ def _run_receipt_command(
     if receipt_file.is_file():
         argv.append("--resume")
     argv.extend(["--", *command])
-    completed = subprocess.run(
-        argv, cwd=ROOT, env=environment, capture_output=True, text=True, check=False
-    )
+    completed = subprocess.run(argv, cwd=ROOT, env=environment, capture_output=True, text=True, check=False)
     if expect_failure:
         if completed.returncode == 0:
             raise RuntimeError("simulated failed attempt unexpectedly succeeded")
     elif completed.returncode != 0:
-        raise RuntimeError(
-            f"media executor failed: {(completed.stdout or completed.stderr).strip()[:1_000]}"
-        )
+        raise RuntimeError(f"media executor failed: {(completed.stdout or completed.stderr).strip()[:1_000]}")
     receipt = _load_json(receipt_file)
     if not expect_failure:
         verify_local_receipt_outputs(receipt)
@@ -346,17 +328,11 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
     receipts = work_dir / "receipts"
     outputs.mkdir(exist_ok=True)
     receipts.mkdir(exist_ok=True)
-    ffmpeg = _tool_path(
-        args.ffmpeg, "ffmpeg.exe" if os.name == "nt" else "ffmpeg", "ffmpeg"
-    )
-    ffprobe = _tool_path(
-        args.ffprobe, "ffprobe.exe" if os.name == "nt" else "ffprobe", "ffprobe"
-    )
+    ffmpeg = _tool_path(args.ffmpeg, "ffmpeg.exe" if os.name == "nt" else "ffmpeg", "ffmpeg")
+    ffprobe = _tool_path(args.ffprobe, "ffprobe.exe" if os.name == "nt" else "ffprobe", "ffprobe")
     environment = _executor_environment(ffmpeg)
 
-    await init_engine_from_config(
-        DatabaseConfig(backend="sqlite", sqlite_dir=str(work_dir / "ledger"))
-    )
+    await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(work_dir / "ledger")))
     session_factory = get_session_factory()
     if session_factory is None:
         raise RuntimeError("acceptance ledger is unavailable")
@@ -593,14 +569,10 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     final = outputs / "final.mp4"
-    use_mediakit = args.finisher == "mediakit" or (
-        args.finisher == "auto" and PROJECT_MEDIAKIT.is_file()
-    )
+    use_mediakit = args.finisher == "mediakit" or (args.finisher == "auto" and PROJECT_MEDIAKIT.is_file())
     if use_mediakit:
         if not PROJECT_MEDIAKIT.is_file():
-            raise RuntimeError(
-                "official MediaKit CLI is not built; run make mediakit-build"
-            )
+            raise RuntimeError("official MediaKit CLI is not built; run make mediakit-build")
         finisher_executor = "mediakit-cli"
         finish_command = [
             str(PROJECT_MEDIAKIT),
@@ -661,9 +633,7 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         receipt=final_receipt,
     )
 
-    qa = run_delivery_qa(
-        final, delivery_spec=delivery_spec, ffmpeg_path=ffmpeg, ffprobe_path=ffprobe
-    )
+    qa = run_delivery_qa(final, delivery_spec=delivery_spec, ffmpeg_path=ffmpeg, ffprobe_path=ffprobe)
     final_ref = final_receipt["outputs"][0]["ref"]
     await _append_business_event(
         repository,
@@ -708,13 +678,7 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         "current_stage": completed["current_stage"],
         "event_count": completed["event_count"],
         "event_types": [event["event_type"] for event in completed["events"]],
-        "task_ids": sorted(
-            {
-                event["provider_task_id"]
-                for event in completed["events"]
-                if event.get("provider_task_id")
-            }
-        ),
+        "task_ids": sorted({event["provider_task_id"] for event in completed["events"] if event.get("provider_task_id")}),
         "final_artifact": qa["artifact"],
         "qa_passed": qa["passed"],
         "finisher": finisher_executor,
@@ -826,6 +790,7 @@ def _paid_checkpoints(args: argparse.Namespace) -> dict[str, Any]:
     for checkpoint in checkpoints:
         checkpoint["cwd"] = str((ROOT / "backend").resolve())
         checkpoint["requires_explicit_user_approval"] = True
+        checkpoint["requires_budget_reservation_before_execution"] = True
         checkpoint["command"] = shlex.join(checkpoint["argv"])
     payload = {
         "contract_version": "personal-ip-paid-media-checkpoints-v1",
@@ -838,11 +803,17 @@ def _paid_checkpoints(args: argparse.Namespace) -> dict[str, Any]:
         },
         "prerequisites": [
             "explicit approval in the active user session",
+            "an immutable production hard limit and a distinct server budget reservation for this checkpoint",
             "provider credentials",
             "make volcengine-install for MediaKit",
         ],
         "checkpoints": checkpoints,
-        "after_each_call": "ingest the emitted receipt with personal_ip_ingest_media_execution; never reconstruct provider evidence from stdout",
+        "after_each_call": (
+            "ingest the emitted receipt with personal_ip_ingest_media_execution, "
+            "then settle authoritative actual cost with "
+            "personal_ip_settle_video_budget; unknown billing leaves the maximum "
+            "reserved; never reconstruct provider evidence from stdout"
+        ),
     }
     path = work_dir / "paid-checkpoints.json"
     path.write_text(
@@ -878,13 +849,9 @@ async def _ingest_real_acceptance(args: argparse.Namespace) -> dict[str, Any]:
     ]
     missing = [str(path) for path in required if not path.is_file()]
     if missing:
-        raise RuntimeError(
-            f"real acceptance is missing {len(missing)} artifact(s): {missing[0]}"
-        )
+        raise RuntimeError(f"real acceptance is missing {len(missing)} artifact(s): {missing[0]}")
 
-    await init_engine_from_config(
-        DatabaseConfig(backend="sqlite", sqlite_dir=str(work_dir / "real-ledger"))
-    )
+    await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(work_dir / "real-ledger")))
     session_factory = get_session_factory()
     if session_factory is None:
         raise RuntimeError("real acceptance ledger is unavailable")
@@ -1054,28 +1021,14 @@ async def _ingest_real_acceptance(args: argparse.Namespace) -> dict[str, Any]:
         "current_stage": completed["current_stage"],
         "event_count": completed["event_count"],
         "event_types": [event["event_type"] for event in completed["events"]],
-        "provider_task_ids": sorted(
-            {
-                str(receipt["task_id"])
-                for receipt in ingested_receipts
-                if receipt.get("task_id")
-            }
-        ),
-        "provider_request_ids": sorted(
-            {
-                str(receipt["request_id"])
-                for receipt in ingested_receipts
-                if receipt.get("request_id")
-            }
-        ),
+        "provider_task_ids": sorted({str(receipt["task_id"]) for receipt in ingested_receipts if receipt.get("task_id")}),
+        "provider_request_ids": sorted({str(receipt["request_id"]) for receipt in ingested_receipts if receipt.get("request_id")}),
         "paid_calls_executed": 3,
         "paid_cost": {
             "status": "unknown",
             "reason": "provider billing API is not connected",
         },
-        "failed_local_attempts_preserved": sum(
-            receipt.get("status") == "failed" for receipt in ingested_receipts
-        ),
+        "failed_local_attempts_preserved": sum(receipt.get("status") == "failed" for receipt in ingested_receipts),
         "qa_passed": True,
         "final_artifact": final_artifact,
         "ledger": str((work_dir / "real-ledger" / "deerflow.db").resolve()),
@@ -1110,17 +1063,13 @@ async def _async_main(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    local = subparsers.add_parser(
-        "local", help="Run/resume the free local acceptance production"
-    )
+    local = subparsers.add_parser("local", help="Run/resume the free local acceptance production")
     local.add_argument("--work-dir", type=Path, required=True)
     local.add_argument("--owner-user-id", default="video-e2e-local")
     local.add_argument("--operation-key", default="video:e2e:local-v1")
     local.add_argument("--ffmpeg")
     local.add_argument("--ffprobe")
-    local.add_argument(
-        "--finisher", choices=("auto", "mediakit", "ffmpeg"), default="auto"
-    )
+    local.add_argument("--finisher", choices=("auto", "mediakit", "ffmpeg"), default="auto")
     paid = subparsers.add_parser(
         "paid-checkpoints",
         help="Write, but never execute, paid provider checkpoint commands",

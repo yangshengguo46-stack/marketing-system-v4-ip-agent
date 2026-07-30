@@ -1,0 +1,4 @@
+interface:
+  display_name: "抖音账号诊断"
+  short_description: "基于内容、商业漏斗和一手平台证据判断抖音账号继续、调整或换号"
+  default_prompt: "Use $diagnose-douyin-account to diagnose this Douyin account from current evidence."

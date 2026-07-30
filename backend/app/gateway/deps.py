@@ -169,6 +169,7 @@ if TYPE_CHECKING:
     from app.gateway.auth.repositories.sqlite import SQLiteUserRepository
     from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
     from deerflow.persistence.personal_ip_brand import PersonalIPBrandRepository
+    from deerflow.persistence.personal_ip_differentiation import PersonalIPDifferentiationRepository
     from deerflow.persistence.personal_ip_evidence_promotions import PersonalIPEvidencePromotionRepository
     from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
     from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
@@ -179,6 +180,7 @@ if TYPE_CHECKING:
     from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
     from deerflow.persistence.personal_ip_video_productions import PersonalIPVideoProductionRepository
     from deerflow.persistence.thread_meta.base import ThreadMetaStore
+    from deerflow.personal_ip.data_lifecycle import PersonalIPDataLifecycleService
     from deerflow.personal_ip.minecontext import MineContextService
     from deerflow.runtime import RunRecord
 
@@ -319,6 +321,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
         if sf is not None:
             from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
             from deerflow.persistence.personal_ip_brand import PersonalIPBrandRepository
+            from deerflow.persistence.personal_ip_differentiation import PersonalIPDifferentiationRepository
             from deerflow.persistence.personal_ip_evidence_promotions import PersonalIPEvidencePromotionRepository
             from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
             from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
@@ -337,6 +340,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.scheduled_task_run_repo = ScheduledTaskRunRepository(sf)
             app.state.personal_ip_account_repo = PersonalIPAccountRepository(sf)
             app.state.personal_ip_brand_repo = PersonalIPBrandRepository(sf)
+            app.state.personal_ip_differentiation_repo = PersonalIPDifferentiationRepository(sf)
             app.state.personal_ip_evidence_promotion_repo = PersonalIPEvidencePromotionRepository(sf)
             app.state.personal_ip_metric_repo = PersonalIPMetricRepository(sf)
             app.state.personal_ip_platform_observation_repo = PersonalIPPlatformObservationRepository(sf)
@@ -357,12 +361,19 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.personal_ip_retrospective_repo = PersonalIPRetrospectiveRepository(sf)
             app.state.personal_ip_subject_repo = PersonalIPSubjectRepository(sf)
             app.state.personal_ip_video_production_repo = PersonalIPVideoProductionRepository(sf)
+            from deerflow.personal_ip.data_lifecycle import PersonalIPDataLifecycleService
             from deerflow.personal_ip.runtime import PersonalIPRuntimeServices, configure_personal_ip_runtime
+
+            app.state.personal_ip_data_lifecycle_service = PersonalIPDataLifecycleService(
+                sf,
+                minecontext=app.state.minecontext_service,
+            )
 
             configure_personal_ip_runtime(
                 PersonalIPRuntimeServices(
                     accounts=app.state.personal_ip_account_repo,
                     brand=app.state.personal_ip_brand_repo,
+                    differentiation=app.state.personal_ip_differentiation_repo,
                     connections=app.state.personal_ip_platform_connection_repo,
                     evidence_promotions=app.state.personal_ip_evidence_promotion_repo,
                     metrics=app.state.personal_ip_metric_repo,
@@ -380,6 +391,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.scheduled_task_run_repo = None
             app.state.personal_ip_account_repo = None
             app.state.personal_ip_brand_repo = None
+            app.state.personal_ip_differentiation_repo = None
             app.state.personal_ip_evidence_promotion_repo = None
             app.state.personal_ip_metric_repo = None
             app.state.personal_ip_platform_observation_repo = None
@@ -389,6 +401,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.personal_ip_retrospective_repo = None
             app.state.personal_ip_subject_repo = None
             app.state.personal_ip_video_production_repo = None
+            app.state.personal_ip_data_lifecycle_service = None
             from deerflow.personal_ip.runtime import configure_personal_ip_runtime
 
             configure_personal_ip_runtime(None)
@@ -517,10 +530,34 @@ def get_personal_ip_account_repo(request: Request) -> PersonalIPAccountRepositor
     return val
 
 
+def get_personal_ip_data_lifecycle_service(
+    request: Request,
+) -> PersonalIPDataLifecycleService:
+    val = getattr(request.app.state, "personal_ip_data_lifecycle_service", None)
+    if val is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Personal-IP data lifecycle service not available",
+        )
+    return val
+
+
 def get_personal_ip_brand_repo(request: Request) -> PersonalIPBrandRepository:
     val = getattr(request.app.state, "personal_ip_brand_repo", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Personal-IP brand repository not available")
+    return val
+
+
+def get_personal_ip_differentiation_repo(
+    request: Request,
+) -> PersonalIPDifferentiationRepository:
+    val = getattr(request.app.state, "personal_ip_differentiation_repo", None)
+    if val is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Personal-IP differentiation repository not available",
+        )
     return val
 
 

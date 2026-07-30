@@ -25,6 +25,17 @@ class _FakeGenerator:
             AudienceCreativeVariant(
                 variant_id=f"v{index + 1}",
                 text=f"创意 {index + 1}",
+                evidence_level="account_history_conditioned",
+                mechanism_hypotheses=[
+                    {
+                        "layer": "attention_prediction",
+                        "claim": "目标人群识别到相关问题后更可能继续观看",
+                        "predicted_signal": "首段继续观看比例提高",
+                        "failure_condition": "目标人群无法复述内容承诺",
+                    }
+                ],
+                distribution_assumptions=["平台分发给相关兴趣人群"],
+                uncertainty="历史数据不能保证本次结果",
                 tags=["fake"],
             )
             for index in range(request.variant_count)
@@ -65,7 +76,29 @@ async def test_lite_service_implements_the_shared_provider_contract() -> None:
     assert result.model_version == "fake-doubao"
     assert len(result.variants) == 2
     assert result.variants[0].match_score is None
-    assert "does not emit a learned match score" in result.warnings[0]
+    assert "not viral guarantees" in result.warnings[0]
+
+
+@pytest.mark.asyncio
+async def test_lite_service_marks_first_pilot_as_an_unmeasured_cold_start_hypothesis() -> None:
+    example = HLLMCreatorAdapter().build_example(
+        history=[],
+        audience_profile={"hypothesis": "可能关心真实开店过程的人"},
+        creator_profile={"voice": ["具体"]},
+        target={"content_id": "pilot-1", "title": "选址第一天", "description": "记录选址判断"},
+    )
+    request = AudiencePreflightRequest(example=example, variant_count=1)
+    app = create_audience_lite_app(generator=_FakeGenerator())
+    provider = HLLMCreatorHTTPProvider(
+        base_url="http://localhost:9128",
+        transport=httpx.ASGITransport(app=app),
+    )
+
+    result = await provider.preflight(request)
+
+    assert result.audience_basis == "cold_start_hypothesis"
+    assert result.variants[0].evidence_level == "unmeasured_hypothesis"
+    assert "unmeasured cold-start hypotheses" in result.warnings[0]
 
 
 @pytest.mark.asyncio
@@ -109,9 +142,41 @@ async def test_doubao_generator_uses_ark_json_generation_without_fake_scores() -
         assert payload["model"] == "doubao-test"
         assert payload["response_format"] == {"type": "json_object"}
         assert "匿名受众画像" in payload["messages"][0]["content"]
+        assert "不得用多巴胺" in payload["messages"][0]["content"]
+        content = {
+            "variants": [
+                {
+                    "text": "候选甲",
+                    "mechanism_hypotheses": [
+                        {
+                            "layer": "attention_prediction",
+                            "claim": "反差与目标问题相关时更可能获得继续观看",
+                            "predicted_signal": "首段继续观看比例提高",
+                            "failure_condition": "观众无法复述承诺",
+                        }
+                    ],
+                    "distribution_assumptions": ["分发到相关兴趣人群"],
+                    "uncertainty": "没有本次发布结果",
+                    "tags": ["反差"],
+                },
+                {
+                    "text": "候选乙",
+                    "mechanism_hypotheses": [
+                        {
+                            "layer": "social_transmission",
+                            "claim": "内容对明确接收者有用时更可能被分享",
+                            "predicted_signal": "分享行为增加",
+                            "failure_condition": "分享没有出现且评论认为不适用",
+                        }
+                    ],
+                    "distribution_assumptions": ["获得足够有效曝光"],
+                    "uncertainty": "分享动机仍需发布验证",
+                },
+            ]
+        }
         return httpx.Response(
             200,
-            json={"choices": [{"message": {"content": '```json\n{"variants":[{"text":"候选甲","tags":["反差"]},{"text":"候选乙"}]}\n```'}}]},
+            json={"choices": [{"message": {"content": json.dumps(content, ensure_ascii=False)}}]},
         )
 
     generator = DoubaoAudienceGenerator(
@@ -126,3 +191,4 @@ async def test_doubao_generator_uses_ark_json_generation_without_fake_scores() -
     assert [variant.text for variant in variants] == ["候选甲", "候选乙"]
     assert variants[0].tags == ["反差"]
     assert all(variant.match_score is None for variant in variants)
+    assert all(variant.evidence_level == "account_history_conditioned" for variant in variants)

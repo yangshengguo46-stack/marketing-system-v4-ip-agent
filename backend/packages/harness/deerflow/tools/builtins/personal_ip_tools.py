@@ -13,6 +13,11 @@ from typing import Any
 from langchain.tools import tool
 
 from deerflow.config.paths import get_paths
+from deerflow.personal_ip.account_diagnosis import (
+    AccountDiagnosisAssessment,
+    PersonalIPAccountDiagnosticContextService,
+    compile_account_diagnosis,
+)
 from deerflow.personal_ip.browser_collection import (
     BrowserPlatformCollectionError,
     BrowserPlatformCollectionService,
@@ -28,7 +33,10 @@ from deerflow.personal_ip.frame_interpolation import interpolate_video_candidate
 from deerflow.personal_ip.generated_shot_qa import run_generated_shot_qa
 from deerflow.personal_ip.material_inspection import inspect_local_video_material
 from deerflow.personal_ip.media_execution import normalize_media_execution_receipt
-from deerflow.personal_ip.operating_cockpit import PersonalIPOperatingCockpitService
+from deerflow.personal_ip.operating_cockpit import (
+    PersonalIPOperatingCockpitService,
+    PersonalIPStartupContextService,
+)
 from deerflow.personal_ip.platform_metrics import (
     DouyinAuthorizedMetricCollectionService,
     PlatformMetricCollectionError,
@@ -151,6 +159,7 @@ def _operating_cockpit_service(services: PersonalIPRuntimeServices) -> PersonalI
         "subjects": services.subjects,
         "accounts": services.accounts,
         "brand": services.brand,
+        "differentiation": services.differentiation,
         "preflights": services.preflights,
         "publish_receipts": services.publish_receipts,
         "metrics": services.metrics,
@@ -165,26 +174,186 @@ def _operating_cockpit_service(services: PersonalIPRuntimeServices) -> PersonalI
     return PersonalIPOperatingCockpitService(**required)
 
 
+def _startup_context_service(services: PersonalIPRuntimeServices) -> PersonalIPStartupContextService:
+    if services.subjects is None or services.accounts is None:
+        raise RuntimeError("Personal-IP startup context is unavailable")
+    return PersonalIPStartupContextService(
+        subjects=services.subjects,
+        accounts=services.accounts,
+    )
+
+
+def _account_diagnostic_service(
+    services: PersonalIPRuntimeServices,
+) -> PersonalIPAccountDiagnosticContextService:
+    required = {
+        "accounts": services.accounts,
+        "platform_observations": services.platform_observations,
+        "retrospectives": services.retrospectives,
+    }
+    missing = sorted(name for name, repository in required.items() if repository is None)
+    if missing:
+        raise RuntimeError("Personal-IP account diagnosis is incomplete: " + ", ".join(missing))
+    return PersonalIPAccountDiagnosticContextService(
+        accounts=services.accounts,
+        brand=services.brand,
+        differentiation=services.differentiation,
+        metrics=services.metrics,
+        platform_observations=services.platform_observations,
+        publish_receipts=services.publish_receipts,
+        retrospectives=services.retrospectives,
+    )
+
+
+async def _personal_ip_startup_context(runtime: Runtime) -> str:
+    """Check whether this is a true Personal-IP cold start.
+
+    Call this before deciding whether a new conversation needs the full
+    operating cockpit. It reads only active subject and account existence. If
+    experience is new_owner, respond to the user's current request and do not
+    scan strategy, publishing, metric, retrospective or video ledgers. If it
+    is returning_owner, use the whole-portfolio cockpit when durable operating
+    state is relevant.
+
+    Returns:
+        JSON cold-start classification, minimal counts and whether the complete
+        operating cockpit is needed.
+    """
+    try:
+        result = await _startup_context_service(get_personal_ip_runtime()).build(owner_user_id=resolve_runtime_user_id(runtime))
+        return _json(result)
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json({"status": "error", "category": "internal", "message": "Personal-IP startup context is unavailable"})
+
+
 async def _personal_ip_operating_cockpit(runtime: Runtime) -> str:
     """Read the user's whole Personal-IP business and video operating state.
 
-    Use this as the default orientation tool before planning or executing work.
-    It joins every subject and platform account with modeling, preflight,
-    publishing, performance, retrospective, evidence-promotion and video
-    production queues. It intentionally has no account filter because one
-    conversation coordinates the user's entire portfolio.
+    Use this for a returning owner, a resume request or a portfolio-wide
+    operating question after startup context says the complete read is needed.
+    Do not use it for a confirmed new_owner cold start. It joins every subject
+    and platform account with modeling, preflight, publishing, performance,
+    retrospective, evidence-promotion and video production queues. It
+    intentionally has no account filter because one conversation coordinates
+    the user's entire portfolio.
 
     Returns:
         JSON containing the six-stage operating loop, nine-stage video line,
         explicit work queues, recent receipts and bounded history coverage.
     """
     try:
-        result = await _operating_cockpit_service(get_personal_ip_runtime()).build(owner_user_id=resolve_runtime_user_id(runtime))
+        services = get_personal_ip_runtime()
+        owner_user_id = resolve_runtime_user_id(runtime)
+        startup = await _startup_context_service(services).build(owner_user_id=owner_user_id)
+        if not startup["should_read_operating_cockpit"]:
+            return _json(
+                {
+                    **startup,
+                    "cockpit_skipped": True,
+                    "message": "A new owner has no operating ledger to resume; continue from the current request.",
+                }
+            )
+        result = await _operating_cockpit_service(services).build(owner_user_id=owner_user_id)
         return _json(result)
     except (RuntimeError, TypeError, ValueError) as exc:
         return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
     except Exception:
         return _json({"status": "error", "category": "internal", "message": "Personal-IP cockpit is unavailable"})
+
+
+async def _personal_ip_account_diagnostic_context(
+    runtime: Runtime,
+    account_id: str,
+) -> str:
+    """Load evidence for a content-first diagnosis of one platform account.
+
+    Use this when deciding whether a connected account should continue, change
+    direction or be replaced. The account id selects only the concrete target.
+    Strategy, content, performance, conversion and recommendation-eligibility
+    evidence are loaded server-side. Low reach alone is never evidence that a
+    new account is required.
+
+    Args:
+        account_id: Exact Personal-IP platform account to diagnose.
+
+    Returns:
+        Compact evidence references, sample and coverage gates, and the
+        content-first account-decision guardrails.
+    """
+    try:
+        context = await _account_diagnostic_service(get_personal_ip_runtime()).build(
+            owner_user_id=resolve_runtime_user_id(runtime),
+            account_id=account_id,
+        )
+        return _json(context)
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json(
+            {
+                "status": "error",
+                "category": "invalid_request",
+                "message": str(exc),
+            }
+        )
+    except Exception:
+        return _json(
+            {
+                "status": "error",
+                "category": "internal",
+                "message": "Personal-IP account diagnostic context is unavailable",
+            }
+        )
+
+
+async def _personal_ip_compile_account_diagnosis(
+    runtime: Runtime,
+    account_id: str,
+    assessment: AccountDiagnosisAssessment,
+) -> str:
+    """Compile an evidence-bound continue, adjust or new-account decision.
+
+    Evaluate all seven observable content-mechanism layers plus reach, trust,
+    intent and conversion. Platform rules are eligibility constraints and
+    distribution amplifiers, not the main content judgment. The compiler
+    reloads authenticated evidence and rejects invented references, viral
+    guarantees, evidence-free self-entertainment labels and new-account advice
+    based only on low reach.
+
+    Args:
+        account_id: Exact Personal-IP platform account being diagnosed.
+        assessment: Complete personal-ip-account-diagnosis-v2 assessment.
+
+    Returns:
+        Compiled diagnosis with evidence-context and diagnosis digests.
+    """
+    try:
+        context = await _account_diagnostic_service(get_personal_ip_runtime()).build(
+            owner_user_id=resolve_runtime_user_id(runtime),
+            account_id=account_id,
+        )
+        return _json(
+            compile_account_diagnosis(
+                context=context,
+                assessment=assessment.model_dump(mode="json"),
+            )
+        )
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json(
+            {
+                "status": "error",
+                "category": "invalid_request",
+                "message": str(exc),
+            }
+        )
+    except Exception:
+        return _json(
+            {
+                "status": "error",
+                "category": "internal",
+                "message": "Personal-IP account diagnosis is unavailable",
+            }
+        )
 
 
 async def _personal_ip_begin_video_production(
@@ -216,7 +385,9 @@ async def _personal_ip_begin_video_production(
         source: Immutable source snapshot, such as an idea, brief or full script.
         delivery_spec: Aspect ratios, durations, languages and target deliverables.
         provider_policy: Preferred models/providers and allowed fallbacks.
-        budget: Currency, limits and approval thresholds; may be empty.
+        budget: Immutable currency, hard_limit and paid-call approval policy.
+            It may be empty only for a free-only production; paid provider
+            submission requires an enforceable hard_limit.
         production_mode: faceless_material for Personal-IP material videos, or generative_cinematic for films and ads.
 
     Returns:
@@ -245,6 +416,214 @@ async def _personal_ip_begin_video_production(
         return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
     except Exception:
         return _json({"status": "error", "category": "internal", "message": "Video production could not be created"})
+
+
+async def _personal_ip_reserve_video_budget(
+    runtime: Runtime,
+    production_id: str,
+    reservation_key: str,
+    capability: str,
+    provider: str,
+    entity_type: str,
+    entity_id: str,
+    maximum_amount: float,
+    currency: str,
+    approval_event_key: str,
+    request_ref: str,
+) -> str:
+    """Reserve a paid media call's hard maximum before provider submission.
+
+    Call this before any paid image, video, speech or cloud-processing request.
+    The server serializes concurrent reservations against the production's
+    immutable hard limit. When the production requires explicit approval,
+    approval_event_key must identify the human-approved paid-provider review
+    whose budget request exactly matches this reservation. Every retry needs a
+    new reservation_key and reservation.
+
+    Args:
+        production_id: Server-issued video production id.
+        reservation_key: Stable idempotency key for this one provider attempt.
+        capability: Provider capability such as image_generation, video_generation, speech_generation or media_processing.
+        provider: Exact provider that will receive the paid request.
+        entity_type: Production entity targeted by the call.
+        entity_id: Stable target entity id.
+        maximum_amount: Hard maximum this call may consume, in the budget currency.
+        currency: Currency matching the immutable production budget.
+        approval_event_key: Approved paid-provider review event key, or empty only when approval is disabled.
+        request_ref: Credential-free immutable request or shot reference.
+
+    Returns:
+        JSON reservation receipt and current reserved, spent and available budget.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.video_productions is None:
+            raise RuntimeError("Personal-IP video production is not available")
+        result = await services.video_productions.reserve_budget(
+            production_id,
+            owner_user_id=resolve_runtime_user_id(runtime),
+            reservation_key=reservation_key,
+            capability=capability,
+            provider=provider,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            maximum_amount=maximum_amount,
+            currency=currency,
+            approval_event_key=str(approval_event_key or "").strip() or None,
+            request_ref=request_ref,
+        )
+        if result is None:
+            return _json(
+                {
+                    "status": "error",
+                    "category": "not_found",
+                    "message": "Video production not found",
+                }
+            )
+        return _json({"operation_status": "ok", **result})
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json(
+            {
+                "status": "error",
+                "category": "invalid_request",
+                "message": str(exc),
+            }
+        )
+    except Exception:
+        return _json(
+            {
+                "status": "error",
+                "category": "internal",
+                "message": "Video budget could not be reserved",
+            }
+        )
+
+
+async def _personal_ip_settle_video_budget(
+    runtime: Runtime,
+    production_id: str,
+    reservation_id: str,
+    settlement_key: str,
+    actual_amount: float,
+    currency: str,
+    provider_receipt_ref: str,
+) -> str:
+    """Accumulate one provider attempt's actual cost against its reservation.
+
+    Settle every succeeded or failed paid attempt from a real provider billing
+    receipt before retrying. Actual cost cannot exceed the reserved maximum.
+    If billing is temporarily unknown, keep the reservation active and settle
+    it only when evidence arrives; do not guess or release it.
+
+    Args:
+        production_id: Server-issued video production id.
+        reservation_id: Reservation returned before this provider submission.
+        settlement_key: Stable idempotency key for this billing receipt.
+        actual_amount: Actual provider cost, including zero for a called but free attempt.
+        currency: Currency matching the reservation.
+        provider_receipt_ref: Credential-free immutable provider billing/execution receipt reference.
+
+    Returns:
+        JSON settlement receipt and current reserved, spent and available budget.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.video_productions is None:
+            raise RuntimeError("Personal-IP video production is not available")
+        result = await services.video_productions.settle_budget(
+            production_id,
+            owner_user_id=resolve_runtime_user_id(runtime),
+            reservation_id=reservation_id,
+            settlement_key=settlement_key,
+            actual_amount=actual_amount,
+            currency=currency,
+            provider_receipt_ref=provider_receipt_ref,
+        )
+        if result is None:
+            return _json(
+                {
+                    "status": "error",
+                    "category": "not_found",
+                    "message": "Video production not found",
+                }
+            )
+        return _json({"operation_status": "ok", **result})
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json(
+            {
+                "status": "error",
+                "category": "invalid_request",
+                "message": str(exc),
+            }
+        )
+    except Exception:
+        return _json(
+            {
+                "status": "error",
+                "category": "internal",
+                "message": "Video budget could not be settled",
+            }
+        )
+
+
+async def _personal_ip_release_video_budget(
+    runtime: Runtime,
+    production_id: str,
+    reservation_id: str,
+    release_key: str,
+    reason: str,
+) -> str:
+    """Release a reservation only when no provider submission occurred.
+
+    Never release an uncertain, failed or successful provider call merely to
+    regain capacity. Called attempts must be settled, including a proven zero
+    actual cost. Release is only for cancellation before submission.
+
+    Args:
+        production_id: Server-issued video production id.
+        reservation_id: Active reservation to release.
+        release_key: Stable idempotency key for this cancellation.
+        reason: Evidence-grounded reason proving the provider was not called.
+
+    Returns:
+        JSON release receipt and current reserved, spent and available budget.
+    """
+    try:
+        services = get_personal_ip_runtime()
+        if services.video_productions is None:
+            raise RuntimeError("Personal-IP video production is not available")
+        result = await services.video_productions.release_budget(
+            production_id,
+            owner_user_id=resolve_runtime_user_id(runtime),
+            reservation_id=reservation_id,
+            release_key=release_key,
+            reason=reason,
+        )
+        if result is None:
+            return _json(
+                {
+                    "status": "error",
+                    "category": "not_found",
+                    "message": "Video production not found",
+                }
+            )
+        return _json({"operation_status": "ok", **result})
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json(
+            {
+                "status": "error",
+                "category": "invalid_request",
+                "message": str(exc),
+            }
+        )
+    except Exception:
+        return _json(
+            {
+                "status": "error",
+                "category": "internal",
+                "message": "Video budget could not be released",
+            }
+        )
 
 
 async def _append_compiled_video_contract(
@@ -2017,7 +2396,10 @@ async def _personal_ip_record_video_production_event(
             ``review_kind`` equal to ``candidate_selection`` and include ``shot_id``,
             ``candidate_id``, ``artifact_ref``, ``artifact_sha256`` and the
             linked ``qa_event_ref`` so the workbench can render the exact
-            candidate confirmation card.
+            candidate confirmation card. A provider-request event must declare
+            ``billing_mode``. Paid requests include the active
+            ``budget_reservation_id`` and an estimated cost no greater than
+            that reservation; free requests carry known zero cost.
         input_refs: Immutable artifact or upstream event references.
         output_refs: Generated artifact, media or delivery references.
         provider: Provider or executor name, including deerflow or manual.
@@ -2123,7 +2505,11 @@ async def _personal_ip_ingest_media_execution(
             generation requires ``task_id`` and at least one output containing
             ``ref``, bare lowercase 64-character ``sha256`` and non-negative
             ``size_bytes``. Cost must use known or estimated status with amount
-            and currency, or unknown status with a reason.
+            and currency, or unknown status with a reason. Before a running
+            paid receipt is submitted, its parameters include
+            ``billing_mode`` set to ``paid`` and the server-issued
+            ``budget_reservation_id``; a free/local request uses
+            ``billing_mode`` set to ``free`` and known zero cost.
 
     Returns:
         JSON updated production projection and ordered immutable event history.
@@ -2894,6 +3280,21 @@ personal_ip_operating_cockpit_tool = tool(
     parse_docstring=True,
 )(_personal_ip_operating_cockpit)
 
+personal_ip_startup_context_tool = tool(
+    "personal_ip_startup_context",
+    parse_docstring=True,
+)(_personal_ip_startup_context)
+
+personal_ip_account_diagnostic_context_tool = tool(
+    "personal_ip_account_diagnostic_context",
+    parse_docstring=True,
+)(_personal_ip_account_diagnostic_context)
+
+personal_ip_compile_account_diagnosis_tool = tool(
+    "personal_ip_compile_account_diagnosis",
+    parse_docstring=True,
+)(_personal_ip_compile_account_diagnosis)
+
 personal_ip_begin_video_production_tool = tool(
     "personal_ip_begin_video_production",
     parse_docstring=True,
@@ -3003,6 +3404,21 @@ personal_ip_record_video_production_event_tool = tool(
     "personal_ip_record_video_production_event",
     parse_docstring=True,
 )(_personal_ip_record_video_production_event)
+
+personal_ip_reserve_video_budget_tool = tool(
+    "personal_ip_reserve_video_budget",
+    parse_docstring=True,
+)(_personal_ip_reserve_video_budget)
+
+personal_ip_settle_video_budget_tool = tool(
+    "personal_ip_settle_video_budget",
+    parse_docstring=True,
+)(_personal_ip_settle_video_budget)
+
+personal_ip_release_video_budget_tool = tool(
+    "personal_ip_release_video_budget",
+    parse_docstring=True,
+)(_personal_ip_release_video_budget)
 
 personal_ip_ingest_media_execution_tool = tool(
     "personal_ip_ingest_media_execution",

@@ -48,7 +48,7 @@ from deerflow.persistence.migrations._helpers import _normalize_default
 asyncio_test = pytest.mark.asyncio
 
 
-HEAD = "0019_personal_ip_strategy_versions"
+HEAD = "0020_personal_ip_differentiation"
 BASELINE = "0001_baseline"
 
 
@@ -138,6 +138,8 @@ async def test_empty_branch_creates_all_and_stamps_head(tmp_path: Path) -> None:
             "threads_meta",
             "feedback",
             "personal_ip_accounts",
+            "personal_ip_asset_observations",
+            "personal_ip_differentiation_versions",
             "personal_ip_evidence_promotions",
             "personal_ip_metric_observations",
             "personal_ip_platform_connections",
@@ -158,6 +160,16 @@ async def test_empty_branch_creates_all_and_stamps_head(tmp_path: Path) -> None:
         }:
             assert required in tables, f"missing table: {required}"
         assert "token_usage_by_model" in await _runs_columns(engine)
+        async with engine.connect() as conn:
+            strategy_columns = await conn.run_sync(
+                lambda c: {
+                    column["name"]
+                    for column in sa.inspect(c).get_columns(
+                        "personal_ip_strategy_versions"
+                    )
+                }
+            )
+        assert "differentiation_version_id" in strategy_columns
         assert await _alembic_version(engine) == HEAD
         # The partial unique index on (thread_id WHERE status IN pending/running)
         # must exist on a fresh DB because the empty-branch stamps head without

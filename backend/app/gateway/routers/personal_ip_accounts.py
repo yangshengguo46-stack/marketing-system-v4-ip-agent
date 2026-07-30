@@ -55,7 +55,7 @@ class PersonalIPAccountUpdateRequest(BaseModel):
 
 class PersonalIPSubjectCreateRequest(BaseModel):
     display_name: str = Field(min_length=1, max_length=128)
-    subject_type: Literal["creator", "brand", "organization"] = "creator"
+    subject_type: Literal["creator", "brand", "product", "organization"] = "creator"
     relationship: Literal["self", "client", "partner"] = "self"
     description: str = Field(default="", max_length=4000)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -68,7 +68,7 @@ class PersonalIPSubjectCreateRequest(BaseModel):
 
 class PersonalIPSubjectUpdateRequest(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=128)
-    subject_type: Literal["creator", "brand", "organization"] | None = None
+    subject_type: Literal["creator", "brand", "product", "organization"] | None = None
     relationship: Literal["self", "client", "partner"] | None = None
     description: str | None = Field(default=None, max_length=4000)
     status: Literal["active", "archived"] | None = None

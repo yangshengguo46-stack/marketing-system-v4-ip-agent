@@ -70,14 +70,18 @@ def create_audience_lite_app(
             variants = await active_generator.generate(request)
         except AudienceLiteGenerationError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
+        if request.audience_basis == "cold_start_hypothesis":
+            variants = [variant.model_copy(update={"evidence_level": "unmeasured_hypothesis"}) for variant in variants]
         return AudiencePreflightResult(
             provider=active_generator.provider,
             model_version=active_generator.model_version,
             algorithm_version=active_generator.algorithm_version,
             request_digest=request.request_digest,
-            audience_basis="aggregate_account_cohort",
+            audience_basis=request.audience_basis,
             variants=variants,
-            warnings=["HLLM-Lite v0 generates audience-conditioned candidates but does not emit a learned match score."],
+            warnings=[
+                ("HLLM-Lite emits account-history-conditioned hypotheses" if request.audience_basis == "aggregate_account_cohort" else "HLLM-Lite emits unmeasured cold-start hypotheses") + ", not viral guarantees or a learned match score."
+            ],
         )
 
     return service

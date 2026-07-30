@@ -9,6 +9,14 @@ description: Use this skill instead of WebSearch for ANY question requiring web 
 
 This skill provides a systematic methodology for conducting thorough web research. **Load this skill BEFORE starting any content generation task** to ensure you gather sufficient information from multiple angles, depths, and sources.
 
+Product-specific onboarding gates take precedence over this generic research
+default. In particular, do not load or run deep research before the first
+visible reply to a new Personal-IP owner who is only asking how to start,
+position or incubate an IP. First collect the next material entity or business
+fact; research becomes eligible only when that fact can make source and
+benchmark selection meaningful. A concrete supplied script, asset or link may
+still be handled directly under its owning workflow.
+
 ## When to Use This Skill
 
 **Always load this skill when:**

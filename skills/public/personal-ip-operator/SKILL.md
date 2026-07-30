@@ -1,6 +1,6 @@
 ---
 name: personal-ip-operator
-description: "Operate a creator or personal-IP account end to end: account scope, research, positioning, topic selection, scripts, visual assets, video production, publishing preparation, receipts, and retrospective learning."
+description: "Operate a person, brand, product or organization IP end to end: entity scope, differentiation, research, positioning, content, production, publishing, observed influence and retrospective learning."
 license: MIT
 allowed-tools:
   - ask_clarification
@@ -17,11 +17,13 @@ allowed-tools:
   - grep
   - image_search
   - ls
+  - personal_ip_account_diagnostic_context
   - personal_ip_begin_publish_receipt
   - personal_ip_begin_video_production
   - personal_ip_collect_browser_page
   - personal_ip_collect_browser_portfolio_today
   - personal_ip_compile_approved_video_assembly
+  - personal_ip_compile_account_diagnosis
   - personal_ip_compile_generated_shot_qa
   - personal_ip_compile_video_asset_manifest
   - personal_ip_compile_video_continuity
@@ -49,6 +51,9 @@ allowed-tools:
   - personal_ip_prepare_browser_publish
   - personal_ip_promote_evidence
   - personal_ip_read_strategy_context
+  - personal_ip_read_differentiation
+  - personal_ip_record_asset_observation
+  - personal_ip_record_differentiation
   - personal_ip_record_strategy
   - personal_ip_read_evidence_promotion
   - personal_ip_read_platform_observation
@@ -59,12 +64,16 @@ allowed-tools:
   - personal_ip_record_browser_observation
   - personal_ip_record_publish_attempt
   - personal_ip_record_video_production_event
+  - personal_ip_release_video_budget
   - personal_ip_render_local_remotion_scene
   - personal_ip_render_locked_video_delivery
+  - personal_ip_reserve_video_budget
   - personal_ip_run_local_generated_shot_qa
   - personal_ip_run_preflight
   - personal_ip_seal_retrospective
   - personal_ip_select_browser_account
+  - personal_ip_settle_video_budget
+  - personal_ip_startup_context
   - personal_ip_sync_douyin_portfolio
   - personal_ip_sync_douyin_post
   - present_files
@@ -79,7 +88,7 @@ allowed-tools:
 
 # Personal IP operator
 
-Treat this as an agent operating an account, not a content-generation app.
+Treat this as an agent operating an influence asset, not a content-generation app.
 DeerFlow owns planning and execution. The operated subject owns person,
 business and positioning truth; the account record only identifies a platform
 execution target.
@@ -112,14 +121,38 @@ philosophical diagnoses.
 
 ## Work loop
 
-1. Call `personal_ip_operating_cockpit` before planning substantial work. It is
-   the authoritative whole-portfolio read model for incubation,
-   preflight, publishing, performance, retrospective, evidence and video queues.
-   Determine whether the request is portfolio-wide or a concrete account
-   operation; never infer an account restriction for a global request.
-   Call `personal_ip_read_strategy_context` for each relevant subject.
-2. If no validated operating strategy exists, default to monetization-first incubation unless
-   the user explicitly chooses influence first. Never claim modeling is complete
+1. A true-empty orientation/incubation request is handled by the Gateway before
+   this Skill is loaded: one provisional route, then a bounded evidence question
+   and target-group/problem question, with no model, web or ledger call. Do not
+   duplicate those intake turns. For later or non-orientation turns, call
+   `personal_ip_startup_context` before deciding how much durable state a new
+   conversation needs. For `new_owner`, do not call the full cockpit or
+   inspect empty strategy, publishing, metric, retrospective or video ledgers;
+   answer the current request and learn only the next material fact. Platform
+   login is not an onboarding prerequisite unless the requested action needs
+   it. If a first-use orientation reaches this Skill through a nonstandard
+   entry point, preserve the same boundary: before web research,
+   subject/account creation or benchmark selection, give a short provisional
+   roadmap and ask exactly one question that can change entity, objectives,
+   buyer, offer, proof or production capacity. Do not apply this delay to a
+   concrete supplied script, asset or link. For `returning_owner`,
+   resume/publish/performance/portfolio/video work, call
+   `personal_ip_operating_cockpit`, then
+   `personal_ip_read_strategy_context` for each relevant subject. The cockpit
+   remains the authoritative whole-portfolio read model for durable queues.
+2. Treat a person, brand, product or organization as the primary operated
+   entity. Before positioning is fixed, use `design-ip-differentiation`
+   internally to establish intended influence, real alternatives, proprietary
+   truth, choice and belief reasons, explicit sacrifice, dramatic engine,
+   distinctive encoding and falsifiable tests. Persist versions with
+   `personal_ip_record_differentiation`; read the current version with
+   `personal_ip_read_differentiation`. Strategy, series and scripts must inherit
+   a pilot or adopted version rather than inventing a parallel slogan.
+3. If no validated operating strategy exists, treat influence as the common IP
+   asset mechanism for a person, brand, product or organization. Never ask the
+   user to choose between influence and monetization as competing modes.
+   Persist separate influence, behavioral and economic goals, time horizons,
+   priority order, guardrails and explicit non-goals. Never claim modeling is complete
    from a short self-description. Work naturally, one relevant question at a
    time, and persist each evidence-backed step with
    `personal_ip_record_strategy` without exposing its private stage or fields.
@@ -147,24 +180,31 @@ philosophical diagnoses.
      checks, avatar/visual direction, at least two bios, pinned content, initial
      experiments, conversion path, success metrics and adjustment rules.
    - Pilot: distinguish reach, trust, intent and actual commercial signals.
-     Specify the experiment, capacity-based cadence, observation window and
-     failure rule. Never substitute a follower target or unsupported deadline
-     for an operating plan.
+     Specify target audience, evidence level, an observable mechanism
+     hypothesis, predicted signal, failure condition, platform-distribution
+     assumptions, uncertainty, capacity-based cadence and observation window.
+     Never substitute a follower target or unsupported deadline for an
+     operating plan.
 
-   In influence-first mode, still preserve plausible monetization paths. Content
-   roles are reach, trust, proof and conversion; monetization-first does not mean
-   every post is a sales pitch. Strategy validation requires pilot evidence and
+   Preserve plausible monetization paths without forcing every influence result
+   to convert immediately. Content roles are reach, trust, proof and conversion.
+   Strategy validation requires pilot evidence and
    a documented commercial decision. Until then, describe outputs as “current
    judgment”, “candidate direction” or “pilot plan”, never “model complete” or
    “position complete”. Do not construct a temporary creator profile inside a
    preflight.
-3. Inspect evidence before strategy: prior content, comments, metrics, source
+4. Inspect evidence before strategy: prior content, comments, metrics, source
    documents and competitor examples.
    Do not give precise spending, posting-time, audience-size or benchmark
    prescriptions until the latest operating strategy and relevant recent
    performance evidence have been inspected.
    Without that evidence, label suggestions as hypotheses and define the next
    measurement instead of inventing numbers.
+   Do not treat dopamine, mirror neurons, the Zeigarnik effect or another named
+   neural/cognitive effect as proof of retention or sharing. Do not map
+   attention, emotion, diffusion and conversion one-to-one onto platform
+   metrics. Viral reach also depends on audience match, recommendation
+   eligibility/allocation, competition, timing and stochastic social feedback.
    A temporary production or uploaded video is not identity evidence by itself.
    After browser login, collect the creator backend as deeply as the requested
    operation needs: account/content inventories, per-post performance, audience
@@ -206,6 +246,42 @@ philosophical diagnoses.
    thread to that exact persistent account profile. Prefer another collection
    with `target_url` for deeper page reads. A login page from an unselected
    temporary browser never proves the saved account login has expired.
+   When the user asks whether a connected account should continue, adjust or
+   restart, route to the matching internal platform account-diagnosis Skill:
+   `diagnose-douyin-account`, `diagnose-wechat-channels-account`,
+   `diagnose-wechat-official-account`, `diagnose-xiaohongshu-account`,
+   `diagnose-x-account`, `diagnose-instagram-account`,
+   `diagnose-youtube-account` or `diagnose-tiktok-account`. Call
+   `personal_ip_account_diagnostic_context` first and
+   `personal_ip_compile_account_diagnosis` last. Content mechanisms and the
+   reach/trust/intent/conversion funnel are the primary diagnosis; platform
+   rules can prove eligibility constraints or explain surface adaptation, but
+   unpublished ranking weights remain unknown. Low reach alone never justifies
+   a new account. Recommend a new account only when current platform evidence
+   proves a persistent structural restriction, legacy audience-positioning
+   lock, identity/business conflict or unrecoverable compliance history.
+   When a structural conclusion is possible, preserve the current rendered
+   status through `personal_ip_record_browser_observation` if the direct
+   collector did not already normalize it. Use only fields visibly supported
+   by the page: `recommendation_eligibility`, `remediation_status`,
+   `restriction_reason_id`, `audience_positioning_fit`,
+   `identity_business_fit` or
+   `compliance_recoverability`, plus exact `observed_at` and coverage. Never
+   fabricate these summary states. Persistent recommendation ineligibility
+   needs the same reason observed as restricted across at least seven days, the
+   latest status collected within 24 hours still restricted and its repair or
+   appeal failed/exhausted.
+   This seven-day minimum is a conservative product decision gate, not a
+   claimed platform ranking rule. A single current restriction means repair
+   and retest, not replace.
+   Call work “self-entertainment” only after at least three distinct measured
+   posts and fresh, complete evidence show that influence, behavioral and
+   economic outcomes all failed. Recognition, trust, adoption or economic
+   success proves active IP operation even if another axis is weak; any missing
+   axis stays unproven. The 30-day freshness window is a conservative product
+   diagnosis gate, not a platform rule. State it as an operating diagnosis, not an
+   insult, and prescribe a controlled content experiment before blaming the
+   platform.
 4. Produce the smallest useful plan and label assumptions.
 5. Route general research and creation through available Skills. Read
    `volcengine-stack` before any ByteDance media work.
@@ -227,13 +303,38 @@ philosophical diagnoses.
    Publication, send, deletion, settings and payment intents need a matching
    structured `risk_confirmation` request id.
 7. For browser-first publication, call `personal_ip_prepare_browser_publish`
-   with the selected account and exact preflight `variant_id` before clicking
-   submit. It selects the persistent profile, freezes the request and writes
-   the pending handoff atomically. After Browser Control completes the action,
-   open the resulting public post and call `personal_ip_finish_browser_publish`.
-   It verifies the live page belongs to the selected platform and matches the
-   declared post URL/id before sealing `published`; otherwise record `failed`
-   or `unknown`. API/UI-TARS executors use the lower-level
+   with the selected account, exact preflight `variant_id` and a
+   `personal-ip-publish-compliance-v1` declaration before clicking submit.
+   Determine whether the content has a commercial relationship, contains
+   generated or materially altered media, touches a sensitive topic and has
+   confirmed rights. The declaration's disclosure plan must exactly match the
+   selected platform policy; sensitive health, finance, election, conflict,
+   disaster, minors or regulated-goods content requires documented human
+   review. Use these internal disclosure identifiers in policy order:
+   Douyin/WeChat Channels/WeChat Official/Xiaohongshu use
+   `visible_ad_disclosure` for commercial content and
+   `platform_ai_generated_label` for generated/materially altered media; X
+   uses `visible_paid_partnership_disclosure` (not for own-brand content) and
+   `visible_synthetic_media_context`; Instagram uses
+   `paid_partnership_label` (not for own-brand content) and
+   `ai_disclosure_tool`; YouTube uses `paid_promotion_setting` (not for
+   own-brand content) and `altered_content_setting`; TikTok uses
+   `content_disclosure_own_brand` or
+   `content_disclosure_branded_content`, followed by
+   `ai_generated_content_setting`. Use an empty list only when neither axis
+   requires disclosure. The server, not the agent, compiles the versioned
+   policy receipt.
+   It selects the persistent profile, freezes both content and compliance
+   request and writes the pending handoff atomically. After Browser Control
+   completes the action, verify each required label/disclosure, retain
+   credential-free evidence references, open the resulting public post and
+   call `personal_ip_finish_browser_publish` with
+   `personal-ip-publish-compliance-evidence-v1`. It verifies the evidence is
+   bound to the frozen policy receipt and that the live page belongs to the
+   selected platform and matches the declared post URL/id before sealing
+   `published`; otherwise record `failed` or `unknown`. Never infer that a
+   platform switch or visible disclosure was applied merely because the
+   upload succeeded. API/UI-TARS executors use the lower-level
    `personal_ip_begin_publish_receipt` and
    `personal_ip_record_publish_attempt` with equivalent provider evidence.
 8. After publication, distinguish observations from interpretations. Persist
@@ -275,6 +376,22 @@ for local source video, run `personal_ip_inspect_local_video_material` first,
 inspect the timestamped frames/contact sheet, and cite its immutable event and
 frame refs in the later material selection. Mechanical extraction never
 invents semantic relevance.
+For every production that may make paid provider calls, freeze `currency`,
+`hard_limit` and `paid_calls_require_explicit_approval` in its initial budget.
+Before each paid attempt, append a `review_requested` receipt with
+`review_kind: paid_provider_call` and an exact `budget_request` containing the
+reservation key, provider, capability, maximum amount, currency and target
+entity; wait for the workbench's trusted approved review when approval is
+required. Then call `personal_ip_reserve_video_budget` before provider
+submission. The subsequent running provider receipt must declare
+`billing_mode: paid`, the returned `budget_reservation_id` and an estimated
+cost within that maximum. After every successful or failed attempt, call
+`personal_ip_settle_video_budget` with authoritative actual cost—even zero.
+If cost is temporarily unknown, leave the reservation active until billing
+evidence arrives. Call `personal_ip_release_video_budget` only when the
+provider was never called. Every retry uses a new reservation so earlier
+actual cost remains accumulated; never split or race calls to evade the hard
+limit. Local/free execution declares `billing_mode: free` and known zero cost.
 cinematic videos compile their continuity hash chain. Local generated
 candidates use `personal_ip_run_local_generated_shot_qa` so project-pinned
 ffprobe, full decode, first-frame SSIM, consecutive-frame SSIM, motion-cadence

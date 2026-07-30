@@ -3,6 +3,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
+from support.personal_ip_publish import (
+    compliant_publish_request,
+    compliant_publish_result,
+)
 
 from deerflow.config.database_config import DatabaseConfig
 from deerflow.persistence.engine import close_engine, get_session_factory, init_engine_from_config
@@ -13,6 +17,25 @@ from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishR
 from deerflow.persistence.personal_ip_retrospectives import PersonalIPRetrospectiveRepository
 from deerflow.personal_ip.audience_provider import AudiencePreflightRequest, AudiencePreflightResult
 from deerflow.personal_ip.hllm_creator import HLLMCreatorAdapter
+
+
+def _variant(variant_id: str, text: str) -> dict:
+    return {
+        "variant_id": variant_id,
+        "text": text,
+        "match_score": None,
+        "evidence_level": "account_history_conditioned",
+        "mechanism_hypotheses": [
+            {
+                "layer": "attention_prediction",
+                "claim": "目标人群识别到相关问题后更可能继续观看",
+                "predicted_signal": "首段继续观看比例提高",
+                "failure_condition": "目标人群无法复述内容承诺",
+            }
+        ],
+        "distribution_assumptions": ["平台分发给相关兴趣人群"],
+        "uncertainty": "历史表现不能保证本次结果",
+    }
 
 
 def _preflight_contract() -> tuple[AudiencePreflightRequest, AudiencePreflightResult]:
@@ -47,7 +70,7 @@ def _preflight_contract() -> tuple[AudiencePreflightRequest, AudiencePreflightRe
         algorithm_version="lite-v0",
         request_digest=request.request_digest,
         audience_basis="aggregate_account_cohort",
-        variants=[{"variant_id": "v1", "text": "候选文案", "match_score": None}],
+        variants=[_variant("v1", "候选文案")],
     )
     return request, result
 
@@ -79,14 +102,21 @@ async def test_retrospective_seals_prediction_publish_and_actual_evidence(tmp_pa
         account_id=account["id"],
         preflight_id=preflight["id"],
         executor="platform_api",
-        request_payload={"variant_id": "v1", "caption": "候选文案"},
+        request_payload=compliant_publish_request(
+            "douyin",
+            variant_id="v1",
+            caption="候选文案",
+        ),
     )
     await receipts.record_attempt(
         receipt["id"],
         owner_user_id="user-1",
         attempt_key="published",
         status="published",
-        result_payload={"post_id": "post-1"},
+        result_payload=compliant_publish_result(
+            receipt,
+            post_id="post-1",
+        ),
         external_post_id="post-1",
         occurred_at=datetime(2026, 7, 21, 8, 0, tzinfo=UTC),
     )
@@ -157,7 +187,10 @@ async def test_retrospective_rejects_unpublished_or_unrelated_evidence(tmp_path)
         account_id=account["id"],
         preflight_id=preflight["id"],
         executor="manual",
-        request_payload={"variant_id": "v1"},
+        request_payload=compliant_publish_request(
+            "douyin",
+            variant_id="v1",
+        ),
     )
     with pytest.raises(ValueError, match="must be published"):
         await retrospectives.seal(
@@ -173,7 +206,10 @@ async def test_retrospective_rejects_unpublished_or_unrelated_evidence(tmp_path)
         owner_user_id="user-1",
         attempt_key="published",
         status="published",
-        result_payload={"post_id": "post-1"},
+        result_payload=compliant_publish_result(
+            receipt,
+            post_id="post-1",
+        ),
         external_post_id="post-1",
     )
     other_receipt = await receipts.begin(
@@ -183,7 +219,10 @@ async def test_retrospective_rejects_unpublished_or_unrelated_evidence(tmp_path)
         account_id=other["id"],
         preflight_id=None,
         executor="manual",
-        request_payload={"caption": "其他内容"},
+        request_payload=compliant_publish_request(
+            "xiaohongshu",
+            caption="其他内容",
+        ),
     )
     observation = await metrics.record(
         owner_user_id="user-1",

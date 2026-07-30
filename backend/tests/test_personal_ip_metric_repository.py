@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
+from support.personal_ip_publish import compliant_publish_request
 
 from deerflow.config.database_config import DatabaseConfig
 from deerflow.persistence.engine import close_engine, get_session_factory, init_engine_from_config
@@ -130,7 +131,10 @@ async def test_metric_observation_is_idempotent_and_validates_publish_receipt_ac
         account_id=account["id"],
         preflight_id=None,
         executor="platform_api",
-        request_payload={"caption": "测试"},
+        request_payload=compliant_publish_request(
+            "douyin",
+            caption="测试",
+        ),
     )
 
     kwargs = {

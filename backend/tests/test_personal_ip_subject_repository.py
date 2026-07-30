@@ -1,5 +1,7 @@
 import pytest
+from pydantic import TypeAdapter
 
+from app.gateway.routers.personal_ip_accounts import PersonalIPSubjectCreateRequest
 from deerflow.config.database_config import DatabaseConfig
 from deerflow.persistence.engine import close_engine, get_session_factory, init_engine_from_config
 from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
@@ -41,6 +43,17 @@ async def test_subject_crud_and_owner_isolation(tmp_path):
     await close_engine()
 
 
+def test_product_is_a_first_class_operating_subject_type() -> None:
+    request = TypeAdapter(PersonalIPSubjectCreateRequest).validate_python(
+        {
+            "display_name": "IP Agent",
+            "subject_type": "product",
+            "relationship": "self",
+        }
+    )
+    assert request.subject_type == "product"
+
+
 @pytest.mark.asyncio
 async def test_accounts_can_only_attach_to_active_same_owner_subjects(tmp_path):
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
@@ -59,9 +72,7 @@ async def test_accounts_can_only_attach_to_active_same_owner_subjects(tmp_path):
     )
 
     assert account["subject_id"] == own_subject["id"]
-    assert [item["id"] for item in await accounts.list("user-1", subject_id=own_subject["id"])] == [
-        account["id"]
-    ]
+    assert [item["id"] for item in await accounts.list("user-1", subject_id=own_subject["id"])] == [account["id"]]
     with pytest.raises(ValueError, match="subject not found"):
         await accounts.update(
             account["id"],

@@ -22,7 +22,6 @@ async def _personal_ip_record_strategy(
     stage: str,
     display_name: str = "",
     subject_id: str = "",
-    mode: str = "monetization_first",
     person_model: dict | None = None,
     business_model: dict | None = None,
     benchmark_research: dict | None = None,
@@ -30,30 +29,37 @@ async def _personal_ip_record_strategy(
     launch_package: dict | None = None,
     validation: dict | None = None,
     evidence_refs: list[dict] | None = None,
+    differentiation_version_id: str = "",
+    subject_type: str = "creator",
 ) -> str:
-    """Append one private Personal-IP operating-strategy snapshot.
+    """Append one private IP influence-asset operating-strategy snapshot.
 
-    Use this throughout natural conversation. The default mode is
-    monetization_first. Never expose stage names, private fields or the
-    underlying method to the customer. Omitted documents inherit from the
-    latest immutable snapshot. The repository permits only an in-place
-    revision or the next stage, so person evidence, business logic, real
-    benchmarks, positioning alternatives, a complete launch package and
-    observed pilot evidence cannot be skipped.
+    Use this throughout natural conversation for a person, brand, product or
+    organization. Every business model declares influence, behavioral and
+    economic goals independently. Never expose stage names, private fields or
+    the underlying method to the customer. Omitted documents inherit from the
+    latest immutable snapshot. The removed binary mode remains only inside
+    historical storage and is not an Agent input.
 
     Args:
         operation_key: Stable idempotency key for this exact strategy write.
         stage: Internal strategy stage from evidence_collecting through scaling.
         display_name: Natural person or brand name; required only when creating the first subject.
         subject_id: Existing owner-scoped subject id, or empty when zero or one subject exists.
-        mode: monetization_first by default; influence_first only on explicit user request.
-        person_model: Basic facts, history, proof, boundaries, media observations and capacity.
-        business_model: Buyer, paid problem, offer, proof, economics and monetization paths.
+        person_model: Operated-entity evidence. For a creator use facts, history,
+            expertise, boundaries, media presence and capacity. For a brand,
+            product or organization use entity_type, category/lifecycle/
+            operating facts, history, capability evidence, public interfaces,
+            stakeholders, boundaries and capacity.
+        business_model: Influence, behavioral and economic objectives plus
+            buyer, paid problem, offer, proof, economics and monetization paths.
         benchmark_research: Evidence-backed real account research with source URLs.
         positioning_candidates: Two or three differentiated business-position alternatives.
         launch_package: Name, handle, avatar, bio, pinned content, pilot and conversion package.
         validation: Pilot, commercial-signal and validation evidence.
         evidence_refs: Credential-free references to interviews, media, pages, metrics or receipts.
+        differentiation_version_id: Pilot or adopted thesis version required before positioning.
+        subject_type: creator, brand, product or organization when creating the first subject.
 
     Returns:
         JSON subject id, immutable version and current stage.
@@ -77,12 +83,15 @@ async def _personal_ip_record_strategy(
             cleaned_name = " ".join(str(display_name or "").split())
             if not cleaned_name:
                 raise ValueError("display_name is required for the first Personal-IP subject")
+            subject_type_key = str(subject_type or "").strip()
+            if subject_type_key not in {"creator", "brand", "product", "organization"}:
+                raise ValueError("subject_type must be creator, brand, product or organization")
             subject = await services.subjects.create(
                 owner_user_id=owner_user_id,
                 display_name=cleaned_name,
-                subject_type="creator",
+                subject_type=subject_type_key,
                 relationship="self",
-                metadata={"strategy_mode": mode},
+                metadata={"asset_mechanism": "influence"},
             )
 
         strategy = await services.brand.create_strategy_version(
@@ -90,7 +99,7 @@ async def _personal_ip_record_strategy(
             operation_key=operation_key,
             subject_id=subject["id"],
             stage=stage,
-            mode=mode,
+            mode="monetization_first",
             person_model=person_model,
             business_model=business_model,
             benchmark_research=benchmark_research,
@@ -98,6 +107,7 @@ async def _personal_ip_record_strategy(
             launch_package=launch_package,
             validation=validation,
             evidence_refs=evidence_refs,
+            differentiation_version_id=str(differentiation_version_id or "").strip() or None,
         )
         assigned_account_count = 0
         if services.accounts is not None and len(await services.subjects.list(owner_user_id)) == 1:
@@ -142,6 +152,9 @@ async def _personal_ip_read_strategy_context(runtime: Runtime, subject_id: str) 
             subject_id,
             owner_user_id=resolve_runtime_user_id(runtime),
         )
+        if strategy is not None:
+            strategy = dict(strategy)
+            strategy.pop("mode", None)
         return _json(
             {
                 "operation_status": "ok",

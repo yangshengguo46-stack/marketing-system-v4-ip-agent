@@ -572,6 +572,7 @@ export interface Translations {
       appearance: string;
       channels: string;
       localContext: string;
+      personalIPData: string;
       memory: string;
       tools: string;
       skills: string;

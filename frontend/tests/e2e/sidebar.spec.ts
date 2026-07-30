@@ -55,6 +55,7 @@ test.describe("Sidebar navigation", () => {
           stages: {},
           queues: {
             subjects_needing_strategy_validation: [],
+            subjects_needing_differentiation_validation: [],
             preflights_awaiting_publish: [],
             published_receipts_awaiting_metrics: [],
             published_receipts_awaiting_retrospective: [],
