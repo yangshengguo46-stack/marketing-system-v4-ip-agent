@@ -7,7 +7,12 @@ import {
   hasToolCalls,
   isHiddenFromUIMessage,
   stripInternalMarkers,
+  visibleAssistantContent,
 } from "../messages/utils";
+import {
+  isInternalSkillToolCall,
+  stripSkillSelectorForDisplay,
+} from "../skills";
 
 import type { AgentThread } from "./types";
 import { titleOfThread } from "./utils";
@@ -51,13 +56,25 @@ function formatMessageContent(message: Message): string {
   // Defence-in-depth: even if a middleware-injected marker slipped through
   // the `hide_from_ui` filter, scrub every known internal tag before the
   // content lands in a user-visible export file.
-  return stripInternalMarkers(text);
+  const visible = stripInternalMarkers(text);
+  return message.type === "human"
+    ? stripSkillSelectorForDisplay(visible)
+    : visibleAssistantContent(visible);
 }
 
 function formatToolCalls(message: Message): string {
   if (message.type !== "ai" || !hasToolCalls(message)) return "";
   const calls = message.tool_calls ?? [];
-  return calls.map((call) => `- **Tool:** \`${call.name}\``).join("\n");
+  return calls
+    .filter(
+      (call) =>
+        !isInternalSkillToolCall(
+          call.name,
+          (call.args ?? {}) as Record<string, unknown>,
+        ),
+    )
+    .map((call) => `- **Tool:** \`${call.name}\``)
+    .join("\n");
 }
 
 export function formatThreadAsMarkdown(
@@ -145,12 +162,22 @@ function buildJSONMessage(
     options.includeReasoning && msg.type === "ai"
       ? (extractReasoningContentFromMessage(msg) ?? undefined)
       : undefined;
-  const toolCalls =
+  const filteredToolCalls =
     options.includeToolCalls &&
     msg.type === "ai" &&
     "tool_calls" in msg &&
     msg.tool_calls?.length
-      ? msg.tool_calls
+      ? msg.tool_calls.filter(
+          (call) =>
+            !isInternalSkillToolCall(
+              call.name,
+              (call.args ?? {}) as Record<string, unknown>,
+            ),
+        )
+      : undefined;
+  const toolCalls =
+    filteredToolCalls && filteredToolCalls.length > 0
+      ? filteredToolCalls
       : undefined;
 
   // Drop rows with no exportable payload (empty content + no opted-in

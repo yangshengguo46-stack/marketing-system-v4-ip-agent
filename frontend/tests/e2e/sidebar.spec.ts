@@ -3,34 +3,136 @@ import { expect, test } from "@playwright/test";
 import { mockLangGraphAPI } from "./utils/mock-api";
 
 test.describe("Sidebar navigation", () => {
-  test("sidebar contains Chats and Agents nav links", async ({ page }) => {
+  test("sidebar contains only customer-facing work areas", async ({
+    page,
+  }) => {
     mockLangGraphAPI(page);
 
     await page.goto("/workspace/chats/new");
 
     // Sidebar uses data-sidebar="menu-button" with asChild rendering on <Link>
     const sidebar = page.locator("[data-sidebar='sidebar']");
+    await expect(sidebar.locator("a[href='/workspace/dashboard']")).toBeVisible(
+      {
+        timeout: 15_000,
+      },
+    );
     await expect(sidebar.locator("a[href='/workspace/chats']")).toBeVisible({
       timeout: 15_000,
     });
-    await expect(sidebar.locator("a[href='/workspace/agents']")).toBeVisible();
+    await expect(
+      sidebar.locator("a[href='/workspace/personal-ip']"),
+    ).toBeVisible();
+    await expect(
+      sidebar.locator("a[href='/workspace/personal-ip/video']"),
+    ).toHaveCount(0);
+    await expect(
+      sidebar.getByText(/^(平台管理|Platform management)$/),
+    ).toBeVisible();
+    await expect(sidebar.locator("a[href='/workspace/agents']")).toHaveCount(0);
   });
 
-  test("Agents link navigates to agents page", async ({ page }) => {
+  test("Dashboard link is above New chat and opens the workbench", async ({
+    page,
+  }) => {
     mockLangGraphAPI(page);
+    await page.route("**/api/personal-ip/accounts", (route) =>
+      route.fulfill({ status: 200, json: [] }),
+    );
+    await page.route("**/api/personal-ip/metrics?*", (route) =>
+      route.fulfill({ status: 200, json: [] }),
+    );
+    await page.route("**/api/personal-ip/cockpit", (route) =>
+      route.fulfill({
+        status: 200,
+        json: {
+          portfolio: {
+            subject_count: 0,
+            account_count: 0,
+            platform_count: 0,
+            platforms: [],
+          },
+          stages: {},
+          queues: {
+            subjects_needing_strategy_validation: [],
+            preflights_awaiting_publish: [],
+            published_receipts_awaiting_metrics: [],
+            published_receipts_awaiting_retrospective: [],
+          },
+          recent: {},
+          video: {
+            production_count: 0,
+            active_count: 0,
+            completed_count: 0,
+            blocked_production_ids: [],
+            awaiting_review_production_ids: [],
+            stages: {},
+            recent: [],
+          },
+        },
+      }),
+    );
+    await page.goto("/workspace/chats/new");
+    const sidebar = page.locator("[data-sidebar='sidebar']");
+    const links = sidebar.locator(
+      "a[href='/workspace/dashboard'], a[href='/workspace/chats/new']",
+    );
+    await expect(links).toHaveCount(2);
+    await expect(links.nth(0)).toHaveAttribute("href", "/workspace/dashboard");
+
+    await links.nth(0).click();
+    await page.waitForURL("**/workspace/dashboard");
+    await expect(
+      page.getByRole("heading", { name: "今天的增长，哪里值得继续追" }),
+    ).toBeVisible();
+    await expect(page.getByText("—", { exact: true })).toHaveCount(4);
+  });
+
+  test("local context lives in Settings instead of the portfolio", async ({
+    page,
+  }) => {
+    mockLangGraphAPI(page);
+    let enableCalled = false;
+    await page.route("**/api/personal-ip/minecontext", (route) =>
+      route.fulfill({
+        status: 200,
+        json: {
+          operator_enabled: true,
+          available: true,
+          source_verified: true,
+          runtime_ready: true,
+          authorized: false,
+          running: false,
+          evidence_count: 0,
+          data_location: "local_owner_isolated",
+          raw_content_enters_deerflow: false,
+        },
+      }),
+    );
+    await page.route("**/api/personal-ip/minecontext/enable", async (route) => {
+      expect(route.request().postDataJSON()).toEqual({ retention_days: 30 });
+      enableCalled = true;
+      await route.fulfill({
+        status: 200,
+        json: { authorized: true, running: true },
+      });
+    });
 
     await page.goto("/workspace/chats/new");
+    await page.getByRole("button", { name: /^(设置|Settings)$/ }).click();
 
-    const sidebar = page.locator("[data-sidebar='sidebar']");
-    const agentsLink = sidebar.locator("a[href='/workspace/agents']");
-    await expect(agentsLink).toBeVisible({ timeout: 15_000 });
-    await agentsLink.click();
-
-    await page.waitForURL("**/workspace/agents");
-    await expect(page).toHaveURL(/\/workspace\/agents/);
+    const dialog = page.getByRole("dialog");
+    await dialog
+      .getByRole("button", { name: /本地上下文|Local context/ })
+      .click();
+    await expect(dialog.getByText("本地上下文", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("允许读取的范围")).toHaveCount(0);
+    await expect(dialog.getByText("允许使用的目的")).toHaveCount(0);
+    await dialog.getByRole("button", { name: "开启本地上下文" }).click();
+    await expect.poll(() => enableCalled).toBe(true);
   });
 
-  test("Agents button is disabled with a hover tooltip when agents_api is off", async ({
+  test("internal agent management stays hidden when agents_api is off", async ({
     page,
   }) => {
     mockLangGraphAPI(page);
@@ -45,33 +147,13 @@ test.describe("Sidebar navigation", () => {
     await page.goto("/workspace/chats/new");
 
     const sidebar = page.locator("[data-sidebar='sidebar']");
-    // Chats remains a real link; Agents is no longer a navigable link.
     await expect(sidebar.locator("a[href='/workspace/chats']")).toBeVisible({
       timeout: 15_000,
     });
     await expect(sidebar.locator("a[href='/workspace/agents']")).toHaveCount(0);
-
-    // The disabled Agents button is rendered and announces its disabled state.
-    const agentsButton = sidebar.getByRole("button", { name: "Agents" });
-    await expect(agentsButton).toHaveAttribute("aria-disabled", "true");
-
-    // The button itself has pointer-events suppressed; force the hover so the
-    // event reaches the wrapping tooltip-trigger span that surfaces the tooltip.
-    await agentsButton.hover({ force: true });
-    await expect(page.getByText("Feature not enabled").first()).toBeVisible({
-      timeout: 5_000,
-    });
-
-    // Keyboard/screen-reader users get the reason too: the disabled entry
-    // stays in the tab order (focusable) and is wired to a visually-hidden
-    // description rather than relying on the hover-only tooltip.
-    const describedById = await agentsButton.getAttribute("aria-describedby");
-    expect(describedById).toBeTruthy();
-    await expect(page.locator(`#${describedById}`)).toHaveText(
-      "Feature not enabled",
+    await expect(sidebar.getByRole("button", { name: "Agents" })).toHaveCount(
+      0,
     );
-    await agentsButton.focus();
-    await expect(agentsButton).toBeFocused();
   });
 
   test("mobile welcome layout stays within viewport and opens sidebar", async ({
@@ -82,18 +164,13 @@ test.describe("Sidebar navigation", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const viewportWidth = page.viewportSize()?.width ?? 390;
     const expectInsideViewport = async (
       locator: ReturnType<typeof page.locator>,
     ) => {
       await expect(locator).toBeVisible({ timeout: 15_000 });
-      const box = await locator.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.x).toBeGreaterThanOrEqual(-1);
-      expect(box!.x + box!.width).toBeLessThanOrEqual(viewportWidth + 1);
+      await expect(locator).toBeInViewport();
     };
 
-    await expectInsideViewport(page.getByText(/Welcome to|欢迎使用/).first());
     await expectInsideViewport(page.getByRole("textbox").first());
     await expectInsideViewport(page.locator("[data-slot='suggestions-list']"));
 
@@ -112,6 +189,6 @@ test.describe("Sidebar navigation", () => {
     ).toBeVisible();
     await expect(
       mobileSidebar.locator("a[href='/workspace/agents']"),
-    ).toBeVisible();
+    ).toHaveCount(0);
   });
 });

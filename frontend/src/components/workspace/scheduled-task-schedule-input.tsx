@@ -37,19 +37,6 @@ const PRESETS: CronPreset[] = [
   "daily",
   "weekly",
   "monthly",
-  "custom",
-];
-
-const FALLBACK_TIMEZONES = [
-  "UTC",
-  "Asia/Shanghai",
-  "Asia/Tokyo",
-  "Asia/Singapore",
-  "Europe/London",
-  "Europe/Berlin",
-  "America/New_York",
-  "America/Chicago",
-  "America/Los_Angeles",
 ];
 
 function detectBrowserTimezone(): string {
@@ -63,20 +50,6 @@ function detectBrowserTimezone(): string {
   }
   return "UTC";
 }
-
-function timezoneOptions(): string[] {
-  const supported = (
-    Intl as unknown as {
-      supportedValuesOf?: (key: string) => string[] | undefined;
-    }
-  ).supportedValuesOf?.("timeZone");
-  if (Array.isArray(supported) && supported.length > 0) {
-    return supported;
-  }
-  return FALLBACK_TIMEZONES;
-}
-
-const TIMEZONE_OPTIONS = timezoneOptions();
 
 export function ScheduledTaskScheduleInput({
   initial,
@@ -108,7 +81,7 @@ export function ScheduledTaskScheduleInput({
         )
       : "",
   );
-  const [timezone, setTimezone] = useState<string>(
+  const [timezone] = useState<string>(
     initial.timezone || detectBrowserTimezone(),
   );
 
@@ -181,6 +154,7 @@ export function ScheduledTaskScheduleInput({
     { scheduleType, preset, parts, runAtLocal, timezone },
     schedLocale,
   );
+  const visiblePreview = preview.replace(/\s*\([^)]*\)\s*$/, "");
 
   return (
     <div className="flex flex-col gap-2" data-testid="schedule-input">
@@ -282,22 +256,9 @@ export function ScheduledTaskScheduleInput({
           )}
 
           {preset === "custom" && (
-            <div className="flex flex-col gap-1">
-              <Input
-                value={parts.raw ?? ""}
-                onChange={(e) => updateParts({ raw: e.target.value })}
-                placeholder={labels.fields.cronPlaceholder}
-                aria-label={labels.fields.cron}
-              />
-              <a
-                href="https://crontab.guru/"
-                target="_blank"
-                rel="noreferrer"
-                className="text-muted-foreground text-xs hover:underline"
-              >
-                {labels.cronHelp} ↗
-              </a>
-            </div>
+            <p className="text-muted-foreground text-sm">
+              {labels.preset.custom}
+            </p>
           )}
         </>
       ) : (
@@ -309,24 +270,11 @@ export function ScheduledTaskScheduleInput({
         />
       )}
 
-      <Select value={timezone} onValueChange={setTimezone}>
-        <SelectTrigger className="w-full" data-testid="schedule-timezone">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {TIMEZONE_OPTIONS.map((tzOption) => (
-            <SelectItem key={tzOption} value={tzOption}>
-              {tzOption}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
       <div
         className="text-muted-foreground text-sm"
         data-testid="schedule-preview"
       >
-        {preview}
+        {visiblePreview}
       </div>
     </div>
   );

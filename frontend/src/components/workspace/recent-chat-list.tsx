@@ -2,11 +2,8 @@
 
 import {
   Download,
-  FileJson,
-  FileText,
   MoreHorizontal,
   Pencil,
-  Share2,
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
@@ -27,9 +24,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -44,12 +38,8 @@ import {
 } from "@/components/ui/sidebar";
 import { resetThreadChatAfterDelete } from "@/components/workspace/chats/use-thread-chat";
 import { getAPIClient } from "@/core/api";
-import { writeTextToClipboard } from "@/core/clipboard";
 import { useI18n } from "@/core/i18n/hooks";
-import {
-  exportThreadAsJSON,
-  exportThreadAsMarkdown,
-} from "@/core/threads/export";
+import { exportThreadAsMarkdown } from "@/core/threads/export";
 import {
   useDeleteThread,
   useInfiniteThreads,
@@ -174,33 +164,8 @@ export function RecentChatList() {
     }
   }, [renameThread, renameThreadId, renameValue]);
 
-  const handleShare = useCallback(
-    async (thread: AgentThread) => {
-      // Always use Vercel URL for sharing so others can access
-      const VERCEL_URL = "https://deer-flow-v2.vercel.app";
-      const isLocalhost =
-        window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1";
-      // On localhost: use Vercel URL; On production: use current origin
-      const baseUrl = isLocalhost ? VERCEL_URL : window.location.origin;
-      const shareUrl = `${baseUrl}${pathOfThread(thread)}`;
-      try {
-        const didCopy = await writeTextToClipboard(shareUrl);
-        if (!didCopy) {
-          toast.error(t.clipboard.failedToCopyToClipboard);
-          return;
-        }
-
-        toast.success(t.clipboard.linkCopied);
-      } catch {
-        toast.error(t.clipboard.failedToCopyToClipboard);
-      }
-    },
-    [t],
-  );
-
   const handleExport = useCallback(
-    async (thread: AgentThread, format: "markdown" | "json") => {
+    async (thread: AgentThread) => {
       try {
         const apiClient = getAPIClient();
         const state = await apiClient.threads.getState<AgentThreadState>(
@@ -211,11 +176,7 @@ export function RecentChatList() {
           toast.error(t.conversation.noMessages);
           return;
         }
-        if (format === "markdown") {
-          exportThreadAsMarkdown(thread, messages);
-        } else {
-          exportThreadAsJSON(thread, messages);
-        }
+        exportThreadAsMarkdown(thread, messages);
         toast.success(t.common.exportSuccess);
       } catch {
         toast.error("Failed to export conversation");
@@ -253,7 +214,7 @@ export function RecentChatList() {
                       >
                         <ThreadChannelIcon source={channelSource} />
                         <span className="min-w-0 truncate">
-                          {titleOfThread(thread)}
+                          {titleOfThread(thread, t.pages.untitled)}
                         </span>
                         {channelSource && (
                           <span
@@ -287,7 +248,7 @@ export function RecentChatList() {
                             onSelect={() =>
                               handleRenameClick(
                                 thread.thread_id,
-                                titleOfThread(thread),
+                                titleOfThread(thread, t.pages.untitled),
                               )
                             }
                           >
@@ -295,33 +256,11 @@ export function RecentChatList() {
                             <span>{t.common.rename}</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onSelect={() => handleShare(thread)}
+                            onSelect={() => handleExport(thread)}
                           >
-                            <Share2 className="text-muted-foreground" />
-                            <span>{t.common.share}</span>
+                            <Download className="text-muted-foreground" />
+                            <span>{t.common.export}</span>
                           </DropdownMenuItem>
-                          <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>
-                              <Download className="text-muted-foreground" />
-                              <span>{t.common.export}</span>
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent>
-                              <DropdownMenuItem
-                                onSelect={() =>
-                                  handleExport(thread, "markdown")
-                                }
-                              >
-                                <FileText className="text-muted-foreground" />
-                                <span>{t.common.exportAsMarkdown}</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => handleExport(thread, "json")}
-                              >
-                                <FileJson className="text-muted-foreground" />
-                                <span>{t.common.exportAsJSON}</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuSubContent>
-                          </DropdownMenuSub>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onSelect={() => handleDelete(thread)}

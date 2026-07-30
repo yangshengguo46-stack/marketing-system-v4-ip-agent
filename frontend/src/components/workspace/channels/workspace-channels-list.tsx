@@ -40,7 +40,7 @@ function getProviderUnavailableReason(
   t: ReturnType<typeof useI18n>["t"],
 ): string | undefined {
   if (provider.unavailable_reason) {
-    return provider.unavailable_reason;
+    return t.channels.unavailable;
   }
   if (!provider.enabled) {
     return t.channels.disabled;
@@ -48,7 +48,7 @@ function getProviderUnavailableReason(
   if (!provider.configured) {
     return t.channels.unconfigured;
   }
-  return provider.unavailable_reason ?? undefined;
+  return undefined;
 }
 
 export function WorkspaceChannelsList() {
@@ -82,11 +82,9 @@ export function WorkspaceChannelsList() {
         closeConnectWindow(connectWindow);
         toast.success(result.instruction);
       })
-      .catch((error) => {
+      .catch(() => {
         closeConnectWindow(connectWindow);
-        toast.error(
-          error instanceof Error ? error.message : t.channels.unavailable,
-        );
+        toast.error(t.channels.unavailable);
       });
   };
 
@@ -202,11 +200,9 @@ export function WorkspaceChannelsList() {
               closeConnectWindow(connectWindow);
               toast.success(t.channels.connected);
             })
-            .catch((error) => {
+            .catch(() => {
               closeConnectWindow(connectWindow);
-              toast.error(
-                error instanceof Error ? error.message : t.channels.unavailable,
-              );
+              toast.error(t.channels.unavailable);
             });
         }}
       />

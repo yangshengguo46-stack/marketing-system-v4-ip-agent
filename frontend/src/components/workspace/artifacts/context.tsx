@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { useSidebar } from "@/components/ui/sidebar";
+import { isCustomerVisibleArtifact } from "@/core/artifacts/utils";
 import { env } from "@/env";
 
 export interface ArtifactsContextType {
@@ -43,6 +44,7 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
 
   const select = useCallback(
     (artifact: string, autoSelect = false) => {
+      if (!isCustomerVisibleArtifact(artifact)) return;
       setSelectedArtifact(artifact);
       if (env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY !== "true") {
         setSidebarOpen(false);
@@ -59,10 +61,13 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     setAutoSelect(true);
     setOpen(false);
   }, []);
+  const setVisibleArtifacts = useCallback((nextArtifacts: string[]) => {
+    setArtifacts(nextArtifacts.filter(isCustomerVisibleArtifact));
+  }, []);
 
   const value: ArtifactsContextType = {
     artifacts,
-    setArtifacts,
+    setArtifacts: setVisibleArtifacts,
 
     open,
     autoOpen,

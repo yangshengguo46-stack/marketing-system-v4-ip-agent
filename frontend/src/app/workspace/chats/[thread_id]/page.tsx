@@ -1,8 +1,8 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 
 import { type PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -24,42 +24,69 @@ import {
   MESSAGE_LIST_DEFAULT_PADDING_BOTTOM,
 } from "@/components/workspace/messages";
 import { ThreadContext } from "@/components/workspace/messages/context";
-import {
-  SidecarProvider,
-  SidecarTrigger,
-} from "@/components/workspace/sidecar";
+import { PersonalIPVideoWorkbench } from "@/components/workspace/personal-ip/video-workbench";
+import { SidecarProvider } from "@/components/workspace/sidecar";
 import { ThreadScheduledTasksLink } from "@/components/workspace/thread-scheduled-tasks-link";
 import { ThreadTitle } from "@/components/workspace/thread-title";
-import { TodoList } from "@/components/workspace/todo-list";
-import { TokenUsageIndicator } from "@/components/workspace/token-usage-indicator";
 import { useActiveGoal } from "@/components/workspace/use-active-goal";
 import { Welcome } from "@/components/workspace/welcome";
 import { useBrowserControlEnabled } from "@/core/features";
 import { useI18n } from "@/core/i18n/hooks";
 import {
   buildHumanInputResponseText,
-  hasOpenHumanInputRequest,
   type HumanInputRequest,
   type HumanInputResponse,
 } from "@/core/messages/human-input";
-import { isHiddenFromUIMessage } from "@/core/messages/utils";
-import { useModels } from "@/core/models/hooks";
 import { useNotification } from "@/core/notification/hooks";
-import { useLocalSettings, useThreadSettings } from "@/core/settings";
 import {
-  useBranchThread,
+  PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
+  usePersonalIPVideoProductions,
+} from "@/core/personal-ip";
+import { useThreadSettings } from "@/core/settings";
+import {
   useThreadMetadata,
   useThreadStream,
-  useThreadTokenUsage,
 } from "@/core/threads/hooks";
-import { threadTokenUsageToTokenUsage } from "@/core/threads/token-usage";
 import { textOfMessage } from "@/core/threads/utils";
 import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
+const CUSTOMER_AGENT_NAME = "ip-agent";
+
 export default function ChatPage() {
+  const { threadId, isNewThread, isMock } = useThreadChat();
+  const videoTasks = usePersonalIPVideoProductions({
+    threadId: isNewThread || isMock ? null : threadId,
+    enabled: !isNewThread && !isMock,
+  });
+  const videoTask =
+    !isNewThread && !isMock ? videoTasks.data?.[0] : undefined;
+
+  if (!isNewThread && !isMock && videoTasks.isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
+        正在打开任务…
+      </div>
+    );
+  }
+
+  if (videoTask) {
+    return (
+      <PersonalIPVideoWorkbench
+        productionId={videoTask.id}
+        threadId={threadId}
+        embedded
+      />
+    );
+  }
+
+  return <StandardChatPage />;
+}
+
+function StandardChatPage() {
   const { t } = useI18n();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { threadId, setThreadId, isNewThread, setIsNewThread, isMock } =
     useThreadChat();
   // `isNewThread` tracks whether the backend has the thread yet — gates the
@@ -69,20 +96,16 @@ export default function ChatPage() {
   // `isNewThread` stays true until the backend actually creates the thread.
   const [isWelcomeMode, setIsWelcomeMode] = useState(isNewThread);
   const [settings, setSettings] = useThreadSettings(threadId);
-  const [localSettings, setLocalSettings] = useLocalSettings();
   const { enabled: browserControlEnabled } = useBrowserControlEnabled();
-  const { tokenUsageEnabled } = useModels();
-  const threadTokenUsage = useThreadTokenUsage(
-    isNewThread || isMock ? undefined : threadId,
-    { enabled: tokenUsageEnabled && !isMock },
-  );
   const threadMetadata = useThreadMetadata(threadId, {
     enabled: !isNewThread && !isMock,
     isMock,
   });
   const effectiveContext = settings.context;
-  const branchThread = useBranchThread();
-  const backendTokenUsage = threadTokenUsageToTokenUsage(threadTokenUsage.data);
+  const runtimeContext = useMemo(
+    () => ({ ...effectiveContext, agent_name: CUSTOMER_AGENT_NAME }),
+    [effectiveContext],
+  );
   const mountedRef = useRef(false);
   useSpecificChatMode();
 
@@ -102,7 +125,6 @@ export default function ChatPage() {
 
   const {
     thread,
-    pendingUsageMessages,
     sendMessage,
     regenerateMessage,
     isUploading,
@@ -112,7 +134,7 @@ export default function ChatPage() {
   } = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     displayThreadId: threadId,
-    context: effectiveContext,
+    context: runtimeContext,
     isMock,
     // onSend only animates the UI; do NOT flip `isNewThread` here — the
     // LangGraph SDK eagerly fetches /history the moment it receives a
@@ -127,6 +149,9 @@ export default function ChatPage() {
       setIsNewThread(false);
     },
     onFinish: (state) => {
+      void queryClient.invalidateQueries({
+        queryKey: PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
+      });
       if (document.hidden || !document.hasFocus()) {
         let body = "Conversation finished";
         const lastMessage = state.messages.at(-1);
@@ -173,7 +198,12 @@ export default function ChatPage() {
 
   const handleSubmit = useCallback(
     (message: PromptInputMessage, options?: InputBoxSubmitOptions) => {
-      const sendPromise = sendMessage(threadId, message, undefined, options);
+      const sendPromise = sendMessage(
+        threadId,
+        message,
+        { agent_name: CUSTOMER_AGENT_NAME },
+        options,
+      );
       if (message.files.length > 0) {
         return sendPromise;
       }
@@ -190,7 +220,7 @@ export default function ChatPage() {
           text: buildHumanInputResponseText(request, response),
           files: [],
         },
-        undefined,
+        { agent_name: CUSTOMER_AGENT_NAME },
         {
           additionalKwargs: {
             hide_from_ui: true,
@@ -213,88 +243,37 @@ export default function ChatPage() {
       regenerateMessage(threadId, messageId, supersededMessageIds),
     [regenerateMessage, threadId],
   );
-  const handleBranchTurn = useCallback(
-    async (messageId: string, messageIds: string[]) => {
-      if (
-        isNewThread ||
-        isMock ||
-        env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true"
-      ) {
-        return;
-      }
-
-      try {
-        const response = await branchThread.mutateAsync({
-          threadId,
-          messageId,
-          messageIds,
-        });
-        toast.success(t.conversation.branchCreated);
-        router.push(`/workspace/chats/${response.thread_id}`);
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : t.conversation.branchFailed,
-        );
-      }
-    },
-    [branchThread, isMock, isNewThread, router, t, threadId],
-  );
-
-  const tokenUsageInlineMode = tokenUsageEnabled
-    ? localSettings.tokenUsage.inlineMode
-    : "off";
-  const hasTodos = (thread.values.todos?.length ?? 0) > 0;
+  const tokenUsageInlineMode = "off";
   const browserEnabled = !isNewThread && browserControlEnabled;
   const { activeGoal, hasGoal, setLocalGoal } = useActiveGoal(
     threadId,
     thread.values.goal,
   );
-  const hasOpenHumanInputCard = useMemo(
-    () =>
-      hasOpenHumanInputRequest(
-        thread.messages,
-        (message) => !isHiddenFromUIMessage(message),
-      ),
-    [thread.messages],
-  );
-
   return (
     <ThreadContext.Provider value={{ thread, isMock }}>
       <SidecarProvider
         parentThreadId={threadId}
-        context={effectiveContext}
+        context={runtimeContext}
         isMock={isMock}
       >
         <ChatBox threadId={threadId} browserEnabled={browserEnabled}>
           <div className="relative flex size-full min-h-0 justify-between">
             <header
               className={cn(
-                "absolute top-0 right-0 left-0 z-30 flex h-12 shrink-0 items-center gap-2 px-2 sm:px-4",
+                "pointer-events-none absolute top-0 right-0 left-0 z-50 flex h-12 shrink-0 items-center gap-2 px-2 sm:px-4",
                 isWelcomeMode
                   ? "bg-background/0 backdrop-blur-none"
                   : "bg-background/80 shadow-xs backdrop-blur",
               )}
             >
-              <SidebarTrigger className="md:hidden" />
-              <div className="flex min-w-0 flex-1 items-center text-sm font-medium">
+              <SidebarTrigger className="pointer-events-auto md:hidden" />
+              <div className="pointer-events-auto flex min-w-0 flex-1 items-center text-sm font-medium">
                 <ThreadTitle threadId={threadId} thread={thread} />
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="pointer-events-auto flex shrink-0 items-center gap-2">
                 {!isNewThread && (
                   <ThreadScheduledTasksLink threadId={threadId} />
                 )}
-                <TokenUsageIndicator
-                  threadId={isNewThread ? undefined : threadId}
-                  backendUsage={backendTokenUsage}
-                  enabled={tokenUsageEnabled}
-                  messages={thread.messages}
-                  pendingMessages={pendingUsageMessages}
-                  preferences={localSettings.tokenUsage}
-                  onPreferencesChange={(preferences) =>
-                    setLocalSettings("tokenUsage", preferences)
-                  }
-                />
-                <SidecarTrigger />
                 {browserEnabled && <BrowserTrigger />}
                 <ExportTrigger threadId={threadId} />
                 <ArtifactTrigger />
@@ -312,6 +291,7 @@ export default function ChatPage() {
                   loadMoreHistory={loadMoreHistory}
                   isHistoryLoading={isHistoryLoading}
                   tokenUsageInlineMode={tokenUsageInlineMode}
+                  enableSidecarActions={false}
                   canRegenerate={
                     !isNewThread &&
                     !isMock &&
@@ -325,15 +305,7 @@ export default function ChatPage() {
                       ? undefined
                       : handleSubmitHumanInput
                   }
-                  canBranch={
-                    !isNewThread &&
-                    !isMock &&
-                    env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY !== "true" &&
-                    !isUploading &&
-                    !thread.isLoading &&
-                    !branchThread.isPending
-                  }
-                  onBranchTurn={handleBranchTurn}
+                  canBranch={false}
                 />
               </div>
               <div
@@ -352,7 +324,7 @@ export default function ChatPage() {
                       : "max-w-(--container-width-md)",
                   )}
                 >
-                  {(hasGoal || hasTodos) && (
+                  {hasGoal && (
                     <div
                       className={cn(
                         "right-0 left-0 z-0",
@@ -366,13 +338,6 @@ export default function ChatPage() {
                         )}
                       >
                         {activeGoal && <GoalStatus goal={activeGoal} />}
-                        {hasTodos && (
-                          <TodoList
-                            className="bg-background/5"
-                            todos={thread.values.todos ?? []}
-                            hidden={false}
-                          />
-                        )}
                       </div>
                     </div>
                   )}
@@ -396,14 +361,12 @@ export default function ChatPage() {
                       context={effectiveContext}
                       extraHeader={
                         isWelcomeMode &&
-                        !hasGoal &&
-                        !hasTodos && <Welcome mode={effectiveContext.mode} />
+                        !hasGoal && <Welcome mode={effectiveContext.mode} />
                       }
                       disabled={
                         isMock ||
                         env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" ||
                         isUploading ||
-                        hasOpenHumanInputCard ||
                         (!isNewThread && isHistoryLoading)
                       }
                       onContextChange={(context) =>

@@ -4,6 +4,7 @@ import { mockLangGraphAPI } from "./utils/mock-api";
 
 const PRODUCTION = {
   id: "video-production-1",
+  thread_id: "video-thread-1",
   title: "Agent 回执验收片",
   status: "awaiting_review",
   current_stage: "selection",
@@ -69,10 +70,15 @@ const RETRY_TASK = {
   ],
 };
 
-const makeWorkbench = (confirmed = false) => ({
+const makeWorkbench = (
+  confirmed = false,
+  timelineSaved = false,
+  finalEditLocked = false,
+) => ({
   contract_version: "personal-ip-video-workbench-v1",
   production: confirmed ? { ...PRODUCTION, status: "running" } : PRODUCTION,
   source: { kind: "script", content: PRODUCTION.source },
+  domain_contracts: {},
   stage_summary: [
     "intake",
     "blueprint",
@@ -227,6 +233,28 @@ const makeWorkbench = (confirmed = false) => ({
     events: [],
     fps: 25,
     duration_sec: 2,
+    revision_id: timelineSaved ? "timeline-revision-1" : null,
+    locked: finalEditLocked,
+    final_edit_lock: finalEditLocked
+      ? {
+          contract_version: "personal-ip-video-final-edit-lock-v1",
+          lock_id: "final-edit-lock-1",
+          source_revision_id: "timeline-revision-1",
+          source_timeline_sha256: "f".repeat(64),
+        }
+      : null,
+    revisions: timelineSaved
+      ? [
+          {
+            event_id: "timeline-event-1",
+            revision_id: "timeline-revision-1",
+            author_kind: "human",
+            intent: "缩短第一镜",
+            tracks: [],
+            operations: [],
+          },
+        ]
+      : [],
     tracks: [
       {
         type: "video",
@@ -279,14 +307,18 @@ const makeWorkbench = (confirmed = false) => ({
   events: [],
 });
 
-test("video workbench exposes ledger evidence, recovery, and candidate confirmation", async ({
+test("video workbench keeps internal evidence hidden while preserving creative control", async ({
   page,
 }) => {
   const screenshotDirectory = process.env.VIDEO_WORKBENCH_SCREENSHOT_DIR;
   await page.setViewportSize({ width: 1440, height: 900 });
   mockLangGraphAPI(page);
   let confirmed = false;
+  let timelineSaved = false;
+  let finalEditLocked = false;
   let reviewBody: Record<string, unknown> | null = null;
+  let timelineRevisionBody: Record<string, unknown> | null = null;
+  let finalEditLockBody: Record<string, unknown> | null = null;
 
   await page.route(/\/api\/personal-ip\/video-productions(?:\?.*)?$/, (route) =>
     route.fulfill({
@@ -295,9 +327,47 @@ test("video workbench exposes ledger evidence, recovery, and candidate confirmat
       body: JSON.stringify([PRODUCTION]),
     }),
   );
+  await page.route("**/api/personal-ip/video-productions/models", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        source: "live",
+        default_image_model: "doubao-seedream-5-0-260128",
+        default_video_model: "doubao-seedance-2-0-260128",
+        image_models: [
+          {
+            id: "doubao-seedream-5-0-260128",
+            display_name: "Seedream 5.0",
+            is_default: true,
+          },
+          {
+            id: "doubao-seedream-4-5-251128",
+            display_name: "Seedream 4.5",
+            is_default: false,
+          },
+        ],
+        video_models: [
+          {
+            id: "doubao-seedance-2-0-260128",
+            display_name: "Seedance 2.0",
+            is_default: true,
+          },
+          {
+            id: "doubao-seedance-2-0-fast-260128",
+            display_name: "Seedance 2.0 Fast",
+            is_default: false,
+          },
+        ],
+      },
+    }),
+  );
   await page.route(
     "**/api/personal-ip/video-productions/video-production-1/workbench",
-    (route) => route.fulfill({ status: 200, json: makeWorkbench(confirmed) }),
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: makeWorkbench(confirmed, timelineSaved, finalEditLocked),
+      }),
   );
   await page.route(
     "**/api/personal-ip/video-productions/video-production-1/events",
@@ -310,54 +380,191 @@ test("video workbench exposes ledger evidence, recovery, and candidate confirmat
       });
     },
   );
+  await page.route(
+    "**/api/personal-ip/video-productions/video-production-1/timeline-revisions",
+    async (route) => {
+      timelineRevisionBody = route.request().postDataJSON() as Record<
+        string,
+        unknown
+      >;
+      timelineSaved = true;
+      await route.fulfill({
+        status: 200,
+        json: {
+          compiled_contract: {
+            contract_version: "personal-ip-video-timeline-revision-v1",
+          },
+          production: { ...PRODUCTION, status: "running" },
+        },
+      });
+    },
+  );
+  await page.route(
+    "**/api/personal-ip/video-productions/video-production-1/final-edit-lock",
+    async (route) => {
+      finalEditLockBody = route.request().postDataJSON() as Record<
+        string,
+        unknown
+      >;
+      finalEditLocked = true;
+      await route.fulfill({
+        status: 200,
+        json: {
+          compiled_contract: {
+            contract_version: "personal-ip-video-final-edit-lock-v1",
+          },
+          production: { ...PRODUCTION, status: "running" },
+        },
+      });
+    },
+  );
 
-  await page.goto("/workspace/personal-ip/video");
+  await page.goto("/workspace/chats/video-thread-1");
 
   await expect(
-    page.getByRole("heading", { name: "视频生产工作台" }),
+    page.getByText("Agent 回执验收片", { exact: true }).first(),
   ).toBeVisible();
-  await expect(page.getByText("Agent 回执验收片").first()).toBeVisible();
-  await expect(page.getByText("账本派生 · 不创建第二套状态")).toBeVisible();
-  await expect(page.getByText("剧本理解")).toBeVisible();
-  await expect(page.getByText("让每一步执行都有可核验回执。")).toBeVisible();
+  await expect(page.getByLabel("选择制作项目")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "返回历史对话" })).toHaveAttribute(
+    "href",
+    "/workspace/chats",
+  );
+  await expect(page.getByRole("link", { name: "新建视频任务" })).toHaveAttribute(
+    "href",
+    "/workspace/chats/new",
+  );
+  await expect(page.getByText("一句话创作 · 随时人工接管")).toBeVisible();
+  await expect(page.getByLabel("视频制作阶段")).toBeVisible();
   await expect(
-    page.getByText("https://example.com/blueprint.json"),
+    page.getByRole("complementary", { name: "项目与镜头" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("complementary", { name: "项目设定与素材" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("制作时间线")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "设定阶段" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "分镜阶段" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "剪辑阶段" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "成片阶段" })).toBeVisible();
+  await expect(page.getByText("当前目标 · 镜头 01")).toBeVisible();
+
+  await page.getByRole("button", { name: "设定阶段" }).click();
+  const modelPicker = page.getByRole("button", {
+    name: "选择生成模型。图像：自动；视频：自动",
+  });
+  await expect(modelPicker).toContainText("模型自动");
+  await modelPicker.click();
+  await page.getByRole("menuitem", { name: /图像模型/ }).hover();
+  await page.getByRole("menuitemradio", { name: "Seedream 4.5" }).click();
+  await page
+    .getByRole("button", { name: /选择生成模型。图像：Seedream 4.5/ })
+    .click();
+  await page.getByRole("menuitem", { name: /视频模型/ }).hover();
+  await page.getByRole("menuitemradio", { name: "Seedance 2.0 Fast" }).click();
+  await expect(
+    page.getByRole("button", {
+      name: "选择生成模型。图像：Seedream 4.5；视频：Seedance 2.0 Fast",
+    }),
+  ).toContainText("2 项已指定");
+  await expect(page.getByText("原始输入、影视蓝图与生产约束")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "查看资产合同" })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("button", { name: "查看全部项目素材" }),
+  ).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText("X-Amz-Credential");
   await expect(page.locator("body")).not.toContainText("user:secret");
+  await expect(page.locator("body")).not.toContainText("source sha256");
+  await expect(page.locator("body")).not.toContainText("shot_required");
+  await page.getByRole("button", { name: "+ 新候选" }).click();
+  await expect(
+    page.getByLabel(
+      "告诉智能体怎样生成或修改当前设定；例如：脸型不变，服装换成黑色风衣，再给我三版……",
+    ),
+  ).toHaveValue("");
+  await expect(page.locator("body")).not.toContainText(
+    "personal_ip_compile_video_asset_manifest",
+  );
 
-  await page.getByRole("tab", { name: "资产" }).click();
-  await expect(page.getByText("v3")).toBeVisible();
-  await expect(page.getByText("shot_required")).toBeVisible();
+  await page.getByRole("button", { name: "查看角色素材" }).click();
+  await expect(
+    page.getByLabel(
+      "告诉智能体怎样生成或修改当前设定；例如：脸型不变，服装换成黑色风衣，再给我三版……",
+    ),
+  ).toBeVisible();
+  await expect(page.getByText("资产合同", { exact: true })).toHaveCount(0);
 
-  await page.getByRole("tab", { name: "分镜" }).click();
-  await expect(page.getByText("回执卡位于画面中央。")).toBeVisible();
-  await expect(page.getByText("校验标记完成点亮。")).toBeVisible();
-  await expect(page.getByText("局部恢复范围")).toBeVisible();
-  await expect(page.getByText("跨镜状态 · intro → shot-01")).toBeVisible();
+  await page.getByRole("button", { name: "分镜阶段" }).click();
+  await expect(
+    page.getByRole("button", {
+      name: "选择生成模型。图像：Seedream 4.5；视频：Seedance 2.0 Fast",
+    }),
+  ).toBeVisible();
+  await expect(page.getByLabel("制作时间线")).toHaveCount(0);
+  await expect(page.getByText("镜头合同与连续性证据")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "检查当前候选的运动流畅度" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "检查当前候选的运动流畅度" }).click();
+  await expect(
+    page.getByLabel(
+      "告诉智能体怎样修改当前镜头；可重生首帧、动作、运镜或整个视频候选……",
+    ),
+  ).toHaveValue("");
+  const shotComposer = page.getByLabel(
+    "告诉智能体怎样修改当前镜头；可重生首帧、动作、运镜或整个视频候选……",
+  );
+  const compactComposerBox = await shotComposer.boundingBox();
+  expect(compactComposerBox).not.toBeNull();
+  await shotComposer.fill(
+    [
+      "保留当前构图",
+      "镜头缓慢推进",
+      "加强前景细节",
+      "保持远景运动",
+      "维持角色一致",
+      "整体使用冷蓝色调",
+    ].join("\n"),
+  );
+  await expect
+    .poll(async () => (await shotComposer.boundingBox())?.height ?? 0)
+    .toBeGreaterThan((compactComposerBox?.height ?? 0) + 60);
+  await shotComposer.fill(
+    Array.from({ length: 20 }, (_, index) => `第 ${index + 1} 行`).join("\n"),
+  );
+  await expect
+    .poll(async () => (await shotComposer.boundingBox())?.height ?? 999)
+    .toBeLessThanOrEqual(161);
+  await shotComposer.fill("");
+  await expect
+    .poll(async () => (await shotComposer.boundingBox())?.height ?? 999)
+    .toBeLessThanOrEqual((compactComposerBox?.height ?? 28) + 1);
+  await expect(page.locator("body")).not.toContainText(
+    "personal_ip_interpolate_video_candidate",
+  );
+  await expect(page.locator("body")).not.toContainText(
+    "personal_ip_run_local_generated_shot_qa",
+  );
   if (screenshotDirectory) {
-    await page
-      .getByText("跨镜状态 · intro → shot-01")
-      .scrollIntoViewIfNeeded();
     await page.screenshot({
       path: `${screenshotDirectory}/video-workbench-storyboard-1440x900.png`,
       fullPage: true,
     });
   }
 
-  await page.getByRole("tab", { name: "任务与重试" }).click();
-  await expect(page.getByText("volcengine-simulated").first()).toBeVisible();
-  await expect(page.getByText("seedance-2.0").first()).toBeVisible();
-  await expect(page.getByText("task-attempt-1")).toBeVisible();
-  await expect(page.getByText("provider_timeout")).toBeVisible();
-  await expect(page.getByText("shot-01:attempt-1").last()).toBeVisible();
-  await expect(page.getByText("费用未知 · billing unavailable")).toBeVisible();
-
-  await page.getByRole("tab", { name: "候选与一致性" }).click();
-  await expect(page.getByText("shot-01:candidate-2")).toBeVisible();
-  await expect(page.getByText("aspect_ratio")).toBeVisible();
-  await expect(page.getByText("first_frame_anchor_score")).toBeVisible();
-  await page.getByRole("button", { name: "确认选用" }).click();
+  await expect(page.getByRole("button", { name: "查看生成任务" })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("button", { name: "查看候选与一致性" }),
+  ).toHaveCount(0);
+  await expect(page.getByText("volcengine-simulated")).toHaveCount(0);
+  await expect(page.getByText("seedance-2.0")).toHaveCount(0);
+  await expect(page.getByText("provider_timeout")).toHaveCount(0);
+  await expect(page.getByText("shot-01:candidate-2")).toHaveCount(0);
+  await expect(page.getByText("aspect_ratio")).toHaveCount(0);
+  await page.getByRole("button", { name: "采用此版本" }).click();
   await expect.poll(() => confirmed).toBe(true);
   expect(reviewBody).toMatchObject({
     event_type: "review_recorded",
@@ -366,19 +573,115 @@ test("video workbench exposes ledger evidence, recovery, and candidate confirmat
     entity_id: "shot-01:candidate-2",
     provider: "human-workbench",
   });
-  await expect(page.getByText("已选片")).toBeVisible();
+  await expect(page.getByText("已生成", { exact: true })).toBeVisible();
 
-  await page.getByRole("tab", { name: "配音与时间线" }).click();
-  await expect(page.getByText("25 fps")).toBeVisible();
-  await expect(page.getByText("clip-shot-01")).toBeVisible();
+  await page.getByRole("button", { name: "剪辑阶段" }).click();
+  await expect(page.getByText("剪辑监看")).toBeVisible();
+  await expect(
+    page.getByRole("complementary", { name: "项目与镜头" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("complementary", { name: "剪辑管线工具" }),
+  ).toHaveCount(0);
+  await expect(page.getByText("时间线轨道")).toHaveCount(0);
+  await expect(page.getByLabel("制作时间线")).toHaveCount(1);
+  await expect(
+    page.getByLabel(
+      "告诉智能体怎么调时间线，例如：把镜头 02 缩短半秒，音乐从这里淡入……",
+    ),
+  ).toHaveValue("");
+  await page
+    .getByRole("button", { name: /交给智能体补全对白\/旁白轨/ })
+    .click();
+  await expect(
+    page.getByLabel(
+      "告诉智能体怎么调时间线，例如：把镜头 02 缩短半秒，音乐从这里淡入……",
+    ),
+  ).toHaveValue("");
+  await expect(page.locator("body")).not.toContainText("实测音频时长对齐镜头");
+  await expect(
+    page.getByPlaceholder("给这次手动修改写一句说明（可选）"),
+  ).toHaveCount(0);
+  await expect(page.getByLabel("制作时间线").getByRole("textbox")).toHaveCount(
+    1,
+  );
+  await expect(page.getByText("25 fps", { exact: true }).first()).toBeVisible();
+  await page
+    .getByRole("button", { name: "时间线视频片段 镜头 01 · 回执卡推进" })
+    .click();
+  await expect(page.getByLabel("片段检查器")).not.toBeVisible();
+  const leftTrimHandle = page.getByLabel(
+    "裁切视频片段 镜头 01 · 回执卡推进左边缘",
+  );
+  await expect(leftTrimHandle).toBeVisible();
+  await expect(
+    page.getByLabel("裁切视频片段 镜头 01 · 回执卡推进右边缘"),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "分割" })).not.toBeVisible();
+  const leftTrimBox = await leftTrimHandle.boundingBox();
+  expect(leftTrimBox).not.toBeNull();
+  if (!leftTrimBox) throw new Error("left trim handle has no bounding box");
+  await page.mouse.move(
+    leftTrimBox.x + leftTrimBox.width / 2,
+    leftTrimBox.y + leftTrimBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    leftTrimBox.x + leftTrimBox.width / 2 + 24,
+    leftTrimBox.y + leftTrimBox.height / 2,
+  );
+  await page.mouse.up();
+  await page.getByRole("button", { name: "保存 (1)" }).click();
+  await expect.poll(() => timelineRevisionBody).not.toBeNull();
+  const savedTimelineRevision = timelineRevisionBody as unknown as Record<
+    string,
+    unknown
+  >;
+  expect(savedTimelineRevision).toMatchObject({
+    author_kind: "human",
+    intent: "用户在视频工作台完成 1 项手动修改：裁切",
+    fps: 25,
+    strategy_confirmed: true,
+  });
+  expect(
+    (savedTimelineRevision.operations as Array<Record<string, unknown>>)[0],
+  ).toMatchObject({
+    type: "trim",
+    clip_id: "clip-shot-01",
+  });
+  expect(
+    (savedTimelineRevision.tracks as Array<Record<string, unknown>>).map(
+      (track) => track.type,
+    ),
+  ).toEqual(["video", "dialogue", "music", "subtitle"]);
+  await page.getByRole("button", { name: "完成剪辑" }).click();
+  await expect.poll(() => finalEditLockBody).not.toBeNull();
+  expect(finalEditLockBody).toMatchObject({
+    locked_by: "human",
+  });
+  await expect(page.getByRole("button", { name: "剪辑已完成" })).toBeVisible();
 
-  await page.getByRole("tab", { name: "交付 QA" }).click();
-  await expect(page.getByText("真实发布确认")).toBeVisible();
+  await page.getByRole("button", { name: "成片阶段" }).click();
   await expect(
     page.getByRole("button", { name: "批准真实发布" }),
-  ).toBeVisible();
-  await expect(page.getByText("personal-ip-delivery-qa-v1")).toBeVisible();
-  await expect(page.getByText("d".repeat(64))).toBeVisible();
+  ).not.toBeVisible();
+  await expect(page.getByLabel("最终成片播放器")).toBeVisible();
+  await expect(page.getByText("交付检查")).not.toBeVisible();
+  await expect(page.getByText("声音正常")).not.toBeVisible();
+  await expect(page.getByText("时长正确")).not.toBeVisible();
+  await expect(page.getByRole("link", { name: "保存到本地" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "返回剪辑" })).toHaveCount(0);
+  await expect(page.getByLabel("制作时间线")).toHaveCount(0);
+  await expect(
+    page.getByRole("complementary", { name: "项目与镜头" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("complementary", { name: "项目设定与素材" }),
+  ).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText(
+    "personal-ip-delivery-qa-v1",
+  );
+  await expect(page.locator("body")).not.toContainText("d".repeat(64));
 
   if (screenshotDirectory) {
     await page.screenshot({
@@ -386,4 +689,15 @@ test("video workbench exposes ledger evidence, recovery, and candidate confirmat
       fullPage: true,
     });
   }
+
+  await page.getByRole("link", { name: /^(新对话|New chat)$/ }).click();
+  await expect(page).toHaveURL(/\/workspace\/chats\/new$/);
+  await expect(
+    page.getByPlaceholder(
+      /告诉我账号、平台和目标|Name the account, platform, and outcome/,
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "视频生产工作台" }),
+  ).toHaveCount(0);
 });

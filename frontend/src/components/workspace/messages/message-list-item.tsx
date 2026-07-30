@@ -10,7 +10,6 @@ import {
   useCallback,
   useMemo,
   useState,
-  useEffect,
   type ImgHTMLAttributes,
 } from "react";
 
@@ -20,10 +19,6 @@ import {
   MessageContent as AIElementMessageContent,
   MessageToolbar,
 } from "@/components/ai-elements/message";
-import {
-  Reasoning,
-  ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
 import { Task, TaskTrigger } from "@/components/ai-elements/task";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -39,27 +34,20 @@ import { extractCitationSources } from "@/core/citations/sources";
 import { useI18n } from "@/core/i18n/hooks";
 import {
   extractContentFromMessage,
-  extractReasoningContentFromMessage,
   getMessageCopyData,
   parseUploadedFiles,
   stripUploadedFilesTag,
+  visibleAssistantContent,
   type FileInMessage,
 } from "@/core/messages/utils";
 import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
 import { readReferenceMessageContexts } from "@/core/sidecar";
-import {
-  parseSlashSkillReference,
-  resolveSlashSkillDisplay,
-} from "@/core/skills";
-import { useSkills } from "@/core/skills/hooks";
-import { SafeReasoningContent } from "@/core/streamdown/components";
+import { stripSkillSelectorForDisplay } from "@/core/skills";
 import { cn } from "@/lib/utils";
 
-import { WorkspaceChangeBadge } from "../changes";
 import { CitationSourcesPanel } from "../citations/citation-sources-panel";
 import { CopyButton } from "../copy-button";
 import { ReferenceAttachmentSummary } from "../sidecar/reference-attachments";
-import { SlashSkillChip } from "../slash-skill-chip";
 
 import { MarkdownContent } from "./markdown-content";
 import { createMarkdownLinkComponent } from "./markdown-link";
@@ -152,6 +140,7 @@ export function MessageListItem({
   showCopyButton?: boolean;
   turnStartTime?: number | null;
 }) {
+  const { locale } = useI18n();
   const isHuman = message.type === "human";
   return (
     <AIElementMessage
@@ -164,7 +153,6 @@ export function MessageListItem({
         isLoading={isLoading}
         threadId={threadId}
         artifactPaths={artifactPaths}
-        runId={runId}
         turnStartTime={turnStartTime}
       />
       {!isLoading && showCopyButton && (
@@ -177,7 +165,7 @@ export function MessageListItem({
           )}
         >
           <div className="pointer-events-auto flex gap-1">
-            <CopyButton clipboardData={getMessageCopyData(message)} />
+            <CopyButton clipboardData={getMessageCopyData(message, locale)} />
             {feedback !== undefined && runId && threadId && (
               <FeedbackButtons
                 threadId={threadId}
@@ -240,40 +228,12 @@ function MessageImage({
   );
 }
 
-const clientTurnDurations = new Map<string, number>();
-
 function HumanMessageText({ content }: { content: string }) {
-  // `parseSlashSkillReference` is a pure regex gate (no data subscription), so
-  // the overwhelmingly common plain-text human message never subscribes to the
-  // skills query. Only a message that literally looks like a `/skill …`
-  // activation mounts `HumanSlashSkillText`, which owns the `useSkills()`
-  // lookup. This keeps a skill-enabled toggle from re-rendering every human
-  // turn — only the few slash-candidate turns react to catalog changes.
-  const reference = useMemo(() => parseSlashSkillReference(content), [content]);
-
-  if (!reference) {
-    return <div className="break-words whitespace-pre-wrap">{content}</div>;
-  }
-
-  return <HumanSlashSkillText content={content} />;
-}
-
-function HumanSlashSkillText({ content }: { content: string }) {
-  const { skills } = useSkills();
-  const slashSkill = resolveSlashSkillDisplay(content, skills);
-
-  if (!slashSkill) {
-    return <div className="break-words whitespace-pre-wrap">{content}</div>;
-  }
-
+  const { t } = useI18n();
+  const visibleContent = stripSkillSelectorForDisplay(content);
   return (
-    <div className="flex max-w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-      <SlashSkillChip name={slashSkill.name} />
-      {slashSkill.remainingText && (
-        <span className="min-w-0 flex-1 break-words whitespace-pre-wrap">
-          {slashSkill.remainingText}
-        </span>
-      )}
+    <div className="break-words whitespace-pre-wrap">
+      {visibleContent || t.common.requestSubmitted}
     </div>
   );
 }
@@ -284,62 +244,17 @@ function MessageContent_({
   isLoading = false,
   threadId,
   artifactPaths,
-  runId,
-  turnStartTime,
 }: {
   className?: string;
   message: Message;
   isLoading?: boolean;
   threadId: string;
   artifactPaths: readonly string[];
-  runId?: string;
   turnStartTime?: number | null;
 }) {
+  const { t, locale } = useI18n();
   const rehypePlugins = useRehypeSplitWordsIntoSpans(isLoading);
   const isHuman = message.type === "human";
-  const rawTurnDuration = message.additional_kwargs?.turn_duration as
-    | number
-    | undefined;
-
-  const [cachedDuration, setCachedDuration] = useState<number | undefined>(
-    () =>
-      message.id
-        ? clientTurnDurations.get(`${threadId}:${message.id}`)
-        : undefined,
-  );
-  const turnDuration = rawTurnDuration ?? cachedDuration;
-
-  useEffect(() => {
-    if (rawTurnDuration !== undefined && message.id) {
-      clientTurnDurations.set(`${threadId}:${message.id}`, rawTurnDuration);
-      setCachedDuration(rawTurnDuration);
-    }
-  }, [rawTurnDuration, message.id, threadId]);
-
-  const handleDurationChange = useCallback(
-    (d: number | undefined) => {
-      if (d !== undefined && message.id) {
-        clientTurnDurations.set(`${threadId}:${message.id}`, d);
-        setCachedDuration(d);
-      }
-    },
-    [message.id, threadId],
-  );
-
-  useEffect(() => {
-    return () => {
-      for (const key of clientTurnDurations.keys()) {
-        if (key.startsWith(`${threadId}:`)) {
-          clientTurnDurations.delete(key);
-        }
-      }
-    };
-  }, [threadId]);
-
-  const [wasLoading, setWasLoading] = useState(isLoading);
-  useEffect(() => {
-    if (isLoading) setWasLoading(true);
-  }, [isLoading]);
   const components = useMemo(
     () => ({
       img: (props: ImgHTMLAttributes<HTMLImageElement>) => (
@@ -356,7 +271,6 @@ function MessageContent_({
   );
 
   const rawContent = extractContentFromMessage(message);
-  const reasoningContent = extractReasoningContentFromMessage(message);
 
   const files = useMemo(() => {
     const files = message.additional_kwargs?.files;
@@ -384,8 +298,8 @@ function MessageContent_({
     if (isHuman) {
       return rawContent ? stripUploadedFilesTag(rawContent) : "";
     }
-    return rawContent ?? "";
-  }, [rawContent, isHuman]);
+    return visibleAssistantContent(rawContent ?? "", locale);
+  }, [rawContent, isHuman, locale]);
   const citationSources = useMemo(
     () => (isHuman ? [] : extractCitationSources(contentToDisplay)),
     [contentToDisplay, isHuman],
@@ -412,21 +326,15 @@ function MessageContent_({
     );
   }
 
-  // Reasoning-only AI message (no main response content yet)
-  if (!isHuman && reasoningContent && !rawContent) {
-    return (
+  if (!isHuman && !rawContent) {
+    return isLoading ? (
       <AIElementMessageContent className={className}>
-        <Reasoning
-          isStreaming={isLoading}
-          startTimeProp={turnStartTime}
-          duration={turnDuration}
-          onTurnDurationChange={handleDurationChange}
-        >
-          <ReasoningTrigger />
-          <SafeReasoningContent>{reasoningContent}</SafeReasoningContent>
-        </Reasoning>
+        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+          <Loader2Icon className="size-4 animate-spin" />
+          {t.common.thinking}
+        </div>
       </AIElementMessageContent>
-    );
+    ) : null;
   }
 
   if (isHuman) {
@@ -461,20 +369,6 @@ function MessageContent_({
   return (
     <AIElementMessageContent className={className}>
       {filesList}
-      {!isHuman &&
-        (!!reasoningContent || wasLoading || turnDuration !== undefined) && (
-          <Reasoning
-            isStreaming={isLoading}
-            startTimeProp={turnStartTime}
-            duration={turnDuration}
-            onTurnDurationChange={handleDurationChange}
-          >
-            <ReasoningTrigger hasContent={!!reasoningContent} />
-            {reasoningContent && (
-              <SafeReasoningContent>{reasoningContent}</SafeReasoningContent>
-            )}
-          </Reasoning>
-        )}
       <MarkdownContent
         content={contentToDisplay}
         isLoading={isLoading}
@@ -483,13 +377,6 @@ function MessageContent_({
         components={components}
       />
       <CitationSourcesPanel sources={citationSources} />
-      {message.type === "ai" && (
-        <WorkspaceChangeBadge
-          threadId={threadId}
-          runId={runId}
-          disabled={isLoading}
-        />
-      )}
     </AIElementMessageContent>
   );
 }

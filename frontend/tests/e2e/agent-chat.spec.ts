@@ -37,7 +37,7 @@ test.describe("Agent chat", () => {
     await page.goto("/workspace/agents/test-agent/chats/new");
 
     // The prompt input textarea should be visible
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
   });
 
@@ -45,17 +45,17 @@ test.describe("Agent chat", () => {
     mockLangGraphAPI(page, { agents: MOCK_AGENTS });
 
     await page.goto("/workspace/agents/test-agent/chats/new");
-    const firstAgentInput = page.getByPlaceholder(/how can i assist you/i);
+    const firstAgentInput = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(firstAgentInput).toBeVisible({ timeout: 15_000 });
     await firstAgentInput.fill("Draft for the first agent");
 
     await page.goto("/workspace/agents/second-agent/chats/new");
-    const secondAgentInput = page.getByPlaceholder(/how can i assist you/i);
+    const secondAgentInput = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(secondAgentInput).toHaveValue("");
     await secondAgentInput.fill("Draft for the second agent");
 
     await page.goto("/workspace/agents/test-agent/chats/new");
-    await expect(page.getByPlaceholder(/how can i assist you/i)).toHaveValue(
+    await expect(page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i)).toHaveValue(
       "Draft for the first agent",
     );
   });

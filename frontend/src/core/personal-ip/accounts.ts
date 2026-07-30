@@ -15,11 +15,6 @@ export type PersonalIPAccount = {
   display_name: string;
   handle: string | null;
   avatar_url: string | null;
-  promise_to_audience: string;
-  primary_audience: string;
-  content_pillars: string[];
-  voice_and_boundaries: string[];
-  business_goal: string;
   status: "active" | "archived";
   metadata: Record<string, unknown>;
   created_at: string;
@@ -28,16 +23,7 @@ export type PersonalIPAccount = {
 
 export type PersonalIPAccountInput = Pick<
   PersonalIPAccount,
-  | "platform"
-  | "subject_id"
-  | "display_name"
-  | "handle"
-  | "avatar_url"
-  | "promise_to_audience"
-  | "primary_audience"
-  | "content_pillars"
-  | "voice_and_boundaries"
-  | "business_goal"
+  "platform" | "subject_id" | "display_name" | "handle" | "avatar_url"
 > & { metadata?: Record<string, unknown> };
 
 const ACCOUNTS_QUERY_KEY = ["personal-ip", "accounts"] as const;
@@ -106,6 +92,25 @@ export function useUpdatePersonalIPAccount() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updates),
         },
+      ),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY }),
+        queryClient.invalidateQueries({
+          queryKey: PERSONAL_IP_COCKPIT_QUERY_KEY,
+        }),
+      ]);
+    },
+  });
+}
+
+export function useLogoutPersonalIPAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (accountId: string) =>
+      requestJSON<PersonalIPAccount>(
+        `/api/personal-ip/accounts/${encodeURIComponent(accountId)}/logout`,
+        { method: "POST" },
       ),
     onSuccess: async () => {
       await Promise.all([

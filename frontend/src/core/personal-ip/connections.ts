@@ -11,27 +11,27 @@ export const PERSONAL_IP_CONNECTION_STATE_COPY = {
   not_added: {
     label: "未添加",
     description: "还没有为这个平台创建账号位置。",
-    action: "添加并登录",
+    action: "登录",
   },
   pending_login: {
     label: "待登录",
-    description: "账号已添加，等待你本人完成平台登录。",
-    action: "完成登录",
+    description: "账号已添加，请本人登录平台。",
+    action: "登录",
   },
   logged_in: {
     label: "已登录",
     description: "登录已确认，可以读取获授权的账号页面。",
-    action: "打开平台",
+    action: "退出登录",
   },
   collection_limited: {
     label: "采集受限",
     description: "登录仍可用，但部分经营数据暂时无法完整读取。",
-    action: "检查登录与权限",
+    action: "退出登录",
   },
   actionable: {
     label: "可执行",
     description: "账号可读取数据，并可执行经过确认的操作。",
-    action: "打开平台",
+    action: "退出登录",
   },
 } as const satisfies Record<
   PersonalIPConnectionState,

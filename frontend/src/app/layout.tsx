@@ -10,7 +10,7 @@ import { detectLocaleServer } from "@/core/i18n/server";
 export const metadata: Metadata = {
   title: "IP Agent",
   description:
-    "A local personal-IP agent powered by DeerFlow and the Volcengine stack.",
+    "A local intelligent agent for operating, creating, and growing personal IP.",
 };
 
 export default async function RootLayout({

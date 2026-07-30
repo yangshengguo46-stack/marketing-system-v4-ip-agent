@@ -20,8 +20,6 @@ const HERO_WORDS = [
   "发布复盘",
 ];
 
-const CAPABILITIES = ["豆包推理", "Seedream", "Seedance", "AI MediaKit"];
-
 export function Hero({ className }: { className?: string }) {
   return (
     <div
@@ -42,7 +40,7 @@ export function Hero({ className }: { className?: string }) {
       </div>
       <div className="container-md relative z-10 mx-auto flex min-h-svh flex-col items-center justify-center px-4 pt-20 pb-14">
         <div className="mb-6 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs tracking-[0.2em] text-white/70 uppercase backdrop-blur">
-          Local Personal IP Agent
+          你的个人 IP 智能体
         </div>
         <h1 className="text-center text-5xl leading-tight font-bold break-words text-white md:text-7xl">
           IP Agent
@@ -52,29 +50,15 @@ export function Hero({ className }: { className?: string }) {
           <span className="whitespace-nowrap text-white">的本地智能体</span>
         </div>
         <p className="mt-8 max-w-3xl text-center text-base leading-8 text-white/65 sm:text-xl">
-          你只说目标。它用 DeerFlow
-          规划，用火山全系列完成研究、图像、视频、语音与媒体处理，
-          并把每一次操作绑定到具体账号、审批和回执。
+          你只说目标。它会理解账号和受众，完成研究、创作、视频生产、发布准备与复盘；
+          需要你做创作判断或确认外部操作时，再请你介入。
         </p>
-        <div className="mt-7 flex flex-wrap justify-center gap-2">
-          {CAPABILITIES.map((capability) => (
-            <span
-              key={capability}
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white/65 backdrop-blur"
-            >
-              {capability}
-            </span>
-          ))}
-        </div>
         <Link href="/workspace">
           <Button className="mt-9 h-11 px-5" size="lg">
             <span className="text-md">进入工作台</span>
             <ChevronRightIcon className="size-4" />
           </Button>
         </Link>
-        <p className="mt-5 text-xs text-white/35">
-          Powered by ByteDance DeerFlow · Volcengine
-        </p>
       </div>
     </div>
   );

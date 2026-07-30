@@ -160,6 +160,26 @@ describe("artifact URL helpers", () => {
     );
   });
 
+  test("keeps deliverables while hiding internal skill and production files", async () => {
+    const { extractArtifactsFromThread, isCustomerVisibleArtifact } =
+      await loadFreshArtifactUtils();
+    const deliverable = "/mnt/user-data/outputs/final-video.mp4";
+    const internalFiles = [
+      "/mnt/skills/video-style/SKILL.md",
+      "/mnt/user-data/outputs/video-style.skill",
+      "/mnt/user-data/outputs/continuity-ledger.json",
+      "/mnt/user-data/outputs/shot-contract.json",
+      "/mnt/user-data/outputs/execution-receipt.json",
+    ];
+
+    expect(isCustomerVisibleArtifact(deliverable)).toBe(true);
+    expect(
+      extractArtifactsFromThread({
+        values: { artifacts: [deliverable, ...internalFiles] },
+      }),
+    ).toEqual([deliverable]);
+  });
+
   test("resolves absolute and relative message image paths", async () => {
     const { resolveMessageImageURL } = await loadFreshArtifactUtils();
     const artifacts = [

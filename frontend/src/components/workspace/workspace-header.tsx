@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquarePlus } from "lucide-react";
+import { LayoutDashboardIcon, MessageSquarePlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -50,6 +50,17 @@ export function WorkspaceHeader({ className }: { className?: string }) {
         )}
       </div>
       <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            isActive={pathname === "/workspace/dashboard"}
+            asChild
+          >
+            <Link className="text-muted-foreground" href="/workspace/dashboard">
+              <LayoutDashboardIcon size={16} />
+              <span>{t.sidebar.dashboard}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
         <SidebarMenuItem>
           <SidebarMenuButton
             isActive={pathname === "/workspace/chats/new"}

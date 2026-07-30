@@ -1,6 +1,7 @@
 import type { Message } from "@langchain/langgraph-sdk";
 
 import type { Translations } from "@/core/i18n/locales/types";
+import { isInternalSkillToolCall } from "@/core/skills";
 
 import { getUsageMetadata, type TokenUsage } from "./usage";
 import { hasContent } from "./utils";
@@ -149,6 +150,10 @@ export function buildTokenDebugSteps(
     for (const toolCall of message.tool_calls ?? []) {
       const toolArgs = (toolCall.args ?? {}) as Record<string, unknown>;
 
+      if (isInternalSkillToolCall(toolCall.name, toolArgs)) {
+        continue;
+      }
+
       if (toolCall.name === "write_todos") {
         actionLabels.push(t.toolCalls.writeTodos);
         continue;
@@ -270,6 +275,10 @@ function describeToolCall(
   },
   t: Translations,
 ): string {
+  if (isInternalSkillToolCall(toolCall.name, toolCall.args)) {
+    return t.common.thinking;
+  }
+
   if (toolCall.name === "task") {
     const description =
       typeof toolCall.args.description === "string"

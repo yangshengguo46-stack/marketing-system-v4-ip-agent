@@ -12,15 +12,13 @@ export type Recipe = {
 
 // Front-end-only starter recipes. The schedule's timezone is left empty so the
 // ScheduleInput falls back to the browser-detected timezone when applied.
-// `{{repo}}` style placeholders are intentional — the user fills them in the
-// prompt field after applying the recipe.
 export const RECIPES: Recipe[] = [
   {
     id: "trending",
     icon: "🔥",
     titleKey: "trending",
     prompt:
-      "Use web_search to open today's GitHub Trending page, then summarize the top 10 repositories. For each: name, primary language, today's star delta, and a one-line description of what it is and why it's trending. Output as a markdown list.",
+      "每天汇总全部已登录平台账号的新增浏览、粉丝、互动和作品表现，明确标出未采集平台，并告诉我最值得继续追的一个增长机会。",
     schedule: {
       schedule_type: "cron",
       schedule_spec: { cron: "0 9 * * *" },
@@ -32,7 +30,7 @@ export const RECIPES: Recipe[] = [
     icon: "📰",
     titleKey: "news",
     prompt:
-      "Use web_search to collect today's top tech news across AI, developer tools, infrastructure, and security. Summarize the 5 most important items: headline, source, and a one-line takeaway each. Output as a markdown list.",
+      "每天结合当前账号定位、受众和近期表现扫描热点，给出最多 5 个值得做的选题，并说明为什么适合这个账号。",
     schedule: {
       schedule_type: "cron",
       schedule_spec: { cron: "0 9 * * *" },
@@ -44,7 +42,7 @@ export const RECIPES: Recipe[] = [
     icon: "🏷️",
     titleKey: "issues",
     prompt:
-      "Triage the open issues in {{repo}}: list the 10 most recent, label each as bug / feature / question, flag any that look stale or high-priority, and suggest 2 that are good first issues. Replace {{repo}} with the target repository (owner/name). Output as a markdown table.",
+      "每天回收近期已发布作品的真实数据，和发布前预演及账号基线对照；发现异常增长或明显下滑时直接告诉我。",
     schedule: {
       schedule_type: "cron",
       schedule_spec: { cron: "0 9 * * *" },
@@ -56,7 +54,7 @@ export const RECIPES: Recipe[] = [
     icon: "📅",
     titleKey: "weekly",
     prompt:
-      "Compile a weekly report: what was accomplished this week, what is currently blocked, and the top 3 priorities for next week. Keep it concise and skimmable.",
+      "每周复盘全部平台的增长、粉丝反馈和作品表现，更新可复用经验，并给出下周最值得做的三件事。",
     schedule: {
       schedule_type: "cron",
       schedule_spec: { cron: "0 9 * * 1" },

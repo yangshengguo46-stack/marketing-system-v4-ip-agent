@@ -59,7 +59,7 @@ function getConnectionLabel(connection: ChannelConnection): string | null {
   if (account && workspace) {
     return `${account} · ${workspace}`;
   }
-  return account ?? workspace ?? connection.external_account_id ?? null;
+  return account ?? workspace ?? null;
 }
 
 function getStatusLabel(
@@ -94,7 +94,7 @@ function getProviderUnavailableReason(
   t: ReturnType<typeof useI18n>["t"],
 ): string | undefined {
   if (provider.unavailable_reason) {
-    return provider.unavailable_reason;
+    return t.channels.unavailable;
   }
   if (!provider.enabled) {
     return t.channels.disabled;
@@ -102,7 +102,7 @@ function getProviderUnavailableReason(
   if (!provider.configured) {
     return t.channels.unconfigured;
   }
-  return provider.unavailable_reason ?? undefined;
+  return undefined;
 }
 
 function ChannelProviderItem({
@@ -158,11 +158,9 @@ function ChannelProviderItem({
         closeConnectWindow(connectWindow);
         toast.success(result.instruction);
       })
-      .catch((error) => {
+      .catch(() => {
         closeConnectWindow(connectWindow);
-        toast.error(
-          error instanceof Error ? error.message : t.channels.unavailable,
-        );
+        toast.error(t.channels.unavailable);
       });
   };
 
@@ -190,9 +188,6 @@ function ChannelProviderItem({
             {getProviderDescription(provider, t.channels.descriptions)}
             {isConnected && connectionLabel
               ? ` ${t.channels.connectedAs(connectionLabel)}`
-              : ""}
-            {!isConnected && provider.unavailable_reason
-              ? ` ${provider.unavailable_reason}`
               : ""}
           </ItemDescription>
         </ItemContent>
@@ -226,12 +221,8 @@ function ChannelProviderItem({
                     .then(() => {
                       toast.success(t.channels.revoked);
                     })
-                    .catch((error) => {
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : t.channels.unavailable,
-                      );
+                    .catch(() => {
+                      toast.error(t.channels.unavailable);
                     });
                 }}
               >
@@ -309,11 +300,9 @@ function ChannelProviderItem({
               closeConnectWindow(connectWindow);
               toast.success(t.channels.connected);
             })
-            .catch((error) => {
+            .catch(() => {
               closeConnectWindow(connectWindow);
-              toast.error(
-                error instanceof Error ? error.message : t.channels.unavailable,
-              );
+              toast.error(t.channels.unavailable);
             });
         }}
       />

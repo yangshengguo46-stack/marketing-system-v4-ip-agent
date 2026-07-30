@@ -29,7 +29,7 @@ test.describe("Chat workspace", () => {
   test("new chat page loads with input box", async ({ page }) => {
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("button", { name: /load more/i })).toBeHidden();
   });
@@ -37,7 +37,7 @@ test.describe("Chat workspace", () => {
   test("can type a message in the input box", async ({ page }) => {
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill("Hello, DeerFlow!");
@@ -49,13 +49,13 @@ test.describe("Chat workspace", () => {
   }) => {
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
     await textarea.fill("Keep this unfinished draft");
 
     await page.reload();
 
-    const restoredTextarea = page.getByPlaceholder(/how can i assist you/i);
+    const restoredTextarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(restoredTextarea).toHaveValue("Keep this unfinished draft");
     await restoredTextarea.press("Enter");
     await expect(page.getByText("Hello from DeerFlow!")).toBeVisible({
@@ -63,7 +63,7 @@ test.describe("Chat workspace", () => {
     });
 
     await page.reload();
-    await expect(page.getByPlaceholder(/how can i assist you/i)).toHaveValue(
+    await expect(page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i)).toHaveValue(
       "",
     );
   });
@@ -73,7 +73,7 @@ test.describe("Chat workspace", () => {
   }) => {
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
     await textarea.fill("Repeat this request");
     await textarea.press("Enter");
@@ -90,40 +90,32 @@ test.describe("Chat workspace", () => {
       .toContain("Repeat this request");
 
     await page.reload();
-    await expect(page.getByPlaceholder(/how can i assist you/i)).toHaveValue(
+    await expect(page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i)).toHaveValue(
       "Repeat this request",
     );
   });
 
-  test("restores a selected slash skill draft after reload", async ({
+  test("does not expose skill suggestions while restoring a plain draft", async ({
     page,
   }) => {
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.locator("textarea").first();
     await expect(textarea).toBeVisible({ timeout: 15_000 });
     await textarea.fill("/dat");
-    await textarea.press("Enter");
-
-    await expect(page.getByText("/data-analysis")).toBeVisible();
-    const skillInput = page.getByRole("textbox", {
-      name: /how can i assist you/i,
-    });
-    await skillInput.fill("Analyze the latest results");
+    await expect(
+      page.getByRole("option", { name: /data-analysis/i }),
+    ).toBeHidden();
     await expect
       .poll(() =>
         page.evaluate(() => Object.values(window.sessionStorage).join("\n")),
       )
-      .toContain("Analyze the latest results");
+      .toContain("/dat");
 
     await page.reload();
 
-    await expect(page.getByText("/data-analysis")).toBeVisible();
-    await expect(
-      page.getByRole("textbox", {
-        name: /how can i assist you/i,
-      }),
-    ).toHaveText("Analyze the latest results");
+    await expect(page.locator("textarea").first()).toHaveValue("/dat");
+    await expect(page.getByText("/data-analysis")).toBeHidden();
   });
 
   test("continues without draft persistence when sessionStorage is blocked", async ({
@@ -154,7 +146,7 @@ test.describe("Chat workspace", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
     await page.evaluate(() => {
       Reflect.set(window, "__blockComposerDraftStorage", true);
@@ -211,7 +203,7 @@ test.describe("Chat workspace", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
     await page.getByLabel("Upload files").setInputFiles({
       name: "notes.txt",
@@ -237,7 +229,7 @@ test.describe("Chat workspace", () => {
     });
 
     await page.reload();
-    await expect(page.getByPlaceholder(/how can i assist you/i)).toHaveValue(
+    await expect(page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i)).toHaveValue(
       "",
     );
   });
@@ -289,7 +281,7 @@ test.describe("Chat workspace", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill("summarize report");
@@ -333,7 +325,7 @@ test.describe("Chat workspace", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill("summarize report");
@@ -372,7 +364,7 @@ test.describe("Chat workspace", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill("summarize report");
@@ -395,57 +387,21 @@ test.describe("Chat workspace", () => {
     releasePolish();
   });
 
-  test("suggests matching skills after a leading slash", async ({ page }) => {
-    let submittedText: string | undefined;
-    await page.route("**/runs/stream", (route) => {
-      const body = route.request().postDataJSON() as {
-        input?: { messages?: Array<{ content?: unknown }> };
-      };
-      const content = body.input?.messages?.at(-1)?.content;
-      if (typeof content === "string") {
-        submittedText = content;
-      } else if (Array.isArray(content)) {
-        submittedText = content
-          .map((block) =>
-            typeof block === "object" &&
-            block !== null &&
-            "text" in block &&
-            typeof block.text === "string"
-              ? block.text
-              : "",
-          )
-          .join("");
-      }
-      return handleRunStream(route);
-    });
-
+  test("does not expose matching skills after a leading slash", async ({
+    page,
+  }) => {
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.locator("textarea").first();
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill("/dat");
     await expect(
       page.getByRole("option", { name: /data-analysis/i }),
-    ).toBeVisible();
+    ).toBeHidden();
     await expect(
       page.getByRole("option", { name: /disabled-skill/i }),
     ).toBeHidden();
-
-    await textarea.press("Enter");
-
-    await expect(page.getByText("/data-analysis")).toBeVisible();
-    const skillInput = page.getByRole("textbox", {
-      name: /how can i assist you/i,
-    });
-    await expect(skillInput).toBeVisible();
-
-    await skillInput.fill("summarize this dataset");
-    await skillInput.press("Enter");
-
-    await expect
-      .poll(() => submittedText)
-      .toBe("/data-analysis summarize this dataset");
   });
 
   test("goal command sets a goal and starts an agent run", async ({ page }) => {
@@ -456,7 +412,7 @@ test.describe("Chat workspace", () => {
       return route.fallback();
     });
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill("/go");
@@ -477,7 +433,7 @@ test.describe("Chat workspace", () => {
   }) => {
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill(
@@ -515,59 +471,54 @@ test.describe("Chat workspace", () => {
     expect(overlaps).toBe(false);
   });
 
-  test("uses arrow keys to navigate skill suggestions before prompt history", async ({
+  test("uses arrow keys only for built-in command suggestions", async ({
     page,
   }) => {
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.locator("textarea").first();
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill("/");
 
-    const dataAnalysis = page.getByRole("option", {
-      name: /data-analysis/i,
+    const goal = page.getByRole("option", {
+      name: /goal/i,
     });
-    const frontendDesign = page.getByRole("option", {
-      name: /frontend-design/i,
+    const compact = page.getByRole("option", {
+      name: /compact/i,
     });
-    await expect(dataAnalysis).toBeVisible();
-    await expect(frontendDesign).toBeVisible();
-    await expect(dataAnalysis).toHaveAttribute("aria-selected", "true");
+    await expect(goal).toBeVisible();
+    await expect(compact).toBeVisible();
+    await expect(
+      page.getByRole("option", { name: /data-analysis/i }),
+    ).toBeHidden();
+    await expect(goal).toHaveAttribute("aria-selected", "true");
 
     await textarea.press("ArrowDown");
 
     await expect(textarea).toHaveValue("/");
-    await expect(dataAnalysis).toHaveAttribute("aria-selected", "false");
-    await expect(frontendDesign).toHaveAttribute("aria-selected", "true");
+    await expect(goal).toHaveAttribute("aria-selected", "false");
+    await expect(compact).toHaveAttribute("aria-selected", "true");
 
     await textarea.press("ArrowUp");
 
     await expect(textarea).toHaveValue("/");
-    await expect(dataAnalysis).toHaveAttribute("aria-selected", "true");
-    await expect(frontendDesign).toHaveAttribute("aria-selected", "false");
-
-    await textarea.press("ArrowDown");
-    await textarea.press("Enter");
-
-    await expect(page.getByText("/frontend-design")).toBeVisible();
-    await expect(
-      page.getByRole("textbox", { name: /how can i assist you/i }),
-    ).toBeVisible();
+    await expect(goal).toHaveAttribute("aria-selected", "true");
+    await expect(compact).toHaveAttribute("aria-selected", "false");
   });
 
-  test("keeps Shift+Enter as newline while skill suggestions are visible", async ({
+  test("keeps Shift+Enter as newline without exposing skill suggestions", async ({
     page,
   }) => {
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.locator("textarea").first();
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill("/dat");
     await expect(
       page.getByRole("option", { name: /data-analysis/i }),
-    ).toBeVisible();
+    ).toBeHidden();
 
     await textarea.press("Shift+Enter");
 
@@ -582,7 +533,7 @@ test.describe("Chat workspace", () => {
   }) => {
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill("please /dat");
@@ -603,7 +554,7 @@ test.describe("Chat workspace", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill("Hello");
@@ -615,6 +566,30 @@ test.describe("Chat workspace", () => {
     await expect(page.getByText("Hello from DeerFlow!")).toBeVisible({
       timeout: 10_000,
     });
+  });
+
+  test("routes every customer chat through the IP Agent", async ({ page }) => {
+    let submittedContext: Record<string, unknown> | undefined;
+    await page.route("**/runs/stream", (route) => {
+      const body = route.request().postDataJSON() as {
+        context?: Record<string, unknown>;
+      };
+      submittedContext = body.context;
+      return handleRunStream(route);
+    });
+
+    await page.goto("/workspace/chats/new");
+
+    const textarea = page.getByPlaceholder(
+      /(?:how can i assist you|name the account|告诉我账号)/i,
+    );
+    await expect(textarea).toBeVisible({ timeout: 15_000 });
+    await textarea.fill("看看我的账号");
+    await textarea.press("Enter");
+
+    await expect
+      .poll(() => submittedContext?.agent_name, { timeout: 10_000 })
+      .toBe("ip-agent");
   });
 
   test("blocks suggestion template placeholders until replaced", async ({
@@ -647,7 +622,7 @@ test.describe("Chat workspace", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole("button", { name: /research/i }).click();
@@ -717,7 +692,7 @@ test.describe("Chat workspace", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.locator("textarea").first();
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill(slashCommand);
@@ -726,6 +701,8 @@ test.describe("Chat workspace", () => {
     await expect
       .poll(() => submittedText, { timeout: 10_000 })
       .toBe(slashCommand);
+    await expect(page.getByText("/data-analysis")).toBeHidden();
+    await expect(page.getByText("analyze uploads/foo.csv")).toBeVisible();
     await expect(page.getByText("Hello from DeerFlow!")).toBeVisible({
       timeout: 10_000,
     });
@@ -800,7 +777,7 @@ test.describe("Chat workspace", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await page.getByLabel("Upload files").setInputFiles({
@@ -976,7 +953,7 @@ test.describe("Chat workspace", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
     const promptForm = page.locator("form").filter({ has: textarea });
 
@@ -1030,7 +1007,7 @@ test.describe("Chat workspace", () => {
 
     await page.goto("/workspace/chats/new");
 
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
 
     await textarea.fill("Hello");

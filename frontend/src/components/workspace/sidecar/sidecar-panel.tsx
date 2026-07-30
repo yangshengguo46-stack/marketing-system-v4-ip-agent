@@ -58,7 +58,6 @@ import {
 import { isHiddenFromUIMessage } from "@/core/messages/utils";
 import { useModels } from "@/core/models/hooks";
 import type { Model } from "@/core/models/types";
-import { useLocalSettings } from "@/core/settings";
 import {
   buildParentConversationContext,
   buildReferenceMessageMetadata,
@@ -150,8 +149,7 @@ export function SidecarPanel({ className }: { className?: string }) {
   const { t } = useI18n();
   const sidecar = useSidecar();
   const { thread: parentThread } = useParentThread();
-  const [localSettings] = useLocalSettings();
-  const { models, tokenUsageEnabled } = useModels();
+  const { models } = useModels();
   const [modelDialogOpen, setModelDialogOpen] = useState(false);
   const [creatingThread, setCreatingThread] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -217,9 +215,7 @@ export function SidecarPanel({ className }: { className?: string }) {
       ),
     [thread.messages],
   );
-  const tokenUsageInlineMode = tokenUsageEnabled
-    ? localSettings.tokenUsage.inlineMode
-    : "off";
+  const tokenUsageInlineMode = "off";
   const disabled =
     (!hasSidecarThread && !hasPendingReferences) ||
     thread.isLoading ||
@@ -652,7 +648,6 @@ export function SidecarPanel({ className }: { className?: string }) {
               </PromptInputTools>
               <PromptInputTools className="min-w-0 justify-end">
                 <SidecarModelSelector
-                  className="max-w-40 min-w-0 sm:max-w-56 @max-[240px]:hidden"
                   context={sidecar.context}
                   models={models}
                   open={modelDialogOpen}
@@ -774,7 +769,7 @@ function SidecarModeMenu({
   return (
     <PromptInputActionMenu>
       <ModeHoverGuide mode={mode}>
-        <PromptInputActionMenuTrigger className="max-w-20 min-w-0 gap-1! px-2!">
+        <PromptInputActionMenuTrigger className="hidden!">
           <div>
             {mode === "flash" && <ZapIcon className="size-3" />}
             {mode === "thinking" && <LightbulbIcon className="size-3" />}
@@ -924,7 +919,6 @@ function SidecarModeMenu({
 }
 
 function SidecarModelSelector({
-  className,
   context,
   models,
   open,
@@ -932,7 +926,6 @@ function SidecarModelSelector({
   onModelSelect,
   onOpenChange,
 }: {
-  className?: string;
   context: ThreadStreamOptions["context"];
   models: Model[];
   open: boolean;
@@ -949,7 +942,7 @@ function SidecarModelSelector({
   return (
     <ModelSelector open={open} onOpenChange={onOpenChange}>
       <ModelSelectorTrigger asChild>
-        <PromptInputButton className={cn("min-w-0 px-2!", className)}>
+        <PromptInputButton className="hidden!">
           <div className="flex min-w-0 flex-col items-start text-left">
             <ModelSelectorName className="truncate text-xs font-normal">
               {selectedModel.display_name}

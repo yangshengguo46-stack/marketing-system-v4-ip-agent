@@ -10,6 +10,8 @@
  * shaping for the live `task_running` event, which still carries the raw message.
  */
 
+import { isInternalSkillToolCall } from "@/core/skills";
+
 export interface SubtaskStepToolCall {
   name?: string;
   args?: unknown;
@@ -95,7 +97,24 @@ export function stepsForDisplay(
   status: "in_progress" | "completed" | "failed",
 ): SubtaskStep[] {
   const visible = (steps ?? [])
-    .filter((step) => step.kind === "tool" || step.text.trim() !== "")
+    .filter((step) => {
+      if (step.kind === "tool") {
+        return !isInternalSkillToolCall(step.tool_name ?? "", {});
+      }
+      if (
+        step.tool_calls?.some((call) =>
+          isInternalSkillToolCall(
+            call.name ?? "",
+            call.args && typeof call.args === "object"
+              ? (call.args as Record<string, unknown>)
+              : {},
+          ),
+        )
+      ) {
+        return false;
+      }
+      return step.text.trim() !== "";
+    })
     .sort((a, b) => a.message_index - b.message_index);
 
   if (status === "completed") {

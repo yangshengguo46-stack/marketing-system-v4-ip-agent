@@ -149,7 +149,7 @@ async function expectComposerHeightsEqual(page: Page) {
     };
 
     return {
-      main: findFormByPlaceholder(/how can i assist you/i),
+      main: findFormByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i),
       sidecar: findFormByPlaceholder(/deeper follow-up/i),
     };
   });
@@ -160,83 +160,7 @@ async function expectComposerHeightsEqual(page: Page) {
   expect(metrics.sidecar?.bottomGap).toBe(metrics.main?.bottomGap);
 }
 
-async function expectSidecarModelPinnedToSubmit(page: Page) {
-  const metrics = await page.evaluate(() => {
-    const getComposerMetrics = (placeholderPattern: RegExp) => {
-      const textarea = Array.from(document.querySelectorAll("textarea")).find(
-        (element) =>
-          placeholderPattern.test(element.getAttribute("placeholder") ?? ""),
-      );
-      const form = textarea?.closest("form");
-      if (!form) {
-        return null;
-      }
-      const formBox = form.getBoundingClientRect();
-      const buttons = Array.from(form.querySelectorAll("button")).map(
-        (button) => {
-          const box = button.getBoundingClientRect();
-          const text = button.textContent?.trim();
-          return {
-            label: text ? text : (button.getAttribute("aria-label") ?? ""),
-            left: Math.round(box.left),
-            right: Math.round(box.right),
-          };
-        },
-      );
-      const model = buttons.find(
-        (button) => button.label === "DeepSeek V4 Pro",
-      );
-      const submit = buttons.find((button) => button.label === "Submit");
-
-      return {
-        formLeft: Math.round(formBox.left),
-        formRight: Math.round(formBox.right),
-        mode: buttons.find((button) => button.label === "Pro"),
-        model,
-        submit,
-        gap: model && submit ? submit.left - model.right : null,
-        overflows: buttons.some(
-          (button) =>
-            button.left < Math.round(formBox.left) ||
-            button.right > Math.round(formBox.right),
-        ),
-      };
-    };
-
-    return {
-      main: getComposerMetrics(/how can i assist you/i),
-      sidecar: getComposerMetrics(/deeper follow-up/i),
-    };
-  });
-
-  const main = metrics?.main;
-  const sidecar = metrics?.sidecar;
-  const mainModel = main?.model;
-  const mainSubmit = main?.submit;
-  const sidecarMode = sidecar?.mode;
-  const sidecarModel = sidecar?.model;
-  const sidecarSubmit = sidecar?.submit;
-
-  if (
-    !main ||
-    !sidecar ||
-    !mainModel ||
-    !mainSubmit ||
-    !sidecarMode ||
-    !sidecarModel ||
-    !sidecarSubmit
-  ) {
-    throw new Error("Unable to measure composer model and submit controls.");
-  }
-
-  expect(sidecarModel.left).toBeGreaterThan(sidecarMode.right);
-  expect(sidecar.gap).toBe(main.gap);
-  expect(sidecarModel.left).toBeGreaterThanOrEqual(sidecar.formLeft);
-  expect(sidecarSubmit.right).toBeLessThanOrEqual(sidecar.formRight);
-  expect(sidecar.overflows).toBe(false);
-}
-
-async function expectSidecarModelHiddenWhenCompact(page: Page) {
+async function expectSidecarInternalControlsHidden(page: Page) {
   const metrics = await page.evaluate(() => {
     const sideTextarea = Array.from(document.querySelectorAll("textarea")).find(
       (element) =>
@@ -280,9 +204,11 @@ async function expectSidecarModelHiddenWhenCompact(page: Page) {
   });
 
   expect(metrics).not.toBeNull();
-  expect(metrics!.labels).toContain("Pro");
   expect(metrics!.labels).toContain("Submit");
+  expect(metrics!.labels).not.toContain("Pro");
+  expect(metrics!.labels).not.toContain("Flash");
   expect(metrics!.labels).not.toContain("DeepSeek V4 Pro");
+  expect(metrics!.labels).not.toContain("Fast Model");
   expect(metrics!.overflows).toBe(false);
 }
 
@@ -756,7 +682,7 @@ test.describe("Side chat", () => {
     );
     const quoteAttachment = page.getByTestId("conversation-quote-attachment");
     const mainInputForm = page.locator("form").filter({
-      has: page.getByPlaceholder(/how can i assist you/i),
+      has: page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i),
     });
     await expect(quoteAttachment).toBeVisible();
     await expect(
@@ -801,41 +727,18 @@ test.describe("Side chat", () => {
     await expect(
       sidecarInputForm.getByTestId("sidecar-add-attachments-button"),
     ).toBeVisible();
-    await expect(
-      sidecarInputForm.getByRole("button", { name: "Pro", exact: true }),
-    ).toBeVisible();
-    await expect(
-      sidecarInputForm.getByRole("button", { name: /DeepSeek V4 Pro/i }),
-    ).toBeVisible();
-    await expectSidecarModelPinnedToSubmit(page);
+    await expectSidecarInternalControlsHidden(page);
     const originalViewport = page.viewportSize();
     await page.setViewportSize({
       width: 820,
       height: originalViewport?.height ?? 720,
     });
-    await expectSidecarModelHiddenWhenCompact(page);
+    await expectSidecarInternalControlsHidden(page);
     await page.setViewportSize(
       originalViewport ?? { width: 1280, height: 720 },
     );
-    await expect(
-      sidecarInputForm.getByRole("button", { name: /DeepSeek V4 Pro/i }),
-    ).toBeVisible();
-    await expectSidecarModelPinnedToSubmit(page);
-    await sidecarInputForm
-      .getByRole("button", { name: "Pro", exact: true })
-      .click();
-    await page.getByRole("menuitem").filter({ hasText: "Flash" }).click();
-    await expect(
-      sidecarInputForm.getByRole("button", { name: "Flash", exact: true }),
-    ).toBeVisible();
-    await sidecarInputForm
-      .getByRole("button", { name: /DeepSeek V4 Pro/i })
-      .click();
-    await page.getByText("Fast Model").click();
-    await expect(
-      sidecarInputForm.getByRole("button", { name: /Fast Model/i }),
-    ).toBeVisible();
-    const mainInput = page.getByPlaceholder(/how can i assist you/i);
+    await expectSidecarInternalControlsHidden(page);
+    const mainInput = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     const sidecarInput = page.getByPlaceholder(/deeper follow-up/i);
     await mainInput.fill("Left draft");
     await expect(sidecarInput).toHaveValue("");

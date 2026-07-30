@@ -7,6 +7,7 @@ import {
   GlobeIcon,
   LightbulbIcon,
   ListTodoIcon,
+  Loader2Icon,
   MessageCircleQuestionMarkIcon,
   MessageSquareTextIcon,
   MonitorIcon,
@@ -24,18 +25,15 @@ import {
   ChainOfThoughtSearchResults,
   ChainOfThoughtStep,
 } from "@/components/ai-elements/chain-of-thought";
-import { CodeBlock } from "@/components/ai-elements/code-block";
 import { Button } from "@/components/ui/button";
 import { resolveArtifactURL } from "@/core/artifacts/utils";
 import { useI18n } from "@/core/i18n/hooks";
 import { formatTokenCount } from "@/core/messages/usage";
 import type { TokenDebugStep } from "@/core/messages/usage-model";
-import {
-  extractContentFromMessage,
-  extractReasoningContentFromMessage,
-  findToolCallResult,
-} from "@/core/messages/utils";
+import { findToolCallResult } from "@/core/messages/utils";
 import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
+import { isInternalSkillToolCall } from "@/core/skills";
+import { explainToolCall } from "@/core/tools/utils";
 import { extractTitleFromMarkdown } from "@/core/utils/markdown";
 import { env } from "@/env";
 import { cn } from "@/lib/utils";
@@ -286,6 +284,15 @@ function MessageGroupComponent({
     showTokenDebugSummaries && lastReasoningStep?.messageId
       ? debugStepByMessageId.get(lastReasoningStep.messageId)
       : undefined;
+
+  if (steps.length === 0) {
+    return isLoading ? (
+      <div className="text-muted-foreground flex items-center gap-2 py-2 text-sm">
+        <Loader2Icon className="size-4 animate-spin" />
+        {t.common.thinking}
+      </div>
+    ) : null;
+  }
 
   return (
     <ChainOfThought
@@ -565,6 +572,10 @@ function ToolCall({
       fallback
     );
 
+  if (isInternalSkillToolCall(name, args)) {
+    return null;
+  }
+
   if (name.startsWith("browser_")) {
     const shot = browserView?.screenshot;
     const previewUrl =
@@ -719,19 +730,12 @@ function ToolCall({
     if (!description) {
       description = t.toolCalls.listFolder;
     }
-    const path: string | undefined = (args as { path: string })?.path;
     return (
       <ChainOfThoughtStep
         key={id}
         label={resolveLabel(description)}
         icon={FolderOpenIcon}
-      >
-        {path && (
-          <ChainOfThoughtSearchResult className="cursor-pointer">
-            {path}
-          </ChainOfThoughtSearchResult>
-        )}
-      </ChainOfThoughtStep>
+      />
     );
   } else if (name === "read_file") {
     let description: string | undefined = (args as { description: string })
@@ -739,19 +743,12 @@ function ToolCall({
     if (!description) {
       description = t.toolCalls.readFile;
     }
-    const { path } = args as { path: string; content: string };
     return (
       <ChainOfThoughtStep
         key={id}
         label={resolveLabel(description)}
         icon={BookOpenTextIcon}
-      >
-        {path && (
-          <ChainOfThoughtSearchResult className="cursor-pointer">
-            {path}
-          </ChainOfThoughtSearchResult>
-        )}
-      </ChainOfThoughtStep>
+      />
     );
   } else if (name === "write_file" || name === "str_replace") {
     let description: string | undefined = (args as { description: string })
@@ -787,13 +784,7 @@ function ToolCall({
           );
           setOpen(true);
         }}
-      >
-        {path && (
-          <ChainOfThoughtSearchResult className="cursor-pointer">
-            {path}
-          </ChainOfThoughtSearchResult>
-        )}
-      </ChainOfThoughtStep>
+      />
     );
   } else if (name === "bash") {
     const description: string | undefined = (args as { description: string })
@@ -807,22 +798,12 @@ function ToolCall({
         />
       );
     }
-    const command: string | undefined = (args as { command: string })?.command;
     return (
       <ChainOfThoughtStep
         key={id}
         label={resolveLabel(description)}
         icon={SquareTerminalIcon}
-      >
-        {command && (
-          <CodeBlock
-            className="mx-0 cursor-pointer border-none px-0"
-            showLineNumbers={false}
-            language="bash"
-            code={command}
-          />
-        )}
-      </ChainOfThoughtStep>
+      />
     );
   } else if (name === "ask_clarification") {
     return (
@@ -846,7 +827,7 @@ function ToolCall({
     return (
       <ChainOfThoughtStep
         key={id}
-        label={resolveLabel(description ?? t.toolCalls.useTool(name))}
+        label={resolveLabel(description ?? explainToolCall({ name, args }, t))}
         icon={WrenchIcon}
       ></ChainOfThoughtStep>
     );
@@ -903,29 +884,13 @@ function findBrowserViewMeta(
 
 function convertToSteps(messages: Message[]): CoTStep[] {
   const steps: CoTStep[] = [];
-  for (const [messageIndex, message] of messages.entries()) {
+  for (const message of messages) {
     if (message.type === "ai") {
-      const content = extractContentFromMessage(message);
-      if (content && message.tool_calls?.length) {
-        steps.push({
-          id: `${message.id ?? `ai-${messageIndex}`}-content`,
-          messageId: message.id,
-          type: "assistantText",
-          content,
-        });
-      }
-      const reasoning = extractReasoningContentFromMessage(message);
-      if (reasoning) {
-        const step: CoTReasoningStep = {
-          id: message.id,
-          messageId: message.id,
-          type: "reasoning",
-          reasoning,
-        };
-        steps.push(step);
-      }
       for (const tool_call of message.tool_calls ?? []) {
-        if (tool_call.name === "task") {
+        if (
+          tool_call.name === "task" ||
+          isInternalSkillToolCall(tool_call.name, tool_call.args)
+        ) {
           continue;
         }
         const step: CoTToolCallStep = {

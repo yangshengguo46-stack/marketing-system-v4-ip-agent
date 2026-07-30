@@ -5,7 +5,6 @@ import {
   MicroscopeIcon,
   PenLineIcon,
   ShapesIcon,
-  SparklesIcon,
   VideoIcon,
 } from "lucide-react";
 
@@ -31,7 +30,7 @@ export const enUS: Translations = {
     search: "Search",
     loadMore: "Load more",
     download: "Download",
-    thinking: "Thinking",
+    thinking: "Understanding your request…",
     artifacts: "Artifacts",
     public: "Public",
     custom: "Custom",
@@ -55,6 +54,7 @@ export const enUS: Translations = {
     showArtifacts: "Show artifacts of this conversation",
     browser: "Browser",
     showBrowser: "Open browser panel",
+    requestSubmitted: "Request submitted",
   },
 
   // Home
@@ -67,11 +67,11 @@ export const enUS: Translations = {
   welcome: {
     greeting: "Which account are we operating today?",
     description:
-      "Give me an account and an outcome, or drop in a topic, script, asset, or link. IP Agent can research, create, produce video, prepare publishing, and retain approvals and receipts.",
+      "Give me an account and an outcome, or drop in a topic, script, asset, or link. IP Agent can research, create, produce video, and prepare publishing—asking only when your decision is needed.",
 
     createYourOwnSkill: "Create Your Own Skill",
     createYourOwnSkillDescription:
-      "Create your own skill to release the power of DeerFlow. With customized skills,\nDeerFlow can help you search on the web, analyze data, and generate\n artifacts like slides, web pages and do almost anything.",
+      "Create your own skill to release the power of IP Agent. With customized skills,\nIP Agent can help you search on the web, analyze data, and generate\n artifacts like slides, web pages and do almost anything.",
   },
 
   // Clipboard
@@ -117,8 +117,6 @@ export const enUS: Translations = {
   inputBox: {
     placeholder:
       "Name the account, platform, and outcome—or drop in a topic, script, asset, or link…",
-    createSkillPrompt:
-      "We're going to build a new skill step by step with `skill-creator`. To start, what do you want this skill to do?",
     addAttachments: "Add attachments",
     inputPolish: "Polish input",
     inputPolishing: "Polishing input...",
@@ -129,7 +127,7 @@ export const enUS: Translations = {
     voiceInputStartLabel: "Dictate with voice",
     voiceInputStopLabel: "Stop voice input",
     voiceInputStart:
-      "Dictate with voice. DeerFlow receives only transcribed text; audio is handled by your browser or system speech service.",
+      "Dictate with voice. IP Agent receives only transcribed text; audio is handled by your browser or system speech service.",
     voiceInputStop: "Stop voice input",
     voiceInputListening: "Listening... Click to stop voice input.",
     voiceInputUnsupported:
@@ -231,23 +229,14 @@ export const enUS: Translations = {
       {
         suggestion: "Image",
         prompt:
-          "Use Seedream to create a [purpose] image for the active account; show the call plan first",
+          "Create a [purpose] image for the active account. Show the creative direction first and ask before incurring cost",
         icon: ImageIcon,
       },
       {
         suggestion: "Video",
         prompt:
-          "Use Seedance and MediaKit to turn [topic/script] into a video; show the shot and call plan first",
+          "Turn [topic/script] into a video. Show the shot plan first and ask before incurring cost",
         icon: VideoIcon,
-      },
-      {
-        type: "separator",
-      },
-      {
-        suggestion: "Skill",
-        prompt:
-          "We're going to build a new skill step by step with `skill-creator`. To start, what do you want this skill to do?",
-        icon: SparklesIcon,
       },
     ],
     pleaseWaitStreaming: "Please wait for the current response to finish.",
@@ -255,13 +244,14 @@ export const enUS: Translations = {
 
   // Sidebar
   sidebar: {
+    dashboard: "Dashboard",
     newChat: "New chat",
     chats: "Chats",
     channels: "Channels",
     recentChats: "Recent chats",
     demoChats: "Demo chats",
     agents: "Agents",
-    personalIP: "Portfolio",
+    personalIP: "Platform management",
     videoWorkbench: "Video workbench",
     scheduledTasks: "Scheduled tasks",
     agentsDisabledTooltip: "Feature not enabled",
@@ -303,9 +293,11 @@ export const enUS: Translations = {
     preview: "Preview",
     cronHelp: "Open crontab.guru",
     create: {
-      title: "Create scheduled task",
+      title: "Schedule recurring agent work",
+      description:
+        "Tell the agent what to do and when; it handles execution context automatically.",
       taskTitle: "Task title",
-      prompt: "Prompt",
+      prompt: "What should the agent do?",
       submit: "Create",
       fillRequired: "Fill all required fields",
     },
@@ -338,6 +330,11 @@ export const enUS: Translations = {
       noRuns: "No runs yet",
       noSelection: "No scheduled task selected",
       filteredByThread: "Filtered by thread: {id}",
+      filteredByCurrentConversation:
+        "Showing schedules related to this conversation",
+      lastRunFailed:
+        "The last run did not finish. Its work is preserved for retry.",
+      runFailed: "This run did not finish",
       loadFailed: "Failed to load scheduled tasks",
     },
     actions: {
@@ -383,20 +380,20 @@ export const enUS: Translations = {
     recipes: {
       label: "Quick create",
       trending: {
-        title: "GitHub Trending daily",
-        desc: "Summarize today's top 10 trending repos",
+        title: "Daily account summary",
+        desc: "Summarize reach, follower and engagement growth",
       },
       news: {
-        title: "Daily tech news digest",
-        desc: "Collect and summarize the day's top tech news",
+        title: "Daily trend scan",
+        desc: "Find trends and topics that fit the account",
       },
       issues: {
-        title: "GitHub Issue triage",
-        desc: "Triage a repo's open issues (fill in {{repo}})",
+        title: "Post-performance collection",
+        desc: "Collect recent post results and flag opportunities",
       },
       weekly: {
-        title: "Weekly report",
-        desc: "Compile a weekly summary, every Monday",
+        title: "Weekly growth review",
+        desc: "Review growth, content performance and next priorities",
       },
     },
   },
@@ -441,13 +438,13 @@ export const enUS: Translations = {
     save: "Save agent",
     saving: "Saving agent...",
     saveRequested:
-      "Save requested. DeerFlow is generating and saving an initial version now.",
+      "Save requested. IP Agent is generating and saving an initial version now.",
     saveHint:
       "You can save this agent at any time from the top-right menu, even if this is only a first draft.",
     saveCommandMessage:
       "Please save this custom agent now based on everything we have discussed so far. Treat this as my explicit confirmation to save. If some details are still missing, make reasonable assumptions, generate a concise first SOUL.md in English, and call setup_agent immediately without asking me for more confirmation.",
     agentCreatedPendingRefresh:
-      "The agent was created, but DeerFlow could not load it yet. Please refresh this page in a moment.",
+      "The agent was created, but IP Agent could not load it yet. Please refresh this page in a moment.",
     more: "More actions",
     agentCreated: "Agent created!",
     startChatting: "Start chatting",
@@ -462,13 +459,13 @@ export const enUS: Translations = {
 
   // Workspace
   workspace: {
-    officialWebsite: "DeerFlow's official website",
-    githubTooltip: "DeerFlow on GitHub",
+    officialWebsite: "IP Agent's official website",
+    githubTooltip: "IP Agent on GitHub",
     settingsAndMore: "Settings and more",
-    visitGithub: "DeerFlow on GitHub",
+    visitGithub: "IP Agent on GitHub",
     reportIssue: "Report an issue",
     contactUs: "Contact us",
-    about: "About DeerFlow",
+    about: "About IP Agent",
     logout: "Log out",
     gatewayUnavailable: "Gateway is temporarily unavailable.",
     gatewayUnavailableRetrying: "Retrying in the background…",
@@ -539,13 +536,13 @@ export const enUS: Translations = {
     saveAndConnect: "Save and connect",
     saveChanges: "Save changes",
     descriptions: {
-      telegram: "Telegram direct messages through your DeerFlow bot.",
+      telegram: "Telegram direct messages through your IP Agent bot.",
       slack: "Slack workspace messages and mentions.",
-      discord: "Discord server messages through your DeerFlow bot.",
-      feishu: "Feishu and Lark messages through your DeerFlow app.",
-      dingtalk: "DingTalk Stream Push messages through your DeerFlow bot.",
-      wechat: "WeChat iLink messages through your DeerFlow bot.",
-      wecom: "WeCom messages through your DeerFlow AI bot.",
+      discord: "Discord server messages through your IP Agent bot.",
+      feishu: "Feishu and Lark messages through your IP Agent app.",
+      dingtalk: "DingTalk Stream Push messages through your IP Agent bot.",
+      wechat: "WeChat iLink messages through your IP Agent bot.",
+      wecom: "WeCom messages through your IP Agent AI bot.",
     },
     connectedAs: (name: string) => `Connected as ${name}.`,
   },
@@ -578,7 +575,7 @@ export const enUS: Translations = {
     writeFile: "Write file",
     clickToViewContent: "Click to view file content",
     writeTodos: "Update to-do list",
-    skillInstallTooltip: "Install skill and make it available to DeerFlow",
+    skillInstallTooltip: "Install skill and make it available to IP Agent",
     browserNavigate: (url: string) => `Open ${url} in browser`,
     browserNavigateGeneric: "Open page in browser",
     browserClick: "Click element in browser",
@@ -588,6 +585,13 @@ export const enUS: Translations = {
     browserBack: "Go back in browser",
     browserScreenshot: "Capture browser screenshot",
     browserClose: "Close browser",
+    personalIpOrienting: "Reviewing your overall operation…",
+    personalIpCollectingAccount: "Reading the latest account data…",
+    personalIpCollectingPortfolio: "Syncing the latest platform data…",
+    personalIpReadingEvidence: "Checking account data and content performance…",
+    personalIpAggregating: "Summarizing data across platforms…",
+    personalIpPreparingOperation: "Preparing the account operation…",
+    personalIpProducingVideo: "Advancing video production…",
   },
 
   humanInput: {
@@ -667,7 +671,7 @@ export const enUS: Translations = {
     actions: "Actions",
     keyboardShortcuts: "Keyboard Shortcuts",
     keyboardShortcutsDescription:
-      "Navigate DeerFlow faster with keyboard shortcuts.",
+      "Navigate IP Agent faster with keyboard shortcuts.",
     openCommandPalette: "Open Command Palette",
     toggleSidebar: "Toggle Sidebar",
   },
@@ -675,11 +679,12 @@ export const enUS: Translations = {
   // Settings
   settings: {
     title: "Settings",
-    description: "Adjust how DeerFlow looks and behaves for you.",
+    description: "Adjust how IP Agent looks and behaves for you.",
     sections: {
       account: "Account",
       appearance: "Appearance",
       channels: "Channels",
+      localContext: "Local context",
       memory: "Memory",
       tools: "Tools",
       skills: "Skills",
@@ -689,7 +694,7 @@ export const enUS: Translations = {
     memory: {
       title: "Memory",
       description:
-        "DeerFlow automatically learns from your conversations in the background. These memories help DeerFlow understand you better and deliver a more personalized experience.",
+        "IP Agent automatically learns from your conversations in the background. These memories help IP Agent understand you better and deliver a more personalized experience.",
       empty: "No memory data to display.",
       rawJson: "Raw JSON",
       exportButton: "Export memory",
@@ -787,9 +792,8 @@ export const enUS: Translations = {
     channels: {
       title: "Channels",
       description:
-        "Connect IM accounts that can send messages to DeerFlow from outside the browser.",
-      disabled:
-        "Channel connections are not enabled on this server. Ask an administrator to enable channel_connections.",
+        "Connect IM accounts that can send messages to IP Agent from outside the browser.",
+      disabled: "No messaging channels are available right now.",
     },
     skills: {
       title: "Agent Skills",
@@ -798,7 +802,7 @@ export const enUS: Translations = {
       createSkill: "Create skill",
       emptyTitle: "No agent skill yet",
       emptyDescription:
-        "Put your agent skill folders under the `/skills/custom` folder under the root folder of DeerFlow.",
+        "Put your agent skill folders under the `/skills/custom` folder under the root folder of IP Agent.",
       emptyButton: "Create Your First Skill",
       adminRequired: "Admin privileges are required to manage agent skills.",
       installAdminRequired:
@@ -807,12 +811,12 @@ export const enUS: Translations = {
     notification: {
       title: "Notification",
       description:
-        "DeerFlow only sends a completion notification when the window is not active. This is especially useful for long-running tasks so you can switch to other work and get notified when done.",
+        "IP Agent only sends a completion notification when the window is not active. This is especially useful for long-running tasks so you can switch to other work and get notified when done.",
       requestPermission: "Request notification permission",
       deniedHint:
         "Notification permission was denied. You can enable it in your browser's site settings to receive completion alerts.",
       testButton: "Send test notification",
-      testTitle: "DeerFlow",
+      testTitle: "IP Agent",
       testBody: "This is a test notification.",
       notSupported: "Your browser does not support notifications.",
       disableNotification: "Disable notification",
@@ -826,7 +830,7 @@ export const enUS: Translations = {
       changePasswordDescription: "Update your account password.",
       ssoPasswordDescription: "Password is managed by your SSO provider.",
       ssoPasswordMessage:
-        "This account signs in with {provider}, so DeerFlow cannot manage or change its password here. Use your SSO provider's account settings instead.",
+        "This account signs in with {provider}, so IP Agent cannot manage or change its password here. Use your SSO provider's account settings instead.",
       currentPassword: "Current password",
       newPassword: "New password",
       confirmNewPassword: "Confirm new password",
@@ -852,14 +856,14 @@ export const enUS: Translations = {
     passwordPlaceholder: "•••••••",
     rememberMe: "Keep me signed in",
     rememberMeDescription:
-      "Keep this browser session when possible. DeerFlow stores only your email, never your password.",
+      "Keep this browser session when possible. IP Agent stores only your email, never your password.",
     pleaseWait: "Please wait...",
     signIn: "Sign In",
     createAccount: "Create Account",
     createAdminAccount: "Create admin account",
     adminSetupRequiredTitle: "Administrator setup is required",
     adminSetupRequiredDescription:
-      "DeerFlow needs an administrator account before new regular accounts can be created.",
+      "IP Agent needs an administrator account before new regular accounts can be created.",
     orContinueWith: "Or continue with",
     ssoHint:
       "If your account uses single sign-on, sign in with the option below instead.",

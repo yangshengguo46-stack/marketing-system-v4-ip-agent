@@ -1,6 +1,5 @@
-import { DownloadIcon, LoaderIcon, PackageIcon } from "lucide-react";
-import { useCallback, useState } from "react";
-import { toast } from "sonner";
+import { DownloadIcon } from "lucide-react";
+import { useCallback, useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,10 +9,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { urlOfArtifact } from "@/core/artifacts/utils";
-import { useAuth } from "@/core/auth/AuthProvider";
+import {
+  isCustomerVisibleArtifact,
+  urlOfArtifact,
+} from "@/core/artifacts/utils";
 import { useI18n } from "@/core/i18n/hooks";
-import { installSkill, SkillRequestError } from "@/core/skills/api";
 import {
   getFileExtensionDisplayName,
   getFileIcon,
@@ -33,10 +33,11 @@ export function ArtifactFileList({
   threadId: string;
 }) {
   const { t } = useI18n();
-  const { user } = useAuth();
-  const isAdmin = user?.system_role === "admin";
   const { select: selectArtifact, setOpen } = useArtifacts();
-  const [installingFile, setInstallingFile] = useState<string | null>(null);
+  const visibleFiles = useMemo(
+    () => files.filter(isCustomerVisibleArtifact),
+    [files],
+  );
 
   const handleClick = useCallback(
     (filepath: string) => {
@@ -46,41 +47,11 @@ export function ArtifactFileList({
     [selectArtifact, setOpen],
   );
 
-  const handleInstallSkill = useCallback(
-    async (e: React.MouseEvent, filepath: string) => {
-      e.stopPropagation();
-      e.preventDefault();
-
-      if (installingFile) return;
-
-      setInstallingFile(filepath);
-      try {
-        const result = await installSkill({
-          thread_id: threadId,
-          path: filepath,
-        });
-        if (result.success) {
-          toast.success(result.message);
-        } else {
-          toast.error(result.message || "Failed to install skill");
-        }
-      } catch (error) {
-        console.error("Failed to install skill:", error);
-        if (error instanceof SkillRequestError && error.isAdminRequired) {
-          toast.error(t.settings.skills.installAdminRequired);
-        } else {
-          toast.error("Failed to install skill");
-        }
-      } finally {
-        setInstallingFile(null);
-      }
-    },
-    [threadId, installingFile, t],
-  );
+  if (visibleFiles.length === 0) return null;
 
   return (
     <ul className={cn("flex w-full flex-col gap-4", className)}>
-      {files.map((file) => (
+      {visibleFiles.map((file) => (
         <Card
           key={file}
           className="relative cursor-pointer p-3"
@@ -97,20 +68,6 @@ export function ArtifactFileList({
               {getFileExtensionDisplayName(file)} file
             </CardDescription>
             <CardAction className="row-span-1 self-center">
-              {file.endsWith(".skill") && isAdmin && (
-                <Button
-                  variant="ghost"
-                  disabled={installingFile === file}
-                  onClick={(e) => handleInstallSkill(e, file)}
-                >
-                  {installingFile === file ? (
-                    <LoaderIcon className="size-4 animate-spin" />
-                  ) : (
-                    <PackageIcon className="size-4" />
-                  )}
-                  {t.common.install}
-                </Button>
-              )}
               <Button variant="ghost" asChild>
                 <a
                   href={urlOfArtifact({

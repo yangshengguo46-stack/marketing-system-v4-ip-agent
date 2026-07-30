@@ -5,6 +5,7 @@ import { QueryClientProvider } from "@/components/query-client-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { CommandPalette } from "@/components/workspace/command-palette";
 import { GatewayOfflineBanner } from "@/components/workspace/gateway-offline-banner";
+import { LocalContextBootstrap } from "@/components/workspace/local-context-bootstrap";
 import { WorkspaceSidebar } from "@/components/workspace/workspace-sidebar";
 
 function parseSidebarOpenCookie(
@@ -29,6 +30,7 @@ export async function WorkspaceContent({
 
   return (
     <QueryClientProvider>
+      <LocalContextBootstrap disabled={gatewayUnavailable} />
       <SidebarProvider className="h-screen" defaultOpen={initialSidebarOpen}>
         <WorkspaceSidebar />
         <SidebarInset className="min-w-0">

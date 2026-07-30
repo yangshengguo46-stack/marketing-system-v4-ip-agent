@@ -1,24 +1,14 @@
 "use client";
 
-import { EyeIcon, LoaderCircleIcon, ShieldCheckIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ShieldCheckIcon } from "lucide-react";
+import { useMemo } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   type PersonalIPOperatingCockpit,
   type PersonalIPWorkflowResource,
-  usePersonalIPWorkflowDetail,
 } from "@/core/personal-ip";
 
 type ReviewItem = Record<string, unknown> & {
@@ -29,12 +19,6 @@ type ReviewItem = Record<string, unknown> & {
 type ReviewEntry = ReviewItem & {
   resource: PersonalIPWorkflowResource;
 };
-
-type DetailTarget = {
-  resource: PersonalIPWorkflowResource;
-  id: string;
-  title: string;
-} | null;
 
 const REVIEW_TABS = [
   { id: "preflight", label: "预演" },
@@ -52,55 +36,89 @@ function arrayLength(value: unknown) {
   return Array.isArray(value) ? value.length : 0;
 }
 
-function number(value: unknown, fallback = 0) {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+const PLATFORM_LABELS: Record<string, string> = {
+  douyin: "抖音",
+  wechat_channels: "视频号",
+  wechat_official: "公众号",
+  xiaohongshu: "小红书",
+  twitter: "X",
+  instagram: "Instagram",
+  youtube: "YouTube",
+  tiktok: "TikTok",
+};
+
+function platformLabel(value: unknown) {
+  const platform = text(value, "平台");
+  return PLATFORM_LABELS[platform.toLowerCase()] ?? platform;
+}
+
+function displayTime(value: unknown, fallback: string) {
+  if (typeof value !== "string" || !value.trim()) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return fallback;
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function itemTitle(item: ReviewEntry) {
   if (item.resource === "preflights") {
-    return `${text(item.provider, "模型预演")} · ${arrayLength(item.target_account_ids)} 个目标账号`;
+    return `发布前预演 · ${arrayLength(item.target_account_ids)} 个账号`;
   }
   if (item.resource === "publish-receipts") {
-    return `${text(item.platform, "平台")} · ${text(item.executor, "执行器")}`;
+    return `${platformLabel(item.platform)} · 发布结果`;
   }
   if (item.resource === "metrics") {
-    return `${text(item.platform, "平台")} · ${text(item.scope, "指标")}`;
+    return `${platformLabel(item.platform)} · 作品数据`;
   }
   if (item.resource === "platform-observations") {
-    return `${text(item.platform, "平台")} · ${text(item.dataset, "经营数据")}`;
+    return `${platformLabel(item.platform)} · 账号数据`;
   }
   if (item.resource === "retrospectives") {
-    return `${text(item.platform, "平台")} · ${text(item.horizon, "复盘")}`;
+    return `${platformLabel(item.platform)} · 复盘`;
   }
   return text(item.claim, "已晋级证据");
 }
 
 function itemDescription(item: ReviewEntry) {
   if (item.resource === "preflights") {
-    return `${text(item.model_version, "模型版本未知")} · ${text(item.created_at, "时间未知")}`;
+    return displayTime(item.created_at, "时间未知");
   }
   if (item.resource === "publish-receipts") {
-    return `${number(item.attempt_count)} 次执行 · ${text(item.published_at ?? item.updated_at, "尚未发布")}`;
+    return displayTime(
+      item.published_at ?? item.updated_at,
+      "等待发布结果",
+    );
   }
   if (
     item.resource === "metrics" ||
     item.resource === "platform-observations"
   ) {
-    return text(item.observed_at, "观测时间未知");
+    return displayTime(item.observed_at, "观测时间未知");
   }
   if (item.resource === "retrospectives") {
-    return `${text(item.comparison_state, "未比较")} · ${text(item.created_at, "时间未知")}`;
+    return displayTime(item.created_at, "时间未知");
   }
-  return `${arrayLength(item.retrospective_ids)} 份复盘证据 · 最低支持 ${number(item.minimum_support, 3)}`;
+  return `${arrayLength(item.retrospective_ids)} 份复盘支持`;
 }
 
-function ReviewList({
-  items,
-  onDetail,
-}: {
-  items: ReviewEntry[];
-  onDetail: (item: ReviewEntry) => void;
-}) {
+function statusLabel(status: unknown) {
+  const value = typeof status === "string" ? status.toLowerCase() : "";
+  if (["completed", "success", "succeeded", "confirmed"].includes(value)) {
+    return "已完成";
+  }
+  if (["approved", "promoted", "sealed"].includes(value)) return "已验证";
+  if (["failed", "error", "rejected"].includes(value)) return "未完成";
+  if (["pending", "queued", "running", "proposed"].includes(value)) {
+    return "进行中";
+  }
+  return "已记录";
+}
+
+function ReviewList({ items }: { items: ReviewEntry[] }) {
   if (items.length === 0) {
     return (
       <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
@@ -121,22 +139,12 @@ function ReviewList({
                 <Badge
                   variant={item.status === "proposed" ? "secondary" : "outline"}
                 >
-                  {text(item.status, "已记录")}
+                  {statusLabel(item.status)}
                 </Badge>
               </div>
               <p className="text-muted-foreground line-clamp-2 text-xs leading-5">
                 {itemDescription(item)}
               </p>
-            </div>
-            <div className="flex shrink-0 gap-1">
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="查看完整证据"
-                onClick={() => onDetail(item)}
-              >
-                <EyeIcon />
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -150,12 +158,6 @@ export function OperatingReviewPanel({
 }: {
   cockpit: PersonalIPOperatingCockpit;
 }) {
-  const [detail, setDetail] = useState<DetailTarget>(null);
-  const detailQuery = usePersonalIPWorkflowDetail(
-    detail?.resource ?? "preflights",
-    detail?.id ?? null,
-  );
-
   const entries = useMemo(() => {
     const withResource = (
       items: Array<Record<string, unknown>>,
@@ -185,25 +187,15 @@ export function OperatingReviewPanel({
     };
   }, [cockpit.recent]);
 
-  const openDetail = (item: ReviewEntry) => {
-    if (!item.id) return;
-    setDetail({
-      resource: item.resource,
-      id: item.id,
-      title: itemTitle(item),
-    });
-  };
-
   return (
-    <>
-      <section className="space-y-4">
+    <section className="space-y-4">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold">
             <ShieldCheckIcon className="size-5" />
             回执与学习证据
           </h2>
           <p className="text-muted-foreground text-sm">
-            智能体负责执行，并按跨样本规则自动晋级；你可以在这里读取完整回执和依据。
+            智能体负责执行，并根据多次真实表现持续更新可复用经验。
           </p>
         </div>
         <Tabs defaultValue="preflight">
@@ -219,43 +211,10 @@ export function OperatingReviewPanel({
           </TabsList>
           {REVIEW_TABS.map((tab) => (
             <TabsContent key={tab.id} value={tab.id}>
-              <ReviewList items={entries[tab.id]} onDetail={openDetail} />
+              <ReviewList items={entries[tab.id]} />
             </TabsContent>
           ))}
         </Tabs>
-      </section>
-
-      <Dialog
-        open={Boolean(detail)}
-        onOpenChange={(open) => !open && setDetail(null)}
-      >
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{detail?.title ?? "完整经营证据"}</DialogTitle>
-            <DialogDescription>
-              读取的是当前用户拥有的不可变请求、回执和证据快照。
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="h-[min(65vh,680px)] rounded-md border">
-            {detailQuery.isLoading ? (
-              <div className="text-muted-foreground flex items-center gap-2 p-5 text-sm">
-                <LoaderCircleIcon className="size-4 animate-spin" />
-                正在读取完整证据…
-              </div>
-            ) : detailQuery.isError ? (
-              <p className="text-destructive p-5 text-sm">
-                {detailQuery.error instanceof Error
-                  ? detailQuery.error.message
-                  : "读取失败"}
-              </p>
-            ) : (
-              <pre className="overflow-auto p-5 text-xs leading-5 break-words whitespace-pre-wrap">
-                {JSON.stringify(detailQuery.data ?? {}, null, 2)}
-              </pre>
-            )}
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-    </>
+    </section>
   );
 }

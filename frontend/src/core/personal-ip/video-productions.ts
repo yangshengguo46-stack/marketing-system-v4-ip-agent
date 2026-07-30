@@ -15,6 +15,22 @@ export type VideoProductionStatus =
   | "completed"
   | "cancelled";
 
+export type VideoProductionMode = "faceless_material" | "generative_cinematic";
+
+export type PersonalIPMediaModel = {
+  id: string;
+  display_name: string;
+  is_default: boolean;
+};
+
+export type PersonalIPMediaModelCatalog = {
+  source: "live" | "fallback";
+  default_image_model: string;
+  default_video_model: string;
+  image_models: PersonalIPMediaModel[];
+  video_models: PersonalIPMediaModel[];
+};
+
 export type VideoProductionStage =
   | "intake"
   | "blueprint"
@@ -64,11 +80,13 @@ export type VideoProductionEvent = {
 
 export type PersonalIPVideoProduction = {
   id: string;
+  thread_id?: string | null;
   title: string;
   status: VideoProductionStatus;
   current_stage: VideoProductionStage;
   event_count: number;
   source_kind: "idea" | "script";
+  production_mode?: VideoProductionMode | null;
   source: Record<string, unknown>;
   delivery_spec: Record<string, unknown>;
   provider_policy: Record<string, unknown>;
@@ -120,8 +138,47 @@ export type VideoWorkbenchConfirmation = {
   requested_at?: string;
 };
 
+export type VideoTimelineClip = {
+  id?: string | null;
+  shot_id?: string | null;
+  start_sec?: number | null;
+  duration_sec?: number | null;
+  source_in_sec?: number | null;
+  source_ref?: string | null;
+  source_sha256?: string | null;
+  selected_candidate_id?: string | null;
+  text?: string | null;
+  volume?: number | null;
+  transition?: string | null;
+  artifact?: VideoArtifact | null;
+};
+
+export type VideoTimelineTrack = {
+  id?: string;
+  type: "video" | "dialogue" | "music" | "subtitle" | "audio";
+  entity_id?: string;
+  status?: string;
+  artifacts: VideoArtifact[];
+  clips: VideoTimelineClip[];
+  event_id?: string;
+};
+
+export type VideoTimelineRevision = {
+  event_id?: string;
+  event_key?: string;
+  revision_id?: string | null;
+  base_revision_id?: string | null;
+  author_kind?: "human" | "agent" | null;
+  intent?: string | null;
+  sha256?: string | null;
+  tracks: Array<Record<string, unknown>>;
+  operations: Array<Record<string, unknown>>;
+  occurred_at?: string | null;
+};
+
 export type PersonalIPVideoWorkbench = {
   contract_version: "personal-ip-video-workbench-v1";
+  production_mode?: VideoProductionMode | null;
   production: PersonalIPVideoProduction;
   source: { kind: "idea" | "script"; content: Record<string, unknown> };
   stage_summary: Array<{
@@ -136,13 +193,33 @@ export type PersonalIPVideoWorkbench = {
     event_count: number;
     latest_event?: VideoProductionEvent | null;
   }>;
-  blueprint: { events: VideoProductionEvent[]; artifacts: VideoArtifact[] };
+  domain_contracts: {
+    plan?: Record<string, unknown> | null;
+    asset_manifest?: Record<string, unknown> | null;
+    storyboard?: Record<string, unknown> | null;
+    narration?: Record<string, unknown> | null;
+    material_selection?: Record<string, unknown> | null;
+    narration_timing?: Record<string, unknown> | null;
+    continuity?: Record<string, unknown> | null;
+    assembly?: Record<string, unknown> | null;
+    timeline_revision?: Record<string, unknown> | null;
+    final_edit_lock?: Record<string, unknown> | null;
+  };
+  blueprint: {
+    events: VideoProductionEvent[];
+    artifacts: VideoArtifact[];
+    contract?: Record<string, unknown> | null;
+  };
   assets: Array<{
-    entity_type: "character" | "scene" | "prop";
+    entity_type: string;
     id: string;
+    name?: string | null;
     status?: string;
     version?: number | string | null;
     source_sha256?: string | null;
+    source_ref?: string | null;
+    license?: string | null;
+    allowed_for_use?: boolean | null;
     generation_route?: string | null;
     projection_mode?: string | null;
     coverage?: Record<string, unknown> | null;
@@ -155,6 +232,7 @@ export type PersonalIPVideoWorkbench = {
     events: VideoProductionEvent[];
     shot_count: number;
     artifacts: VideoArtifact[];
+    contract?: Record<string, unknown> | null;
   };
   shots: Array<{
     id: string;
@@ -170,6 +248,13 @@ export type PersonalIPVideoWorkbench = {
       change_elements?: string[];
       dialogue?: string | null;
       camera?: unknown;
+      action?: string | null;
+      narration_text?: string | null;
+      visual_subject?: string | null;
+      visual_query?: string | null;
+      composition_strategy?: string | null;
+      claim_evidence_refs?: string[];
+      pass_criteria?: string[];
     };
     task_ids: string[];
     candidate_ids: string[];
@@ -190,6 +275,7 @@ export type PersonalIPVideoWorkbench = {
     event_ids: string[];
   }>;
   continuity: {
+    ledger?: Record<string, unknown> | null;
     bridges: Array<{
       event_id?: string;
       event_key?: string;
@@ -219,29 +305,19 @@ export type PersonalIPVideoWorkbench = {
     events: VideoProductionEvent[];
     fps?: number | null;
     duration_sec?: number | null;
-    tracks: Array<{
-      id?: string;
-      type: "audio" | "video";
-      entity_id?: string;
-      status?: string;
-      artifacts: VideoArtifact[];
-      clips: Array<{
-        id?: string | null;
-        shot_id?: string | null;
-        start_sec?: number | null;
-        duration_sec?: number | null;
-        source_in_sec?: number | null;
-        source_sha256?: string | null;
-        selected_candidate_id?: string | null;
-        artifact?: VideoArtifact | null;
-      }>;
-      event_id?: string;
-    }>;
+    tracks: VideoTimelineTrack[];
+    revision_id?: string | null;
+    revisions: VideoTimelineRevision[];
+    locked?: boolean;
+    final_edit_lock?: Record<string, unknown> | null;
   };
   delivery: {
     qa_events: VideoProductionEvent[];
+    current_qa_event?: VideoProductionEvent | null;
     delivery_events: VideoProductionEvent[];
     qa_passed?: boolean | null;
+    qa_stale?: boolean;
+    qa_stale_reason?: string | null;
     artifacts: VideoArtifact[];
   };
   events: VideoProductionEvent[];
@@ -251,9 +327,31 @@ export const PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY = [
   "personal-ip",
   "video-productions",
 ] as const;
+export const PERSONAL_IP_MEDIA_MODELS_QUERY_KEY = [
+  "personal-ip",
+  "media-models",
+] as const;
+
+export function personalIPMediaModelsPath() {
+  return "/api/personal-ip/video-productions/models";
+}
 
 export function personalIPVideoWorkbenchPath(productionId: string) {
   return `/api/personal-ip/video-productions/${encodeURIComponent(productionId)}/workbench`;
+}
+
+export function personalIPVideoArtifactPath(
+  productionId: string,
+  artifactSha256: string,
+) {
+  return `/api/personal-ip/video-productions/${encodeURIComponent(productionId)}/artifacts/${encodeURIComponent(artifactSha256)}`;
+}
+
+export function personalIPVideoArtifactURL(
+  productionId: string,
+  artifactSha256: string,
+) {
+  return `${getBackendBaseURL()}${personalIPVideoArtifactPath(productionId, artifactSha256)}`;
 }
 
 export function isMeaningfulVideoConfirmation(kind: string) {
@@ -299,13 +397,83 @@ async function requestJSON<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function usePersonalIPVideoProductions() {
+function normalizeOptionalThreadId(value: string | null | undefined) {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+  return normalized;
+}
+
+export function usePersonalIPVideoProductions(options?: {
+  threadId?: string | null;
+  enabled?: boolean;
+}) {
+  const threadId = normalizeOptionalThreadId(options?.threadId);
   return useQuery({
-    queryKey: PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
+    queryKey: [...PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY, { threadId }],
+    enabled: options?.enabled ?? true,
     queryFn: () =>
       requestJSON<PersonalIPVideoProduction[]>(
-        "/api/personal-ip/video-productions?limit=200",
+        `/api/personal-ip/video-productions?limit=200${
+          threadId ? `&thread_id=${encodeURIComponent(threadId)}` : ""
+        }`,
       ),
+  });
+}
+
+export function useBindVideoProductionThread(productionId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (threadId: string) => {
+      if (!productionId) throw new Error("未选择视频制作");
+      return bindPersonalIPVideoProductionThread(productionId, threadId);
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
+      }),
+  });
+}
+
+export function bindPersonalIPVideoProductionThread(
+  productionId: string,
+  threadId: string,
+) {
+  return requestJSON<PersonalIPVideoProduction>(
+    `/api/personal-ip/video-productions/${encodeURIComponent(productionId)}/thread`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ thread_id: threadId }),
+    },
+  );
+}
+
+export function ensurePersonalIPVideoTaskThread(
+  productionId: string,
+  threadId: string,
+  title: string,
+) {
+  return requestJSON<{ thread_id: string }>("/api/threads", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      thread_id: threadId,
+      assistant_id: "ip-agent",
+      metadata: {
+        title,
+        task_type: "video_production",
+        video_production_id: productionId,
+      },
+    }),
+  });
+}
+
+export function usePersonalIPMediaModelCatalog() {
+  return useQuery({
+    queryKey: PERSONAL_IP_MEDIA_MODELS_QUERY_KEY,
+    queryFn: () =>
+      requestJSON<PersonalIPMediaModelCatalog>(personalIPMediaModelsPath()),
+    staleTime: 15 * 60 * 1000,
   });
 }
 
@@ -359,6 +527,87 @@ export function useRecordVideoConfirmation(productionId: string | null) {
               currency: "CNY",
               basis: "human confirmation",
             },
+          }),
+        },
+      );
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: PERSONAL_IP_COCKPIT_QUERY_KEY,
+        }),
+      ]);
+    },
+  });
+}
+
+export type SaveVideoTimelineRevisionInput = {
+  revision_id: string;
+  base_revision_id?: string | null;
+  author_kind: "human" | "agent";
+  intent: string;
+  fps: number;
+  tracks: Array<Record<string, unknown>>;
+  operations: Array<Record<string, unknown>>;
+  strategy_confirmed?: boolean;
+};
+
+export function useSaveVideoTimelineRevision(productionId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SaveVideoTimelineRevisionInput) => {
+      if (!productionId) throw new Error("未选择视频制作");
+      const eventKey = `timeline-revision:${input.revision_id}`;
+      return requestJSON<{
+        compiled_contract: Record<string, unknown>;
+        production: PersonalIPVideoProduction;
+      }>(
+        `/api/personal-ip/video-productions/${encodeURIComponent(productionId)}/timeline-revisions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...input,
+            event_key: eventKey,
+            strategy_confirmed: input.strategy_confirmed ?? true,
+          }),
+        },
+      );
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: PERSONAL_IP_COCKPIT_QUERY_KEY,
+        }),
+      ]);
+    },
+  });
+}
+
+export function useLockVideoFinalEdit(productionId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ lockId, note }: { lockId: string; note: string }) => {
+      if (!productionId) throw new Error("未选择视频制作");
+      return requestJSON<{
+        compiled_contract: Record<string, unknown>;
+        production: PersonalIPVideoProduction;
+      }>(
+        `/api/personal-ip/video-productions/${encodeURIComponent(productionId)}/final-edit-lock`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event_key: `final-edit-lock:${lockId}`,
+            lock_id: lockId,
+            locked_by: "human",
+            note,
           }),
         },
       );

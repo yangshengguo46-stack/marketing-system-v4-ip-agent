@@ -78,12 +78,6 @@ export function AccountSettingsPage() {
               {t.settings.account.email}
             </span>
             <span className="text-sm font-medium">{user?.email ?? "—"}</span>
-            <span className="text-muted-foreground text-sm">
-              {t.settings.account.role}
-            </span>
-            <span className="text-sm font-medium capitalize">
-              {user?.system_role ?? "—"}
-            </span>
             {isSsoUser && (
               <>
                 <span className="text-muted-foreground text-sm">

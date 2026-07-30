@@ -15,6 +15,7 @@ import {
   hasReasoning,
   isAssistantMessageGroupStreaming,
   stripUploadedFilesTag,
+  visibleAssistantContent,
 } from "@/core/messages/utils";
 
 function aiMessage(content: string): Message {
@@ -24,6 +25,20 @@ function aiMessage(content: string): Message {
     content,
   } as Message;
 }
+
+test("hides orchestration details from assistant-facing content", () => {
+  expect(
+    visibleAssistantContent(
+      [
+        "provider_task_id=task-secret",
+        "model: internal-model",
+        "已通过 personal_ip_compile_video_asset_manifest 更新资产合同。",
+        "下一步由 Seedance 和 FFmpeg 完成。",
+      ].join("\n"),
+      "zh-CN",
+    ),
+  ).toBe("已通过相关操作更新制作记录。\n下一步由视频生成和后期处理完成。");
+});
 
 test("aggregates token usage messages once per assistant turn", () => {
   const messages = [
@@ -305,6 +320,16 @@ describe("human message internal context stripping", () => {
     } as Message;
 
     expect(getMessageCopyData(message)).toBe("Summarize this paper");
+  });
+
+  test("removes an internal slash skill selector from copy data", () => {
+    const message = {
+      id: "human-skill",
+      type: "human",
+      content: "/video-pattern Improve this edit",
+    } as Message;
+
+    expect(getMessageCopyData(message)).toBe("Improve this edit");
   });
 
   test("strips slash skill activation context from display content", () => {

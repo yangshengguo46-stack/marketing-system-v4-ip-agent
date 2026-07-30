@@ -36,7 +36,7 @@ describe("personal IP operating cockpit", () => {
   it("counts every explicit queue without treating missing data as zero", () => {
     const cockpit = {
       queues: {
-        accounts_needing_model_input: ["acct-1"],
+        subjects_needing_strategy_validation: ["subject-1"],
         preflights_awaiting_publish: ["preflight-1"],
         published_receipts_awaiting_metrics: ["receipt-1"],
         published_receipts_awaiting_retrospective: ["receipt-1"],

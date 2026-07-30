@@ -77,30 +77,33 @@ export function describeMineContextStatus(
     return { label: "系统未启用", action: "请管理员先启用并安装本地观察源" };
   }
   if (!status.source_verified) {
-    return { label: "源码校验失败", action: "恢复已固定版本的完整源码后再使用" };
+    return {
+      label: "源码校验失败",
+      action: "恢复已固定版本的完整源码后再使用",
+    };
   }
   if (!status.runtime_ready || !status.available) {
     return { label: "等待安装", action: "请管理员从随包源码安装本地运行环境" };
   }
   if (!status.authorized) {
-    return { label: "等待授权", action: "选择范围与用途后明确授权" };
+    return { label: "尚未开启", action: "开启后即可自动使用" };
   }
   if (!status.running) {
-    return { label: "已授权，未运行", action: "需要时手动启动；不会自动恢复采集" };
+    return { label: "已关闭", action: "需要时可以重新开启" };
   }
-  return { label: "本地运行中", action: "可随时停止、撤销授权或删除数据" };
+  return { label: "使用中", action: "智能体正在使用本机工作上下文" };
 }
 
-export function useMineContextStatus() {
+export function useMineContextStatus(options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: MINECONTEXT_QUERY_KEY,
-    queryFn: () => requestJSON<MineContextStatus>("/api/personal-ip/minecontext"),
+    queryFn: () =>
+      requestJSON<MineContextStatus>("/api/personal-ip/minecontext"),
+    enabled: options.enabled ?? true,
   });
 }
 
-function useMineContextMutation<T>(
-  mutationFn: (value: T) => Promise<unknown>,
-) {
+function useMineContextMutation<T>(mutationFn: (value: T) => Promise<unknown>) {
   const client = useQueryClient();
   return useMutation({
     mutationFn,
@@ -113,6 +116,15 @@ function useMineContextMutation<T>(
 export function useAuthorizeMineContext() {
   return useMineContextMutation((body: MineContextConsentInput) =>
     requestJSON("/api/personal-ip/minecontext/authorize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+}
+export function useEnableMineContext() {
+  return useMineContextMutation((body: { retention_days: number }) =>
+    requestJSON("/api/personal-ip/minecontext/enable", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

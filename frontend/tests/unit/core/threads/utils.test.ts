@@ -5,6 +5,8 @@ import {
   channelSourceOfThread,
   pathOfThread,
   textOfMessage,
+  titleOfThread,
+  visibleThreadTitle,
 } from "@/core/threads/utils";
 
 test("uses standard chat route when thread has no agent context", () => {
@@ -22,44 +24,32 @@ test("encodes thread ids in standard chat routes", () => {
   );
 });
 
-test("encodes thread ids in agent chat routes", () => {
+test("keeps agent-backed threads in the standard user conversation route", () => {
   expect(pathOfThread("thread#1?draft", { agent_name: "researcher" })).toBe(
-    "/workspace/agents/researcher/chats/thread%231%3Fdraft",
+    "/workspace/chats/thread%231%3Fdraft",
   );
-});
-
-test("uses agent chat route when thread context has agent_name", () => {
   expect(
     pathOfThread({
       thread_id: "thread-123",
       context: { agent_name: "researcher" },
     }),
-  ).toBe("/workspace/agents/researcher/chats/thread-123");
-});
-
-test("uses provided context when pathOfThread is called with a thread id", () => {
+  ).toBe("/workspace/chats/thread-123");
   expect(pathOfThread("thread-123", { agent_name: "ops agent" })).toBe(
-    "/workspace/agents/ops%20agent/chats/thread-123",
+    "/workspace/chats/thread-123",
   );
-});
-
-test("uses agent chat route when thread metadata has agent_name", () => {
   expect(
     pathOfThread({
       thread_id: "thread-456",
       metadata: { agent_name: "coder" },
     }),
-  ).toBe("/workspace/agents/coder/chats/thread-456");
-});
-
-test("prefers context.agent_name over metadata.agent_name", () => {
+  ).toBe("/workspace/chats/thread-456");
   expect(
     pathOfThread({
       thread_id: "thread-789",
       context: { agent_name: "from-context" },
       metadata: { agent_name: "from-metadata" },
     }),
-  ).toBe("/workspace/agents/from-context/chats/thread-789");
+  ).toBe("/workspace/chats/thread-789");
 });
 
 test("reads IM channel source metadata", () => {
@@ -129,4 +119,43 @@ test("textOfMessage returns null when array content has no text", () => {
   } as unknown as Message;
 
   expect(textOfMessage(message)).toBeNull();
+});
+
+test("hides internal execution context from customer-facing titles", () => {
+  expect(
+    visibleThreadTitle(
+      "【视频工作台操作上下文】 production_id=video-production-1",
+      "未命名",
+    ),
+  ).toBe("未命名");
+  expect(
+    visibleThreadTitle(
+      "调用 personal_ip_select_browser_account，account_id=account-1",
+      "未命名",
+    ),
+  ).toBe("未命名");
+  expect(
+    visibleThreadTitle(
+      "<uploaded_files> The following files were uploaded",
+      "未命名",
+    ),
+  ).toBe("未命名");
+  expect(visibleThreadTitle("帮我复盘今天的作品", "未命名")).toBe(
+    "帮我复盘今天的作品",
+  );
+});
+
+test("reads customer-visible titles from current and legacy thread shapes", () => {
+  expect(
+    titleOfThread({
+      thread_id: "thread-values",
+      values: { title: "First conversation" },
+    } as never),
+  ).toBe("First conversation");
+  expect(
+    titleOfThread({
+      thread_id: "thread-top-level",
+      title: "Second conversation",
+    } as never),
+  ).toBe("Second conversation");
 });

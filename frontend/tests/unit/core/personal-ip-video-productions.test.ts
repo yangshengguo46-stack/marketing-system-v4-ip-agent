@@ -3,14 +3,30 @@ import { describe, expect, it } from "@rstest/core";
 import {
   formatVideoCost,
   isMeaningfulVideoConfirmation,
+  personalIPMediaModelsPath,
+  personalIPVideoArtifactPath,
   personalIPVideoWorkbenchPath,
   videoRecoveryPrompt,
 } from "@/core/personal-ip";
 
 describe("Personal-IP video workbench helpers", () => {
+  it("reads the owner-facing Ark media model catalog from the gateway", () => {
+    expect(personalIPMediaModelsPath()).toBe(
+      "/api/personal-ip/video-productions/models",
+    );
+  });
+
   it("encodes production ids in the ledger-derived read path", () => {
     expect(personalIPVideoWorkbenchPath("video/id with space")).toBe(
       "/api/personal-ip/video-productions/video%2Fid%20with%20space/workbench",
+    );
+  });
+
+  it("addresses owner-scoped media by production and immutable artifact hash", () => {
+    expect(
+      personalIPVideoArtifactPath("video/id with space", "a".repeat(64)),
+    ).toBe(
+      `/api/personal-ip/video-productions/video%2Fid%20with%20space/artifacts/${"a".repeat(64)}`,
     );
   });
 

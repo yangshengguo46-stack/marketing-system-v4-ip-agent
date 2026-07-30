@@ -9,6 +9,7 @@ export {
   useBrowserStream,
   type BrowserTab,
   type BrowserInputEvent,
+  type BrowserPresentationMode,
   type BrowserStreamStatus,
 } from "./use-browser-stream";
 export {

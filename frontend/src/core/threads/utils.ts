@@ -18,26 +18,11 @@ type ThreadRouteTarget =
 
 export function pathOfThread(
   thread: ThreadRouteTarget,
-  context?: Pick<AgentThreadContext, "agent_name"> | null,
+  _context?: Pick<AgentThreadContext, "agent_name"> | null,
 ) {
   const threadId = typeof thread === "string" ? thread : thread.thread_id;
   const encodedThreadId = encodeURIComponent(threadId);
-  let agentName: string | undefined;
-  if (typeof thread === "string") {
-    agentName = context?.agent_name;
-  } else {
-    agentName = thread.context?.agent_name;
-    if (!agentName) {
-      const metaAgent = thread.metadata?.agent_name;
-      if (typeof metaAgent === "string") {
-        agentName = metaAgent;
-      }
-    }
-  }
-
-  return agentName
-    ? `/workspace/agents/${encodeURIComponent(agentName)}/chats/${encodedThreadId}`
-    : `/workspace/chats/${encodedThreadId}`;
+  return `/workspace/chats/${encodedThreadId}`;
 }
 
 export function textOfMessage(message: Message) {
@@ -56,8 +41,28 @@ export function textOfMessage(message: Message) {
   return null;
 }
 
-export function titleOfThread(thread: AgentThread) {
-  return thread.values?.title ?? "Untitled";
+const INTERNAL_THREAD_TITLE_RE =
+  /<uploaded_files>|<slash_skill_activation>|【视频工作台操作上下文】|(?:^|\b)personal_ip_[a-z0-9_]+|(?:production|account|provider_task|candidate|shot|asset|event|revision)_id\s*=|SKILL\.md|\/mnt\/(?:user-data|skills)\//i;
+
+export function visibleThreadTitle(
+  title: string | null | undefined,
+  fallback = "Untitled",
+) {
+  const normalized = title?.replace(/\s+/g, " ").trim();
+  if (!normalized || INTERNAL_THREAD_TITLE_RE.test(normalized)) {
+    return fallback;
+  }
+  return normalized;
+}
+
+export function titleOfThread(thread: AgentThread, fallback = "Untitled") {
+  const metadataTitle = thread.metadata?.title;
+  const topLevelTitle = Reflect.get(thread, "title");
+  const title =
+    thread.values?.title ??
+    (typeof metadataTitle === "string" ? metadataTitle : undefined) ??
+    (typeof topLevelTitle === "string" ? topLevelTitle : undefined);
+  return visibleThreadTitle(title, fallback);
 }
 
 const CHANNEL_PROVIDER_LABELS: Record<string, string> = {

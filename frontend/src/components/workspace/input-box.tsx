@@ -19,7 +19,6 @@ import {
   XIcon,
   ZapIcon,
 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -80,7 +79,6 @@ import {
   buildReferenceMessageMetadata,
   type SidecarContext,
 } from "@/core/sidecar";
-import { useSkills } from "@/core/skills/hooks";
 import { useSuggestionsConfig } from "@/core/suggestions/hooks";
 import type { AgentThreadContext, GoalState } from "@/core/threads";
 import { compactThreadContext } from "@/core/threads/api";
@@ -89,7 +87,6 @@ import {
   clearComposerDraft,
   getSessionComposerDraftStorage,
   readComposerDraft,
-  resolveComposerDraft,
   type ComposerDraft,
   writeComposerDraft,
 } from "@/core/threads/composer-draft";
@@ -158,6 +155,7 @@ import { Tooltip } from "./tooltip";
 type InputMode = "flash" | "thinking" | "pro" | "ultra";
 
 const COMPOSER_DRAFT_SAVE_DELAY_MS = 300;
+const EXPLICIT_SKILL_UI_ENABLED = false;
 
 function focusContentEditableEnd(element: HTMLElement | null) {
   if (!element) {
@@ -337,7 +335,6 @@ export function InputBox({
 }) {
   const { locale, t } = useI18n();
   const queryClient = useQueryClient();
-  const searchParams = useSearchParams();
   const [modelDialogOpen, setModelDialogOpen] = useState(false);
   const { models } = useModels();
   const { user } = useAuth();
@@ -347,7 +344,6 @@ export function InputBox({
   const sidecar = useMaybeSidecar();
   const attachmentParts = attachments.files;
   const removeAttachment = attachments.remove;
-  const { skills, isLoading: skillsLoading } = useSkills();
   const { data: uploadLimits } = useUploadLimits(threadId);
   const promptRootRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -589,13 +585,6 @@ export function InputBox({
       }),
     [context.agent_name, draftAgentName, draftThreadId, user?.id],
   );
-  const enabledSkillNames = useMemo(
-    () =>
-      new Set(
-        skills.filter((skill) => skill.enabled).map((skill) => skill.name),
-      ),
-    [skills],
-  );
   const cancelDraftSaveTimer = useCallback(() => {
     if (draftSaveTimerRef.current === null) {
       return;
@@ -700,7 +689,7 @@ export function InputBox({
   }, [flushLatestDraft]);
 
   useEffect(() => {
-    if (skillsLoading || hydratedDraftKey === draftKey) {
+    if (hydratedDraftKey === draftKey) {
       return;
     }
 
@@ -716,33 +705,10 @@ export function InputBox({
       return;
     }
 
-    const resolvedDraft = resolveComposerDraft(savedDraft, enabledSkillNames);
-    setTextInput(resolvedDraft.text);
-    const restoredSkill = resolvedDraft.skillName
-      ? skills.find(
-          (skill) => skill.enabled && skill.name === resolvedDraft.skillName,
-        )
-      : undefined;
-    setSelectedSlashSkill(
-      restoredSkill
-        ? {
-            name: restoredSkill.name,
-            description: restoredSkill.description,
-            kind: "skill",
-          }
-        : null,
-    );
+    setTextInput(savedDraft.text);
+    setSelectedSlashSkill(null);
     setHydratedDraftKey(draftKey);
-  }, [
-    draftKey,
-    enabledSkillNames,
-    hydratedDraftKey,
-    initialValue,
-    setTextInput,
-    skills,
-    skillsLoading,
-    textInput.value,
-  ]);
+  }, [draftKey, hydratedDraftKey, initialValue, setTextInput, textInput.value]);
 
   useEffect(() => {
     if (hydratedDraftKey !== draftKey) {
@@ -951,9 +917,7 @@ export function InputBox({
         ) {
           return false;
         }
-        toast.error(
-          error instanceof Error ? error.message : t.inputBox.goalFailed,
-        );
+        toast.error(t.inputBox.goalFailed);
         return false;
       } finally {
         finishGoalRequest(goalRequestStateRef.current, request);
@@ -1014,9 +978,7 @@ export function InputBox({
       ) {
         return;
       }
-      toast.error(
-        error instanceof Error ? error.message : t.inputBox.compactFailed,
-      );
+      toast.error(t.inputBox.compactFailed);
     } finally {
       finishGoalRequest(compactRequestStateRef.current, request);
     }
@@ -1248,13 +1210,14 @@ export function InputBox({
       slashSkillQuery === null
         ? []
         : getMatchingSkillSuggestions(
-            skills,
+            [],
             slashSkillQuery,
             builtinSlashCommands,
           ),
-    [builtinSlashCommands, skills, slashSkillQuery],
+    [builtinSlashCommands, slashSkillQuery],
   );
   const showSkillSuggestions =
+    EXPLICIT_SKILL_UI_ENABLED &&
     !disabled &&
     textareaFocused &&
     !selectedSlashSkill &&
@@ -1624,9 +1587,7 @@ export function InputBox({
       if (isAbortError(error) || !isCurrentRequest) {
         return;
       }
-      toast.error(
-        error instanceof Error ? error.message : t.inputBox.inputPolishFailed,
-      );
+      toast.error(t.inputBox.inputPolishFailed);
     } finally {
       if (
         inputPolishRequestRef.current.controller === controller &&
@@ -2051,7 +2012,7 @@ export function InputBox({
       {showSkillSuggestions && (
         <div className="absolute right-0 bottom-full left-0 z-40 mb-2 px-1">
           <div
-            aria-label="Skill suggestions"
+            aria-label="Command suggestions"
             className="bg-popover/95 text-popover-foreground border-border max-h-72 overflow-y-auto rounded-xl border p-1 shadow-lg backdrop-blur-sm"
             role="listbox"
           >
@@ -2238,39 +2199,41 @@ export function InputBox({
               supported={voiceInputSupported}
               onToggle={toggleVoiceInput}
             />
-            <Tooltip
-              content={
-                polishingInput
-                  ? t.inputBox.inputPolishing
-                  : inputPolishUndoAvailable
-                    ? t.inputBox.inputPolishUndo
-                    : t.inputBox.inputPolish
-              }
-            >
-              <PromptInputButton
-                aria-label={
-                  inputPolishUndoAvailable
-                    ? t.inputBox.inputPolishUndo
-                    : t.inputBox.inputPolish
-                }
-                className="px-2!"
-                data-testid="polish-input-button"
-                disabled={inputPolishDisabled}
-                onClick={
-                  inputPolishUndoAvailable
-                    ? handleUndoInputPolish
-                    : handlePolishInput
+            <div className="hidden" aria-hidden="true">
+              <Tooltip
+                content={
+                  polishingInput
+                    ? t.inputBox.inputPolishing
+                    : inputPolishUndoAvailable
+                      ? t.inputBox.inputPolishUndo
+                      : t.inputBox.inputPolish
                 }
               >
-                {polishingInput ? (
-                  <Loader2Icon className="size-3 animate-spin" />
-                ) : inputPolishUndoAvailable ? (
-                  <Undo2Icon className="size-3" />
-                ) : (
-                  <SparklesIcon className="size-3" />
-                )}
-              </PromptInputButton>
-            </Tooltip>
+                <PromptInputButton
+                  aria-label={
+                    inputPolishUndoAvailable
+                      ? t.inputBox.inputPolishUndo
+                      : t.inputBox.inputPolish
+                  }
+                  className="px-2!"
+                  data-testid="polish-input-button"
+                  disabled={inputPolishDisabled}
+                  onClick={
+                    inputPolishUndoAvailable
+                      ? handleUndoInputPolish
+                      : handlePolishInput
+                  }
+                >
+                  {polishingInput ? (
+                    <Loader2Icon className="size-3 animate-spin" />
+                  ) : inputPolishUndoAvailable ? (
+                    <Undo2Icon className="size-3" />
+                  ) : (
+                    <SparklesIcon className="size-3" />
+                  )}
+                </PromptInputButton>
+              </Tooltip>
+            </div>
             <PromptInputActionMenu>
               <ModeHoverGuide
                 mode={
@@ -2283,7 +2246,7 @@ export function InputBox({
                 }
               >
                 <PromptInputActionMenuTrigger
-                  className="max-w-28 gap-1! px-2! sm:max-w-none"
+                  className="hidden!"
                   disabled={composerLocked}
                 >
                   <div>
@@ -2448,7 +2411,7 @@ export function InputBox({
             {supportReasoningEffort && context.mode !== "flash" && (
               <PromptInputActionMenu>
                 <PromptInputActionMenuTrigger
-                  className="hidden gap-1! px-2! sm:inline-flex"
+                  className="hidden!"
                   disabled={composerLocked}
                 >
                   <div className="text-xs font-normal">
@@ -2572,7 +2535,7 @@ export function InputBox({
             >
               <ModelSelectorTrigger asChild>
                 <PromptInputButton
-                  className="max-w-40 min-w-0 sm:max-w-56"
+                  className="hidden!"
                   disabled={composerLocked}
                 >
                   <div className="flex min-w-0 flex-col items-start text-left">
@@ -2626,14 +2589,11 @@ export function InputBox({
         <div className="bg-background absolute right-0 -bottom-[17px] left-0 z-0 h-4"></div>
       )}
 
-      {isWelcomeMode &&
-        searchParams.get("mode") !== "skill" &&
-        !selectedSlashSkill &&
-        !showSkillSuggestions && (
-          <div className="flex items-center justify-center pt-2">
-            <SuggestionList onSelectPlaceholder={onSelectPlaceholder} />
-          </div>
-        )}
+      {isWelcomeMode && !selectedSlashSkill && !showSkillSuggestions && (
+        <div className="flex items-center justify-center pt-2">
+          <SuggestionList onSelectPlaceholder={onSelectPlaceholder} />
+        </div>
+      )}
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>

@@ -62,5 +62,6 @@ test.describe("Subtask card", () => {
     });
     await expect(page.getByText("Subtask failed")).toBeVisible();
     await expect(page.getByText("Running subtask")).toHaveCount(0);
+    await expect(page.getByText(STOPPED_TASK_PROMPT)).toHaveCount(0);
   });
 });

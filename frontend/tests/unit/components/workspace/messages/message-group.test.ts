@@ -21,7 +21,52 @@ rs.mock("@/components/workspace/artifacts", () => ({
 }));
 
 describe("MessageGroup", () => {
-  it("renders assistant text attached to a tool-calling processing message", () => {
+  it("shows a safe waiting status before the first tool call arrives", () => {
+    const html = renderGroup(
+      [
+        {
+          id: "ai-reasoning",
+          type: "ai",
+          content: "",
+          additional_kwargs: {
+            reasoning_content: "Private internal planning.",
+          },
+        } as Message,
+      ],
+      { isLoading: true },
+    );
+
+    expect(html).toContain("Understanding your request");
+    expect(html).not.toContain("Private internal planning");
+  });
+
+  it("shows account collection progress without exposing its tool name", () => {
+    const html = renderGroup(
+      [
+        {
+          id: "ai-account-collection",
+          type: "ai",
+          content: "",
+          tool_calls: [
+            {
+              id: "call-account-collection",
+              name: "personal_ip_collect_browser_page",
+              args: {
+                account_id: "acct-1",
+                dataset: "dashboard",
+              },
+            },
+          ],
+        } as Message,
+      ],
+      { isLoading: true },
+    );
+
+    expect(html).toContain("Reading the latest account data");
+    expect(html).not.toContain("personal_ip_collect_browser_page");
+  });
+
+  it("hides internal assistant planning while keeping useful progress", () => {
     const html = renderGroup([
       {
         id: "ai-1",
@@ -37,13 +82,13 @@ describe("MessageGroup", () => {
       } as Message,
     ]);
 
-    expect(html).toContain(
+    expect(html).not.toContain(
       "The browser action failed, so I will try another approach.",
     );
     expect(html).toContain("DeerFlow issue 4027");
   });
 
-  it("keeps assistant text visible while older tool steps stay collapsed", () => {
+  it("keeps internal planning hidden while older tool steps stay collapsed", () => {
     const html = renderGroup([
       {
         id: "ai-1",
@@ -81,10 +126,10 @@ describe("MessageGroup", () => {
       } as Message,
     ]);
 
-    expect(html).toContain(
+    expect(html).not.toContain(
       "The first tool failed; I will try a narrower search.",
     );
-    expect(html).toContain(
+    expect(html).not.toContain(
       "The second approach should reveal the missing context.",
     );
     expect(html).not.toContain("first hidden query");
@@ -92,7 +137,7 @@ describe("MessageGroup", () => {
     expect(html).toContain("1 more step");
   });
 
-  it("keeps tool-calling assistant text visible when reasoning is also present", () => {
+  it("hides tool-calling assistant text and reasoning", () => {
     const html = renderGroup([
       {
         id: "ai-1",
@@ -114,11 +159,11 @@ describe("MessageGroup", () => {
       } as Message,
     ]);
 
-    expect(html).toContain(
+    expect(html).not.toContain(
       "I found a likely cause, so I will inspect the renderer next.",
     );
     expect(html).toContain("Inspect renderer conversion");
-    expect(html).toContain("1 more step");
+    expect(html).not.toContain("sed -n");
     expect(html).not.toContain("Check how processing groups convert messages.");
   });
 

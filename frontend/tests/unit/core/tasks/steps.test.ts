@@ -127,6 +127,36 @@ describe("stepsForDisplay", () => {
     ).toEqual([2]);
   });
 
+  it("drops internal skill loading steps", () => {
+    const steps = [
+      messageToStep(
+        {
+          type: "ai",
+          content: "Loading a private workflow",
+          tool_calls: [
+            {
+              name: "read_file",
+              args: { path: "/mnt/skills/private-flow/SKILL.md" },
+            },
+          ],
+        },
+        1,
+      ),
+      messageToStep(
+        { type: "tool", name: "skill_manage", content: "ok" },
+        2,
+      ),
+      messageToStep(
+        { type: "tool", name: "web_search", content: "results" },
+        3,
+      ),
+    ];
+
+    expect(
+      stepsForDisplay(steps, "in_progress").map((step) => step.message_index),
+    ).toEqual([3]);
+  });
+
   it("drops the trailing final AI answer when completed (already shown as result)", () => {
     const steps = [
       messageToStep({ type: "tool", name: "web_search", content: "x" }, 1),

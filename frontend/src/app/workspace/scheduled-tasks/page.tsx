@@ -123,12 +123,6 @@ export default function ScheduledTasksPage() {
         : v;
   const statusLabel = (v: string) =>
     (st.status as Record<string, string>)[v] ?? v;
-  const contextModeLabel = (v: string) =>
-    v === "fresh_thread_per_run"
-      ? st.context.fresh
-      : v === "reuse_thread"
-        ? st.context.reuse
-        : v;
   const runTriggerLabel = (v: string) =>
     (st.runTrigger as Record<string, string>)[v] ?? v;
   const runStatusLabel = (v: string) =>
@@ -142,7 +136,7 @@ export default function ScheduledTasksPage() {
     setTitle(labels.title);
     setPrompt(recipe.prompt);
     setCreateSchedule(recipe.schedule);
-    setContextMode("fresh_thread_per_run");
+    setContextMode(threadId ? "reuse_thread" : "fresh_thread_per_run");
     setCreateNonce((n) => n + 1);
   };
 
@@ -198,6 +192,9 @@ export default function ScheduledTasksPage() {
             data-testid="scheduled-task-create-form"
           >
             <div className="font-medium">{st.create.title}</div>
+            <p className="text-muted-foreground text-sm">
+              {st.create.description}
+            </p>
             <div
               className="flex flex-wrap items-center gap-1"
               data-testid="schedule-recipes"
@@ -217,31 +214,6 @@ export default function ScheduledTasksPage() {
                 </Button>
               ))}
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant={
-                  contextMode === "fresh_thread_per_run" ? "default" : "outline"
-                }
-                size="sm"
-                onClick={() => setContextMode("fresh_thread_per_run")}
-              >
-                {st.context.fresh}
-              </Button>
-              <Button
-                variant={contextMode === "reuse_thread" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setContextMode("reuse_thread")}
-              >
-                {st.context.reuse}
-              </Button>
-            </div>
-            {contextMode === "reuse_thread" && (
-              <Input
-                value={targetThreadId}
-                onChange={(event) => setTargetThreadId(event.target.value)}
-                placeholder={st.context.threadIdPlaceholder}
-              />
-            )}
             <Input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
@@ -292,8 +264,10 @@ export default function ScheduledTasksPage() {
                       // Clear the form so a follow-up task starts fresh.
                       setTitle("");
                       setPrompt("");
-                      setTargetThreadId("");
-                      setContextMode("fresh_thread_per_run");
+                      setTargetThreadId(threadId ?? "");
+                      setContextMode(
+                        threadId ? "reuse_thread" : "fresh_thread_per_run",
+                      );
                       setCreateSchedule({
                         schedule_type: "cron",
                         schedule_spec: { cron: "0 9 * * *" },
@@ -318,7 +292,7 @@ export default function ScheduledTasksPage() {
           </div>
           {threadId && (
             <div className="text-muted-foreground text-sm">
-              {st.detail.filteredByThread.replace("{id}", threadId)}
+              {st.detail.filteredByCurrentConversation}
             </div>
           )}
           {queryError ? (
@@ -432,15 +406,6 @@ export default function ScheduledTasksPage() {
                     </Button>
                   </div>
                   <div className="text-muted-foreground text-sm">
-                    {st.detail.contextMode}:{" "}
-                    {contextModeLabel(selectedTask.context_mode)}
-                  </div>
-                  <div className="text-muted-foreground text-sm">
-                    {selectedTask.context_mode === "reuse_thread"
-                      ? `${st.detail.thread}: ${selectedTask.thread_id ?? NONE}`
-                      : `${st.detail.lastThread}: ${selectedTask.last_thread_id ?? NONE}`}
-                  </div>
-                  <div className="text-muted-foreground text-sm">
                     {st.detail.schedule}:{" "}
                     {scheduleTypeLabel(selectedTask.schedule_type)}
                   </div>
@@ -452,12 +417,11 @@ export default function ScheduledTasksPage() {
                     {st.detail.lastRun}:{" "}
                     {formatTimestamp(selectedTask.last_run_at, locale)}
                   </div>
-                  <div className="text-muted-foreground text-sm">
-                    {st.detail.lastRunId}: {selectedTask.last_run_id ?? NONE}
-                  </div>
-                  <div className="text-muted-foreground text-sm">
-                    {st.detail.lastError}: {selectedTask.last_error ?? NONE}
-                  </div>
+                  {selectedTask.last_error && (
+                    <div className="text-destructive text-sm">
+                      {st.detail.lastRunFailed}
+                    </div>
+                  )}
                   {editing ? (
                     <div className="flex flex-col gap-2 rounded-lg border p-3">
                       <Input
@@ -547,14 +511,11 @@ export default function ScheduledTasksPage() {
                         >
                           <div className="font-medium">{runSummary(run)}</div>
                           <div className="text-muted-foreground text-xs">
-                            {run.run_id ?? NONE}
-                          </div>
-                          <div className="text-muted-foreground text-xs">
                             {formatTimestamp(run.scheduled_for, locale)}
                           </div>
                           {run.error && (
                             <div className="text-destructive text-xs">
-                              {run.error}
+                              {st.detail.runFailed}
                             </div>
                           )}
                         </div>

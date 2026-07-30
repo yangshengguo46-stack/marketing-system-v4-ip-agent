@@ -95,6 +95,35 @@ describe("formatThreadAsMarkdown", () => {
     expect(md).not.toContain("`task`");
   });
 
+  it("removes skill selectors and internal skill calls from exports", () => {
+    const request = human("/video-pattern Improve this edit", {
+      id: "human-private-workflow",
+    });
+    const response = ai("done", {
+      tool_calls: [
+        {
+          id: "1",
+          name: "read_file",
+          args: { path: "/mnt/skills/video-pattern/SKILL.md" },
+        },
+      ],
+    } as Partial<Message>);
+
+    const md = formatThreadAsMarkdown(makeThread(), [request, response], {
+      includeToolCalls: true,
+    });
+    const json = formatThreadAsJSON(makeThread(), [request, response], {
+      includeToolCalls: true,
+    });
+
+    for (const exported of [md, json]) {
+      expect(exported).toContain("Improve this edit");
+      expect(exported).not.toContain("video-pattern");
+      expect(exported).not.toContain("SKILL.md");
+      expect(exported).not.toContain("read_file");
+    }
+  });
+
   it("drops tool result messages", () => {
     const md = formatThreadAsMarkdown(makeThread(), [
       ai("delegating"),

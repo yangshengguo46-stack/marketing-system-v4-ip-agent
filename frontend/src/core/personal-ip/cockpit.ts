@@ -11,7 +11,7 @@ export const PERSONAL_IP_COCKPIT_QUERY_KEY = [
 ] as const;
 
 export const PERSONAL_IP_OPERATING_STAGES = [
-  { id: "modeling", label: "人格 / 粉丝建模" },
+  { id: "modeling", label: "定位与商业验证" },
   { id: "preflight", label: "发布前预演" },
   { id: "publishing", label: "发布回执" },
   { id: "performance", label: "实绩回收" },
@@ -42,7 +42,7 @@ export type PersonalIPOperatingStage = {
 };
 
 export type PersonalIPOperatingCockpit = {
-  contract_version: "personal-ip-operating-cockpit-v1";
+  contract_version: "personal-ip-operating-cockpit-v4";
   generated_at: string;
   portfolio: {
     subject_count: number;
@@ -52,7 +52,7 @@ export type PersonalIPOperatingCockpit = {
   };
   stages: Record<PersonalIPOperatingStageId, PersonalIPOperatingStage>;
   queues: {
-    accounts_needing_model_input: string[];
+    subjects_needing_strategy_validation: string[];
     preflights_awaiting_publish: string[];
     published_receipts_awaiting_metrics: string[];
     published_receipts_awaiting_retrospective: string[];

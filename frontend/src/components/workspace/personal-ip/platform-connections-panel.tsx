@@ -3,16 +3,12 @@
 import {
   AlertCircleIcon,
   CheckCircle2Icon,
-  DatabaseIcon,
-  Edit3Icon,
   Globe2Icon,
-  KeyRoundIcon,
   LoaderCircleIcon,
-  LockKeyholeIcon,
   LogInIcon,
+  LogOutIcon,
   PlusIcon,
   RefreshCcwIcon,
-  ShieldCheckIcon,
 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -33,7 +29,6 @@ import {
   PERSONAL_IP_CONNECTION_STATE_COPY,
   type PersonalIPConnectionState,
   personalIPAccountConnectionState,
-  summarizePersonalIPConnections,
 } from "@/core/personal-ip";
 import { cn } from "@/lib/utils";
 
@@ -69,24 +64,6 @@ function ConnectionBadge({ state }: { state: PersonalIPConnectionState }) {
   );
 }
 
-function nextStepText(
-  summary: ReturnType<typeof summarizePersonalIPConnections>,
-) {
-  if (summary.pendingLogin > 0) {
-    return `继续完成 ${summary.pendingLogin} 个账号的本人登录。扫码、验证码和 MFA 都由你操作。`;
-  }
-  if (summary.collectionLimited > 0) {
-    return `打开 ${summary.collectionLimited} 个受限账号，检查登录是否过期以及平台的数据权限提示。`;
-  }
-  if (summary.loggedIn > 0) {
-    return "登录已确认。回到同一场会话，让 IP Agent 先读取账号、内容和经营数据。";
-  }
-  if (summary.notAdded > 0) {
-    return "选择你最常用的平台，点击“添加并登录”。无需先配置公司统一认证。";
-  }
-  return "账号均可执行。继续在同一场会话里安排跨平台分析、创作和经过确认的操作。";
-}
-
 export function PlatformConnectionsPanel({
   accounts,
   subjectNames,
@@ -95,8 +72,8 @@ export function PlatformConnectionsPanel({
   actionError,
   actionPending,
   onAddPlatform,
-  onOpenAccount,
-  onEditAccount,
+  onLoginAccount,
+  onLogoutAccount,
   onRetry,
   onDismissError,
 }: {
@@ -107,107 +84,15 @@ export function PlatformConnectionsPanel({
   actionError: string | null;
   actionPending: boolean;
   onAddPlatform: (platform: PersonalIPBrowserPlatform) => void;
-  onOpenAccount: (account: PersonalIPAccount) => void;
-  onEditAccount: (account: PersonalIPAccount) => void;
+  onLoginAccount: (account: PersonalIPAccount) => void;
+  onLogoutAccount: (account: PersonalIPAccount) => void;
   onRetry: () => void;
   onDismissError: () => void;
 }) {
-  const platformIds = PERSONAL_IP_BROWSER_PLATFORMS.map(
-    (platform) => platform.id,
-  );
-  const summary = summarizePersonalIPConnections(accounts, platformIds);
   const visibleError = loadError ?? actionError;
 
   return (
-    <section className="space-y-5" aria-labelledby="platform-connections-title">
-      <Card className="border-primary/20 overflow-hidden py-0">
-        <CardContent className="grid gap-6 p-5 lg:grid-cols-[1.15fr_0.85fr] lg:p-7">
-          <div className="space-y-4">
-            <Badge variant="secondary">首次使用从这里开始</Badge>
-            <div className="space-y-2">
-              <h2
-                id="platform-connections-title"
-                className="text-xl font-semibold tracking-tight sm:text-2xl"
-              >
-                连接你要经营的平台
-              </h2>
-              <p className="text-muted-foreground max-w-2xl text-sm leading-6">
-                不需要公司统一认证。按平台手动点击“添加并登录”，由你本人在独立浏览器窗口完成扫码、验证码或双重验证；一场会话可以继续统筹全部账号。
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="bg-muted/35 rounded-lg border p-3">
-                <KeyRoundIcon className="text-muted-foreground mb-2 size-4" />
-                <p className="text-sm font-medium">你亲自登录</p>
-                <p className="text-muted-foreground mt-1 text-xs leading-5">
-                  密码、扫码、验证码和 MFA 都由你操作。
-                </p>
-              </div>
-              <div className="bg-muted/35 rounded-lg border p-3">
-                <DatabaseIcon className="text-muted-foreground mb-2 size-4" />
-                <p className="text-sm font-medium">深度读取业务数据</p>
-                <p className="text-muted-foreground mt-1 text-xs leading-5">
-                  获授权后可读取内容、指标、受众、评论和回执。
-                </p>
-              </div>
-              <div className="bg-muted/35 rounded-lg border p-3">
-                <LockKeyholeIcon className="text-muted-foreground mb-2 size-4" />
-                <p className="text-sm font-medium">凭据不进入智能体</p>
-                <p className="text-muted-foreground mt-1 text-xs leading-5">
-                  Cookie、Token、密码和浏览器目录不会暴露给智能体。
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-muted/25 flex flex-col justify-between gap-5 rounded-xl border p-4 sm:p-5">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">连接状态摘要</p>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    {loadError
-                      ? "暂时无法读取账号状态"
-                      : `${summary.platformCount} 个平台 · ${summary.accountCount} 个账号`}
-                  </p>
-                </div>
-                <ShieldCheckIcon className="text-muted-foreground size-5" />
-              </div>
-              <div className="flex flex-wrap gap-2" aria-label="连接状态摘要">
-                <ConnectionBadge state="not_added" />
-                <span className="text-sm tabular-nums">
-                  {loadError ? "—" : summary.notAdded}
-                </span>
-                <ConnectionBadge state="pending_login" />
-                <span className="text-sm tabular-nums">
-                  {loadError ? "—" : summary.pendingLogin}
-                </span>
-                <ConnectionBadge state="logged_in" />
-                <span className="text-sm tabular-nums">
-                  {loadError ? "—" : summary.loggedIn}
-                </span>
-                <ConnectionBadge state="collection_limited" />
-                <span className="text-sm tabular-nums">
-                  {loadError ? "—" : summary.collectionLimited}
-                </span>
-                <ConnectionBadge state="actionable" />
-                <span className="text-sm tabular-nums">
-                  {loadError ? "—" : summary.actionable}
-                </span>
-              </div>
-            </div>
-            <div className="border-primary/15 bg-background rounded-lg border p-4">
-              <p className="text-xs font-semibold tracking-wide">下一步</p>
-              <p className="text-muted-foreground mt-1 text-sm leading-6">
-                {loadError
-                  ? "先重新读取连接状态，再继续添加账号，避免重复创建。"
-                  : nextStepText(summary)}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
+    <section className="space-y-5" aria-label="平台账号">
       {visibleError && (
         <Alert variant="destructive">
           <AlertCircleIcon />
@@ -272,7 +157,7 @@ export function PlatformConnectionsPanel({
                     </div>
                   ) : platformAccounts.length === 0 ? (
                     <div className="text-muted-foreground rounded-lg border border-dashed p-3 text-sm leading-6">
-                      尚未添加账号。创建后会使用该账号独立的浏览器登录状态。
+                      尚未添加账号。
                     </div>
                   ) : (
                     platformAccounts.map((account) => {
@@ -280,6 +165,7 @@ export function PlatformConnectionsPanel({
                         personalIPAccountConnectionState(account);
                       const copy =
                         PERSONAL_IP_CONNECTION_STATE_COPY[connectionState];
+                      const isLoggedIn = connectionState !== "pending_login";
                       return (
                         <div
                           key={account.id}
@@ -304,28 +190,26 @@ export function PlatformConnectionsPanel({
                           <p className="text-muted-foreground text-xs leading-5">
                             {copy.description}
                           </p>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              className="min-w-0 flex-1"
-                              variant={
-                                connectionState === "pending_login"
-                                  ? "default"
-                                  : "outline"
-                              }
-                              onClick={() => onOpenAccount(account)}
-                            >
-                              <LogInIcon /> {copy.action}
-                            </Button>
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              aria-label={`编辑${account.display_name}`}
-                              onClick={() => onEditAccount(account)}
-                            >
-                              <Edit3Icon />
-                            </Button>
-                          </div>
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            variant={isLoggedIn ? "outline" : "default"}
+                            disabled={actionPending}
+                            onClick={() =>
+                              isLoggedIn
+                                ? onLogoutAccount(account)
+                                : onLoginAccount(account)
+                            }
+                          >
+                            {actionPending ? (
+                              <LoaderCircleIcon className="animate-spin" />
+                            ) : isLoggedIn ? (
+                              <LogOutIcon />
+                            ) : (
+                              <LogInIcon />
+                            )}
+                            {copy.action}
+                          </Button>
                         </div>
                       );
                     })
@@ -348,8 +232,8 @@ export function PlatformConnectionsPanel({
                       <PlusIcon />
                     )}
                     {platformAccounts.length === 0
-                      ? "添加并登录"
-                      : "添加另一个账号"}
+                      ? "登录"
+                      : "登录另一个账号"}
                   </Button>
                 </CardFooter>
               </Card>

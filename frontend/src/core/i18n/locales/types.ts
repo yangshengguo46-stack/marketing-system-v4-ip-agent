@@ -44,6 +44,7 @@ export interface Translations {
     showArtifacts: string;
     browser: string;
     showBrowser: string;
+    requestSubmitted: string;
   };
 
   home: {
@@ -99,7 +100,6 @@ export interface Translations {
   // Input Box
   inputBox: {
     placeholder: string;
-    createSkillPrompt: string;
     addAttachments: string;
     inputPolish: string;
     inputPolishing: string;
@@ -180,6 +180,7 @@ export interface Translations {
   // Sidebar
   sidebar: {
     recentChats: string;
+    dashboard: string;
     newChat: string;
     chats: string;
     demoChats: string;
@@ -225,6 +226,7 @@ export interface Translations {
     cronHelp: string;
     create: {
       title: string;
+      description: string;
       taskTitle: string;
       prompt: string;
       submit: string;
@@ -259,6 +261,9 @@ export interface Translations {
       noRuns: string;
       noSelection: string;
       filteredByThread: string;
+      filteredByCurrentConversation: string;
+      lastRunFailed: string;
+      runFailed: string;
       loadFailed: string;
     };
     actions: {
@@ -470,6 +475,13 @@ export interface Translations {
     browserBack: string;
     browserScreenshot: string;
     browserClose: string;
+    personalIpOrienting: string;
+    personalIpCollectingAccount: string;
+    personalIpCollectingPortfolio: string;
+    personalIpReadingEvidence: string;
+    personalIpAggregating: string;
+    personalIpPreparingOperation: string;
+    personalIpProducingVideo: string;
   };
 
   humanInput: {
@@ -559,6 +571,7 @@ export interface Translations {
       account: string;
       appearance: string;
       channels: string;
+      localContext: string;
       memory: string;
       tools: string;
       skills: string;

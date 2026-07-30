@@ -15,11 +15,6 @@ const EMPTY_ACCOUNT: PersonalIPAccount = {
   display_name: "TikTok账号",
   handle: null,
   avatar_url: null,
-  promise_to_audience: "",
-  primary_audience: "",
-  content_pillars: [],
-  voice_and_boundaries: [],
-  business_goal: "",
   status: "active",
   metadata: {
     connection_mode: "local_browser_profile",
@@ -30,7 +25,7 @@ const EMPTY_ACCOUNT: PersonalIPAccount = {
 };
 
 const EMPTY_COCKPIT: PersonalIPOperatingCockpit = {
-  contract_version: "personal-ip-operating-cockpit-v1",
+  contract_version: "personal-ip-operating-cockpit-v4",
   generated_at: "2026-07-22T00:00:00Z",
   portfolio: {
     subject_count: 0,
@@ -49,7 +44,7 @@ const EMPTY_COCKPIT: PersonalIPOperatingCockpit = {
     ].map((id) => [id, { state: "empty", total: 0, pending: 0 }]),
   ) as PersonalIPOperatingCockpit["stages"],
   queues: {
-    accounts_needing_model_input: [],
+    subjects_needing_strategy_validation: [],
     preflights_awaiting_publish: [],
     published_receipts_awaiting_metrics: [],
     published_receipts_awaiting_retrospective: [],
@@ -103,7 +98,30 @@ test("portfolio shows all eight platforms and opens manual login", async ({
     }
     await route.fulfill({ status: 200, json: accounts });
   });
-  await page.route("**/api/personal-ip/accounts/*", async (route) => {
+  await page.route("**/api/personal-ip/accounts/**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (route.request().method() === "POST" && pathname.endsWith("/logout")) {
+      const accountId = decodeURIComponent(pathname.split("/").at(-2) ?? "");
+      const current = accounts.find((account) => account.id === accountId);
+      if (!current) {
+        await route.fulfill({ status: 404, json: { detail: "not found" } });
+        return;
+      }
+      const updated = {
+        ...current,
+        metadata: {
+          ...current.metadata,
+          browser_authenticated: false,
+          connection_state: "pending_login",
+          execution_ready: false,
+        },
+      };
+      accounts = accounts.map((account) =>
+        account.id === accountId ? updated : account,
+      );
+      await route.fulfill({ status: 200, json: updated });
+      return;
+    }
     if (route.request().method() !== "PATCH") {
       await route.fallback();
       return;
@@ -128,17 +146,11 @@ test("portfolio shows all eight platforms and opens manual login", async ({
 
   await page.goto("/workspace/personal-ip");
 
-  await expect(page.getByText("首次使用从这里开始")).toBeVisible();
-  await expect(page.getByText("不需要公司统一认证")).toBeVisible();
-  await expect(page.getByText("深度读取业务数据")).toBeVisible();
-  await expect(page.getByText("Cookie、Token、密码和浏览器目录")).toBeVisible();
-
-  const connectionSummary = page.getByLabel("连接状态摘要");
-  await expect(connectionSummary).toContainText("未添加");
-  await expect(connectionSummary).toContainText("待登录");
-  await expect(connectionSummary).toContainText("已登录");
-  await expect(connectionSummary).toContainText("采集受限");
-  await expect(connectionSummary).toContainText("可执行");
+  await expect(page.getByText("本地上下文（MineContext）")).toHaveCount(0);
+  await expect(page.getByText("首次使用从这里开始")).toHaveCount(0);
+  await expect(page.getByText("连接状态摘要")).toHaveCount(0);
+  await expect(page.getByText("下一步", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("平台账号")).toBeVisible();
 
   for (const label of [
     "抖音",
@@ -173,6 +185,7 @@ test("portfolio shows all eight platforms and opens manual login", async ({
       onmessage: ((event: { data: string }) => void) | null;
       onclose: (() => void) | null;
       readyState: number;
+      sent: string[];
       emit: (payload: unknown) => void;
       fail: () => void;
     }> = [];
@@ -183,6 +196,7 @@ test("portfolio shows all eight platforms and opens manual login", async ({
       onclose: (() => void) | null = null;
       onerror: (() => void) | null = null;
       readyState = 0;
+      sent: string[] = [];
 
       constructor() {
         sockets.push(this);
@@ -192,8 +206,8 @@ test("portfolio shows all eight platforms and opens manual login", async ({
         });
       }
 
-      send() {
-        return undefined;
+      send(payload: string) {
+        this.sent.push(payload);
       }
 
       close() {
@@ -215,21 +229,39 @@ test("portfolio shows all eight platforms and opens manual login", async ({
       __loginSockets: sockets,
     });
   });
-  await tiktokCard.getByRole("button", { name: "添加并登录" }).click();
+  await tiktokCard.getByRole("button", { name: "登录", exact: true }).click();
 
   await expect(page.getByRole("dialog")).toContainText("TikTok · TikTok账号");
   await expect(page.getByRole("dialog")).toContainText(
     "登录状态只保存在这个账号的独立浏览器中",
   );
-  const browserSurface = page.getByRole("dialog").locator("main");
-  const browserBox = await browserSurface.boundingBox();
-  expect(browserBox).not.toBeNull();
-  expect((browserBox?.width ?? 0) / (browserBox?.height ?? 1)).toBeGreaterThan(
-    1.5,
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        return (
+          Reflect.get(window, "__loginSockets") as Array<{
+            emit: (payload: unknown) => void;
+          }>
+        ).length;
+      }),
+    )
+    .toBeGreaterThan(0);
+  await page.evaluate(() => {
+    const sockets = Reflect.get(window, "__loginSockets") as Array<{
+      emit: (payload: unknown) => void;
+    }>;
+    sockets.at(-1)?.emit({
+      type: "presentation",
+      mode: "native_window",
+    });
+  });
+  await expect(page.getByTestId("native-account-login")).toContainText(
+    "平台登录窗口已打开",
   );
+  await expect(page.getByTestId("browser-interaction-surface")).toHaveCount(0);
   if (screenshotDirectory) {
     await page.getByRole("dialog").screenshot({
-      path: `${screenshotDirectory}/account-login-landscape.png`,
+      path: `${screenshotDirectory}/account-login-native-window.png`,
     });
   }
 
@@ -239,15 +271,58 @@ test("portfolio shows all eight platforms and opens manual login", async ({
     }>;
     sockets.at(-1)?.fail();
   });
-  await expect(page.getByText("连接中断。可以立即重新连接")).toBeVisible();
-  await page.getByRole("button", { name: "重新连接" }).click();
+  await expect(page.getByTestId("native-account-login")).toContainText(
+    "登录窗口已断开",
+  );
+  await page.waitForTimeout(1_000);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            Reflect.get(window, "__loginSockets") as Array<{
+              emit: (payload: unknown) => void;
+            }>
+          ).length,
+      ),
+    )
+    .toBe(1);
+
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await tiktokCard.getByRole("button", { name: "登录", exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            Reflect.get(window, "__loginSockets") as Array<{
+              emit: (payload: unknown) => void;
+            }>
+          ).length,
+      ),
+    )
+    .toBeGreaterThan(1);
 
   await page.evaluate(() => {
     const sockets = Reflect.get(window, "__loginSockets") as Array<{
       emit: (payload: unknown) => void;
     }>;
+    sockets.at(-1)?.emit({
+      type: "presentation",
+      mode: "native_window",
+    });
     sockets.at(-1)?.emit({ type: "account_authenticated" });
   });
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(tiktokCard.getByText("已登录", { exact: true })).toBeVisible();
+  await expect(
+    tiktokCard.getByRole("button", { name: "退出登录", exact: true }),
+  ).toBeVisible();
+  await tiktokCard
+    .getByRole("button", { name: "退出登录", exact: true })
+    .click();
+  await expect(tiktokCard.getByText("待登录", { exact: true })).toBeVisible();
+  await expect(
+    tiktokCard.getByRole("button", { name: "登录", exact: true }),
+  ).toBeVisible();
 });

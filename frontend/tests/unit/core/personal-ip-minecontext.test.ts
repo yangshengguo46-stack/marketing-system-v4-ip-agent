@@ -13,7 +13,10 @@ describe("MineContext user-visible state", () => {
         authorized: false,
         running: false,
       }),
-    ).toEqual({ label: "系统未启用", action: "请管理员先启用并安装本地观察源" });
+    ).toEqual({
+      label: "系统未启用",
+      action: "请管理员先启用并安装本地观察源",
+    });
 
     expect(
       describeMineContextStatus({
@@ -24,7 +27,7 @@ describe("MineContext user-visible state", () => {
         authorized: false,
         running: false,
       }),
-    ).toEqual({ label: "等待授权", action: "选择范围与用途后明确授权" });
+    ).toEqual({ label: "尚未开启", action: "开启后即可自动使用" });
   });
 
   it("never describes authorization as active capture", () => {
@@ -37,6 +40,6 @@ describe("MineContext user-visible state", () => {
         authorized: true,
         running: false,
       }),
-    ).toEqual({ label: "已授权，未运行", action: "需要时手动启动；不会自动恢复采集" });
+    ).toEqual({ label: "已关闭", action: "需要时可以重新开启" });
   });
 });

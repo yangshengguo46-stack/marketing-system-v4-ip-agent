@@ -24,6 +24,7 @@ import { useMaybeBrowserView } from "./context";
 import { decideBrowserKeyInput } from "./keyboard";
 import {
   type BrowserInputEvent,
+  type BrowserPresentationMode,
   type BrowserStreamStatus,
   useBrowserStream,
 } from "./use-browser-stream";
@@ -32,8 +33,9 @@ export function BrowserViewPanel({
   threadId,
   accountId,
   initialUrl,
-  title = "Browser",
+  title = "浏览器",
   onAccountAuthenticated,
+  onPresentationModeChange,
   onStreamStatusChange,
   onClose,
   className,
@@ -43,6 +45,7 @@ export function BrowserViewPanel({
   initialUrl?: string;
   title?: string;
   onAccountAuthenticated?: () => void;
+  onPresentationModeChange?: (mode: BrowserPresentationMode) => void;
   onStreamStatusChange?: (status: BrowserStreamStatus) => void;
   onClose?: () => void;
   className?: string;
@@ -66,24 +69,29 @@ export function BrowserViewPanel({
   const streamSeedUrl =
     lastLiveUrl ?? liveFallback?.url ?? frame?.url ?? initialUrl;
   const handleNavRejected = useCallback(
-    (url: string | undefined, message: string | undefined) => {
+    (_url: string | undefined, _message: string | undefined) => {
       setNavigating(false);
-      toast.error(
-        message?.replace(/^Error:\s*/i, "") ??
-          `Cannot open ${url ?? "that URL"}`,
-      );
+      toast.error("这个页面暂时无法打开，请稍后重试");
     },
     [],
   );
-  const { status, frameUrl, liveUrl, accountAuthenticated, sendInput } =
-    useBrowserStream(
-      sessionId,
-      live,
-      streamSeedUrl,
-      handleNavRejected,
-      accountMode ? "account" : "thread",
-    );
+  const {
+    status,
+    frameUrl,
+    liveUrl,
+    accountAuthenticated,
+    presentationMode,
+    sendInput,
+  } = useBrowserStream(
+    sessionId,
+    live,
+    streamSeedUrl,
+    handleNavRejected,
+    accountMode ? "account" : "thread",
+  );
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const keyboardCaptureRef = useRef<HTMLTextAreaElement | null>(null);
+  const keyboardComposingRef = useRef(false);
   const surfaceRef = useRef<HTMLImageElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const staticScreenshotRef = useRef<string | null>(null);
@@ -115,6 +123,10 @@ export function BrowserViewPanel({
   useEffect(() => {
     onStreamStatusChange?.(status);
   }, [onStreamStatusChange, status]);
+
+  useEffect(() => {
+    onPresentationModeChange?.(presentationMode);
+  }, [onPresentationModeChange, presentationMode]);
 
   useEffect(() => {
     if (frame?.url && !urlInput && !liveUrl) {
@@ -214,11 +226,11 @@ export function BrowserViewPanel({
         });
       } else {
         setUrlInput(result.url);
-        toast.warning("Navigated, but no screenshot could be captured.");
+        toast.warning("页面已打开，但暂时无法显示画面");
       }
       browserView?.openPanel();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+    } catch {
+      toast.error("浏览器暂时无法执行这个操作，请稍后重试");
     } finally {
       setNavigating(false);
     }
@@ -340,6 +352,48 @@ export function BrowserViewPanel({
     };
   }, [liveActive, normalizedPoint, sendInput]);
 
+  if (accountMode && presentationMode !== "embedded_stream") {
+    const openingNativeWindow = presentationMode === "pending";
+    const nativeWindowDisconnected = status === "closed";
+    return (
+      <div
+        data-testid="native-account-login"
+        className={cn(
+          "bg-muted/25 flex size-full min-h-36 items-center justify-center rounded-lg border",
+          className,
+        )}
+      >
+        <div className="flex max-w-sm items-start gap-3 px-6 py-5">
+          <div className="bg-background flex size-10 shrink-0 items-center justify-center rounded-full border shadow-sm">
+            {nativeWindowDisconnected ? (
+              <XIcon className="text-destructive size-5" />
+            ) : openingNativeWindow ? (
+              <Loader2Icon className="size-5 animate-spin" />
+            ) : (
+              <MonitorIcon className="size-5" />
+            )}
+          </div>
+          <div className="space-y-1">
+            <p className="font-medium">
+              {nativeWindowDisconnected
+                ? "登录窗口已断开"
+                : openingNativeWindow
+                ? "正在打开平台登录窗口"
+                : "平台登录窗口已打开"}
+            </p>
+            <p className="text-muted-foreground text-sm leading-6">
+              {nativeWindowDisconnected
+                ? "请关闭这里后重新点击登录。系统不会自动重复打开窗口。"
+                : openingNativeWindow
+                ? "窗口打开后，请直接在浏览器中完成登录。"
+                : "请在独立浏览器窗口中完成扫码、验证码或双重验证。登录成功后窗口会自动关闭。"}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={panelRef}
@@ -459,11 +513,77 @@ export function BrowserViewPanel({
       <main className="relative flex min-h-0 grow flex-col overflow-hidden bg-neutral-950">
         <div
           ref={stageRef}
+          data-testid="browser-interaction-surface"
           className="relative min-h-0 grow bg-neutral-900"
-          onMouseDown={() => {
-            panelRef.current?.focus({ preventScroll: true });
+          onMouseDown={(event) => {
+            // Keep the invisible text receiver focused after the native image
+            // mousedown default runs; otherwise the subsequent click leaves
+            // focus on the non-editable screenshot and typed text is lost.
+            event.preventDefault();
+            keyboardCaptureRef.current?.focus({ preventScroll: true });
           }}
         >
+          <textarea
+            ref={keyboardCaptureRef}
+            tabIndex={-1}
+            aria-label="浏览器键盘输入"
+            autoCapitalize="none"
+            autoComplete="off"
+            spellCheck={false}
+            className="pointer-events-none absolute top-0 left-0 z-10 size-px resize-none opacity-0"
+            onCompositionStart={() => {
+              keyboardComposingRef.current = true;
+            }}
+            onCompositionEnd={(event) => {
+              keyboardComposingRef.current = false;
+              const text = event.currentTarget.value;
+              if (text) {
+                sendInput({ type: "text", text });
+                event.currentTarget.value = "";
+              }
+            }}
+            onInput={(event) => {
+              if (keyboardComposingRef.current) {
+                return;
+              }
+              const text = event.currentTarget.value;
+              if (text) {
+                sendInput({ type: "text", text });
+                event.currentTarget.value = "";
+              }
+            }}
+            onPaste={(event) => {
+              const text = event.clipboardData.getData("text");
+              if (text) {
+                sendInput({ type: "text", text });
+              }
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onKeyDown={(event) => {
+              if (
+                keyboardComposingRef.current ||
+                isIMEComposing(event) ||
+                ((event.metaKey || event.ctrlKey) &&
+                  event.key.toLowerCase() === "v")
+              ) {
+                return;
+              }
+              const input = decideBrowserKeyInput({
+                live,
+                editableTarget: false,
+                composing: false,
+                key: event.key,
+                metaKey: event.metaKey,
+                ctrlKey: event.ctrlKey,
+              });
+              if (input?.type === "key") {
+                sendInput(input);
+                event.preventDefault();
+                event.stopPropagation();
+              }
+            }}
+          />
           {displayUrl ? (
             <img
               ref={surfaceRef}

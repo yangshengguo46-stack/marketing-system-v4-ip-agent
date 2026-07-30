@@ -3,11 +3,9 @@ import {
   ChevronUp,
   ClipboardListIcon,
   Loader2Icon,
-  SparklesIcon,
-  WrenchIcon,
   XCircleIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   ChainOfThought,
@@ -18,22 +16,15 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { useI18n } from "@/core/i18n/hooks";
-import { hasToolCalls } from "@/core/messages/utils";
 import { useModels } from "@/core/models/hooks";
 import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
-import { streamdownPluginsWithWordAnimation } from "@/core/streamdown";
-import { SafeStreamdown } from "@/core/streamdown/components";
-import { fetchSubtaskSteps } from "@/core/tasks/api";
-import { useSubtask, useUpdateSubtask } from "@/core/tasks/context";
+import { useSubtask } from "@/core/tasks/context";
 import {
   formatSubtaskTokenUsage,
   resolveSubtaskModelLabel,
 } from "@/core/tasks/presentation";
-import { stepsForDisplay } from "@/core/tasks/steps";
-import { explainLastToolCall } from "@/core/tools/utils";
 import { cn } from "@/lib/utils";
 
-import { CitationLink } from "../citations/citation-link";
 import { FlipDisplay } from "../flip-display";
 
 import { MarkdownContent } from "./markdown-content";
@@ -41,8 +32,6 @@ import { MarkdownContent } from "./markdown-content";
 export function SubtaskCard({
   className,
   taskId,
-  threadId,
-  runId,
   isLoading,
 }: {
   className?: string;
@@ -56,7 +45,6 @@ export function SubtaskCard({
   const rehypePlugins = useRehypeSplitWordsIntoSpans(isLoading);
   const task = useSubtask(taskId)!;
   const { models, tokenUsageEnabled } = useModels();
-  const updateSubtask = useUpdateSubtask();
   const modelLabel = resolveSubtaskModelLabel(task.modelName, models);
   const tokenLabel = tokenUsageEnabled
     ? formatSubtaskTokenUsage(task.usage)
@@ -69,34 +57,6 @@ export function SubtaskCard({
         : t.tokenUsage.unavailableShort
     : undefined;
 
-  // The card shows the subagent's step timeline (#3779): its reasoning turns
-  // (AI text) interleaved with the tools it ran (by name). See stepsForDisplay
-  // for what is kept/dropped.
-  const displaySteps = stepsForDisplay(task.steps, task.status);
-
-  // Backfill step history on expand for historical runs (#3779). Live runs
-  // already have steps from SSE, so the `steps.length` guard skips the fetch.
-  const stepsCount = task.steps?.length ?? 0;
-  const backfilledRef = useRef(false);
-  useEffect(() => {
-    if (collapsed || backfilledRef.current || stepsCount > 0) {
-      return;
-    }
-    if (!threadId || !runId) {
-      return;
-    }
-    backfilledRef.current = true;
-    fetchSubtaskSteps(threadId, runId, taskId)
-      .then((steps) => {
-        if (steps.length > 0) {
-          updateSubtask({ id: taskId, steps });
-        }
-      })
-      .catch(() => {
-        // Allow a retry on the next expand if the fetch failed.
-        backfilledRef.current = false;
-      });
-  }, [collapsed, stepsCount, threadId, runId, taskId, updateSubtask]);
   const icon = useMemo(() => {
     if (task.status === "completed") {
       return <CheckCircleIcon className="size-3" />;
@@ -172,11 +132,7 @@ export function SubtaskCard({
                       className="max-w-[420px] truncate pb-1"
                       uniqueKey={task.latestMessage?.id ?? ""}
                     >
-                      {task.status === "in_progress" &&
-                      task.latestMessage &&
-                      hasToolCalls(task.latestMessage)
-                        ? explainLastToolCall(task.latestMessage, t)
-                        : t.subtasks[task.status]}
+                      {t.subtasks[task.status]}
                     </FlipDisplay>
                   </div>
                 )}
@@ -191,48 +147,12 @@ export function SubtaskCard({
           </Button>
         </div>
         <ChainOfThoughtContent className="px-4 pb-4">
-          {task.prompt && (
+          {task.status === "in_progress" && (
             <ChainOfThoughtStep
-              label={
-                <SafeStreamdown
-                  {...streamdownPluginsWithWordAnimation}
-                  components={{ a: CitationLink }}
-                >
-                  {task.prompt}
-                </SafeStreamdown>
-              }
-            ></ChainOfThoughtStep>
+              label={t.subtasks.in_progress}
+              icon={<Loader2Icon className="size-4 animate-spin" />}
+            />
           )}
-          {displaySteps.map((step, i) => {
-            const isLastWhileRunning =
-              task.status === "in_progress" && i === displaySteps.length - 1;
-            const icon = isLastWhileRunning ? (
-              <Loader2Icon className="size-4 animate-spin" />
-            ) : step.kind === "tool" ? (
-              <WrenchIcon className="size-4" />
-            ) : (
-              <SparklesIcon className="size-4" />
-            );
-            return (
-              <ChainOfThoughtStep
-                key={`${step.message_index}-${i}`}
-                label={
-                  step.kind === "tool" ? (
-                    (step.tool_name ?? t.subtasks[task.status])
-                  ) : (
-                    <div className="text-muted-foreground line-clamp-3 text-sm">
-                      <MarkdownContent
-                        content={step.text}
-                        isLoading={false}
-                        rehypePlugins={rehypePlugins}
-                      />
-                    </div>
-                  )
-                }
-                icon={icon}
-              />
-            );
-          })}
           {task.status === "completed" && (
             <>
               <ChainOfThoughtStep

@@ -3,6 +3,12 @@ import { isStaticWebsiteOnly } from "../static-mode";
 import type { AgentThreadState } from "../threads";
 
 const EMPTY_ARTIFACT_PATHS: readonly string[] = [];
+const INTERNAL_ARTIFACT_RE =
+  /(?:^|[/\\])(?:skills?|internal)(?:[/\\]|$)|(?:^|[/\\])SKILL\.md(?:[?#]|$)|\.skill(?:[?#/]|$)|(?:personal-ip-media-execution|continuity-ledger|shot-contract|asset-contract|execution-receipt)(?:[-_.?#/]|$)/i;
+
+export function isCustomerVisibleArtifact(filepath: string) {
+  return !INTERNAL_ARTIFACT_RE.test(filepath);
+}
 
 function decodePathSegment(segment: string) {
   try {
@@ -56,7 +62,13 @@ export function urlOfArtifact({
 export function extractArtifactsFromThread(thread: {
   values: Pick<AgentThreadState, "artifacts">;
 }) {
-  return thread.values.artifacts ?? EMPTY_ARTIFACT_PATHS;
+  const artifacts = thread.values.artifacts ?? EMPTY_ARTIFACT_PATHS;
+  if (artifacts.length === 0) return EMPTY_ARTIFACT_PATHS;
+  const visibleArtifacts = artifacts.filter(isCustomerVisibleArtifact);
+  if (visibleArtifacts.length === 0) return EMPTY_ARTIFACT_PATHS;
+  return visibleArtifacts.length === artifacts.length
+    ? artifacts
+    : visibleArtifacts;
 }
 
 export function resolveArtifactURL(absolutePath: string, threadId: string) {

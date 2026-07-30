@@ -210,9 +210,7 @@ export default function AgentChatPage() {
     [regenerateMessage, threadId],
   );
 
-  const tokenUsageInlineMode = tokenUsageEnabled
-    ? localSettings.tokenUsage.inlineMode
-    : "off";
+  const tokenUsageInlineMode = "off";
   const hasTodos = (thread.values.todos?.length ?? 0) > 0;
   const { activeGoal, hasGoal, setLocalGoal } = useActiveGoal(
     threadId,
@@ -238,25 +236,25 @@ export default function AgentChatPage() {
           <div className="relative flex size-full min-h-0 justify-between">
             <header
               className={cn(
-                "absolute top-0 right-0 left-0 z-30 flex h-12 shrink-0 items-center gap-2 px-2 sm:px-4",
+                "pointer-events-none absolute top-0 right-0 left-0 z-50 flex h-12 shrink-0 items-center gap-2 px-2 sm:px-4",
                 isWelcomeMode
                   ? "bg-background/0 backdrop-blur-none"
                   : "bg-background/80 shadow-xs backdrop-blur",
               )}
             >
-              <SidebarTrigger className="md:hidden" />
+              <SidebarTrigger className="pointer-events-auto md:hidden" />
               {/* Agent badge */}
-              <div className="flex min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-2 py-1">
+              <div className="pointer-events-auto flex min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-2 py-1">
                 <BotIcon className="text-primary h-3.5 w-3.5" />
                 <span className="hidden max-w-24 truncate text-xs font-medium sm:inline sm:max-w-none">
                   {agent?.name ?? agent_name}
                 </span>
               </div>
 
-              <div className="flex min-w-0 flex-1 items-center text-sm font-medium">
+              <div className="pointer-events-auto flex min-w-0 flex-1 items-center text-sm font-medium">
                 <ThreadTitle threadId={threadId} thread={thread} />
               </div>
-              <div className="flex shrink-0 items-center sm:mr-4">
+              <div className="pointer-events-auto flex shrink-0 items-center sm:mr-4">
                 <Tooltip content={t.agents.newChat}>
                   <Button
                     className="px-2 sm:px-3"
@@ -270,17 +268,19 @@ export default function AgentChatPage() {
                     <span className="hidden sm:inline">{t.agents.newChat}</span>
                   </Button>
                 </Tooltip>
-                <TokenUsageIndicator
-                  threadId={isNewThread ? undefined : threadId}
-                  backendUsage={backendTokenUsage}
-                  enabled={tokenUsageEnabled}
-                  messages={thread.messages}
-                  pendingMessages={pendingUsageMessages}
-                  preferences={localSettings.tokenUsage}
-                  onPreferencesChange={(preferences) =>
-                    setLocalSettings("tokenUsage", preferences)
-                  }
-                />
+                {false && (
+                  <TokenUsageIndicator
+                    threadId={isNewThread ? undefined : threadId}
+                    backendUsage={backendTokenUsage}
+                    enabled={tokenUsageEnabled}
+                    messages={thread.messages}
+                    pendingMessages={pendingUsageMessages}
+                    preferences={localSettings.tokenUsage}
+                    onPreferencesChange={(preferences) =>
+                      setLocalSettings("tokenUsage", preferences)
+                    }
+                  />
+                )}
                 <SidecarTrigger />
                 <ExportTrigger threadId={threadId} />
                 <ArtifactTrigger />

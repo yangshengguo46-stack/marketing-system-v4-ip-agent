@@ -229,7 +229,7 @@ test.describe("Thread history", () => {
     await page.waitForURL("**/workspace/chats/new");
 
     await expect(page.getByText(SVG_PROMPT_MARKER)).toBeHidden();
-    await expect(page.getByPlaceholder(/how can i assist you/i)).toBeVisible();
+    await expect(page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i)).toBeVisible();
   });
 
   test("new chat does not show previous optimistic user message after client-side navigation", async ({
@@ -273,7 +273,7 @@ test.describe("Thread history", () => {
     );
 
     await page.goto("/workspace/chats/new");
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
     await textarea.fill(
       `请严格执行：使用 write_file 创建 shared.svg，内容包含 ${OPTIMISTIC_PROMPT_MARKER}。`,
@@ -292,7 +292,7 @@ test.describe("Thread history", () => {
     await page.waitForURL("**/workspace/chats/new");
 
     await expect(page.getByText(OPTIMISTIC_PROMPT_MARKER)).toHaveCount(0);
-    await expect(page.getByPlaceholder(/how can i assist you/i)).toBeVisible();
+    await expect(page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i)).toBeVisible();
   });
 
   test("new chat resets immediately after a history-only thread URL update", async ({
@@ -301,7 +301,7 @@ test.describe("Thread history", () => {
     mockLangGraphAPI(page);
 
     await page.goto("/workspace/chats/new");
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
     await textarea.fill("Message that must disappear in the next new chat");
     await textarea.press("Enter");
@@ -348,7 +348,7 @@ test.describe("Thread history", () => {
     });
 
     await page.goto("/workspace/chats/new");
-    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    const textarea = page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
     await textarea.fill("What should disappear after deletion?");
     await textarea.press("Enter");
@@ -373,12 +373,12 @@ test.describe("Thread history", () => {
     await expect(page).toHaveURL(/\/workspace\/chats\/new$/);
     await expect(page.getByText("Previous question")).toHaveCount(0);
     await expect(page.getByText("Hello from DeerFlow!")).toHaveCount(0);
-    await expect(page.getByPlaceholder(/how can i assist you/i)).toBeVisible();
+    await expect(page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i)).toBeVisible();
 
     await page.goto(`/workspace/chats/${MOCK_THREAD_ID}`);
     await page.waitForURL("**/workspace/chats/new");
     await expect(page.getByText("Hello from DeerFlow!")).toHaveCount(0);
-    await expect(page.getByPlaceholder(/how can i assist you/i)).toBeVisible();
+    await expect(page.getByPlaceholder(/(?:how can i assist you|name the account|告诉我账号)/i)).toBeVisible();
   });
 
   test("mock thread does not load real backend run history", async ({

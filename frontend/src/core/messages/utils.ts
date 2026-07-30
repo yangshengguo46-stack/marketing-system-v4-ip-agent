@@ -1,5 +1,7 @@
 import type { AIMessage, Message } from "@langchain/langgraph-sdk";
 
+import { stripSkillSelectorForDisplay } from "@/core/skills";
+
 interface GenericMessageGroup<T = string> {
   type: T;
   id: string | undefined;
@@ -314,15 +316,15 @@ export function getAssistantTurnCopyData(
   );
 }
 
-export function getMessageCopyData(message: Message) {
+export function getMessageCopyData(message: Message, locale?: string) {
   const content = extractContentFromMessage(message);
   if (message.type === "human") {
-    return stripUploadedFilesTag(content);
+    return stripSkillSelectorForDisplay(stripUploadedFilesTag(content));
   }
   if (content.length > 0) {
-    return content;
+    return visibleAssistantContent(content, locale);
   }
-  return extractReasoningContentFromMessage(message) ?? "";
+  return "";
 }
 
 export function extractTextFromMessage(message: Message) {
@@ -630,6 +632,48 @@ const INTERNAL_MARKER_RE = new RegExp(
  */
 export function stripInternalMarkers(content: string): string {
   return content.replace(INTERNAL_MARKER_RE, "").trim();
+}
+
+export function visibleAssistantContent(
+  content: string,
+  locale = "en-US",
+) {
+  if (
+    /configured LLM provider is temporarily unavailable after multiple retries/i.test(
+      content,
+    )
+  ) {
+    return locale === "zh-CN"
+      ? "这次没有继续完成。请稍后重试，我会从当前进度继续。"
+      : "I couldn't continue this time. Please retry shortly and I will resume from the current progress.";
+  }
+  if (content.includes("【视频工作台操作上下文】")) {
+    return locale === "zh-CN"
+      ? "当前操作已经交给智能体处理；结果会直接显示在视频工作台，需要你决定时我会单独说明。"
+      : "The agent is handling this operation. Results will appear in the video workbench, and I will ask only when your decision is needed.";
+  }
+  return content
+    .replace(
+      /^\s*(?:(?:production|provider_task|selected_candidate|candidate|shot|thread|run|asset|entity)_id|event_key|retry_of|sha256|provider|model)\s*[:=].*$/gim,
+      "",
+    )
+    .replace(/\bpersonal_ip_[a-z0-9_]+\b/gi, "相关操作")
+    .replace(/\bDeerFlow\b/gi, "IP Agent")
+    .replace(/\bSeedream\b/gi, "图像生成")
+    .replace(/\bSeedance\b/gi, "视频生成")
+    .replace(/\b(?:MediaKit|FFmpeg|Remotion)\b/gi, "后期处理")
+    .replace(/\bMineContext\b/gi, "本地上下文")
+    .replace(/\bMCP\b/gi, "外部能力")
+    .replace(/\b(?:subagent|sub-agent)\b/gi, "协作能力")
+    .replace(/\b(?:image-generation\s+)?skill\b/gi, "生成能力")
+    .replace(
+      /(?:资产|镜头|旁白)合同|连续性账本|执行回执|不可变视频账本|生产账本/g,
+      "制作记录",
+    )
+    .replace(/\bawaiting_review\b/gi, "待确认")
+    .replace(/([\p{Script=Han}])[ \t]+(?=\p{Script=Han})/gu, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function parseUploadedFiles(content: string): FileInMessage[] {

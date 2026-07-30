@@ -23,10 +23,6 @@ import {
   ConversationContent,
   type ConversationProps,
 } from "@/components/ai-elements/conversation";
-import {
-  Reasoning,
-  ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
 import { Button } from "@/components/ui/button";
 import { extractArtifactsFromThread } from "@/core/artifacts/utils";
 import { useI18n } from "@/core/i18n/hooks";
@@ -45,7 +41,6 @@ import {
 import {
   extractContentFromMessage,
   extractPresentFilesFromMessage,
-  extractTextFromMessage,
   getAssistantTurnCopyData,
   getAssistantTurnUsageMessages,
   getBranchableAssistantGroupIds,
@@ -53,7 +48,6 @@ import {
   getStreamingMessageLookup,
   hasContent,
   hasPresentFiles,
-  hasReasoning,
   isAssistantMessageGroupStreaming,
   isHiddenFromUIMessage,
   type MessageGroup as ThreadMessageGroup,
@@ -63,12 +57,6 @@ import {
   buildMessageSidecarContext,
   type SidecarContext,
 } from "@/core/sidecar";
-import type { Subtask } from "@/core/tasks";
-import { useUpdateSubtask } from "@/core/tasks/context";
-import {
-  derivePendingSubtaskStatus,
-  parseSubtaskResult,
-} from "@/core/tasks/subtask-result";
 import type { AgentThreadState } from "@/core/threads";
 import { cn } from "@/lib/utils";
 
@@ -90,7 +78,6 @@ import {
   MessageTokenUsageList,
 } from "./message-token-usage";
 import { MessageListSkeleton } from "./skeleton";
-import { SubtaskCard } from "./subtask-card";
 
 const EMPTY_TOKEN_DEBUG_STEPS: TokenDebugStep[] = [];
 const EMPTY_ARTIFACT_PATHS: readonly string[] = [];
@@ -435,7 +422,6 @@ export function MessageList({
       .some((g) => g.type === "assistant");
   }, [groupedMessages]);
   const rehypePlugins = useRehypeSplitWordsIntoSpans(thread.isLoading);
-  const updateSubtask = useUpdateSubtask();
   const lastGroupIndex = groupedMessages.length - 1;
   const turnUsageMessagesByGroupIndex =
     getAssistantTurnUsageMessages(groupedMessages);
@@ -447,41 +433,6 @@ export function MessageList({
     [messages, t, tokenUsageInlineMode],
   );
   const showTokenDebugSummaries = tokenUsageInlineMode === "step_debug";
-  const tokenDebugStepsByMessageId = useMemo(() => {
-    const stepsByMessageId = new Map<string, TokenDebugStep[]>();
-    for (const step of tokenDebugSteps) {
-      const messageId = step.messageId;
-      if (!messageId) {
-        continue;
-      }
-      const steps = stepsByMessageId.get(messageId);
-      if (steps) {
-        steps.push(step);
-      } else {
-        stepsByMessageId.set(messageId, [step]);
-      }
-    }
-    return stepsByMessageId;
-  }, [tokenDebugSteps]);
-  const getTokenDebugStepsForMessages = useCallback(
-    (groupMessages: Message[]) => {
-      if (!showTokenDebugSummaries) {
-        return EMPTY_TOKEN_DEBUG_STEPS;
-      }
-      const steps: TokenDebugStep[] = [];
-      for (const message of groupMessages) {
-        if (!message.id) {
-          continue;
-        }
-        const matched = tokenDebugStepsByMessageId.get(message.id);
-        if (matched) {
-          steps.push(...matched);
-        }
-      }
-      return steps;
-    },
-    [showTokenDebugSummaries, tokenDebugStepsByMessageId],
-  );
   const streamingMessages = useMemo(
     () =>
       getStreamingMessageLookup(
@@ -561,9 +512,9 @@ export function MessageList({
           clearPendingHumanInput(request.request_id);
         }
         return result;
-      } catch (error) {
+      } catch {
         clearPendingHumanInput(request.request_id);
-        toast.error(error instanceof Error ? error.message : String(error));
+        toast.error("这一步暂时无法继续，请重试");
         return false;
       }
     },
@@ -1072,103 +1023,15 @@ export function MessageList({
                 </div>
               );
             } else if (group.type === "assistant:subagent") {
-              const tasks = new Set<Subtask>();
-              for (const message of group.messages) {
-                if (message.type === "ai") {
-                  for (const toolCall of message.tool_calls ?? []) {
-                    if (toolCall.name === "task") {
-                      const taskId = toolCall.id;
-                      if (!taskId) {
-                        continue;
-                      }
-                      const status = derivePendingSubtaskStatus(
-                        taskId,
-                        group.messages,
-                        groupIsLoading,
-                      );
-                      const task: Subtask = {
-                        id: taskId,
-                        subagent_type: toolCall.args.subagent_type,
-                        description: toolCall.args.description,
-                        prompt: toolCall.args.prompt,
-                        status,
-                        ...(status === "failed"
-                          ? { error: t.subtasks.failed }
-                          : {}),
-                      };
-                      updateSubtask(task);
-                      tasks.add(task);
-                    }
-                  }
-                } else if (message.type === "tool") {
-                  const taskId = message.tool_call_id;
-                  if (taskId) {
-                    const parsed = parseSubtaskResult(
-                      extractTextFromMessage(message),
-                      message.additional_kwargs,
-                    );
-                    updateSubtask({ id: taskId, ...parsed });
-                  }
-                }
-              }
-
-              const results: React.ReactNode[] = [];
-              const subagentDebugMessageIds: string[] = [];
-              if (tasks.size > 0) {
-                results.push(
-                  <div
-                    key="subtask-count"
-                    className="text-muted-foreground pt-2 text-sm font-normal"
-                  >
-                    {t.subtasks.executing(tasks.size)}
-                  </div>,
-                );
-              }
-              for (const message of group.messages.filter(
-                (message) => message.type === "ai",
-              )) {
-                if (hasReasoning(message)) {
-                  results.push(
-                    <MessageGroup
-                      key={"thinking-group-" + message.id}
-                      messages={[message]}
-                      isLoading={groupIsLoading}
-                      deferBrowserPreviews={thread.isLoading}
-                      tokenDebugSteps={getTokenDebugStepsForMessages([message])}
-                      showTokenDebugSummaries={showTokenDebugSummaries}
-                    />,
-                  );
-                } else if (message.id) {
-                  subagentDebugMessageIds.push(message.id);
-                }
-                const taskIds = message.tool_calls?.flatMap((toolCall) =>
-                  toolCall.name === "task" && toolCall.id ? [toolCall.id] : [],
-                );
-                for (const taskId of taskIds ?? []) {
-                  results.push(
-                    <SubtaskCard
-                      key={"task-group-" + taskId}
-                      taskId={taskId}
-                      threadId={threadId}
-                      runId={(message as { run_id?: string }).run_id}
-                      isLoading={groupIsLoading}
-                    />,
-                  );
-                }
-              }
-              return (
+              return groupIsLoading ? (
                 <div
                   key={"subtask-group-" + group.id}
-                  className="relative z-1 flex flex-col gap-2"
+                  className="text-muted-foreground flex items-center gap-2 py-2 text-sm"
                 >
-                  {results}
-                  {renderTokenUsage({
-                    messages: group.messages,
-                    turnUsageMessages,
-                    debugMessageIds: subagentDebugMessageIds,
-                  })}
+                  <Loader2Icon className="size-4 animate-spin" />
+                  {t.common.thinking}
                 </div>
-              );
+              ) : null;
             }
             return (
               <div key={"group-" + group.id} className="w-full">
@@ -1177,10 +1040,6 @@ export function MessageList({
                   isLoading={groupIsLoading}
                   deferBrowserPreviews={thread.isLoading}
                   threadId={threadId}
-                  tokenDebugSteps={getTokenDebugStepsForMessages(
-                    group.messages,
-                  )}
-                  showTokenDebugSummaries={showTokenDebugSummaries}
                 />
                 {renderTokenUsage({
                   messages: group.messages,
@@ -1191,10 +1050,9 @@ export function MessageList({
             );
           })}
           {thread.isLoading && !hasActiveAssistantText && (
-            <div className="w-full">
-              <Reasoning isStreaming={true} startTimeProp={turnStartTime}>
-                <ReasoningTrigger hasContent={false} />
-              </Reasoning>
+            <div className="text-muted-foreground flex w-full items-center gap-2 py-2 text-sm">
+              <Loader2Icon className="size-4 animate-spin" />
+              {t.common.thinking}
             </div>
           )}
           <div style={{ height: `${paddingBottom}px` }} />
