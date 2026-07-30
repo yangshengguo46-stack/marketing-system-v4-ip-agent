@@ -1,0 +1,4 @@
+interface:
+  display_name: "个人IP剧集圣经"
+  short_description: "为长期账号设计人物弧、关系引擎、季结构和连续性账本"
+  default_prompt: "使用 $design-ip-series-bible 为这个个人IP设计长周期故事、人物关系与季度推进圣经。"

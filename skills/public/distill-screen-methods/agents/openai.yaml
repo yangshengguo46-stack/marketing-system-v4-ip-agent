@@ -1,0 +1,4 @@
+interface:
+  display_name: "影视方法蒸馏器"
+  short_description: "研究影视作品与课程，生成有证据边界、可验证的个人IP机制卡"
+  default_prompt: "使用 $distill-screen-methods 研究指定影片、创作者或课程，并输出带证据边界的个人IP机制卡。"

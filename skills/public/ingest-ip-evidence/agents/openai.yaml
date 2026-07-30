@@ -1,0 +1,4 @@
+interface:
+  display_name: "真实IP素材入库"
+  short_description: "冻结生命周期欲望，并把真实人物、事件和素材转成可追溯证据"
+  default_prompt: "把我的真实经历和素材按事实、证词、推断、假设、同意与未知分类，并接入当前主体的原生策略和证据引用。"

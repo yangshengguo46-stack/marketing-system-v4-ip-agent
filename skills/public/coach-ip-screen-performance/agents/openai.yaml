@@ -1,0 +1,4 @@
+interface:
+  display_name: "个人IP镜头表演指导"
+  short_description: "把抽象情绪词转成目标、策略、潜台词和可重复的表演任务"
+  default_prompt: "使用 $coach-ip-screen-performance 把这场戏转成演员可执行、可连续拍摄的镜头表演任务。"

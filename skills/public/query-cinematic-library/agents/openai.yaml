@@ -1,0 +1,4 @@
+interface:
+  display_name: "影视机制库检索"
+  short_description: "检索358部权威影片、393位创作者与304张可追溯机制卡"
+  default_prompt: "使用 $query-cinematic-library 为我的个人IP问题检索影片、创作者和机制样本，并标明证据等级与转译边界。"

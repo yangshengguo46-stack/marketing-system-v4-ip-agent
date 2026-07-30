@@ -1,0 +1,4 @@
+interface:
+  display_name: "悬疑推理惊悚编剧室"
+  short_description: "设计谜题、公平线索、观众信息差、嫌疑结构、威胁升级与揭示回收"
+  default_prompt: "使用 $write-mystery-thriller 把这个个人IP选题设计成公平、紧张且能回收的悬疑单集或长线。"

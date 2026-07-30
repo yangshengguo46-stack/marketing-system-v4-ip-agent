@@ -1,0 +1,4 @@
+interface:
+  display_name: "战争历史史诗编剧室"
+  short_description: "连接私人选择、群体运动、制度权力、历史后果、研究证据与宏大尺度"
+  default_prompt: "使用 $write-war-history-epic 把这段历史或群体事件设计成事实严谨、人物具体的史诗叙事。"

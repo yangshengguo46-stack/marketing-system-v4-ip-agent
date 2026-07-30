@@ -1,0 +1,4 @@
+interface:
+  display_name: "场面调度导演"
+  short_description: "用人物位置、距离、视线、出入口、遮挡和运动呈现权力与关系变化"
+  default_prompt: "使用 $direct-scene-blocking 为这场戏设计人物走位、空间地理、视线和转向调度。"

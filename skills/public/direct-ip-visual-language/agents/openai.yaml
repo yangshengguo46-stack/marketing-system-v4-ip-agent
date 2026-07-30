@@ -1,0 +1,4 @@
+interface:
+  display_name: "个人IP视觉导演"
+  short_description: "把叙事意图翻译成场面调度、镜头、光色、质感和声音方案"
+  default_prompt: "使用 $direct-ip-visual-language 为这条内容设计可拍的调度、镜头、光色与质感方案。"

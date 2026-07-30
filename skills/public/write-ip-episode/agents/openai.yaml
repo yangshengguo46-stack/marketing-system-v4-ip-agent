@@ -1,0 +1,4 @@
+interface:
+  display_name: "个人IP单集编剧"
+  short_description: "把真实素材写成独立满足且推动长期故事的可拍短视频单集"
+  default_prompt: "使用 $write-ip-episode 把这段真实素材写成独立满足且推进长期IP的单集。"

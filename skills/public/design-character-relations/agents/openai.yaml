@@ -1,0 +1,4 @@
+interface:
+  display_name: "人物与关系设计"
+  short_description: "设计人物欲望、盲点、能力、底线、关系冲突与长期变化弧线"
+  default_prompt: "使用 $design-character-relations 为这个个人IP设计人物功能、关系引擎与可持续变化。"

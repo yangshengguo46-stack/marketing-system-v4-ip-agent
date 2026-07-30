@@ -1,0 +1,4 @@
+interface:
+  display_name: "恐怖编剧室"
+  short_description: "设计安全基线、异常、威胁规则、显露节奏、身体边界与残余恐惧"
+  default_prompt: "使用 $write-horror 把这个日常场景设计成规则清楚、逐步失效且有余波的恐怖故事。"

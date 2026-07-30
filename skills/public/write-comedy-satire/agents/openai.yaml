@@ -1,0 +1,4 @@
+interface:
+  display_name: "喜剧与讽刺编剧室"
+  short_description: "用人物盲点、错位、地位交换、升级、回收和严肃需要设计喜剧"
+  default_prompt: "使用 $write-comedy-satire 把这个真实关系或事件写成有角色逻辑、升级与余味的喜剧。"

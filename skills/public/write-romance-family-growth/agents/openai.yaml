@@ -1,0 +1,4 @@
+interface:
+  display_name: "爱情家庭成长编剧室"
+  short_description: "设计亲密关系、代际义务、共同生活、成长选择与克制情绪变化"
+  default_prompt: "使用 $write-romance-family-growth 把这段关系写成有具体选择、边界与成长代价的故事。"

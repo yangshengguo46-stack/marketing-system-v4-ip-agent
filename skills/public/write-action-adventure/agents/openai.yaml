@@ -1,0 +1,4 @@
+interface:
+  display_name: "动作冒险编剧室"
+  short_description: "用目标、地理、路径、资源、障碍、角色分工和动作选择组织场面"
+  default_prompt: "使用 $write-action-adventure 为这个任务设计地理清楚、因果连续且暴露人物的动作序列。"

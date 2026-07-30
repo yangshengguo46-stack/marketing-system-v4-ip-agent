@@ -1,0 +1,4 @@
+interface:
+  display_name: "科幻奇幻动画编剧室"
+  short_description: "建立新规则、世界边界、视觉隐喻、思想实验与人物伦理选择"
+  default_prompt: "使用 $write-scifi-fantasy-animation 为这个个人IP建立低成本但能改变人物选择的幻想规则。"

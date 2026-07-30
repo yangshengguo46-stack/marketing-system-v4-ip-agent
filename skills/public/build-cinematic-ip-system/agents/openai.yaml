@@ -1,0 +1,4 @@
+interface:
+  display_name: "电影化个人IP总控"
+  short_description: "按阶段编排欲望、研究、编剧、导演、表演、审片和校准矩阵"
+  default_prompt: "诊断这个个人IP所处阶段，从欲望—行为开始选择最小必要的影视化创作能力，并只向客户说明结果和依据。"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "犯罪权力西部编剧室"
+  short_description: "围绕资源、合法性、规则真空、谈判、忠诚、背叛与代价组织冲突"
+  default_prompt: "使用 $write-crime-power-western 为这个故事设计资源、规则、联盟和代价清楚的权力冲突。"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "个人IP情绪导演"
+  short_description: "统筹账号、季度、小弧、单集、场景和镜头的完整分层情绪系统"
+  default_prompt: "使用 $shape-ip-emotion 设计这个个人IP从账号到镜头的分层情绪系统。"

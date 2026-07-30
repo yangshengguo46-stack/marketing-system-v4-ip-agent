@@ -1,0 +1,4 @@
+interface:
+  display_name: "电影工种训练营"
+  short_description: "运行编剧、导演、摄影、剪辑、声音、表演等八轨训练与考核"
+  default_prompt: "为我生成与当前个人IP项目绑定的训练计划、练习和只读考核模板，不创建平行项目台账。"

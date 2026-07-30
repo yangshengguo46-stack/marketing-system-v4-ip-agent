@@ -1,0 +1,4 @@
+interface:
+  display_name: "叙事摄影设计"
+  short_description: "为剧本选择视点、景别、焦段、机位、距离、运动和摄影机语法"
+  default_prompt: "使用 $design-cinematography 把这场戏的叙事意图转成完整且可拍的摄影机方案。"

@@ -14,6 +14,12 @@ ByteDance/Volcengine stack as its default capability layer.
 - HLLM-Creator's complete source plus a privacy-bounded adapter for aggregate
   audience history, personalized creative generation and later shared-model
   fine-tuning.
+- A first-party cinematic Personal-IP method matrix for evidence intake,
+  desire and behavior, long-arc and episode writing, genre, emotion, directing,
+  cinematography, performance, editing, sound, production design, continuity
+  review and an eight-track 96-module curriculum. Its bundled research index
+  contains 358 films, 393 creators or teams and 304 evidence-labeled mechanism
+  cards.
 - A default `ip-agent` with portfolio-wide coordination, approval and receipt
   rules.
 
@@ -25,6 +31,14 @@ a persistent Settings opt-out; it never replaces DeerFlow as the agent brain.
 AgentKit is not used as the
 runtime because it duplicates DeerFlow in the cloud. Data Agent is not part of
 the distribution.
+
+The cinematic method matrix is private operating intelligence, not a second
+agent runtime or customer-facing Skill catalog. Evidence intake appends
+subject-level strategy versions and credential-free evidence references.
+Blind predictions, publishing, metrics, retrospectives and rule promotion use
+the existing Personal-IP native services. The bundled curriculum CLI is
+read-only and may generate plans or assessment templates, but it cannot create
+a parallel project or completion ledger.
 
 ## First run
 

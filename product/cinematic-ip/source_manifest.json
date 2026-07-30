@@ -1,0 +1,80 @@
+[
+  {
+    "authority": "BFI",
+    "cache_policy": "local_ignored_cache",
+    "kind": "critics_canon",
+    "name": "BFI Sight and Sound Greatest Films of All Time 2022",
+    "retrieved_at": "2026-07-29T13:53:57+00:00",
+    "rights_note": "Store compact factual metadata and provenance; do not redistribute page media or page copy.",
+    "sha256": "550fe7cd65c58957a1ff390740c218af32d7ac6c2a1607a9ad433735feacec4a",
+    "source_id": "bfi_sight_sound_2022",
+    "url": "https://www.bfi.org.uk/sight-and-sound/greatest-films-all-time"
+  },
+  {
+    "authority": "Writers Guild of America East and West",
+    "cache_policy": "local_ignored_cache",
+    "kind": "screenwriting_canon",
+    "name": "WGA 101 Greatest Screenplays of the 21st Century",
+    "retrieved_at": "2026-07-29T13:53:59+00:00",
+    "rights_note": "Store title, year, rank and compact credit facts; do not reproduce article prose.",
+    "sha256": "3b4f7951bc079e65f8388c4448b260e679c5c0aa574971b2e6eb69b396d023b9",
+    "source_id": "wga_21c_2021",
+    "url": "https://www.wgaeast.org/writers-guild-of-america-east-and-west-announce-wgas-101-greatest-screenplays-of-the-21st-century-so-far/"
+  },
+  {
+    "kind": "local_original_research",
+    "name": "global film case index",
+    "path": "skills/public/distill-screen-methods/references/global-film-case-index.md",
+    "rights_note": "Original project synthesis; facts retain upstream citations inside the source document.",
+    "sha256": "ae06db93310e4e548bc70459908da87804b85fe72fbe47b0f6b28dc4dab20fa0",
+    "source_id": "film_case_index"
+  },
+  {
+    "kind": "local_original_research",
+    "name": "creator atlas cn",
+    "path": "skills/public/distill-screen-methods/references/creator-atlas-cn.md",
+    "rights_note": "Original project synthesis; facts retain upstream citations inside the source document.",
+    "sha256": "b2283d28ece6494b3a1c47ec4f732dd44f1513ae0509072adf265c39a2017cc5",
+    "source_id": "creator_atlas_cn"
+  },
+  {
+    "kind": "local_original_research",
+    "name": "creator atlas global",
+    "path": "skills/public/distill-screen-methods/references/creator-atlas-global.md",
+    "rights_note": "Original project synthesis; facts retain upstream citations inside the source document.",
+    "sha256": "983f106b38ed9d90a90ff5ef9b95048da1a0482b24e0a9894e3217718bbf66f1",
+    "source_id": "creator_atlas_global"
+  },
+  {
+    "kind": "local_original_research",
+    "name": "craft artist atlas",
+    "path": "skills/public/distill-screen-methods/references/craft-artist-atlas.md",
+    "rights_note": "Original project synthesis; facts retain upstream citations inside the source document.",
+    "sha256": "e846675236b676329d5f6241e577f31b5dd3e8c3c3929cf8e068775b06715da5",
+    "source_id": "craft_artist_atlas"
+  },
+  {
+    "kind": "local_original_research",
+    "name": "creator mechanism cards",
+    "path": "skills/public/distill-screen-methods/references/creator-mechanism-cards.md",
+    "rights_note": "Original project synthesis; facts retain upstream citations inside the source document.",
+    "sha256": "5b951a3e38031e4d22f232ecc45828a6e99b7f951ac9129d57933c34228d64d2",
+    "source_id": "creator_mechanism_cards"
+  },
+  {
+    "kind": "local_original_research",
+    "name": "personal ip creator atlas",
+    "path": "skills/public/distill-screen-methods/references/personal-ip-creator-atlas.md",
+    "rights_note": "Original project synthesis; facts retain upstream citations inside the source document.",
+    "sha256": "b01c3e4a9f9d0d77371d8603d245e1272dcb44781f6481482e2be827d7ce7f77",
+    "source_id": "personal_ip_creator_atlas"
+  },
+  {
+    "kind": "local_original_research",
+    "name": "course atlas",
+    "path": "skills/public/distill-screen-methods/references/course-atlas.md",
+    "rights_note": "Original project synthesis; facts retain upstream citations inside the source document.",
+    "sha256": "b3fe62ae0991b464a706f939d7c3bd336906e482b4a11ea22fdb5a30427287ad",
+    "source_id": "course_atlas"
+  }
+]

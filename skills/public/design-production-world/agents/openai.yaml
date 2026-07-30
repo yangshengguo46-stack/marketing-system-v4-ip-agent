@@ -1,0 +1,4 @@
+interface:
+  display_name: "美术与世界视觉化"
+  short_description: "用空间、道具、服装、颜色、材质与时代细节外化人物和世界规则"
+  default_prompt: "使用 $design-production-world 为这个个人IP设计可持续的空间、道具、服装和世界细节。"

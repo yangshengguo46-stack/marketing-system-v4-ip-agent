@@ -1,0 +1,4 @@
+interface:
+  display_name: "剪辑与银幕节奏"
+  short_description: "按观众心理、表演、信息、动作和声音设计剪切、节奏与场景结构"
+  default_prompt: "使用 $edit-screen-rhythm 为这些素材或分镜设计信息清楚、情绪有效的剪辑结构。"

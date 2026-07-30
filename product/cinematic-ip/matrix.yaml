@@ -1,0 +1,375 @@
+version: 4.0.0
+purpose: >-
+  把影视编剧、导演、摄影、表演和情绪设计的可迁移机制转化为个人IP
+  的长期叙事与日更视频工作流。只提炼方法，不仿写在世创作者的独特风格。
+
+shared_contract:
+  story_layers:
+    - event_line
+    - character_line
+    - information_line
+    - emotion_line
+    - world_line
+  time_scales:
+    - account_lifecycle
+    - season
+    - mini_arc
+    - episode
+    - scene
+    - shot
+  evidence_labels:
+    - sourced_fact
+    - cross_source_synthesis
+    - analyst_inference
+    - creative_hypothesis
+  required_output_fields:
+    - objective
+    - desire_behavior
+    - audience_emotional_promise
+    - mechanism
+    - observable_execution
+    - failure_mode
+    - validation_check
+
+architecture:
+  orchestration_layer: 1
+  operating_system_layer: 4
+  foundation_layer: 9
+  craft_labs: 11
+  genre_rooms: 10
+  total_skills: 35
+
+skills:
+  - name: build-cinematic-ip-system
+    role: 总控入口
+    job: 诊断项目阶段并编排真实证据、研究库、圣经、题材、情绪、编剧、导演、训练、审片和校准闭环
+    outputs:
+      - stage_diagnosis
+      - skill_route
+      - shared_state
+      - next_action
+
+  - name: query-cinematic-library
+    role: 研究数据库
+    job: 检索358部影片、393位创作者与304张机制卡，并按证据等级和转译问题选样
+    outputs:
+      - sample_set
+      - evidence_labels
+      - mechanism_candidates
+      - transfer_limits
+
+  - name: run-cinematic-curriculum
+    role: 训练系统
+    job: 运行编剧、导演、摄影、剪辑、声音、表演、美术、真人纪录八轨96模块训练与考核
+    outputs:
+      - diagnostic
+      - training_plan
+      - exercise
+      - evidence_score
+      - remediation
+
+  - name: ingest-ip-evidence
+    role: 真实素材与项目状态
+    job: 把人物、事件、素材、限制、同意、主张、观察和未知接入原生主体策略与证据引用
+    outputs:
+      - subject_scope
+      - evidence_refs
+      - consent_boundaries
+      - unresolved_unknowns
+
+  - name: calibrate-cinematic-ip
+    role: 发布与学习闭环
+    job: 通过原生服务冻结盲预测，登记发布与指标，完成复盘，并在满足证据门槛后升级方法
+    outputs:
+      - immutable_preflight
+      - publication_receipt
+      - metric_snapshot
+      - retrospective
+      - method_promotion
+
+  - name: distill-screen-methods
+    role: 研究入口
+    job: 将影片、导演、编剧、摄影师或课程蒸馏成有来源的机制卡
+    outputs:
+      - evidence_map
+      - mechanism_cards
+      - transfer_limits
+      - ip_adaptation
+
+  - name: engineer-desire-behavior
+    role: 0号叙事发动机
+    job: 把生命周期与单集欲望转成目标、行动、反作用、策略变化、选择、代价、状态改变和观众欲望
+    outputs:
+      - lifecycle_desire_ledger
+      - episode_desire_behavior
+      - counter_desire_map
+      - action_feedback_chain
+      - silent_behavior_test
+
+  - name: design-ip-series-bible
+    role: 总编剧
+    job: 设计个人IP的长期故事、人物、世界、关系和季结构
+    outputs:
+      - one_sentence_premise
+      - lifecycle_question
+      - character_arc
+      - season_map
+      - relationship_engine
+      - continuity_rules
+
+  - name: route-ip-genre-engine
+    role: 类型策划
+    job: 选择或混合题材发动机，并把题材转成可持续的事件生产规则
+    outputs:
+      - genre_contract
+      - recurring_conflict
+      - event_generators
+      - reveal_pattern
+      - genre_failure_checks
+
+  - name: shape-ip-emotion
+    role: 情绪导演
+    job: 管理账号总情绪、季度情绪、单集情绪曲线和镜头情绪
+    outputs:
+      - emotional_promise
+      - emotion_palette
+      - season_wave
+      - episode_curve
+      - exit_emotion
+
+  - name: write-ip-episode
+    role: 单集编剧
+    job: 把真实素材转成独立成立且推进长期IP的短视频单集
+    outputs:
+      - episode_logline
+      - beat_sheet
+      - scene_actions
+      - dialogue_intentions
+      - hook_and_payoff
+      - long_arc_delta
+
+  - name: direct-ip-visual-language
+    role: 导演与摄影
+    job: 把故事和情绪翻译成场面调度、镜头、光线、色彩、质感与滤镜选择
+    outputs:
+      - visual_intent
+      - blocking_plan
+      - shot_plan
+      - lighting_and_color_plan
+      - filter_and_grade_plan
+      - continuity_notes
+
+  - name: coach-ip-screen-performance
+    role: 表演指导
+    job: 把台词和情绪词转成行动目标、潜台词、身体任务与可拍表演
+    outputs:
+      - playable_objective
+      - obstacle
+      - tactics
+      - subtext
+      - physical_score
+      - take_variations
+
+  - name: audit-ip-continuity
+    role: 编剧室审片
+    job: 审查单集满足、人物变化、暗线证据、情绪一致性和视觉连续性
+    outputs:
+      - continuity_report
+      - promise_payoff_report
+      - contradiction_log
+      - revision_priorities
+
+  - name: develop-theme-premise
+    role: 主题开发
+    job: 从真实矛盾提炼主题问题、反题和可持续强前提
+
+  - name: design-character-relations
+    role: 人物设计
+    job: 设计人物选择、能力、盲点、底线、关系引擎与变化弧
+
+  - name: engineer-plot-information
+    role: 情节工程
+    job: 组织因果、知识差、线索、误导、揭示、转折与回收
+
+  - name: write-scenes-dialogue
+    role: 场景编剧
+    job: 把故事节点写成目标、阻力、策略变化与台词行动
+
+  - name: direct-scene-blocking
+    role: 场面调度
+    job: 用位置、距离、视线、遮挡、物件与运动呈现关系变化
+
+  - name: design-cinematography
+    role: 摄影设计
+    job: 设计视点、距离、景别、焦段、机位、运动与覆盖
+
+  - name: design-light-color-texture
+    role: 光色质感
+    job: 设计光线、色彩、扩散、Look、LUT、颗粒与调色管线
+
+  - name: edit-screen-rhythm
+    role: 剪辑
+    job: 按观众心理、表演、信息、动作和声音设计剪切与节奏
+
+  - name: design-screen-sound
+    role: 声音设计
+    job: 从剧本阶段设计声音视点、空间、母题、动态、音乐与静默
+
+  - name: design-production-world
+    role: 美术设计
+    job: 用空间、道具、服装、颜色、材质和生活痕迹外化世界
+
+  - name: previsualize-screen-direction
+    role: 导演预演
+    job: 生成导演阐述、跨部门语法、预演、分镜意图和拍摄优先级
+
+  - name: write-mystery-thriller
+    role: 悬疑编剧室
+    job: 设计谜题、公平线索、信息差、威胁、调查、揭示与回收
+
+  - name: write-comedy-satire
+    role: 喜剧编剧室
+    job: 设计人物盲点、错位、地位交换、升级、回收与讽刺边界
+
+  - name: write-crime-power-western
+    role: 权力编剧室
+    job: 设计资源、合法性、三方联盟、谈判、忠诚、背叛与新规则
+
+  - name: write-romance-family-growth
+    role: 关系编剧室
+    job: 设计亲密、家庭、代际、边界、照护、成长选择与克制余味
+
+  - name: write-scifi-fantasy-animation
+    role: 幻想编剧室
+    job: 设计新规则、思想实验、世界边界、视觉隐喻与伦理选择
+
+  - name: write-horror
+    role: 恐怖编剧室
+    job: 设计安全基线、威胁规则、显露、身体边界与残余恐惧
+
+  - name: write-action-adventure
+    role: 动作编剧室
+    job: 设计目标、地理、路径、资源、障碍、动作选择与身体后果
+
+  - name: write-war-history-epic
+    role: 历史编剧室
+    job: 连接事实、私人选择、群体行动、制度、地理与历史后果
+
+  - name: write-musical-performance
+    role: 音乐编剧室
+    job: 让音乐、歌词、节奏、身体与摄影改变关系和故事时间
+
+  - name: write-documentary-reality
+    role: 纪录编剧室
+    job: 在不造假前提下组织现实任务、人物选择、场景日志和剪辑结构
+
+skill_groups:
+  orchestration:
+    - build-cinematic-ip-system
+  operating_system:
+    - query-cinematic-library
+    - run-cinematic-curriculum
+    - ingest-ip-evidence
+    - calibrate-cinematic-ip
+  foundations:
+    - distill-screen-methods
+    - engineer-desire-behavior
+    - design-ip-series-bible
+    - route-ip-genre-engine
+    - shape-ip-emotion
+    - write-ip-episode
+    - direct-ip-visual-language
+    - coach-ip-screen-performance
+    - audit-ip-continuity
+  craft_labs:
+    - develop-theme-premise
+    - design-character-relations
+    - engineer-plot-information
+    - write-scenes-dialogue
+    - direct-scene-blocking
+    - design-cinematography
+    - design-light-color-texture
+    - edit-screen-rhythm
+    - design-screen-sound
+    - design-production-world
+    - previsualize-screen-direction
+  genre_rooms:
+    - write-mystery-thriller
+    - write-comedy-satire
+    - write-crime-power-western
+    - write-romance-family-growth
+    - write-scifi-fantasy-animation
+    - write-horror
+    - write-action-adventure
+    - write-war-history-epic
+    - write-musical-performance
+    - write-documentary-reality
+
+workflow:
+  - ingest-ip-evidence
+  - query-cinematic-library
+  - distill-screen-methods
+  - engineer-desire-behavior
+  - develop-theme-premise
+  - design-ip-series-bible
+  - design-character-relations
+  - route-ip-genre-engine
+  - selected-genre-room
+  - shape-ip-emotion
+  - engineer-plot-information
+  - write-ip-episode
+  - write-scenes-dialogue
+  - direct-scene-blocking
+  - previsualize-screen-direction
+  - direct-ip-visual-language
+  - design-cinematography
+  - design-light-color-texture
+  - design-production-world
+  - design-screen-sound
+  - coach-ip-screen-performance
+  - edit-screen-rhythm
+  - audit-ip-continuity
+  - calibrate-cinematic-ip
+
+test_cases:
+  - name: detective-chinatown
+    validates:
+      - multi_level_story_lines
+      - unit_story_and_meta_arc
+      - character_moral_question
+  - name: crazy-little-yang
+    validates:
+      - lifecycle_and_episode_desire_chain
+      - counter_desire_engine
+      - silent_behavior_test
+      - sitcom_reset_engine
+      - family_relationship_engine
+      - comedy_emotional_release
+  - name: dayuange
+    validates:
+      - emotional_anthology
+      - recurring_emotional_theme
+      - restrained_exit_emotion
+  - name: let-the-bullets-fly
+    validates:
+      - three_way_power_conflict
+      - dense_dialogue_action
+      - tonal_hybrid
+      - performance_fit
+  - name: stephen-chow-comedy
+    validates:
+      - nobody_growth_arc
+      - comic_duo_rhythm
+      - comedy_and_pathos
+  - name: zhang-yimou-visual-system
+    validates:
+      - color_as_structure
+      - production_design_integration
+      - visual_duality
+  - name: four-episode-calibration-loop
+    validates:
+      - immutable_preflight
+      - append_only_publish_and_metrics
+      - prediction_to_outcome_join
+      - three_retrospective_promotion_gate
+      - heldout_portability_test

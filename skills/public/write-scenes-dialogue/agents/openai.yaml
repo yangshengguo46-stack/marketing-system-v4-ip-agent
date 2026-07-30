@@ -1,0 +1,4 @@
+interface:
+  display_name: "场景与对白编剧"
+  short_description: "把故事节点写成目标明确、策略变化、潜台词清楚且可表演的场景"
+  default_prompt: "使用 $write-scenes-dialogue 把这个故事节点写成可拍场景，并让对白承担具体行动。"

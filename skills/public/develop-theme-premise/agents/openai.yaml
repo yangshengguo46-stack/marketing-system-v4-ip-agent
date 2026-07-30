@@ -1,0 +1,4 @@
+interface:
+  display_name: "主题与强前提开发"
+  short_description: "把个人经历与业务矛盾提炼成可持续、可验证的长期影视强前提"
+  default_prompt: "使用 $develop-theme-premise 把这组真实素材提炼成个人IP的主题问题与长期强前提。"

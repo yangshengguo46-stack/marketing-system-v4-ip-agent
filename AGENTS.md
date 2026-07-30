@@ -383,6 +383,16 @@ IP Agent distribution note:
   sibling decoy when applicable. The compiler emits one atomic candidate plus
   reference/eval files; installation remains explicit through `skill_manage`,
   and portable use still requires three distinct measured publications.
+- `product/cinematic-ip/matrix.yaml` and the 35 matching first-party packages
+  under `skills/public/` form the private cinematic Personal-IP methodology
+  layer. Keep the bundled 358-film / 393-creator / 304-mechanism SQLite index
+  and eight-track 96-module curriculum source-auditable. Its evidence intake
+  must write only through subject-level `personal_ip_strategy_versions` and
+  credential-free evidence references; its calibration path must reuse native
+  preflights, publish receipts, metrics, retrospectives and promotions. Never
+  restore the source matrix's standalone `ip_os.py`, project JSON/JSONL ledger
+  or writable curriculum completion ledger. Keep customer answers free of
+  package names, paths, tools and internal routing.
 - Personal-IP operating truth is subject-scoped and versioned in
   `personal_ip_strategy_versions`. Platform accounts are execution targets and
   must not regain person, business, positioning, naming, audience or voice

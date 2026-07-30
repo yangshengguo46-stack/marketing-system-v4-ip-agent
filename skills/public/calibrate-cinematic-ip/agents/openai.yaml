@@ -1,0 +1,4 @@
+interface:
+  display_name: "电影化IP校准闭环"
+  short_description: "冻结欲望行为映射、盲预测、发布回执和证据化方法升级"
+  default_prompt: "通过项目原生服务冻结本条欲望—行为映射和盲预测，并在发布后做可回溯复盘。"

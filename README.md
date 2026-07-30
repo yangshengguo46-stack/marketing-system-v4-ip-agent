@@ -138,7 +138,16 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > can disable it persistently or clear its local data. Backend scope identifiers
 > are not exposed as checkboxes. In the Chinese sidebar, “工作台” stays immediately
 > above “新对话”, while “历史对话” opens the complete thread list from below
-> “定时任务”. Video uses a second
+> “定时任务”. The default agent now includes a first-party cinematic Personal-IP
+> methodology layer covering real-evidence intake, desire and behavior,
+> long-form story architecture, genre and emotion, screenwriting, directing,
+> cinematography, performance, editing, sound, production design, continuity
+> review and an eight-track 96-module curriculum. Its research index contains
+> 358 films, 393 creators or teams and 304 evidence-labeled mechanism cards.
+> This layer does not own another filesystem ledger: accepted identity,
+> publishing, metrics, retrospectives and learned rules stay in the existing
+> Personal-IP native stores.
+> Video uses a second
 > auditable line from idea/script through blueprint,
 > assets, storyboard, shot jobs and retries, consistency, selection, finishing
 > and delivery. The request is immutable and every provider/model/task/cost or

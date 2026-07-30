@@ -1,0 +1,4 @@
+interface:
+  display_name: "欲望—行为引擎"
+  short_description: "把人物欲望转成可见行动、阻力、选择、代价和状态变化"
+  default_prompt: "使用 $engineer-desire-behavior 为这个个人IP或故事建立欲望账本与可拍行为链。"

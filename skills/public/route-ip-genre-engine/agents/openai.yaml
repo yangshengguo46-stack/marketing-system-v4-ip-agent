@@ -1,0 +1,4 @@
+interface:
+  display_name: "个人IP类型发动机"
+  short_description: "选择或混合影视题材，生成持续事件、冲突和信息分配规则"
+  default_prompt: "使用 $route-ip-genre-engine 为这个个人IP选择或混合题材发动机，并生成持续选题规则。"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "音乐歌舞表演编剧室"
+  short_description: "让音乐、歌词、节奏、身体与摄影共同改变关系、决定和故事时间"
+  default_prompt: "使用 $write-musical-performance 设计一段音乐或身体表演，使其真正推进人物关系与故事。"

@@ -326,9 +326,17 @@ coverage evidence.
 - [x] Pin and vendor 18 MIT production Skills for reference analysis,
       cinematic direction, visual style, continuity, production design,
       lighting, performance, sound, captions, color and commercial formats.
+- [x] Bundle and enable the first-party 35-part cinematic Personal-IP matrix,
+      including the 358-film / 393-creator / 304-mechanism research index and
+      eight-track 96-module curriculum. Replace its standalone filesystem IP
+      operating system with the product's subject strategy, preflight,
+      publication, metric, retrospective and evidence-promotion services.
 - [x] Vendor SkillHone evaluation and optimization packages into an isolated
       evaluation-only lab. They are not enabled for customer conversations and
       cannot rewrite a live Skill.
+- [ ] Exercise the cinematic matrix on one real subject from consented evidence
+      through desire/behavior, series and episode work, shoot/edit review,
+      immutable preflight, publication, observed metrics and retrospective.
 - [ ] Build the first private probe/test set from retained strategy, content and
       video cases; run one candidate Skill through baseline, probe, held-out
       regression, reviewed promotion and rollback acceptance.

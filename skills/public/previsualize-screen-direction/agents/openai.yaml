@@ -1,0 +1,4 @@
+interface:
+  display_name: "导演预演与拍摄设计"
+  short_description: "把剧本转成导演阐述、视觉规则、分镜意图、拍摄覆盖和现场优先级"
+  default_prompt: "使用 $previsualize-screen-direction 为这条内容生成导演阐述、分镜意图与可执行拍摄计划。"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "电影声音设计"
+  short_description: "从剧本阶段统筹对白、环境、画外、主观声、声音母题、音乐与静默"
+  default_prompt: "使用 $design-screen-sound 从剧本和场景开始设计声音视点、空间、母题与动态。"

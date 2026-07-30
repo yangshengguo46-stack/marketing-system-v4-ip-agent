@@ -1,0 +1,4 @@
+interface:
+  display_name: "情节与信息工程"
+  short_description: "组织因果、观众知识、伏笔、误导、揭示、转折与承诺回收结构"
+  default_prompt: "使用 $engineer-plot-information 为这个故事设计因果链、信息差、揭示节奏与回收。"

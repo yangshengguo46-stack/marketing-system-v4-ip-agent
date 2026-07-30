@@ -1,0 +1,4 @@
+interface:
+  display_name: "纪录与真人叙事编剧室"
+  short_description: "在不伪造现实的前提下组织人物选择、长期观察、场景日志、剪辑结构与伦理"
+  default_prompt: "使用 $write-documentary-reality 把这些真实素材组织成有进展、有选择且诚实披露的真人叙事。"
