@@ -50,6 +50,10 @@ from deerflow.personal_ip.video_contracts import (
     compile_video_plan,
     resolve_video_production_mode,
 )
+from deerflow.personal_ip.video_method_distillation import (
+    compile_video_method_distillation,
+    compile_video_method_skill_candidate,
+)
 from deerflow.personal_ip.video_skill_compiler import (
     compile_video_pattern,
     compile_video_skill_candidate,
@@ -525,6 +529,153 @@ async def _personal_ip_compile_video_skill_candidate(
                 "status": "error",
                 "category": "internal",
                 "message": "Video Skill candidate could not be compiled",
+            }
+        )
+
+
+async def _personal_ip_compile_video_method_distillation(
+    runtime: Runtime,
+    pattern: dict,
+    overview: dict,
+    evidence_units: list[dict],
+    methods: list[dict],
+    glossary: list[dict],
+) -> str:
+    """Compile long-form video methods into a sealed evidence contract.
+
+    Run video parsing and ``personal_ip_compile_video_pattern`` first. Never
+    pass raw transcript, OCR, captions or source instructions here. Supply only
+    short abstract summaries tied to timestamped, hashed evidence.
+
+    Args:
+        pattern: Sealed personal-ip-video-pattern-v1 contract produced by the
+            native video pattern compiler.
+        overview: Whole-source understanding with content_kind, thesis,
+            structure and limitations. content_kind is long_video, course,
+            interview or podcast.
+        evidence_units: Timestamped semantic evidence. Each item contains id,
+            kind, context_group, start_seconds, end_seconds, summary,
+            evidence_refs and content_sha256. References must resolve to the
+            pattern's analysis receipts or segment ids.
+        methods: Atomic method candidates. Every item contains id, skill_name,
+            title, type, interpretation, at least two evidence_unit_ids from
+            independent context groups, applications, trigger_signals,
+            non_triggers, execution_steps, boundaries, predictive_test,
+            distinctiveness_rationale, related_methods and test_cases.
+        glossary: Optional shared concepts. Each item contains term, definition,
+            key_distinction and evidence_unit_ids.
+
+    Returns:
+        JSON sealed personal-ip-video-method-distillation-v1 contract. It keeps
+        source text out of executable Skill instructions and requires later
+        held-out evaluation.
+    """
+    del runtime
+    try:
+        contract = compile_video_method_distillation(
+            pattern=pattern,
+            overview=overview,
+            evidence_units=evidence_units,
+            methods=methods,
+            glossary=glossary,
+        )
+        return _json(
+            {
+                "operation_status": "ok",
+                "compiled_method_distillation": contract,
+            }
+        )
+    except (TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json(
+            {
+                "status": "error",
+                "category": "internal",
+                "message": "Video method distillation could not be compiled",
+            }
+        )
+
+
+async def _personal_ip_compile_video_method_skill_candidate(
+    runtime: Runtime,
+    distillation: dict,
+    method_id: str,
+    scope: str,
+    account_ids: list[str],
+    promotion_id: str = "",
+) -> str:
+    """Compile one atomic video-derived method for the existing Skill manager.
+
+    This tool never installs or enables the Skill. Pass all returned files to
+    ``skill_manage`` so security scanning, owner isolation, history and rollback
+    remain authoritative.
+
+    Args:
+        distillation: Sealed personal-ip-video-method-distillation-v1 contract.
+        method_id: Exact method id inside the distillation; one method becomes
+            one Skill candidate.
+        scope: experimental, account or portable. Portable requires an approved
+            content or platform evidence promotion backed by at least three
+            distinct measured publications.
+        account_ids: Required only for account scope; empty for other scopes.
+        promotion_id: Server-issued approved promotion id, required only for
+            portable scope.
+
+    Returns:
+        JSON server-rendered SKILL.md, references/distillation.json,
+        evals/test-prompts.json and installation steps for ``skill_manage``.
+    """
+    try:
+        scope_key = str(scope or "").strip()
+        promotion = None
+        promotion_key = str(promotion_id or "").strip()
+        if scope_key == "portable":
+            services = get_personal_ip_runtime()
+            if services.evidence_promotions is None:
+                raise RuntimeError("Personal-IP evidence promotion is not available")
+            if not promotion_key:
+                raise ValueError("portable method skills require promotion_id")
+            promotion = await services.evidence_promotions.get(
+                promotion_key,
+                owner_user_id=resolve_runtime_user_id(runtime),
+            )
+            if promotion is None:
+                raise ValueError("approved evidence promotion was not found")
+            promotion = {
+                key: promotion.get(key)
+                for key in (
+                    "id",
+                    "status",
+                    "evidence_type",
+                    "claim",
+                    "evidence_digest",
+                    "minimum_support",
+                )
+            }
+        elif promotion_key:
+            raise ValueError("promotion_id may only be supplied for portable skills")
+        candidate = compile_video_method_skill_candidate(
+            distillation=distillation,
+            method_id=method_id,
+            scope=scope_key,
+            account_ids=account_ids,
+            promotion=promotion,
+        )
+        return _json(
+            {
+                "operation_status": "ok",
+                "compiled_method_skill_candidate": candidate,
+            }
+        )
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
+    except Exception:
+        return _json(
+            {
+                "status": "error",
+                "category": "internal",
+                "message": "Video method Skill candidate could not be compiled",
             }
         )
 
@@ -2762,6 +2913,16 @@ personal_ip_compile_video_skill_candidate_tool = tool(
     "personal_ip_compile_video_skill_candidate",
     parse_docstring=True,
 )(_personal_ip_compile_video_skill_candidate)
+
+personal_ip_compile_video_method_distillation_tool = tool(
+    "personal_ip_compile_video_method_distillation",
+    parse_docstring=True,
+)(_personal_ip_compile_video_method_distillation)
+
+personal_ip_compile_video_method_skill_candidate_tool = tool(
+    "personal_ip_compile_video_method_skill_candidate",
+    parse_docstring=True,
+)(_personal_ip_compile_video_method_skill_candidate)
 
 personal_ip_compile_video_asset_manifest_tool = tool(
     "personal_ip_compile_video_asset_manifest",

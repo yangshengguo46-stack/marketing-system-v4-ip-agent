@@ -22,3 +22,17 @@ License text: [licenses/generative-media-skills-MIT.txt](licenses/generative-med
   `product/skill-lab/vendor`; they are not exposed to the customer Agent.
 
 License text: [licenses/tencent-skillhone-MIT.txt](licenses/tencent-skillhone-MIT.txt)
+
+## Cangjie Skill
+
+- Source: <https://github.com/kangarooking/cangjie-skill>
+- Revision: `355dd47a97eeb87d249bf7d32aab561405b6de76`
+- License: MIT
+- Scope: the RIA-TV++ whole-source understanding, five-view extraction,
+  cross-context/predictive/distinctiveness checks and sibling-confusion test
+  ideas are adapted by `video-method-distillation`; the upstream repository is
+  not bundled. DeerFlow adds typed evidence contracts, instruction/data
+  separation, rights receipts, owner isolation, security scanning, rollback
+  and measured promotion.
+
+License text: [licenses/cangjie-skill-MIT.txt](licenses/cangjie-skill-MIT.txt)

@@ -26,6 +26,8 @@ allowed-tools:
   - personal_ip_compile_video_asset_manifest
   - personal_ip_compile_video_continuity
   - personal_ip_compile_video_material_selection
+  - personal_ip_compile_video_method_distillation
+  - personal_ip_compile_video_method_skill_candidate
   - personal_ip_compile_video_narration
   - personal_ip_compile_video_narration_timing
   - personal_ip_compile_video_plan

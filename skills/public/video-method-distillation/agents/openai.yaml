@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video Method Distillation"
+  short_description: "Extract evidence-backed methods from long-form video"
+  default_prompt: "Use $video-method-distillation to turn this long-form video transcript into reviewed, evidence-backed Skill candidates."

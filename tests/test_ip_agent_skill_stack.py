@@ -9,6 +9,7 @@ CORE_SKILLS = {
     "ip-strategy-director",
     "ip-content-calibration",
     "video-pattern-learning",
+    "video-method-distillation",
 }
 
 MEDIA_SKILLS = {
@@ -69,3 +70,13 @@ def test_skill_lab_is_isolated_from_customer_agent() -> None:
 
     for name in ("skillhone", "skillhone-evaluation", "skillhone-optimization"):
         assert (lab / "vendor" / name / "SKILL.md").is_file(), name
+
+
+def test_cangjie_methodology_is_attributed_without_vendoring_runtime() -> None:
+    skill = ROOT / "skills" / "public" / "video-method-distillation"
+    assert (skill / "references" / "method-contract.md").is_file()
+    attribution = (ROOT / "THIRD_PARTY_SKILLS.md").read_text(encoding="utf-8")
+    assert "https://github.com/kangarooking/cangjie-skill" in attribution
+    assert "355dd47a97eeb87d249bf7d32aab561405b6de76" in attribution
+    assert (ROOT / "licenses" / "cangjie-skill-MIT.txt").is_file()
+    assert not (ROOT / "product" / "skill-lab" / "vendor" / "cangjie-skill").exists()

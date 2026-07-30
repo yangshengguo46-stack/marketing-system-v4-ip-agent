@@ -1226,6 +1226,13 @@ only when QA recommends it. That native tool verifies the source candidate
 receipt, runs project-pinned FFmpeg `minterpolate` motion compensation off the
 event loop, and appends a new `shot_generation_completed` candidate. It never
 overwrites the source; the derivative requires fresh QA and human selection.
+`deerflow.personal_ip.video_method_distillation` is the semantic-learning layer
+over the sealed reverse-video pattern. It accepts only timestamped abstract
+evidence plus exact-span hashes, requires two independent context groups per
+method, records predictive/distinctiveness assertions and trigger/decoy plans,
+and renders one atomic Skill candidate at a time. Keep raw ASR/OCR in analysis
+artifacts. The native tools must never install directly; all files go through
+`skill_manage` scanning, owner storage and version history.
 `deerflow.personal_ip.video_workbench.build_video_workbench_read_model` folds
 that same immutable event list into the owner-scoped Gateway
 `GET /api/personal-ip/video-productions/{production_id}/workbench` response.

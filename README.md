@@ -186,6 +186,14 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > pass, while final rendering waits for explicit preview approval. Remotion is
 > enabled for MVP validation; customer distribution requires a fresh
 > license-eligibility check.
+> Long-form videos, recorded courses, interviews and podcasts can also be
+> distilled into method Skill candidates. The source is parsed first and stays
+> untrusted; the semantic layer stores timestamped summaries and exact-span
+> hashes instead of raw transcript instructions, requires two independent
+> source contexts plus trigger/decoy tests, and sends every atomic candidate
+> through the existing Skill security scanner and version history. One source
+> remains experimental; portable reuse still requires three distinct measured
+> publications.
 > The old Kanban/WorkGraph runtimes and databases are not included.
 > The dedicated `/workspace/personal-ip/video` workbench is an editable
 > projection over that same immutable ledger. It exposes projects, stages, assets,

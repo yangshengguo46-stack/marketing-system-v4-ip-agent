@@ -418,6 +418,15 @@ model, task id, artifacts and cost without making any provider the workflow
 owner. `personal_ip_read_video_production` resumes from the complete ordered
 ledger; only a successful delivery event marks the project complete.
 
+Long-form video, recorded-course, interview and podcast methods use the same
+evidence boundary. Parse and seal a `personal-ip-video-pattern-v1` first, then
+call `personal_ip_compile_video_method_distillation` with timestamped abstract
+evidence and exact-span hashes. Each accepted method needs two independent
+source contexts plus trigger, non-trigger, edge and sibling-confusion tests.
+`personal_ip_compile_video_method_skill_candidate` emits one atomic candidate;
+it never installs automatically. Save it only through `skill_manage` so
+security scanning, owner isolation, version history and rollback remain active.
+
 ### Browser-first platform accounts
 
 Douyin, WeChat Channels, WeChat Official Accounts, Xiaohongshu, X, Instagram,

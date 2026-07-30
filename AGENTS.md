@@ -374,6 +374,15 @@ IP Agent distribution note:
   bounded-history coverage. The native begin/compile/execute/read video tools
   are the agent's write/resume surface; chat history is never the production
   ledger.
+- `deerflow.personal_ip.video_method_distillation` adapts the MIT-licensed
+  Cangjie RIA-TV++ workflow for long-form video, recorded courses, interviews
+  and podcasts. It may consume only a sealed `personal-ip-video-pattern-v1`
+  plus timestamped, hashed abstract evidence. Raw transcript/OCR and
+  prompt-like source text must never become Skill instructions. Each method
+  needs two independent source contexts, trigger/non-trigger/edge tests and a
+  sibling decoy when applicable. The compiler emits one atomic candidate plus
+  reference/eval files; installation remains explicit through `skill_manage`,
+  and portable use still requires three distinct measured publications.
 - Personal-IP operating truth is subject-scoped and versioned in
   `personal_ip_strategy_versions`. Platform accounts are execution targets and
   must not regain person, business, positioning, naming, audience or voice

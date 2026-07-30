@@ -264,6 +264,17 @@ coverage evidence.
       Tarsier2, video-SALMONN 2+, Shot2Story, Marlin-2B and VideoMind remain
       optional provider adapters. Vidi2.5/Vidi-Edit remain noncommercial
       architectural references and are not shipped.
+- [x] Adapt Cangjie RIA-TV++ as the internal `video-method-distillation`
+      workflow. The typed compiler accepts only a sealed video pattern plus
+      timestamped abstract evidence and exact-span hashes, requires two
+      independent contexts per method, emits trigger/non-trigger/edge and
+      sibling-confusion tests, and hands one atomic candidate to `skill_manage`.
+      Raw transcript/OCR never becomes Skill instruction and direct install is
+      forbidden.
+- [ ] Accept one real long-form video method distillation: parse the full
+      source, compile at least two atomic methods, pass held-out routing tests,
+      install one experimental candidate, use it in a new production and seal
+      the publication retrospective.
 - [x] Parse and inspect the real user-owned `燧元纪` final delivery, compile its
       seven ordered segments and eight grammar domains, and install the enabled
       per-user experimental `suiyuan-cinematic-opening` Skill through
