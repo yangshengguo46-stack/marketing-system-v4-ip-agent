@@ -4,6 +4,20 @@ import ipaddress
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from deerflow.community import url_safety
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_public_dns(monkeypatch):
+    """Keep mocked tool tests independent from the developer's DNS/proxy."""
+    monkeypatch.setattr(
+        url_safety,
+        "resolve_host_addresses",
+        lambda _hostname: [ipaddress.ip_address("93.184.216.34")],
+    )
+
 
 class TestWebSearchTool:
     @patch.dict("os.environ", {}, clear=True)

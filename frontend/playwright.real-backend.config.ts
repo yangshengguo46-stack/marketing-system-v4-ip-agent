@@ -60,10 +60,11 @@ export default defineConfig({
         SKIP_ENV_VALIDATION: "1",
         DEER_FLOW_AUTH_DISABLED: "1",
         BETTER_AUTH_SECRET: "local-dev-secret",
-        // Leave NEXT_PUBLIC_* unset so the frontend uses its built-in
-        // next.config rewrites (same-origin proxy) instead of talking to the
-        // gateway cross-origin — cross-origin fetches drop the auth cookies.
-        // Just point that proxy at the replay gateway.
+        // Explicitly clear developer .env values so this suite always uses the
+        // same-origin rewrites instead of accidentally calling a local :8001
+        // gateway. Cross-origin fetches would also drop the auth cookies.
+        NEXT_PUBLIC_BACKEND_BASE_URL: "",
+        NEXT_PUBLIC_LANGGRAPH_BASE_URL: "",
         DEER_FLOW_INTERNAL_GATEWAY_BASE_URL: gatewayInternalUrl,
       },
     },

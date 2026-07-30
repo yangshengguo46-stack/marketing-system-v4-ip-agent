@@ -15,7 +15,7 @@ remains the only agent runtime. Provider scripts and the official MediaKit CLI
 are executors; the append-only Personal-IP production ledger remains the source
 of truth.
 
-`scripts/personal_ip_video_e2e.py` has two deliberately separate commands:
+`scripts/personal_ip_video_e2e.py` has three deliberately separate commands:
 
 - `local` runs a fully free acceptance. Seedream, Seedance and speech responses
   are simulated with project-local FFmpeg, while their receipts carry realistic
@@ -25,6 +25,9 @@ of truth.
 - `paid-checkpoints` writes four real-provider command checkpoints and marks
   every one `requires_explicit_user_approval: true` and `executed: false`. It
   never invokes a provider.
+- `ingest-real` verifies already-created real provider/finishing/QA receipts,
+  then idempotently seals them into an isolated Personal-IP production ledger.
+  It never makes a provider call.
 
 Every executor writes `personal-ip-media-execution-v1`. Successful local files
 are hashed at receipt creation; declared inputs and outputs are re-hashed before
@@ -88,6 +91,30 @@ Runtime evidence is intentionally ignored by Git under
 `.deer-flow/acceptance/video-e2e/`: `acceptance-summary.json`, input snapshots,
 verified outputs, immutable receipts and `ledger/deerflow.db`.
 
+## Minimal real provider acceptance
+
+The user explicitly approved a deliberately minimal paid batch on 2026-07-23.
+Exactly three paid calls were made: one Seedream image, one Seedance shot and
+one Doubao Speech narration. No cloud MediaKit call was needed.
+
+The accepted output is
+`.deer-flow/acceptance/live-volcengine-minimal-2026-07-23/paid-outputs/delivery.mp4`.
+It is a 486x864 exact 9:16 H.264/AAC file at 24 fps and 4.041667 seconds.
+Full decode, audio presence, first-frame SSIM and consecutive-frame checks
+passed. Its SHA-256 is
+`0bd45421ab26eb96a7d341e45535555efed94bf9bdcd7d6090ce6186bc9b7aa1`.
+
+The production
+`video-production-a702235bde4a42a8ab617730bc76eaa4` completed with 11
+append-only events. Re-running `ingest-real` returned the same production and
+event count. Seedance's provider task/request identifiers and Speech's request
+identifier are retained in the receipts. Actual RMB cost remains unknown
+because no authoritative billing endpoint is connected.
+
+This closes only the minimal one-shot generative acceptance. A full multi-shot
+`generative_cinematic` run, one real `faceless_material` run, reference-input
+coverage and the optional cloud MediaKit route remain open.
+
 ## Paid provider gate
 
 Do not run any command in this section until the active user session explicitly
@@ -105,7 +132,7 @@ for these checkpoints:
 | --- | --- | --- |
 | Seedream | `VOLCENGINE_API_KEY` and configured image model | one 9:16 preview image |
 | Seedance | `VOLCENGINE_API_KEY` and configured video model | one 2-second 9:16 preview clip |
-| Doubao Speech | `VOLCENGINE_TTS_APPID` and `VOLCENGINE_TTS_ACCESS_TOKEN` | one short voice-over |
+| Doubao Speech | `VOLCENGINE_TTS_API_KEY` (the local `VOLCENGINE_TTS_ACCESS_TOKEN` alias is also accepted) | one short voice-over; AppID is not required |
 | MediaKit cloud, optional | `MEDIAKIT_API_KEY` and `make volcengine-install` | one mux submission |
 
 Before approval, report exactly four possible paid calls, the table above, and
@@ -140,8 +167,9 @@ paid-generation acceptance without adding an unnecessary cloud finishing fee.
   format check still reports three unchanged baseline test files
   (`test_doctor.py`, `test_personal_ip_context.py`,
   `test_personal_ip_subject_repository.py`).
-- No Seedream, Seedance, speech or cloud MediaKit call was made during this
-  work. Only local build, FFmpeg, FFprobe and MediaKit execution occurred.
+- The original branch delivery made no paid calls. The later 2026-07-23
+  acceptance made exactly three approved calls: Seedream, Seedance and Speech.
+  Cloud MediaKit was not called.
 
 ## Merge
 

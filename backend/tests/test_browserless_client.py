@@ -10,6 +10,16 @@ from deerflow.community.browserless import tools
 from deerflow.community.browserless.browserless_client import BrowserlessClient, BrowserlessFetchResult, BrowserlessScreenshotResult
 
 
+@pytest.fixture(autouse=True)
+def _hermetic_public_dns(monkeypatch):
+    """Keep mocked tool tests independent from the developer's DNS/proxy."""
+    monkeypatch.setattr(
+        tools,
+        "_resolve_host_addresses",
+        lambda _hostname: [ipaddress.ip_address("93.184.216.34")],
+    )
+
+
 class AsyncMock(MagicMock):
     """Mock that supports async call."""
 

@@ -469,6 +469,14 @@ Scheduled-task runtime note:
 - `image_search/` - Image search via DuckDuckGo
 - `aio_sandbox/` - Docker-based isolation (`AioSandboxProvider`)
 - `browser_automation/` - Agentic browser control (stateful `navigate → observe → click/type` loop) via Playwright, distinct from the read-only `web_fetch`/`web_capture` tools. Tools: `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_get_text`, `browser_back`, `browser_screenshot`, `browser_close` (config `group: browser`). A process-local `BrowserSessionManager` owns one private, loop-affine Playwright event-loop thread (same pattern as the BoxLite provider) so a per-thread browser session survives across turns regardless of the caller's loop (Gateway / TUI / test). Each action returns a fresh page snapshot whose interactive elements are addressed by a stable numeric `[ref]` index (stamped as `data-df-ref` during snapshot), so the model acts on what it just observed instead of holding stale handles or guessing selectors. URLs are SSRF-screened via the shared `validate_public_http_url` (opt-out `allow_private_addresses` only for intentional internal targets). CDP attachment cannot install the request guard on an existing Chrome context, so `cdp_url` fails closed unless the operator explicitly sets `allow_unguarded_cdp: true` for a trusted local browser. Browser REST/Live access requires either an exact non-NULL thread owner or an exact owner-scoped active Personal-IP account; account Live sessions derive the profile only after ownership validation. Session admission is a hard `max_sessions` cap: pinned Live/operation sessions are never evicted, and a new thread is rejected when no unpinned session can be closed; one Live viewer owns a session at a time. Optional dependency: `cd backend && uv sync --extra browser && uv run playwright install chromium`; `scripts/detect_uv_extras.py` preserves the extra when `config.yaml` enables `browser_navigate`, and Gateway startup fails fast if configured browser control cannot import Playwright. Tests: `tests/test_browser_automation.py` (mocked tools + a real-Chromium integration test guarded by `importorskip`); `tests/manual_browser_live_check.py` is a manual DeepSeek-driven end-to-end check (not collected by pytest).
+  Personal-IP dashboard collection always navigates a logged-in account profile
+  to its registered creator dashboard and returns a fresh `observed_at`. Local
+  proxy RFC 2544 fake-IP answers for public creator hosts use the same narrow
+  URL-safety exception as Browser Control. A Playwright DOMContentLoaded timeout
+  may continue only into the ordinary same-platform URL/login/rendered-DOM
+  checks; never treat the timeout itself as successful collection. Douyin's
+  loading shell receives a longer bounded rendered-DOM polling window for
+  concurrent portfolio reads.
   Live UI input dispatch is kept independent from JPEG capture: non-move actions start a rate-limited background refresh loop, so pointer, wheel, or keyboard input stays responsive while continuous gestures still produce frames throughout the interaction.
 - `ui_tars/` - Default-off local desktop visual fallback. It never embeds Agent
   TARS or a second task loop: `ui_tars_desktop_step` is appended to built-ins
@@ -874,8 +882,17 @@ Gateway API endpoints and `DeerFlowClient` methods can modify MCP servers and sk
 make test
 
 # Run a specific test file
-PYTHONPATH=. uv run pytest tests/test_<feature>.py -v
+PYTHONPATH=. uv run python -m pytest tests/test_<feature>.py -v
 ```
+
+Use module-form `uv run python -m pytest` and `uv run python -m uvicorn` in
+operational scripts and new documentation. Generated console-script shebangs
+contain the checkout path and can become stale when a local source tree moves.
+
+Mocked web-tool unit tests must inject deterministic DNS results for public
+example hosts. Never make their success depend on the developer's resolver or
+transparent-proxy fake-IP mode; keep explicit private/link-local/metadata
+rejection cases as separate tests.
 
 ### Running the Full Application
 
@@ -1006,15 +1023,19 @@ a substitute for that evidence.
 MineContext is an observation source, not another harness. Its process-local
 lifecycle manager is `deerflow.personal_ip.minecontext.MineContextService` and
 is injected app → harness through `PersonalIPRuntimeServices`; harness code
-must not import `app.*`. Config is startup-only and default-off. Operator
-enablement does not grant owner consent, resume a prior process, or turn on
-capture. Routes under `/api/personal-ip/minecontext` own authorize/start/stop/
-revoke/delete controls. Native tools may only sync/read evidence and must not
-start capture or widen scope. Store state under `Paths.user_dir(owner) /
+must not import `app.*`. Config is startup-only and defaults on for the bundled
+Personal-IP product. The first workspace status read or native evidence request
+creates the full-purpose owner consent and starts bounded screen summaries;
+folder watching remains off until an exact directory exists. An inactive
+consent is an explicit owner opt-out and must never be auto-started again.
+Routes under `/api/personal-ip/minecontext` own authorize/start/stop/
+revoke/delete controls. Native tools may trigger the same idempotent default
+start but must not override an opt-out. Store state under `Paths.user_dir(owner) /
 "minecontext"` with private permissions. Only
 `personal-ip-local-context-evidence-v1` may cross into HLLM/preflight/retro;
 keep raw screenshots, document content, paths, embeddings and credentials out.
-Preflight evidence requires both `preflight` and `hllm_user_profile` consent.
+Preflight evidence requires both `preflight` and `hllm_user_profile` consent;
+both are present in the hidden product default.
 
 Migration `0008_personal_ip_preflights` and
 `deerflow.persistence.personal_ip_preflights` store immutable, owner-scoped
@@ -1168,6 +1189,12 @@ productions for one authenticated owner. The Gateway route and native
 `personal_ip_operating_cockpit` tool must share it. It is intentionally
 portfolio-wide, returns explicit pending ids, and labels history truncation;
 never reconstruct this state from a conversation or add an account filter.
+The public `personal-ip-operator` skill explicitly declares its native
+`personal_ip_*`, browser, UI-TARS and file/media tools because MediaKit skills
+activate the restrictive `allowed-tools: [bash]` policy. Their union must keep
+the production ledger visible. A `sequential_human_gate` production may submit
+only the current shot; after candidate QA it records a candidate-selection
+review request and waits for an approved workbench review before the next shot.
 
 Migration `0015_personal_ip_video_productions` owns one immutable production
 request plus an append-only event ledger. Registered event types map to the
@@ -1183,6 +1210,22 @@ declared inputs and outputs are re-hashed. Native
 `personal_ip_begin_video_production`,
 `personal_ip_record_video_production_event` and
 `personal_ip_read_video_production` are the DeerFlow execution surface.
+`personal_ip_compile_video_timeline_revision` is the only typed edit-decision
+surface for both conversational Agent edits and direct workbench edits. It
+seals a complete video/dialogue/music/subtitle snapshot plus typed operations
+as `timeline_revision_compiled`; earlier candidates and revisions are
+append-only. The Gateway
+`POST /api/personal-ip/video-productions/{production_id}/timeline-revisions`
+uses the same pure compiler. UI drag state must stay local until one deliberate
+save and must never become a projection table.
+Generated-shot QA also measures near-duplicate transitions, longest stalled
+runs and frame-delta cadence. Motion gates are opt-in so intentional static
+shots are not rejected. For a continuous-motion shot, the agent may set a
+target playback FPS and then use `personal_ip_interpolate_video_candidate`
+only when QA recommends it. That native tool verifies the source candidate
+receipt, runs project-pinned FFmpeg `minterpolate` motion compensation off the
+event loop, and appends a new `shot_generation_completed` candidate. It never
+overwrites the source; the derivative requires fresh QA and human selection.
 `deerflow.personal_ip.video_workbench.build_video_workbench_read_model` folds
 that same immutable event list into the owner-scoped Gateway
 `GET /api/personal-ip/video-productions/{production_id}/workbench` response.
@@ -1190,6 +1233,12 @@ It is a projection only: do not persist it, add a second lifecycle, or infer
 provider success from UI state. Candidate approval may be reflected from a
 matching `review_recorded` receipt, while all execution and recovery remains in
 the native begin/event/read tools.
+The owner-scoped
+`GET /api/personal-ip/video-productions/{production_id}/artifacts/{sha256}`
+route may resolve checksummed local media from execution `artifact`/`outputs`
+or from a compiled asset manifest's `assets`. Manifest entries use
+`source_ref`, may omit `mime_type`, and must still pass the same owner sandbox
+boundary plus an on-disk SHA-256 verification before streaming.
 
 `PersonalIPMetricCollectionService` assigns official Douyin snapshots a stable
 post series. When a strictly older snapshot exists, it writes a separate exact
@@ -1197,6 +1246,23 @@ interval `delta` from monotonic counter differences. The delta is always
 `partial` because one tracked post is not account-wide coverage; missing and
 decreasing counters remain coverage metadata. The first snapshot is a baseline
 only and must not be aggregated as a daily total.
+
+`deerflow.persistence.personal_ip_brand` owns the subject-level operating
+strategy. `personal_ip_strategy_versions` is the immutable truth: person
+evidence, business design, real benchmarks, positioning
+alternatives, launch package and pilot validation advance one stage at a time.
+The default mode is `monetization_first`; `influence_first` is explicit and
+still requires reserved monetization paths. Historical retired tables may
+remain physically present for migration compatibility, but repositories,
+routers, context, preflight and customer UI must not expose or consume them.
+Native preflight resolves the latest launch-ready strategy for every subject
+and strips local ids before the provider request.
+`deerflow.personal_ip.strategy_methodology` owns the private stage prerequisites
+and `personal_ip_record_strategy` is the normal native write surface. The
+customer must never receive a fixed questionnaire, stage name or internal
+dimension list. The agent asks one relevant natural question at a time, reuses
+existing evidence and does not claim completion before a real pilot and
+validation decision.
 
 Personal-IP browser-first operation uses
 `deerflow.personal_ip.browser_profiles`. The native selection tool validates
@@ -1208,10 +1274,14 @@ to filter portfolio context, metrics, tools or memory. General browsing without
 an account selection remains thread-scoped. A configured CDP browser and a
 persistent account profile are mutually exclusive for one session. The
 account-scoped WebSocket route under `/api/personal-ip/accounts/{id}/browser`
-is the manual-login surface for the operating portfolio; it must resolve an
-active owner-scoped account before creating the profile path, seeds only the
-registered platform URL and shares the exact same account session key as the
-agent tools. Conservative host/path rules may emit one
+owns the manual-login lifecycle for the operating portfolio; it must resolve an
+active owner-scoped account before creating the profile path, seed only the
+registered platform URL and share the exact same account session key as the
+agent tools. On a local graphical desktop it launches a real headed persistent
+Chromium and does not screencast or proxy input; without a graphical desktop it
+falls back to the embedded Live stream. Closing the local login socket closes
+the headed session and flushes its profile so later headless agent tools can
+reopen the same login state. Conservative host/path rules may emit one
 `account_authenticated` event so the UI can close the login dialog; never use
 cookie or token values for that client event. Chromium and server connectors
 still use credentials internally. After login, Browser Control may extract

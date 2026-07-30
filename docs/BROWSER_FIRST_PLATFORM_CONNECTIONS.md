@@ -85,16 +85,21 @@ minimal local account slot and immediately opens the real platform page. Each
 existing account has its own login/open action, so multiple accounts on one
 platform never share a browser profile.
 
-The Live route emits only an `account_authenticated` boolean event when a
-conservative platform URL rule recognizes successful login. The Web UI closes
-the login dialog automatically. This small event does not limit what the agent
-may collect afterward through Browser Control or an official API.
+The account browser route first emits a presentation mode. On a local graphical
+desktop it opens a real headed Chromium window (`native_window`); on a server
+without a display it falls back to the embedded Live stream
+(`embedded_stream`). It emits only an `account_authenticated` boolean event when
+a conservative platform URL rule recognizes successful login. The Web UI then
+closes the login dialog and the local headed window automatically. This small
+event does not limit what the agent may collect afterward through Browser
+Control or an official API.
 
 ## Runtime contract
 
-1. The account-scoped Live route validates the authenticated owner and active
+1. The account-scoped browser route validates the authenticated owner and active
    account before deriving the persistent profile directory. It does not create
-   or depend on a chat thread.
+   or depend on a chat thread. Local login uses a native persistent Chromium
+   window; the screenshot/input stream is only a no-display deployment fallback.
 2. `personal_ip_select_browser_account(account_id)` validates that the account
    belongs to the authenticated user and selects it as the concrete browser
    target for the current thread.

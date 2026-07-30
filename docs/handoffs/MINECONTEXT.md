@@ -7,10 +7,10 @@ Baseline: `3e56b0a36406c53070a37500278f6b64570be519`
 ## Outcome
 
 MineContext is a native Personal-IP local observation source while DeerFlow
-remains the only agent brain. The integration is operator-disabled by default,
-does not auto-start or resume capture, and requires a separate owner consent
-plus explicit Start action. It exposes owner-visible status, scope/purpose,
-retention, stop, revoke, evidence deletion and complete local-data deletion.
+remains the only agent brain. The integration now ships enabled and
+automatically starts bounded screen summaries for a new owner. An explicit
+Settings opt-out persists across page loads. The customer surface exposes only
+status, retention, disable/re-enable and complete local-data deletion.
 
 ## Upstream and license evidence
 
@@ -38,26 +38,26 @@ minecontext-doctor` verifies that the runtime resolves back to that source.
 ## Lifecycle and privacy boundary
 
 Startup config is `minecontext` in `config.example.yaml` and defaults to
-`enabled: false`. Gateway startup constructs only the lifecycle manager; it
-does not spawn MineContext. Per-owner state lives under
+`enabled: true`. `make install` builds the isolated runtime. The first workspace
+status request or native evidence operation starts a new owner's bounded screen
+summary sidecar; an explicit opt-out remains off. Per-owner state lives under
 `.deer-flow/users/<owner>/minecontext` with `0700` directories and `0600`
 files. A process binds only to loopback and uses a per-start random API key that
 is never returned to the frontend or model.
 
-The normal UI uses manual mode, so screenshots and file watchers remain off.
-The advanced API permits bounded continuous file watching only for explicit
-existing absolute directories, with recursion explicit and `initial_scan:
-false`. Continuous screen mode additionally requires a separate confirmation,
-at least a 60-second interval, and the literal target `all_displays`, matching
-what this upstream pin can actually enforce. Broad root/home-directory watches
-are rejected.
+The product default uses bounded continuous screen summaries at no less than a
+60-second interval and the literal target `all_displays`, matching what this
+upstream pin can actually enforce. Folder watching remains off when no exact
+directory is configured; configured paths must be existing absolute directories
+and broad root/home-directory watches are rejected.
 
 The generated upstream config disables MineContext consumption, content
 generation, completion, web search tools and cross-context merging. Only
 MineContext's processed vector-search summary endpoint is bridged into
-DeerFlow. The child environment is an allowlist plus six explicitly named
-`MINECONTEXT_*` provider settings; the Gateway's other credentials are not
-inherited.
+DeerFlow. The child environment is an allowlist. It reuses
+`VOLCENGINE_API_KEY` for the default Doubao vision and embedding models; six
+`MINECONTEXT_*` settings remain optional overrides. Other Gateway credentials
+are not inherited.
 
 ## Evidence contract and downstream flow
 
@@ -77,8 +77,9 @@ redacted before persistence. Retention pruning occurs on status, store and
 read; evidence is owner-isolated and unavailable after revoke.
 
 Native DeerFlow tools are `personal_ip_minecontext_sync` and
-`personal_ip_minecontext_evidence`. They cannot start capture or expand
-consent, and they have no account/thread filter. Selected evidence can enter
+`personal_ip_minecontext_evidence`. For a new owner they may idempotently
+apply the product default and start the sidecar; they never override a user's
+explicit opt-out and have no account/thread filter. Selected evidence can enter
 the HLLM `user_profile` only as
 `personal-ip-hllm-context-evidence-v1`, marked
 `observational_partial_revisable`. A preflight requires both `preflight` and
@@ -90,6 +91,7 @@ request, and carries the same allowlisted projection into its retrospective.
 Owner-authenticated routes:
 
 - `GET /api/personal-ip/minecontext`
+- `POST /api/personal-ip/minecontext/enable`
 - `POST /api/personal-ip/minecontext/authorize`
 - `POST /api/personal-ip/minecontext/start`
 - `POST /api/personal-ip/minecontext/stop`
@@ -97,10 +99,11 @@ Owner-authenticated routes:
 - `POST /api/personal-ip/minecontext/sync`
 - `DELETE /api/personal-ip/minecontext/data?scope=evidence|all`
 
-The Personal-IP workspace renders the distinction between operator
-availability, owner authorization and actual running state. New forms select
-no scope or purpose by default and show the raw-data exclusion, retention,
-evidence count and deletion semantics.
+Every workspace mounts a lightweight status bootstrap. For a new owner it
+applies all Personal-IP scopes and purposes and starts the isolated sidecar.
+Settings exposes only status, retention, persistent disable/re-enable, evidence
+count and deletion semantics; internal scope and purpose identifiers are not
+customer controls.
 
 ## Packaging and verification
 
@@ -108,8 +111,8 @@ The source-package required-path contract includes the MineContext verifier,
 LICENSE, NOTICE, README, version manifest, packaging metadata, CLI and search
 boundary. Package smoke extraction runs `minecontext_source.py verify` without
 installing dependencies or accessing credentials. Clean install therefore
-contains the complete source while keeping the optional runtime uninstalled and
-capture off. `make doctor` verifies the source pin; when operator-disabled it
+contains the complete source, and normal `make install` builds the isolated
+runtime required by the default-on product. `make doctor` verifies the source pin; when operator-disabled it
 does not require a runtime or provider credentials, and when enabled it reports
 only missing variable names, never their values.
 
@@ -143,14 +146,14 @@ Final command results are recorded here before branch handoff:
 No automated test grants OS capture permission or reads real private data.
 Before production enablement, a human owner must:
 
-1. review the exact scopes, purposes and retention period in the UI;
-2. if enabling continuous screen capture through the advanced API, confirm
-   that `all_displays` genuinely matches the intended scope and approve the OS
+1. confirm the default status is visible in Settings and approve the OS
    screen-recording prompt;
+2. confirm that the default `all_displays` target genuinely matches the
+   intended scope;
 3. if enabling file watching, choose a dedicated fixture/test directory and
    confirm no parent, home or unrelated directory is traversed;
-4. start and stop the sidecar, restart Gateway, and confirm it does not
-   auto-resume;
+4. disable the feature, restart Gateway, and confirm the explicit opt-out does
+   not auto-resume; then re-enable it once from Settings;
 5. revoke authorization and verify runtime/raw data disappears while sealed
    summaries follow the displayed deletion choice;
 6. inspect one real processed result to confirm only the minimized contract

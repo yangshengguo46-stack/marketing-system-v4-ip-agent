@@ -127,6 +127,32 @@ FastAPI application providing REST endpoints for frontend integration:
 | `GET /api/threads/{id}/uploads/list` | List uploaded files |
 | `DELETE /api/threads/{id}` | Delete DeerFlow-managed local thread data after LangGraph thread deletion; unexpected failures are logged server-side and return a generic 500 detail |
 | `GET /api/threads/{id}/artifacts/{path}` | Serve generated artifacts |
+| `GET /api/personal-ip/video-productions/{id}/workbench` | Project the immutable video ledger into the four-stage workbench |
+| `GET /api/personal-ip/video-productions/{id}/artifacts/{sha256}` | Stream an owner-scoped, hash-verified media artifact recorded in an execution receipt or asset manifest |
+| `POST /api/personal-ip/video-productions/{id}/timeline-revisions` | Server-compile one shared human/agent edit snapshot and append it to the video ledger |
+Personal-IP operating strategy belongs to a subject, not a platform account.
+Its immutable repository requires person evidence, a buyer/problem/offer/conversion
+model, real benchmark coverage, two or three positioning alternatives, a
+name/avatar/bio launch package, pilot evidence and a validation decision.
+Monetization-first is the default; influence-first remains available only as
+an explicit mode and still preserves monetization options. Preflight loads the
+latest launch-ready strategy server-side; callers cannot inject a parallel
+creator/audience profile.
+
+Browser-first account status reads navigate each logged-in profile to its
+registered creator dashboard and seal a new observation with `observed_at`.
+Public creator hosts may resolve through a local proxy's RFC 2544 fake-IP range;
+the collector applies Browser Control's narrow public-host exception while
+continuing to reject private, loopback and metadata targets. A creator SPA that
+renders despite a DOMContentLoaded timeout remains collectible only after the
+normal same-platform URL, login-state and rendered-DOM checks succeed.
+
+Personal-IP generated-shot QA includes motion-cadence evidence in addition to
+decode, anchor and cut checks. The native
+`personal_ip_interpolate_video_candidate` tool can create a separate 48/60fps
+candidate with the project-pinned FFmpeg motion-compensation filter. It accepts
+only a checksummed successful candidate and never replaces the source; the
+result must be QA'd and selected normally.
 
 ### IM Channels
 
@@ -454,8 +480,13 @@ the only execution path, which keeps operational mistakes off the table. See
 ### Testing
 
 ```bash
-uv run pytest
+uv run python -m pytest
 ```
+
+The Make targets and local launchers use module-form Python entrypoints
+(`python -m pytest`, `python -m uvicorn`). This keeps normal commands usable
+after the repository directory is moved even before ignored virtualenv console
+scripts are rebuilt.
 
 `make detect-blocking-io` statically scans backend business code for blocking
 IO that may run on the backend event loop and is not test-coverage-bound. It

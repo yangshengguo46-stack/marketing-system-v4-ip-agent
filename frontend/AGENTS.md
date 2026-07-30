@@ -39,7 +39,15 @@ sets it false and explicitly denies the existing `esbuild`, `sharp`, and
 source clean-install gate further lowers registry concurrency and applies one
 bounded network retry; ordinary frontend commands keep their normal defaults.
 
-E2E tests live under `tests/e2e/` and use Playwright with Chromium. They mock all backend APIs via `page.route()` network interception and test real page interactions (navigation, chat input, streaming responses). Config: `playwright.config.ts`.
+E2E tests under `tests/e2e/` use Playwright with Chromium and mock backend APIs
+through `page.route()`; their production build startup budget is 300 seconds.
+Cross-stack contracts live under `tests/e2e-real-backend/` and run a real
+Next.js server against a real Gateway with temporary migrated SQLite and a
+deterministic replay model:
+`pnpm exec playwright test -c playwright.real-backend.config.ts`. The
+real-backend config must explicitly clear `NEXT_PUBLIC_BACKEND_BASE_URL` and
+`NEXT_PUBLIC_LANGGRAPH_BASE_URL` so developer `.env` files cannot bypass its
+same-origin temporary Gateway.
 
 ## Architecture
 
@@ -85,7 +93,14 @@ Auth UI note: the login page's "keep me signed in" option submits only `remember
 
 Human input requests are a structured message protocol layered on normal chat history. The backend writes request payloads to `ToolMessage.artifact.human_input`, `src/core/messages/human-input.ts` owns the runtime validators/types, and `src/components/workspace/messages/human-input-card.tsx` renders the reusable card. `MessageList` owns answered/latest/pending state for visible cards, but derives answered responses from raw `thread.messages` because replies are hidden; pending cards clear when the hidden reply appears, when dispatch is dropped, or when a new `thread.error` reports an async stream failure. Page-level submit callbacks must send a normal human message and put `hide_from_ui: true` plus the response payload in the fourth `sendMessage(..., options)` argument as `options.additionalKwargs`; the third argument remains run context such as `{ agent_name }`. Composer entry points should disable normal bottom input while `hasOpenHumanInputRequest(...)` is true so users answer through the card and preserve response metadata.
 
-Tool-calling AI messages can contain user-visible text as well as `tool_calls`. `core/messages/utils.ts` keeps these turns in an `assistant:processing` group, and `components/workspace/messages/message-group.tsx` must render the visible text as a processing step instead of treating the message as only tool metadata. This preserves provider text such as error explanations or "trying another approach" notes during tool-heavy runs.
+Tool-calling AI messages stay in an `assistant:processing` group, but the
+customer UI must not render their free-form assistant text, raw reasoning, raw
+tool names, Skill names, commands or local paths. `message-list.tsx` mounts
+`MessageGroup` for that group; `message-group.tsx` projects only allowlisted
+customer-safe activity labels from `core/tools/utils.ts` and shows the generic
+thinking label before the first useful tool call arrives. Keep this processing
+surface live during long browser/model operations so the product never appears
+frozen, while implementation detail remains hidden.
 
 ### Key Patterns
 
@@ -103,36 +118,119 @@ Tool-calling AI messages can contain user-visible text as well as `tool_calls`. 
   the fixed browser-platform registry. It also owns the versioned operating
   cockpit query for the six-stage business loop and nine-stage video line;
   account/subject mutations must invalidate that cockpit query.
+  `/workspace/dashboard` is the customer-facing owner-wide operating read
+  model and its sidebar entry stays immediately above `新对话`. It may aggregate
+  only persisted `window_total`/`delta` observations, must keep missing
+  coverage distinct from zero and may mark paid-traffic review candidates only
+  after at least three same-platform post samples. The CTA starts evaluation;
+  it never starts spend.
   `/workspace/personal-ip` always renders
   all eight supported platforms; `src/components/workspace/personal-ip/` owns
   account editing and the manual-login dialog. Account login uses the
-  account-scoped Browser Live socket, never a synthetic chat thread. Empty
-  platforms create a minimal account slot before opening login; QR, CAPTCHA and
-  MFA remain user actions. An `account_authenticated` stream event closes the
-  login dialog and shows success; it carries no credential or business-data
-  payload. The portfolio derives the customer-facing 未添加 / 待登录 / 已登录 /
+  account-scoped browser lifecycle socket, never a synthetic chat thread.
+  `native_window` presentation is the normal local path and shows only a compact
+  status dialog while the user operates the real Chromium window;
+  `embedded_stream` is the no-display server fallback. Empty platforms create a
+  minimal account slot before opening login; QR, CAPTCHA and MFA remain user
+  actions. An `account_authenticated` stream event closes the login dialog and
+  shows success; it carries no credential or business-data payload. The
+  portfolio derives the customer-facing 未添加 / 待登录 / 已登录 /
   采集受限 / 可执行 states from non-secret account metadata and records only a
   non-secret login marker after that event. Later detailed collection remains an
   agent/browser responsibility.
-  The same workspace renders the MineContext control surface. It must keep
-  operator availability distinct from owner consent and running state, default
-  every new consent form to no selected scope/purpose, and never imply that
-  authorization alone starts capture. Show retention, evidence count,
-  stop/revoke/delete controls and the raw-data exclusion copy. The normal UI
-  stays in manual mode; continuous screen/file collection must not be added
-  without an equally explicit bounded-scope confirmation flow.
+  Settings renders MineContext in the dedicated `本地上下文` section; the
+  operating portfolio must not duplicate it. This control surface must keep
+  operator availability distinct from owner consent and running state. The
+  customer UI exposes one enable action rather than scope/purpose checkboxes:
+  new owners receive every supported scope and Personal-IP purpose and the
+  workspace bootstrap starts the local runtime automatically. Internal purpose
+  ids such as `hllm_user_profile` must never be rendered. Show retention,
+  evidence count, one persistent opt-out action and one all-local-data deletion
+  action. The product default enables bounded screen summaries, while file
+  watching remains off unless an exact directory is configured.
+  The Skill catalog is not a customer surface: omit the Skills Settings
+  section, Skill autocomplete/chips, agent Skill badges, and internal Skill
+  tool/path steps from conversations, subtask timelines, copy and exports.
+  Keep built-in slash commands such as `/goal` and `/compact`; internal Skill
+  execution and persistence remain unchanged.
   Never accept or cache an expanded account record as run authority; the Gateway
-  resolves it again for the authenticated owner. Keep this page a thin status
-  and account surface: DeerFlow conversation tools create and advance business
+  resolves it again for the authenticated owner. Keep the portfolio page a thin
+  subject and account surface: DeerFlow conversation tools create and advance business
   or video workflows instead of duplicating them as form-heavy applications.
-  `/workspace/personal-ip/video` is the dedicated read-oriented video
-  workbench. `core/personal-ip/video-productions.ts` owns its list/read-model
-  queries and confirmation mutation. The page must display evidence from the
+  The account editor contains only subject assignment, platform identity and
+  login metadata. Never restore per-account audience, promise, content-pillar,
+  voice or business-goal fields: canonical operating strategy is subject-level
+  and versioned. First-use person/business discovery, benchmark research,
+  positioning alternatives, name/avatar/bio decisions and pilot validation
+  belong to the natural Agent conversation and private backend strategy ledger;
+  never add a questionnaire, stage-field inspector or “建模完成” shortcut to
+  the customer UI. The operating dashboard shows useful business outcomes and
+  queues, not private strategy documents or a second editable modeling form.
+  Video production is task-native rather than a global customer page.
+  `personal_ip_begin_video_production` records the current DeerFlow
+  `thread_id`; `/workspace/chats/[thread_id]` detects that owner-scoped binding
+  and replaces the ordinary chat canvas with the human/agent workbench. Each
+  new video therefore starts in a new conversation and returns to the same
+  workbench through normal thread history. The legacy
+  `/workspace/personal-ip/video` route remains only for old local projects to
+  bind their previously persisted thread; it must not appear in the sidebar or
+  dashboard and must not become a global project switcher again.
+  `core/personal-ip/video-productions.ts` owns its list/read-model,
+  confirmation and server-compiled timeline-revision mutations. The page must
+  display evidence from the
   immutable production ledger—including provider/model/task ids, cost state,
   failures, retries, artifact hashes and QA—without exposing credentials or
-  inventing client state. Only candidate selection, real paid calls and real
-  publishing are meaningful confirmations; evidence promotion stays automatic.
-  Recovery actions send the user back to DeerFlow and its native video tools.
+  inventing durable client state. Its director layout folds the nine-stage ledger into
+  four user-facing stages (`设定 → 分镜 → 剪辑 → 成片`), with shots on
+  the left, preview/version/instruction and timeline in the center, and project
+  references on the right. Mount exactly one editable timeline in the lower
+  dock, and only during the edit stage; setup, storyboard and delivery never
+  mount it. In the edit stage the upper canvas is a render monitor and revision
+  summary, while the lower dock exposes all manual and Agent edit controls. Do
+  not expose a separate pipeline shortcut rail: picture, sound
+  and QA capabilities are selected internally by the Agent through the same
+  controlled composer. Hide both side rails in the edit stage so the preview
+  and timeline use the recovered width; users return to storyboard for shot
+  regeneration or setup for character, scene and style changes. The
+  selected clip uses Jianying-style direct manipulation: move it by dragging
+  the clip body and trim it by dragging either edge. Do not mount a selected
+  clip status/toolbar row, a persistent numeric inspector or a second
+  `TimelineEditor`; version, transition, volume and text changes go through
+  the Agent. Keep one Agent composer in that edit surface. Do not ask the user for a
+  second free-text "manual revision note"; derive its immutable receipt intent
+  from the typed operations. Shot and timeline prompts use a persistent native
+  `ip-agent` thread with production/target context; ids select one operation
+  and never scope conversation authority. Manual drag/trim/split/copy/delete/
+  volume/caption changes remain local drafts until Save, then compile through
+  the same `timeline_revision_compiled` contract as Agent edits. Never persist
+  pointer movement or overwrite earlier candidates/revisions. Only candidate
+  selection, real paid calls and real publishing are meaningful confirmations;
+  evidence promotion stays automatic. Candidate version tiles must remain
+  directly previewable before selection. The smooth-motion action only
+  pre-fills the native Agent workflow: measure cadence first, create a separate
+  motion-compensated candidate only when recommended, then re-run QA and let
+  the user compare versions.
+  Setup is also a candidate work surface: its left rail lists only character,
+  scene, prop and image artifacts (never document/video receipts), the selected
+  asset version is previewed centrally, and its persistent `ip-agent` composer
+  carries `target=setup` plus the selected asset identity. Generated versions
+  stay append-only and enter the production through standard media receipts;
+  adoption updates the asset manifest only after the user chooses a version.
+  Keep adopt, user-library and new-version shortcuts hidden on each left-rail
+  thumbnail until hover/focus; do not duplicate those actions below or over the
+  central preview.
+  Storyboard keeps the selected-shot Agent composer pinned at the bottom of the
+  central work surface. Do not expose the raw shot-contract or continuity-
+  evidence accordion there; the Agent continues to consume those records
+  internally, while generation tasks and candidate confirmation remain
+  available through their focused views.
+  Hide the timeline dock throughout setup and storyboard. The setup Agent
+  composer and the storyboard shot composer are their only bottom editing
+  controls.
+  Delivery is a full-width viewer, not another editor or evidence console.
+  Hide both side rails and the timeline dock; expose only the final player and
+  one `保存到本地` action. Delivery QA, contract versions, raw refs, hashes and
+  publish checkpoints remain internal or in receipts.
 - `src/app/workspace/chats/[thread_id]/page.tsx` owns branch-from-turn submission and navigation; sidecar `MessageList` instances do not receive the branch action.
 - `src/app/workspace/chats/[thread_id]/page.tsx` gates the Workspace Browser trigger and browser right panel on `/api/features -> browser_control.enabled`; default/failed feature discovery hides the browser control so optional backend installs do not show a dead Live socket.
 - `src/app/workspace/chats/[thread_id]/page.tsx` and `src/app/workspace/agents/[agent_name]/chats/[thread_id]/page.tsx` own active-goal display state for their composer overlays.
@@ -172,6 +270,8 @@ When adding features:
 
 1. Follow the established `src/` structure
 2. Add TypeScript types and proper error handling
-3. Write unit tests under `tests/unit/` (`pnpm test`) and E2E tests under `tests/e2e/` (`pnpm test:e2e`)
+3. Write unit tests under `tests/unit/` (`pnpm test`), mocked browser scenarios
+   under `tests/e2e/` (`pnpm test:e2e`), and cross-stack contracts under
+   `tests/e2e-real-backend/`
 4. Run `pnpm check` before committing
 5. Update this `AGENTS.md` when architecture, commands, or conventions change

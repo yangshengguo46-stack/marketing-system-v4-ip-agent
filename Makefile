@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify ip-clean-install personal-ip-publish-acceptance video-e2e-local video-e2e-paid-checkpoints volcengine-install volcengine-doctor hllm-doctor hllm-lite ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-package ip-package-verify ip-clean-install personal-ip-publish-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor hllm-lite ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 PNPM ?= pnpm
@@ -28,6 +28,8 @@ help:
 	@echo "  make personal-ip-publish-acceptance - Run local-only eight-platform publish recovery checks"
 	@echo "  make video-e2e-local - Run/resume the free local video delivery acceptance"
 	@echo "  make video-e2e-paid-checkpoints - Write paid media commands without running them"
+	@echo "  make video-renderers-install - Install exact source-owned HyperFrames dependencies"
+	@echo "  make video-renderers-verify - Verify renderer source, lock and installed versions"
 	@echo "  make ip-clean-install - Validate the source archive in a credential-free clean room"
 	@echo "  make volcengine-install - Build the pinned AI MediaKit CLI from source"
 	@echo "  make volcengine-doctor  - Check the source-built AI MediaKit CLI"
@@ -39,8 +41,8 @@ help:
 	@echo "  make ui-tars-status     - Show sanitized UI-TARS lifecycle and health status"
 	@echo "  make ui-tars-doctor     - Check source, config, connection and desktop permissions"
 	@echo "  make minecontext-verify - Verify pinned Apache-2.0 MineContext source"
-	@echo "  make minecontext-install - Install an isolated runtime from vendored source"
-	@echo "  make minecontext-doctor - Verify source/runtime linkage (never starts capture)"
+	@echo "  make minecontext-install - Reinstall the bundled runtime from vendored source"
+	@echo "  make minecontext-doctor - Verify source/runtime and provider readiness"
 	@echo "  make douyin-metrics-smoke - Query authorized Douyin video metrics"
 	@echo "  make ffmpeg-toolchain   - Build pinned project-local FFmpeg with subtitles"
 	@echo "  make mediakit-toolchain - Install a pinned project-local Go toolchain"
@@ -98,6 +100,12 @@ video-e2e-local:
 video-e2e-paid-checkpoints:
 	@$(BACKEND_UV_RUN) python ../scripts/personal_ip_video_e2e.py paid-checkpoints --work-dir "$(abspath $(VIDEO_E2E_DIR))"
 
+video-renderers-install:
+	@$(PYTHON) ./scripts/install_video_renderers.py
+
+video-renderers-verify:
+	@node ./product/video-renderers/verify-pins.mjs
+
 ip-clean-install:
 	@$(PYTHON) ./scripts/clean_install_ip_agent.py
 
@@ -111,7 +119,7 @@ hllm-doctor:
 	@$(PYTHON) ./scripts/hllm_creator_source.py
 
 hllm-lite:
-	@cd backend && uv run uvicorn app.audience_lite.app:app --host 127.0.0.1 --port 9128
+	@cd backend && uv run python -m uvicorn app.audience_lite.app:app --host 127.0.0.1 --port 9128
 
 ui-tars-install:
 	@$(BACKEND_UV_RUN) python ../scripts/ui_tars_operator.py install
@@ -178,11 +186,13 @@ check:
 install:
 	@echo "Installing backend dependencies..."
 	@cd backend && uv sync
+	@echo "Installing bundled MineContext runtime..."
+	@$(PYTHON) ./scripts/minecontext_source.py install
 	@echo "Installing frontend dependencies..."
 	@cd frontend && $(PNPM) install
 	@echo "Installing repository-only developer hooks..."
 	@$(PYTHON) ./scripts/install_dev_hooks.py
-	@echo "✓ All dependencies installed"
+	@echo "✓ All dependencies and local context runtime installed"
 	@echo ""
 	@echo "=========================================="
 	@echo "  Optional: Pre-pull Sandbox Image"

@@ -29,6 +29,7 @@ def _source_repo(tmp_path: Path) -> Path:
     shutil.copytree(
         real_root / "third_party" / "volcengine" / "MineContext",
         root / "third_party" / "volcengine" / "MineContext",
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
     )
     for relative in REQUIRED_PACKAGE_PATHS:
         if relative.startswith("third_party/volcengine/MineContext/"):
@@ -39,7 +40,15 @@ def _source_repo(tmp_path: Path) -> Path:
             path.write_bytes((real_root / relative).read_bytes())
         else:
             path.write_text("source\n", encoding="utf-8")
-    extra = root / "backend" / "packages" / "harness" / "deerflow" / "personal_ip" / "module.py"
+    extra = (
+        root
+        / "backend"
+        / "packages"
+        / "harness"
+        / "deerflow"
+        / "personal_ip"
+        / "module.py"
+    )
     extra.parent.mkdir(parents=True, exist_ok=True)
     extra.write_text("VALUE = 1\n", encoding="utf-8")
     _git(root, "init")
@@ -51,7 +60,9 @@ def _source_repo(tmp_path: Path) -> Path:
     return root
 
 
-def test_source_package_is_deterministic_verified_and_smoke_installable(tmp_path) -> None:
+def test_source_package_is_deterministic_verified_and_smoke_installable(
+    tmp_path,
+) -> None:
     root = _source_repo(tmp_path)
     (root / ".env").write_text("SECRET=must-not-ship\n", encoding="utf-8")
     output_one = tmp_path / "one.tar.gz"
@@ -62,7 +73,10 @@ def test_source_package_is_deterministic_verified_and_smoke_installable(tmp_path
     manifest = verify_source_package(output_one)
     smoke_test_source_package(output_one)
 
-    assert hashlib.sha256(output_one.read_bytes()).digest() == hashlib.sha256(output_two.read_bytes()).digest()
+    assert (
+        hashlib.sha256(output_one.read_bytes()).digest()
+        == hashlib.sha256(output_two.read_bytes()).digest()
+    )
     tracked_count = len(
         subprocess.run(
             ["git", "ls-files"],
@@ -74,7 +88,9 @@ def test_source_package_is_deterministic_verified_and_smoke_installable(tmp_path
     )
     assert manifest["file_count"] == tracked_count
     assert not any(item["path"] == ".env" for item in manifest["files"])
-    checksum = output_one.with_suffix(output_one.suffix + ".sha256").read_text(encoding="utf-8")
+    checksum = output_one.with_suffix(output_one.suffix + ".sha256").read_text(
+        encoding="utf-8"
+    )
     assert hashlib.sha256(output_one.read_bytes()).hexdigest() in checksum
 
 

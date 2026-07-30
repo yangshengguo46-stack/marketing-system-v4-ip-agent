@@ -93,7 +93,7 @@ fi
 
 # ── Hand off to uvicorn ─────────────────────────────────────────────────────
 
-PYTHONPATH=. exec uv run uvicorn app.gateway.app:app \
+PYTHONPATH=. exec uv run python -m uvicorn app.gateway.app:app \
     --host 0.0.0.0 --port 8001 \
     --reload \
     --reload-include='*.yaml' \

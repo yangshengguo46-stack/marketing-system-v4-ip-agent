@@ -20,8 +20,9 @@ ByteDance/Volcengine stack as its default capability layer.
 UI-TARS is a default-off, source-auditable local computer organ. DeerFlow calls
 it for one visual desktop step only after native Browser Control cannot finish
 the work or a native desktop application is genuinely required; Agent TARS is
-not included. MineContext is a native but default-off local observation source;
-it never replaces DeerFlow as the agent brain. AgentKit is not used as the
+not included. MineContext is a native, default-on local observation source with
+a persistent Settings opt-out; it never replaces DeerFlow as the agent brain.
+AgentKit is not used as the
 runtime because it duplicates DeerFlow in the cloud. Data Agent is not part of
 the distribution.
 
@@ -46,8 +47,21 @@ make volcengine-install
 make volcengine-doctor
 ```
 
-To verify or install the exact MineContext source runtime (this does not start
-capture):
+To install the exact local source-renderer dependencies:
+
+```bash
+make video-renderers-install
+make video-renderers-verify
+```
+
+HyperFrames 0.7.57 is the default interactive renderer. Remotion 4.0.488 is
+also enabled for MVP validation and renders deterministic PNG frames through
+software Chromium before project-local FFmpeg finishing. Confirm current
+Remotion license eligibility before distributing a customer installation
+package.
+
+`make install` installs the exact MineContext source runtime. These commands
+verify or reinstall it:
 
 ```bash
 make minecontext-verify
@@ -55,16 +69,11 @@ make minecontext-install
 make minecontext-doctor
 ```
 
-Then set `minecontext.enabled: true`, restart the Gateway, and use “本地上下文
-（MineContext）” in the Personal-IP workspace. Operator enablement only makes
-the source available. Each owner must separately select scopes, purposes and a
-retention period, authorize, and press Start. The normal UI uses manual mode:
-it never enables continuous screenshots or file watchers. The advanced API can
-enable a bounded watcher only with explicit directories (`initial_scan: false`)
-or an explicit `all_displays` acknowledgement at a minimum 60-second interval.
-Stop terminates the sidecar; Revoke also removes runtime configuration and raw
-runtime data; Delete evidence or Delete all enforces the corresponding local
-deletion semantics.
+MineContext is enabled in the shipped configuration. The first workspace load
+starts bounded screen summaries for a new owner with every Personal-IP purpose
+available internally. Folder monitoring remains off until an exact directory
+is configured. “关闭本地上下文” persists an opt-out; clearing local data removes
+captured evidence without allowing the next page load to silently restart it.
 
 The model-facing boundary is `personal-ip-local-context-evidence-v1`. It
 contains a hashed source-record reference, source kind, processed context type,
@@ -138,6 +147,11 @@ delivery-spec and full-decode QA pass for the exact final artifact. Seedream,
 Seedance and speech are simulated in this target; local MediaKit and FFmpeg are
 real. No paid API is called.
 
+The native `personal_ip_render_local_remotion_scene` tool accepts a
+`personal-ip-render-scene-v1` file from the current task, creates a verified
+candidate MP4 and seals the exact renderer version, input/output hashes, probe
+and local zero-cost receipt in the production ledger.
+
 To prepare the real-provider boundary without crossing it:
 
 ```bash
@@ -150,6 +164,12 @@ checkpoint. The file records `executed: false`; obtain explicit approval in the
 active user session before running any listed command. Ingest every emitted
 `personal-ip-media-execution-v1` receipt through
 `personal_ip_ingest_media_execution` immediately after its provider call.
+After the approved batch and local finishing/QA are complete, run
+`scripts/personal_ip_video_e2e.py ingest-real` with the acceptance root. It
+verifies the existing artifacts and receipts, then idempotently seals them into
+the Personal-IP ledger without making another provider call. The 2026-07-23
+minimal Seedream/Seedance/Speech acceptance passed; full multi-shot,
+material-video and optional cloud MediaKit acceptance remain separate gates.
 
 `make doctor` has an IP Agent Product section. It verifies the complete
 ByteDance/Volcengine source bundle, all eight browser-first platform entries,
@@ -197,6 +217,7 @@ it intentionally contains no `.git` metadata.
 VOLCENGINE_API_KEY=
 VOLCENGINE_IMAGE_MODEL=doubao-seedream-5-0-260128
 VOLCENGINE_VIDEO_MODEL=doubao-seedance-2-0-260128
+VOLCENGINE_TTS_API_KEY=
 PERSONAL_IP_AUDIENCE_BASE_URL=http://127.0.0.1:9128
 PERSONAL_IP_AUDIENCE_TOKEN=
 PERSONAL_IP_AUDIENCE_MODEL=doubao-seed-2-0-pro-260215
@@ -213,6 +234,11 @@ MINECONTEXT_EMBEDDING_MODEL=
 VOLCENGINE_TTS_APPID=
 VOLCENGINE_TTS_ACCESS_TOKEN=
 ```
+
+The new-console Speech V3 path needs only `VOLCENGINE_TTS_API_KEY`. Narration
+script lines can optionally set `voice_type`, `speech_rate`, `loudness_rate`
+and `context_text`/`context_texts`; provider receipts store only sanitized
+control values plus the context count and digest.
 
 Generation URLs may expire, so outputs are downloaded immediately. Paid batch
 generation and publishing are approval-gated by the default Agent policy.

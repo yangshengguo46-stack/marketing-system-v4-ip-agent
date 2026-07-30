@@ -7,6 +7,7 @@ English | [中文](./README_zh.md) | [日本語](./README_ja.md) | [Français](.
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 <a href="https://trendshift.io/repositories/14699" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14699" alt="bytedance%2Fdeer-flow | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+
 > On February 28th, 2026, DeerFlow claimed the 🏆 #1 spot on GitHub Trending following the launch of version 2. Thanks a million to our incredible community — you made this happen! 💪🔥
 
 DeerFlow (**D**eep **E**xploration and **E**fficient **R**esearch **Flow**) is an open-source **super agent harness** that orchestrates **sub-agents**, **memory**, and **sandboxes** to do almost anything — powered by **extensible skills**.
@@ -27,18 +28,21 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > [THIRD_PARTY_BYTE.md](THIRD_PARTY_BYTE.md). Real product completion and the
 > remaining delivery gates are tracked in
 > [docs/IP_AGENT_PRODUCT_LEDGER.md](docs/IP_AGENT_PRODUCT_LEDGER.md).
+> The 2026-07-29 audit findings and executable remediation gates are tracked
+> separately in
+> [docs/IP_AGENT_AUDIT_REMEDIATION_LEDGER.md](docs/IP_AGENT_AUDIT_REMEDIATION_LEDGER.md).
 > HLLM-Lite and a future full HLLM-Creator cloud deployment share the same
 > versioned audience-preflight contract, so changing model capacity does not
 > replace the DeerFlow runtime or bind conversations to one account.
 > `make hllm-lite` starts today's local Doubao-backed provider; it does not
 > fabricate ranking scores before outcome-trained calibration exists.
 > MineContext is included as complete Apache-2.0 source at official commit
-> `171c7a9ea8091e326ddcf0f10718aa1b58c83c65`, but remains default-off. It runs
-> only after operator enablement plus an owner's explicit scoped authorization
-> and Start action. Only minimized `personal-ip-local-context-evidence-v1`
+> `171c7a9ea8091e326ddcf0f10718aa1b58c83c65`. `make install` builds its runtime
+> and new owners start with bounded screen summaries enabled; they can opt out
+> persistently in Settings. Only minimized `personal-ip-local-context-evidence-v1`
 > summaries can enter DeerFlow/HLLM; raw screens, files, paths and credentials
-> remain local. Verify/install it with `make minecontext-verify` and
-> `make minecontext-install`; neither command starts capture.
+> remain local. `VOLCENGINE_API_KEY` is reused for its default Doubao models;
+> `MINECONTEXT_*` variables are optional overrides.
 > Release owners can run `make ip-clean-install` to package the committed tree
 > and validate it with a fresh HOME, dependency caches and allowlisted
 > environment. The clean room covers config bootstrap, IP Agent initialization,
@@ -100,12 +104,42 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > turns a missing `views` field into zero. Native inventory/read tools keep the
 > detailed, credential-free records available to later agent analysis. See
 > [docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md](docs/BROWSER_FIRST_PLATFORM_CONNECTIONS.md).
+> Account-status, “看看我的账号”, “最新”, “现在” and “同步” requests trigger a
+> fresh creator-page read for every relevant logged-in account without a second
+> confirmation. Fresh observations carry their collection time; older evidence
+> may appear only as a clearly dated fallback after a current read fails. The
+> conversation shows customer-safe progress such as “正在读取账号的最新数据”
+> while keeping raw tool names, Skill names and private reasoning hidden.
 >
-> The Personal-IP workspace now reads one whole-portfolio operating cockpit:
-> persona/fan modeling → preflight → publish receipt → observed performance →
-> retrospective → evidence promotion. DeerFlow can read the same state through
+> The Personal-IP workspace now reads one whole-portfolio operating cockpit.
+> Before the first active identity, the private operating truth progresses
+> through person evidence → business model → real benchmarks → positioning
+> alternatives → name/avatar/bio launch package → pilot → observed commercial
+> signal → validated identity. Monetization-first is the default; an explicit
+> influence-first choice still reserves compatible monetization paths. A short
+> self-description can save only a draft and can never claim “建模完成”.
+> The continuing loop is identity → expression intent → preflight → publish
+> receipt → observed performance → audience feedback → retrospective →
+> evidence promotion → next identity version. Identity and content strategy are versioned at the
+> subject level. Accounts now contain only platform execution/login identity,
+> so eight platforms do not create eight competing personas. DeerFlow can read the same state through
 > a native tool, so account ids remain operation targets rather than chat
-> filters. Video uses a second auditable line from idea/script through blueprint,
+> filters. The customer-facing `/workspace/dashboard` projects that real ledger
+> into the current positioning, content strategy and observed audience
+> feedback alongside seven-day
+> views/follower/engagement growth, platform contribution,
+> recent-work performance and agent queues. Missing coverage stays missing
+> rather than becoming zero. Paid-traffic candidates require a measured
+> same-platform baseline and open an evaluation only; they never authorize
+> spend. `/workspace/personal-ip` remains the subject/account/platform-login
+> surface. MineContext consent, startup, retention, revocation and deletion live
+> in Settings → “本地上下文”. It is installed with the product and starts for new
+> owners with bounded screen summaries plus all Personal-IP purposes; customers
+> can disable it persistently or clear its local data. Backend scope identifiers
+> are not exposed as checkboxes. In the Chinese sidebar, “工作台” stays immediately
+> above “新对话”, while “历史对话” opens the complete thread list from below
+> “定时任务”. Video uses a second
+> auditable line from idea/script through blueprint,
 > assets, storyboard, shot jobs and retries, consistency, selection, finishing
 > and delivery. The request is immutable and every provider/model/task/cost or
 > human-review outcome is an append-only receipt; successful delivery is the
@@ -113,13 +147,65 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > resumable end-to-end acceptance that uses the pinned local MediaKit/FFmpeg
 > toolchain, re-hashes every successful output and requires probe/spec/full-
 > decode QA before delivery. `make video-e2e-paid-checkpoints` only writes the
-> real provider commands; it never submits a paid call.
-> The dedicated `/workspace/personal-ip/video` workbench is a read-oriented
-> view over that same immutable ledger. It exposes projects, stages, assets,
+> real provider commands; it never submits a paid call. After explicit approval
+> and provider execution, `scripts/personal_ip_video_e2e.py ingest-real` verifies
+> the emitted real receipts and idempotently seals them into the same production
+> ledger without making another paid call. The first minimal real
+> Seedream/Seedance/Speech-to-local-MediaKit/FFmpeg acceptance passed on
+> 2026-07-23; full multi-shot and material-video acceptance remain open.
+> New productions use one of two contracts on the same ledger:
+> `faceless_material` for Personal-IP material videos and
+> `generative_cinematic` for films, short drama and ads. DeerFlow-native typed
+> tools compile plans, rights-aware assets, storyboards, frame-grounded
+> material ranges, exact narration/TTS timing, continuity hash chains,
+> computed shot QA and exact-hash timeline admission. Local generated shots
+> can now run the pinned ffprobe/full-decode/first-frame-SSIM/consecutive-SSIM/
+> motion-cadence/contact-sheet executor through a native tool; the resulting
+> evidence and server-computed gate are sealed into the same production
+> ledger. Continuous-motion shots may then create a separate 48/60fps candidate
+> through project-pinned FFmpeg motion compensation. The original remains
+> immutable, repeated-frame failures route back to regeneration, and every
+> enhanced candidate must pass fresh QA and human selection. Doubao
+> Speech uses the new-console single API key (`X-Api-Key`) and does not require
+> an AppID. Narration lines may independently select a voice and set validated
+> `speech_rate`, `loudness_rate` and `context_texts`; raw performance directions
+> are sent only to the V3 provider and receipts retain only their count and
+> digest. Material-video assets stored in the current task can likewise be
+> probed and sampled into timestamped frames plus a contact sheet; the
+> mechanical inspection is hash-sealed before the agent makes and records a
+> separate semantic selection.
+> The Personal-IP operator explicitly retains native production-ledger tools
+> when restrictive MediaKit skills are active. A production may also opt into
+> `sequential_human_gate`: only one shot is generated and checked at a time,
+> and the next shot waits for an approved workbench candidate review.
+> Source-defined scenes can now be rendered through the native pinned Remotion
+> 4.0.488 tool. It captures deterministic PNG frames with software Chromium,
+> finishes through the project-local FFmpeg build and records the verified MP4
+> as an immutable candidate receipt. HyperFrames 0.7.57 remains the default
+> interactive renderer: its source compiler and browser check/snapshot gate
+> pass, while final rendering waits for explicit preview approval. Remotion is
+> enabled for MVP validation; customer distribution requires a fresh
+> license-eligibility check.
+> The old Kanban/WorkGraph runtimes and databases are not included.
+> The dedicated `/workspace/personal-ip/video` workbench is an editable
+> projection over that same immutable ledger. It exposes projects, stages, assets,
 > shots, retries, candidates, consistency, timeline, delivery QA and receipt
 > evidence without introducing another video runtime or state machine. DeerFlow
-> conversations still create and advance productions; the workbench writes only
-> meaningful candidate-selection, paid-call or real-publish confirmations. See
+> conversations are embedded at the selected shot or timeline target, while
+> direct drag, trim, split, duplicate, delete, volume and caption edits compile
+> to the same append-only `timeline_revision_compiled` contract used by the
+> native agent tool. The lower dock is the only mounted timeline editor; the
+> edit-stage upper canvas monitors the latest render and current revision
+> instead of duplicating tracks. It contains one Agent composer; typed manual
+> operations automatically produce the revision intent instead of asking for a
+> second note box. “Full auto” therefore remains an editable rough cut;
+> the setup stage uses the same candidate interaction for generated reference
+> images: visual versions are listed at left, enlarged in the central preview
+> and revised through the embedded Agent before adoption. The setup view hides
+> the editing timeline because its bottom control is the asset conversation.
+> existing candidate and timeline revisions are never overwritten. After any
+> new edit, delivery QA rejects stale inputs until the latest revision is
+> deliberately sealed by `final_edit_locked`. See
 > [docs/VIDEO_WORKBENCH.md](docs/VIDEO_WORKBENCH.md).
 
 ## Official Website
@@ -332,11 +418,11 @@ That prompt is intended for coding agents. It tells the agent to clone the repo 
 
 Use the table below as a practical starting point when choosing how to run DeerFlow:
 
-| Deployment target | Starting point | Recommended | Notes |
-|---------|-----------|------------|-------|
-| Local evaluation / `make dev` | 4 vCPU, 8 GB RAM, 20 GB free SSD | 8 vCPU, 16 GB RAM | Good for one developer or one light session with hosted model APIs. `2 vCPU / 4 GB` is usually not enough. |
-| Docker development / `make docker-start` | 4 vCPU, 8 GB RAM, 25 GB free SSD | 8 vCPU, 16 GB RAM | Image builds, bind mounts, and sandbox containers need more headroom than pure local dev. |
-| Long-running server / `make up` | 8 vCPU, 16 GB RAM, 40 GB free SSD | 16 vCPU, 32 GB RAM | Preferred for shared use, multi-agent runs, report generation, or heavier sandbox workloads. |
+| Deployment target                        | Starting point                    | Recommended        | Notes                                                                                                      |
+| ---------------------------------------- | --------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Local evaluation / `make dev`            | 4 vCPU, 8 GB RAM, 20 GB free SSD  | 8 vCPU, 16 GB RAM  | Good for one developer or one light session with hosted model APIs. `2 vCPU / 4 GB` is usually not enough. |
+| Docker development / `make docker-start` | 4 vCPU, 8 GB RAM, 25 GB free SSD  | 8 vCPU, 16 GB RAM  | Image builds, bind mounts, and sandbox containers need more headroom than pure local dev.                  |
+| Long-running server / `make up`          | 8 vCPU, 16 GB RAM, 40 GB free SSD | 16 vCPU, 32 GB RAM | Preferred for shared use, multi-agent runs, report generation, or heavier sandbox workloads.               |
 
 - These numbers cover DeerFlow itself. If you also host a local LLM, size that service separately.
 - Linux plus Docker is the recommended deployment target for a persistent server. macOS and Windows are best treated as development or evaluation environments.
@@ -393,11 +479,13 @@ Prerequisite: complete the "Configuration" steps above first (`make setup`). `ma
 On Windows, run the local development flow from Git Bash. Native `cmd.exe` and PowerShell shells are not supported for the bash-based service scripts, and WSL is not guaranteed because some scripts rely on Git for Windows utilities such as `cygpath`.
 
 1. **Check prerequisites**:
+
    ```bash
    make check  # Verifies Node.js 22+, pnpm, uv, nginx
    ```
 
 2. **Install dependencies**:
+
    ```bash
    make install  # Install backend + frontend dependencies; Git checkouts also get pre-commit hooks
    ```
@@ -407,19 +495,23 @@ On Windows, run the local development flow from Git Bash. Native `cmd.exe` and P
    committed checkout, run `make ip-clean-install`.
 
 3. **(Optional) Pre-pull sandbox image**:
+
    ```bash
    # Recommended if using Docker/Container-based sandbox
    make setup-sandbox
    ```
 
 4. **(Optional) Load sample memory data for local review**:
+
    ```bash
    python scripts/load_memory_sample.py
    ```
+
    This copies the sample fixture into the default local runtime memory file so reviewers can immediately test `Settings > Memory`.
    See [backend/docs/MEMORY_SETTINGS_REVIEW.md](backend/docs/MEMORY_SETTINGS_REVIEW.md) for the shortest review flow.
 
 5. **Start services**:
+
    ```bash
    make dev
    ```
@@ -430,15 +522,15 @@ On Windows, run the local development flow from Git Bash. Native `cmd.exe` and P
 
 DeerFlow runs the agent runtime inside the Gateway API. Development mode enables hot-reload; production mode uses a pre-built frontend.
 
-| | **Local Foreground** | **Local Daemon** | **Docker Dev** | **Docker Prod** |
-|---|---|---|---|---|
-| **Dev** | `./scripts/serve.sh --dev`<br/>`make dev` | `./scripts/serve.sh --dev --daemon`<br/>`make dev-daemon` | `./scripts/docker.sh start`<br/>`make docker-start` | — |
-| **Prod** | `./scripts/serve.sh --prod`<br/>`make start` | `./scripts/serve.sh --prod --daemon`<br/>`make start-daemon` | — | `./scripts/deploy.sh`<br/>`make up` |
+|          | **Local Foreground**                         | **Local Daemon**                                             | **Docker Dev**                                      | **Docker Prod**                     |
+| -------- | -------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------- | ----------------------------------- |
+| **Dev**  | `./scripts/serve.sh --dev`<br/>`make dev`    | `./scripts/serve.sh --dev --daemon`<br/>`make dev-daemon`    | `./scripts/docker.sh start`<br/>`make docker-start` | —                                   |
+| **Prod** | `./scripts/serve.sh --prod`<br/>`make start` | `./scripts/serve.sh --prod --daemon`<br/>`make start-daemon` | —                                                   | `./scripts/deploy.sh`<br/>`make up` |
 
-| Action | Local | Docker Dev | Docker Prod |
-|---|---|---|---|
-| **Stop** | `./scripts/serve.sh --stop`<br/>`make stop` | `./scripts/docker.sh stop`<br/>`make docker-stop` | `./scripts/deploy.sh down`<br/>`make down` |
-| **Restart** | `./scripts/serve.sh --restart [flags]` | `./scripts/docker.sh restart` | — |
+| Action      | Local                                       | Docker Dev                                        | Docker Prod                                |
+| ----------- | ------------------------------------------- | ------------------------------------------------- | ------------------------------------------ |
+| **Stop**    | `./scripts/serve.sh --stop`<br/>`make stop` | `./scripts/docker.sh stop`<br/>`make docker-stop` | `./scripts/deploy.sh down`<br/>`make down` |
+| **Restart** | `./scripts/serve.sh --restart [flags]`      | `./scripts/docker.sh restart`                     | —                                          |
 
 Gateway owns `/api/langgraph/*` and translates those public LangGraph-compatible paths to its native `/api/*` routers behind nginx.
 
@@ -459,9 +551,11 @@ deploy.sh down
 ```
 
 ### Advanced
+
 #### Sandbox Mode
 
 DeerFlow supports multiple sandbox execution modes:
+
 - **Local Execution** (runs sandbox code directly on the host machine)
 - **Docker Execution** (runs sandbox code in isolated Docker containers)
 - **Docker Execution with Kubernetes** (runs sandbox code in Kubernetes pods via provisioner service)
@@ -484,14 +578,14 @@ DeerFlow supports receiving tasks from messaging apps. Channels auto-start when 
 
 DeerFlow can also expose user-owned IM channel connections in the workspace UI. When `channel_connections` is enabled, logged-in users can bind Telegram, Slack, Discord, Feishu/Lark, DingTalk, WeChat, or WeCom from the sidebar / Settings > Channels. It reuses the existing outbound `channels.*` transports, so no public IP or provider callback URL is required. Incoming IM messages then run under the connected DeerFlow user account. See [IM Channel Connections](backend/docs/IM_CHANNEL_CONNECTIONS.md) for setup and security notes.
 
-| Channel | Transport | Difficulty |
-|---------|-----------|------------|
-| Telegram | Bot API (long-polling) | Easy |
-| Slack | Socket Mode | Moderate |
-| Feishu / Lark | WebSocket | Moderate |
-| WeChat | Tencent iLink (long-polling) | Moderate |
-| WeCom | WebSocket | Moderate |
-| DingTalk | Stream Push (WebSocket) | Moderate |
+| Channel       | Transport                    | Difficulty |
+| ------------- | ---------------------------- | ---------- |
+| Telegram      | Bot API (long-polling)       | Easy       |
+| Slack         | Socket Mode                  | Moderate   |
+| Feishu / Lark | WebSocket                    | Moderate   |
+| WeChat        | Tencent iLink (long-polling) | Moderate   |
+| WeCom         | WebSocket                    | Moderate   |
+| DingTalk      | Stream Push (WebSocket)      | Moderate   |
 
 **Configuration in `config.yaml`:**
 
@@ -504,7 +598,7 @@ channels:
 
   # Optional: global session defaults for all mobile channels
   session:
-    assistant_id: lead_agent  # or a custom agent name; custom agents are routed via lead_agent + agent_name
+    assistant_id: lead_agent # or a custom agent name; custom agents are routed via lead_agent + agent_name
     config:
       recursion_limit: 100
     context:
@@ -526,22 +620,22 @@ channels:
 
   slack:
     enabled: true
-    bot_token: $SLACK_BOT_TOKEN     # xoxb-...
-    app_token: $SLACK_APP_TOKEN     # xapp-... (Socket Mode)
-    allowed_users: []               # empty = allow all
+    bot_token: $SLACK_BOT_TOKEN # xoxb-...
+    app_token: $SLACK_APP_TOKEN # xapp-... (Socket Mode)
+    allowed_users: [] # empty = allow all
 
   telegram:
     enabled: true
     bot_token: $TELEGRAM_BOT_TOKEN
-    allowed_users: []               # empty = allow all
+    allowed_users: [] # empty = allow all
 
   wechat:
     enabled: false
     bot_token: $WECHAT_BOT_TOKEN
     ilink_bot_id: $WECHAT_ILINK_BOT_ID
-    qrcode_login_enabled: true      # optional: allow first-time QR bootstrap when bot_token is absent
-    allowed_users: []               # empty = allow all
-    polling_timeout: 35             # timing values must be positive finite seconds
+    qrcode_login_enabled: true # optional: allow first-time QR bootstrap when bot_token is absent
+    allowed_users: [] # empty = allow all
+    polling_timeout: 35 # timing values must be positive finite seconds
     polling_retry_delay: 5
     qrcode_poll_interval: 2
     qrcode_poll_timeout: 180
@@ -553,7 +647,7 @@ channels:
 
     # Optional: per-channel / per-user session settings
     session:
-      assistant_id: mobile-agent  # custom agent names are also supported here
+      assistant_id: mobile-agent # custom agent names are also supported here
       context:
         thinking_enabled: false
       users:
@@ -567,13 +661,14 @@ channels:
 
   dingtalk:
     enabled: true
-    client_id: $DINGTALK_CLIENT_ID             # Client ID of your DingTalk application
-    client_secret: $DINGTALK_CLIENT_SECRET     # Client Secret of your DingTalk application
-    allowed_users: []                          # empty = allow all
-    card_template_id: ""                       # Optional: AI Card template ID for streaming typewriter effect
+    client_id: $DINGTALK_CLIENT_ID # Client ID of your DingTalk application
+    client_secret: $DINGTALK_CLIENT_SECRET # Client Secret of your DingTalk application
+    allowed_users: [] # empty = allow all
+    card_template_id: "" # Optional: AI Card template ID for streaming typewriter effect
 ```
 
 Notes:
+
 - `assistant_id: lead_agent` calls the default LangGraph assistant directly.
 - If `assistant_id` is set to a custom agent name, DeerFlow still routes through `lead_agent` and injects that value as `agent_name`, so the custom agent's SOUL/config takes effect for IM channels.
 - IM channel workers call Gateway's LangGraph-compatible API internally and automatically attach process-local internal auth plus the CSRF cookie/header pair required for thread and run creation.
@@ -647,8 +742,7 @@ DINGTALK_CLIENT_SECRET=your_client_secret
 1. Create a DingTalk application in the [DingTalk Developer Console](https://open.dingtalk.com/) and enable **Robot** capability.
 2. Set the message receiving mode to **Stream Mode** in the robot configuration page.
 3. Copy the `Client ID` and `Client Secret`, set `DINGTALK_CLIENT_ID` and `DINGTALK_CLIENT_SECRET` in `.env`, and enable the channel in `config.yaml`.
-4. *(Optional)* To enable streaming AI Card replies (typewriter effect), create an **AI Card** template on the [DingTalk Card Platform](https://open.dingtalk.com/document/dingstart/typewriter-effect-streaming-ai-card), then set `card_template_id` in `config.yaml` to the template ID. You also need to apply for the `Card.Streaming.Write` and `Card.Instance.Write` permissions.
-
+4. _(Optional)_ To enable streaming AI Card replies (typewriter effect), create an **AI Card** template on the [DingTalk Card Platform](https://open.dingtalk.com/document/dingstart/typewriter-effect-streaming-ai-card), then set `card_template_id` in `config.yaml` to the template ID. You also need to apply for the `Card.Streaming.Write` and `Card.Instance.Write` permissions.
 
 When DeerFlow runs in Docker Compose, IM channels execute inside the `gateway` container. In that case, do not point `channels.langgraph_url` or `channels.gateway_url` at `localhost`; use container service names such as `http://gateway:8001/api` and `http://gateway:8001`, or set `DEER_FLOW_CHANNELS_LANGGRAPH_URL` and `DEER_FLOW_CHANNELS_GATEWAY_URL`.
 
@@ -656,13 +750,13 @@ When DeerFlow runs in Docker Compose, IM channels execute inside the `gateway` c
 
 Once a channel is connected, you can interact with DeerFlow directly from the chat:
 
-| Command | Description |
-|---------|-------------|
-| `/new` | Start a new conversation |
+| Command   | Description              |
+| --------- | ------------------------ |
+| `/new`    | Start a new conversation |
 | `/status` | Show current thread info |
-| `/models` | List available models |
-| `/memory` | View memory |
-| `/help` | Show help |
+| `/models` | List available models    |
+| `/memory` | View memory              |
+| `/help`   | Show help                |
 
 > Messages without a command prefix are treated as regular chat — DeerFlow creates a thread and responds conversationally.
 
@@ -755,7 +849,7 @@ Use it as-is. Or tear it apart and make it yours.
 
 ### Skills & Tools
 
-Skills are what make DeerFlow do *almost anything*.
+Skills are what make DeerFlow do _almost anything_.
 
 A standard Agent Skill is a structured capability module — a Markdown file that defines a workflow, best practices, and references to supporting resources. DeerFlow ships with built-in skills for research, report generation, slide creation, web pages, image and video generation, and more. But the real power is extensibility: add your own skills, replace the built-in ones, or combine them into compound workflows.
 
@@ -824,6 +918,7 @@ npx skills add https://github.com/bytedance/deer-flow --skill claude-to-deerflow
 Then make sure DeerFlow is running (default at `http://localhost:2026`) and use the `/claude-to-deerflow` command in Claude Code.
 
 **What you can do**:
+
 - Send messages to DeerFlow and get streaming responses
 - Choose execution modes: flash (fast), standard, pro (planning), ultra (sub-agents)
 - Check DeerFlow health, list models/skills/agents
@@ -870,7 +965,7 @@ This is how DeerFlow handles tasks that take minutes to hours: a research task m
 
 ### Sandbox & File System
 
-DeerFlow doesn't just *talk* about doing things. It has its own computer.
+DeerFlow doesn't just _talk_ about doing things. It has its own computer.
 
 Each task gets its own execution environment with a full filesystem view — skills, workspace, uploads, outputs. The agent reads, writes, and edits files. It can view images and, when configured safely, execute shell commands.
 
@@ -890,13 +985,15 @@ This is the difference between a chatbot with tool access and an agent with an a
 
 ### Agentic Browser Control
 
-Reading a page is not the same as *using* one. Alongside the read-only `web_fetch` and `web_capture` tools, DeerFlow ships an optional agentic browser tool group that keeps a live, per-conversation browser session so the agent can actually operate a page — navigate, read the interactive elements, click, type, submit forms, and follow multi-step flows on JavaScript-heavy sites.
+Reading a page is not the same as _using_ one. Alongside the read-only `web_fetch` and `web_capture` tools, DeerFlow ships an optional agentic browser tool group that keeps a live, per-conversation browser session so the agent can actually operate a page — navigate, read the interactive elements, click, type, submit forms, and follow multi-step flows on JavaScript-heavy sites.
 
 The IP Agent operating portfolio also exposes an owner-checked, account-scoped
-Live browser. It uses the same browser engine but does not borrow a conversation
-id: each account opens its registered platform URL with its own persistent
-profile, so closing the window or restarting DeerFlow does not intentionally
-discard the platform login state.
+browser login lifecycle. It uses the same browser engine but does not borrow a
+conversation id: each account opens its registered platform URL with its own
+persistent profile. Local interactive installs open a real headed Chromium
+window; deployments without a graphical desktop fall back to the embedded Live
+view. Closing the window or restarting DeerFlow does not intentionally discard
+the platform login state.
 
 Each action returns a fresh snapshot of the page's interactive elements, each addressed by a stable `[ref]` number, so the agent acts on what it just observed instead of guessing selectors. Outbound URLs are SSRF-screened by default. It is powered by Playwright and shipped as an optional extra so the core install stays lean:
 

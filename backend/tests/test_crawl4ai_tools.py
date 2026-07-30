@@ -6,7 +6,18 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from deerflow.community import url_safety
 from deerflow.community.crawl4ai.crawl4ai_client import Crawl4AiClient
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_public_dns(monkeypatch):
+    """Keep mocked tool tests independent from the developer's DNS/proxy."""
+    monkeypatch.setattr(
+        url_safety,
+        "resolve_host_addresses",
+        lambda _hostname: [ipaddress.ip_address("93.184.216.34")],
+    )
 
 
 class AsyncMock(MagicMock):

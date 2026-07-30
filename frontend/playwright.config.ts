@@ -32,7 +32,7 @@ export default defineConfig({
           "./node_modules/.bin/next build && ./node_modules/.bin/next start",
         url: baseURL,
         reuseExistingServer: !process.env.CI,
-        timeout: 120_000,
+        timeout: 300_000,
         env: {
           SKIP_ENV_VALIDATION: "1",
           DEER_FLOW_AUTH_DISABLED: "1",

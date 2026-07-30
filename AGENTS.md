@@ -24,7 +24,7 @@ DingTalk) bridge into the same agent through the Gateway.
 
 A single `make dev` / Docker stack runs four cooperating services:
 
-| Service         | Port   | Role                                                                 |
+| Service         | Port   | Role                                                                |
 | --------------- | ------ | ------------------------------------------------------------------- |
 | **Nginx**       | `2026` | Unified reverse-proxy entry point — open this in the browser        |
 | **Gateway API** | `8001` | FastAPI REST API + embedded LangGraph-compatible agent runtime      |
@@ -63,11 +63,18 @@ Gateway API. Config schema and resolution order are documented in
 [backend/AGENTS.md](backend/AGENTS.md).
 
 IP Agent distribution note:
+
 - `IP_AGENT.md` is the product setup and capability-routing guide;
   `THIRD_PARTY_BYTE.md` records copied ByteDance/Volcengine components and pins.
 - `docs/IP_AGENT_PRODUCT_LEDGER.md` is the delivery source of truth. Update its
   acceptance gates and weighted score only when a real product path is added,
   removed or verified; do not equate schemas or mocked tests with completion.
+- `docs/IP_AGENT_AUDIT_REMEDIATION_LEDGER.md` records audit findings and their
+  executable acceptance gates. Update an item to done only after the named
+  command or external acceptance completes.
+- Python launch/test targets use `uv run python -m ...`, not generated console
+  scripts, so a copied or moved checkout does not depend on stale virtualenv
+  shebangs.
 - `product/defaults/` owns the product agent/owner defaults, while
   `product/volcengine/capabilities.yaml` is the auditable media routing policy.
 - `scripts/init_ip_agent.py` installs those defaults into a normal DeerFlow
@@ -88,19 +95,74 @@ IP Agent distribution note:
 - `third_party/volcengine/MineContext` is the complete Apache-2.0 source pinned
   at `171c7a9ea8091e326ddcf0f10718aa1b58c83c65`. Keep DeerFlow as the only
   agent brain. `deerflow.personal_ip.minecontext` may run it only as a
-  default-off, explicitly authorized, owner-isolated loopback sidecar. Never
-  auto-start capture or place raw screenshots, full screen/file text, paths,
-  vectors or credentials in model evidence. Preserve source/observation time,
-  partial coverage, retention, stop/revoke/delete controls and the
-  `personal-ip-local-context-evidence-v1` boundary. `make minecontext-install`
-  must install from the vendored source; do not add an opaque prebuilt
-  MineContext executable.
+  default-on, owner-isolated loopback sidecar with a persistent owner opt-out.
+  New-owner startup may enable bounded screen summaries but must never override
+  an inactive consent. Never place raw screenshots, full screen/file text,
+  paths, vectors or credentials in model evidence. Preserve source/observation
+  time, partial coverage, retention, stop/revoke/delete controls and the
+  `personal-ip-local-context-evidence-v1` boundary. Normal `make install` must
+  install from the vendored source; do not add an opaque prebuilt MineContext
+  executable.
 - `scripts/install_ffmpeg_toolchain.py` owns the pinned project-local FFmpeg
   build. Service launch and MediaKit diagnosis must prefer its `bin` directory;
   do not silently fall back to a feature-incomplete system FFmpeg.
+- `deerflow.personal_ip.generated_shot_qa` owns deterministic local generated-
+  shot measurement. `personal_ip_run_local_generated_shot_qa` may resolve only
+  current-owner/current-thread `/mnt/user-data` paths, must offload FFmpeg and
+  filesystem work from the async tool loop, and must seal the measured hashes,
+  contact sheet, motion-cadence evidence, mechanical-only report and
+  server-computed gate into the existing append-only video ledger. It must
+  never create a second QA state store or claim human/final approval.
+- `deerflow.personal_ip.frame_interpolation` owns the optional local smooth-
+  motion derivative. `personal_ip_interpolate_video_candidate` accepts only a
+  successful checksummed candidate in the current owner/task, uses the pinned
+  FFmpeg `minterpolate` motion-compensation filter (never duplicate-frame FPS
+  conversion), writes a non-overwriting candidate receipt, and requires fresh
+  QA plus human selection. Frozen/repeated source runs should be regenerated,
+  not disguised by interpolation.
+- `deerflow.personal_ip.material_inspection` owns local, frame-grounded source
+  inspection for `faceless_material`. The native tool must require a
+  rights-cleared asset and storyboard shot from the latest compiled contracts,
+  resolve only current-owner/current-thread `/mnt/user-data` paths, compare the
+  local source hash with the manifest when present, use only the project-pinned
+  FFmpeg/ffprobe, and seal timestamped frames/contact sheet/report into the
+  existing video ledger. Mechanical inspection must require a later semantic
+  assessment; it must never fabricate relevance or silently approve material.
+- New-console Doubao Speech uses one `VOLCENGINE_TTS_API_KEY` sent as
+  `X-Api-Key`; `VOLCENGINE_TTS_ACCESS_TOKEN` is a temporary local compatibility
+  alias. Do not make AppID a product-wide prerequisite. Protocol-specific
+  legacy/async endpoints may declare their own additional requirements.
+- `podcast-generation` may set per-line `voice_type`, `speech_rate`,
+  `loudness_rate` and `context_text`/`context_texts` only on the new-console
+  V3 single-key route. Validate every control before provider execution and
+  reject unsupported legacy execution instead of silently degrading. Receipts
+  may contain context count and SHA-256 only; never persist the raw performance
+  direction.
 - Personal-IP account data is the product-owned domain boundary. It must remain
   owner-scoped, enter runs through validated server context, and never be trusted
   from a caller-supplied expanded object.
+- Keep the Chinese workspace sidebar distinction explicit: `新对话` creates a
+  thread, while `历史对话` opens the complete thread index from immediately
+  below `定时任务`. Do not label both entries simply as `对话`.
+- Keep `工作台` immediately above `新对话` in the workspace sidebar.
+  `/workspace/dashboard` is the owner-wide operating read model for real
+  metric observations, platform growth, recent works and agent queues;
+  `/workspace/personal-ip` remains the subject, account and platform-login
+  surface. MineContext consent, lifecycle, retention and deletion belong to the
+  dedicated `本地上下文` section inside Settings, not the operating portfolio.
+  New owners receive every supported local-context scope and Personal-IP
+  purpose internally and the workspace starts bounded screen summaries by
+  default, without exposing backend scope or purpose ids as checkboxes.
+  “关闭” persists an opt-out; it must not be undone by the next page load.
+  Missing observations must remain missing, never synthetic zeroes. A
+  paid-traffic review candidate needs at least three same-platform post samples
+  and only authorizes evaluation, never spend.
+- Treat the Skill catalog as private product implementation. Do not render a
+  Skill-management section in customer Settings, Skill autocomplete/chips in
+  chat, agent Skill badges, or Skill names/paths/tool steps in conversations,
+  subtask timelines, copy and ordinary exports. Internal discovery, execution,
+  evolution, audit and owner isolation remain enabled. Customer-facing agent
+  output describes work and results, not which Skill was selected.
 - Personal-IP preflights are immutable model request/receipt snapshots under
   `deerflow.persistence.personal_ip_preflights` and migration
   `0008_personal_ip_preflights`. Account ids are operation targets in the
@@ -175,10 +237,13 @@ IP Agent distribution note:
 - Personal-IP platform operation is browser-first for Douyin, WeChat Channels,
   WeChat Official Accounts, Xiaohongshu, X, Instagram, YouTube and TikTok.
   `/workspace/personal-ip` must render all eight entries even before accounts
-  exist and open manual login through the account-scoped Live Browser route.
-  The user—not the agent—completes QR, CAPTCHA and MFA. Each account uses an
+  exist. Local interactive installs open manual login in a real headed Chromium
+  window; the account-scoped socket owns its lifecycle and falls back to an
+  embedded Live stream only when the Gateway has no graphical desktop. The
+  user—not the agent—completes QR, CAPTCHA and MFA. Each account uses an
   owner/account-isolated persistent profile. Successful login emits a boolean
-  event and closes the login dialog. This credential boundary must not suppress
+  event, closes the native browser and dismisses the login dialog. This
+  credential boundary must not suppress
   detailed authorized business-data collection: account/content inventories,
   metrics, audience analytics, comments and receipts should retain source,
   observed-at and coverage evidence while raw credential values stay out of
@@ -221,9 +286,23 @@ IP Agent distribution note:
   only when the page explicitly displays 今日/今天/Today; other windows are
   unavailable for that request, collection failures stay missing, and all
   detailed page evidence remains in platform observations.
+  Account-status/最新/同步 requests are authorization for reversible read-only
+  collection and must not trigger a second clarification. Route dashboard
+  reads to the registered creator dashboard, tolerate a Playwright
+  DOMContentLoaded timeout only when subsequent same-platform URL/login and
+  rendered-DOM checks still pass, and allow local proxy RFC 2544 fake-IP
+  answers for public creator hosts under the same narrow SSRF policy as Browser
+  Control. Always return `observed_at`; never silently relabel an older
+  observation as the current result.
 - Personal-IP video production lives in
   `deerflow.persistence.personal_ip_video_productions` and migration
-  `0015_personal_ip_video_productions`. Keep the initial idea/script, delivery
+  `0015_personal_ip_video_productions`; migration
+  `0018_video_production_threads` binds each production to exactly one
+  customer-visible DeerFlow task thread. A new video starts from a new native
+  conversation, the production workbench replaces that task's ordinary chat
+  canvas after creation, and leaving it returns the task to normal persisted
+  history. Do not restore a global video-project switcher in customer
+  navigation. Keep the initial idea/script, delivery
   spec, provider policy and budget immutable; record blueprint, assets,
   storyboard, per-shot generation/failure/retry, consistency, selection,
   finishing and delivery as idempotent append-only events. Providers and model
@@ -233,20 +312,97 @@ IP Agent distribution note:
   output refs. `scripts/personal_ip_video_e2e.py` is the credential-free local
   acceptance/resume path; it must keep paid providers simulated unless the
   active user session explicitly approves the generated paid checkpoints.
+  Its `ingest-real` command verifies already-emitted real provider, finishing
+  and QA receipts and idempotently seals them into a production; it must never
+  make or reconstruct a provider call.
+  New requests must declare `faceless_material` or `generative_cinematic`.
+  `deerflow.personal_ip.video_contracts` owns the pure, server-validated plan,
+  rights manifest, storyboard, material selection, narration/TTS timing,
+  continuity, generated-shot QA, exact-hash assembly and shared human/agent
+  timeline-revision contracts. Expose
+  those through native typed tools and
+  seal them as events in the existing ledger; never let an arbitrary generic
+  payload impersonate one of those contracts. Generic events remain for
+  low-level provider callbacks and legacy receipts. Candidate admission must
+  prove that selection, QA and assembly reference the same candidate and
+  source SHA-256.
+  Source-defined local scenes use the exact renderer tree in
+  `product/video-renderers`. HyperFrames 0.7.57 is the default interactive
+  renderer and must pass `check --snapshots` before an explicitly approved
+  final render. Remotion 4.0.488 is available for MVP rendering through
+  `personal_ip_render_local_remotion_scene`; it must use software Chromium,
+  deterministic PNG frames and the project-local FFmpeg finisher before its
+  candidate receipt is sealed. Never restore hard-coded legacy branding.
+  Reconfirm Remotion license eligibility before distributing a customer
+  installation package.
   `deerflow.personal_ip.video_workbench` and Gateway
   `GET /api/personal-ip/video-productions/{production_id}/workbench` are a pure,
-  owner-scoped read model over that same production and event stream. Keep the
-  frontend workbench read-oriented: it may record only meaningful confirmation
-  events through the existing event endpoint, and must never create a parallel
-  video runtime, mutable projection table or chat-derived recovery state.
+  owner-scoped read model over that same production and event stream. The
+  frontend may submit server-compiled timeline revisions through
+  `POST /api/personal-ip/video-productions/{production_id}/timeline-revisions`
+  and meaningful confirmation events, but must never persist pointer movement,
+  create a parallel video runtime, mutable projection table or chat-derived
+  recovery state. The director UI mounts one editable timeline in the lower
+  dock only during the edit stage; setup, storyboard and delivery never mount
+  it. The edit-stage upper canvas is monitoring/revision context, not a second
+  editor. It exposes one Agent composer and derives manual-revision
+  intent from typed operations rather than a second free-text note box. In the
+  edit stage, do not expose a separate pipeline shortcut rail: picture, sound
+  and QA capabilities are selected internally by the Agent through the same
+  controlled composer. Hide both side rails so the preview and timeline use
+  the recovered width; users return to storyboard for shot regeneration or
+  setup for character, scene and style changes. Use
+  Jianying-style direct manipulation for selected clips: drag the
+  clip body to move it and drag either edge to trim it. Do not add a selected
+  clip status/toolbar row or a persistent numeric inspector above or below the
+  timeline; version, transition, volume and text changes go through the Agent.
+  The setup stage lists only visual asset candidates in the left rail, previews
+  the selected version centrally and sends generation/revision/adoption through
+  one persistent `ip-agent` setup composer. Keep every generated version in the
+  immutable ledger and keep the timeline dock hidden throughout setup and
+  storyboard.
+  The delivery stage is a full-width viewer, not another editor or evidence
+  console. Hide both side rails and the timeline dock; expose only the final
+  player and one `保存到本地` action. Delivery QA, contract versions, raw refs,
+  hashes and publish checkpoints remain internal or in receipts.
+  Shot/timeline conversations use ordinary DeerFlow threads;
+  exact ids are operation targets only and never conversation authority.
 - `deerflow.personal_ip.operating_cockpit` is the owner-scoped read model that
   joins the six-stage operating loop and nine-stage video line. The Gateway
   route and native `personal_ip_operating_cockpit` tool must use the same
   service, stay whole-portfolio, expose explicit pending queues and report
-  bounded-history coverage. The native begin/event/read video tools are the
-  agent's write/resume surface; chat history is never the production ledger.
+  bounded-history coverage. The native begin/compile/execute/read video tools
+  are the agent's write/resume surface; chat history is never the production
+  ledger.
+- Personal-IP operating truth is subject-scoped and versioned in
+  `personal_ip_strategy_versions`. Platform accounts are execution targets and
+  must not regain person, business, positioning, naming, audience or voice
+  fields in API, UI, agent context or readiness gates. Preflight loads the
+  latest launch-ready strategy server-side; a caller-provided parallel
+  creator/audience profile is forbidden. First-use incubation is a natural
+  `ip-agent` conversation, not a customer questionnaire surface. Strategy
+  versions must cover
+  person evidence, commercial design, real benchmarks, two-to-three positioning
+  alternatives, name/avatar/bio launch assets, pilot experiments and observed
+  validation evidence. `monetization_first` is the default; `influence_first`
+  requires explicit user intent and still reserves monetization routes. The
+  agent surface uses `personal_ip_record_strategy` and
+  `personal_ip_read_strategy_context`. Customer copy may say current
+  judgment/candidate/pilot before observed validation, never “建模完成” or
+  “定位完成”. Internal stages and fields stay private. Repeated content
+  outcomes become revisable versioned rules through blind prediction,
+  retrospective and evidence promotion; one viral post is not permanent truth.
+- `skills/public/personal-ip-operator/SKILL.md` must explicitly allow every
+  native `personal_ip_*` tool plus the browser/media execution surfaces it
+  directs the agent to use. MediaKit skills declare restrictive
+  `allowed-tools: [bash]`; their active-skill union must not reduce an operating
+  conversation to shell-only work. When a production requests
+  `sequential_human_gate`, the agent submits one shot, seals its candidate and
+  QA, writes a candidate-selection review request, and waits for the workbench
+  approval before requesting the next shot.
 
 Skill quality review note:
+
 - `skills/public/skill-reviewer/` is the built-in read-only skill quality reviewer.
   It uses the harness-layer `review_skill_package` tool and contracts in
   `contracts/skill_review/`. Model-visible review data is compact and
@@ -255,6 +411,7 @@ Skill quality review note:
   `skill-creator` ownership boundaries.
 
 Scheduled-task note:
+
 - The scheduled-task MVP adds a workspace page at `/workspace/scheduled-tasks` plus a background scheduler service gated by `config.yaml -> scheduler.enabled`.
 - Scheduled background runs are intentionally non-interactive: they execute through the normal run lifecycle, but the lead-agent toolset excludes `ask_clarification` when `context.non_interactive=true`. The key is honored only for internally-authenticated callers (the scheduler launch path); client-supplied `context.non_interactive` is dropped.
 - Personal-IP metric schedules should call
