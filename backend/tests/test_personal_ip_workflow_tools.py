@@ -182,7 +182,7 @@ async def test_browser_publish_tools_bind_selected_profile_and_live_proof(tmp_pa
 
 
 @pytest.mark.asyncio
-async def test_run_preflight_keeps_local_identity_out_of_provider_request(monkeypatch) -> None:
+async def test_run_preflight_uses_strategy_without_local_ids(monkeypatch) -> None:
     preflights = SimpleNamespace(
         seal=AsyncMock(
             return_value={
@@ -192,12 +192,25 @@ async def test_run_preflight_keeps_local_identity_out_of_provider_request(monkey
             }
         )
     )
+    brand = SimpleNamespace(
+        get_latest_strategy=AsyncMock(
+            return_value={
+                "stage": "launch_package_ready",
+                "mode": "monetization_first",
+                "person_model": {"values_boundaries": ["不夸大"]},
+                "business_model": {"primary_goal": "获取付费客户"},
+                "positioning_candidates": [{"candidate_id": "a", "promise": "经营结果"}],
+                "launch_package": {"selected_candidate_id": "a", "bio_options": ["真实经营"]},
+            }
+        ),
+    )
     configure_personal_ip_runtime(
         PersonalIPRuntimeServices(
             connections=SimpleNamespace(),
             metrics=SimpleNamespace(),
             publish_receipts=SimpleNamespace(),
             preflights=preflights,
+            brand=brand,
         )
     )
 
@@ -236,8 +249,6 @@ async def test_run_preflight_keeps_local_identity_out_of_provider_request(monkey
                     "metrics": {"views": 1000, "likes": 90},
                 }
             ],
-            audience_profile={"cohort_label": "智能体创作者"},
-            creator_profile={"voice": ["直接"]},
             target={
                 "content_id": "draft-1",
                 "title": "待发布",
@@ -266,12 +277,25 @@ async def test_run_preflight_requires_both_local_evidence_purposes(monkeypatch) 
         "digest": "a" * 64,
     }
     minecontext = SimpleNamespace(read_evidence=MagicMock(return_value=[evidence]))
+    brand = SimpleNamespace(
+        get_latest_strategy=AsyncMock(
+            return_value={
+                "stage": "launch_package_ready",
+                "mode": "monetization_first",
+                "person_model": {"values_boundaries": ["不夸大"]},
+                "business_model": {"primary_goal": "获取付费客户"},
+                "positioning_candidates": [{"candidate_id": "a", "promise": "经营结果"}],
+                "launch_package": {"selected_candidate_id": "a", "bio_options": ["真实经营"]},
+            }
+        ),
+    )
     configure_personal_ip_runtime(
         PersonalIPRuntimeServices(
             connections=SimpleNamespace(),
             metrics=SimpleNamespace(),
             publish_receipts=SimpleNamespace(),
             preflights=preflights,
+            brand=brand,
             minecontext=minecontext,
         )
     )
@@ -296,15 +320,18 @@ async def test_run_preflight_requires_both_local_evidence_purposes(monkeypatch) 
         await _personal_ip_run_preflight(
             SimpleNamespace(context={"user_id": "user-1"}),
             operation_key="preflight:local",
-            subject_ids=[],
+            subject_ids=["subject-1"],
             target_account_ids=[],
-            history=[{
-                "content_id": "published-1", "published_at": "2026-07-20T08:00:00Z",
-                "platform": "douyin", "title": "历史内容", "content_type": "short_video",
-                "metrics": {"views": 1000},
-            }],
-            audience_profile={"cohort_label": "智能体创作者"},
-            creator_profile={"voice": ["直接"]},
+            history=[
+                {
+                    "content_id": "published-1",
+                    "published_at": "2026-07-20T08:00:00Z",
+                    "platform": "douyin",
+                    "title": "历史内容",
+                    "content_type": "short_video",
+                    "metrics": {"views": 1000},
+                }
+            ],
             target={"content_id": "draft-1", "title": "待发布", "description": "预演"},
             local_context_evidence_ids=["mctx_1"],
         )

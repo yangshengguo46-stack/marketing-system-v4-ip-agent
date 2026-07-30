@@ -48,7 +48,7 @@ from deerflow.persistence.migrations._helpers import _normalize_default
 asyncio_test = pytest.mark.asyncio
 
 
-HEAD = "0016_personal_ip_auto_evidence"
+HEAD = "0019_personal_ip_strategy_versions"
 BASELINE = "0001_baseline"
 
 
@@ -858,7 +858,7 @@ class TestDecideState:
 # ---------------------------------------------------------------------------
 
 
-def test_head_revision_is_personal_ip_platform_observations_revision() -> None:
+def test_head_revision_is_personal_ip_strategy_revision() -> None:
     assert _get_head_revision() == HEAD
 
 

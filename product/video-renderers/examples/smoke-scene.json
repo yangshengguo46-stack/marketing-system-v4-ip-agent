@@ -1,0 +1,15 @@
+{
+  "contract_version": "personal-ip-render-scene-v1",
+  "canvas": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30
+  },
+  "duration_seconds": 3,
+  "label": "本地确定性渲染",
+  "headline": "预览、检查、批准、成片",
+  "body": "场景由规格驱动，不写死客户品牌，也不依赖运行时网络。",
+  "accent": "#f05a36",
+  "background": "#101418",
+  "media": []
+}

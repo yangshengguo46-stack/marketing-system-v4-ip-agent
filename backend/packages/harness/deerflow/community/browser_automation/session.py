@@ -15,7 +15,6 @@ private loop so the core harness installs without it.
 from __future__ import annotations
 
 import asyncio
-import base64
 import contextlib
 import logging
 import os
@@ -27,7 +26,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from urllib.parse import urlparse
 
 if TYPE_CHECKING:
-    from playwright.async_api import Browser, BrowserContext, Page, Playwright
+    from playwright.async_api import Browser, BrowserContext, CDPSession, Page, Playwright
 
 logger = logging.getLogger(__name__)
 
@@ -217,10 +216,10 @@ _CLICK_TIMEOUT_MS = 8000
 # Short, best-effort settle wait after a click. SPA (client-side) navigations
 # never fire a fresh load event, so this must never block the action.
 _POST_CLICK_LOAD_TIMEOUT_MS = 3000
-_LIVE_FRAME_JPEG_QUALITY = 85
+_LIVE_FRAME_JPEG_QUALITY = 70
 _MANUAL_LIVE_FRAME_MIN_INTERVAL_S = 0.75
 _LIVE_FRAME_INPUT_INTERVAL_S = 0.05
-_LIVE_FRAME_SETTLE_DELAYS_S = (0.8, 2.0)
+_LIVE_FRAME_SETTLE_DELAYS_S = (0.6,)
 
 # Bound per-thread Chromium accumulation on a long-running multi-user gateway.
 # Sessions unused past the idle timeout are lazily evicted on the next
@@ -405,6 +404,13 @@ class BrowserSession:
         # may call _ensure_page (which routes through _set_active_page); without
         # this flag that would schedule another rebind and recurse.
         self._screencast_binding = False
+        # Reuse one native DevTools session for the active page. Playwright's
+        # high-level ``page.screenshot`` waits for extra screenshot stability
+        # work and made every remote click feel several seconds late on complex
+        # creator dashboards. ``Page.captureScreenshot`` can return the already
+        # encoded viewport JPEG directly and supports an explicit fast path.
+        self._live_cdp_session: CDPSession | None = None
+        self._live_cdp_page: Page | None = None
         self._last_manual_live_frame_at = 0.0
         self._settle_live_frames_pending = False
         self._input_live_frame_generation = 0
@@ -478,7 +484,7 @@ class BrowserSession:
                         self._user_data_dir,
                         headless=self._headless,
                         viewport=self._viewport,
-                        device_scale_factor=2,
+                        device_scale_factor=1,
                     )
                     self._context.set_default_timeout(self._timeout_ms)
                     await self._install_request_guard()
@@ -489,9 +495,12 @@ class BrowserSession:
 
             if self._browser is None or not self._browser.is_connected():
                 self._browser = await self._playwright.chromium.launch(headless=self._headless)
-            # device_scale_factor=2 renders screenshots at retina density so the
-            # panel stays crisp when the image is scaled up to fill the view.
-            self._context = await self._browser.new_context(viewport=self._viewport, device_scale_factor=2)
+            # Keep the interactive backing bitmap at the CSS viewport instead
+            # of rendering four times as many Retina pixels before every frame.
+            self._context = await self._browser.new_context(
+                viewport=self._viewport,
+                device_scale_factor=1,
+            )
             self._context.set_default_timeout(self._timeout_ms)
             await self._install_request_guard()
             self._set_active_page(await self._context.new_page())
@@ -577,6 +586,20 @@ class BrowserSession:
         await page.goto(url, wait_until="domcontentloaded")
         return await self._snapshot_impl(page)
 
+    async def _open_single_page(self, url: str) -> str:
+        """Open *url* and collapse restored/stale tabs to this one page."""
+        page = await self._ensure_page()
+        await page.goto(url, wait_until="domcontentloaded")
+        context = self._context
+        if context is not None:
+            for other_page in list(context.pages):
+                if other_page is page or other_page.is_closed():
+                    continue
+                with contextlib.suppress(Exception):
+                    await other_page.close()
+        self._set_active_page(page)
+        return page.url
+
     async def _snapshot_impl(self, page: Page) -> PageSnapshot:
         data = await page.evaluate(_SNAPSHOT_JS)
         elements = [SnapshotElement(ref=int(e["ref"]), tag=e["tag"], role=e["role"], type=e["type"], name=e["name"]) for e in data["elements"]]
@@ -640,8 +663,27 @@ class BrowserSession:
 
     async def _get_text(self, max_chars: int) -> str:
         page = await self._ensure_page()
-        text = await page.inner_text("body")
-        return text[:max_chars]
+        chunks: list[str] = []
+        for frame in page.frames:
+            with contextlib.suppress(Exception):
+                text = await frame.inner_text("body", timeout=1_500)
+                if text:
+                    chunks.append(text)
+            if sum(len(chunk) for chunk in chunks) >= max_chars:
+                break
+        return "\n".join(chunks)[:max_chars]
+
+    async def _has_first_party_cookie_set(
+        self,
+        domains: tuple[str, ...],
+        cookie_sets: tuple[tuple[str, ...], ...],
+    ) -> bool:
+        """Check cookie names inside the browser owner; never return values."""
+        page = await self._ensure_page()
+        cookies = await page.context.cookies()
+        normalized_domains = tuple(domain.lstrip(".").lower() for domain in domains)
+        names = {str(cookie.get("name") or "") for cookie in cookies if any((cookie_domain := str(cookie.get("domain") or "").lstrip(".").lower()) == domain or cookie_domain.endswith(f".{domain}") for domain in normalized_domains)}
+        return any(cookie_set and all(cookie_name in names for cookie_name in cookie_set) for cookie_set in cookie_sets)
 
     async def _extract_business_page(self, *, max_chars: int, max_rows: int) -> dict[str, Any]:
         page = await self._ensure_page()
@@ -659,8 +701,23 @@ class BrowserSession:
 
     async def _live_frame(self) -> str:
         page = await self._ensure_page()
-        shot = await page.screenshot(type="jpeg", quality=_LIVE_FRAME_JPEG_QUALITY)
-        return base64.b64encode(shot).decode("ascii")
+        if self._live_cdp_session is None or self._live_cdp_page is not page:
+            if self._live_cdp_session is not None:
+                with contextlib.suppress(Exception):
+                    await self._live_cdp_session.detach()
+            self._live_cdp_session = await page.context.new_cdp_session(page)
+            self._live_cdp_page = page
+        result = await self._live_cdp_session.send(
+            "Page.captureScreenshot",
+            {
+                "format": "jpeg",
+                "quality": _LIVE_FRAME_JPEG_QUALITY,
+                "fromSurface": True,
+                "captureBeyondViewport": False,
+                "optimizeForSpeed": True,
+            },
+        )
+        return str(result["data"])
 
     async def _emit_live_frame(self) -> None:
         if self._on_frame is None:
@@ -791,6 +848,8 @@ class BrowserSession:
             self._context = None
             self._page = None
             self._screencast_page = None
+            self._live_cdp_session = None
+            self._live_cdp_page = None
             self._connected_over_cdp = False
             self._on_frame = None
             self._settle_live_frames_pending = False
@@ -870,7 +929,11 @@ class BrowserSession:
         elif etype == "text":
             text = event.get("text")
             if text:
-                await page.keyboard.type(text)
+                # Insert committed text as one browser editing operation. Sites
+                # with controlled OTP/verification inputs can discard synthetic
+                # per-key keydown/keyup sequences, while insert_text mirrors the
+                # browser's committed text/IME path and preserves Unicode.
+                await page.keyboard.insert_text(text)
         elif etype == "navigate":
             url = event.get("url")
             if url:
@@ -891,6 +954,11 @@ class BrowserSession:
         with self._activity():
             return await self._loop.run(self._navigate(url))
 
+    async def open_single_page(self, url: str) -> str:
+        """Prepare a user-facing login window with exactly one platform page."""
+        with self._activity():
+            return await self._loop.run(self._open_single_page(url))
+
     async def snapshot(self) -> PageSnapshot:
         with self._activity():
             return await self._loop.run(self._snapshot())
@@ -906,6 +974,18 @@ class BrowserSession:
     async def get_text(self, max_chars: int = 8000) -> str:
         with self._activity():
             return await self._loop.run(self._get_text(max_chars))
+
+    async def has_first_party_cookie_set(
+        self,
+        *,
+        domains: tuple[str, ...],
+        cookie_sets: tuple[tuple[str, ...], ...],
+    ) -> bool:
+        """Verify a login signal without exposing any browser cookie value."""
+        with self._activity():
+            return await self._loop.run(
+                self._has_first_party_cookie_set(domains, cookie_sets),
+            )
 
     async def extract_business_page(self, *, max_chars: int = 60_000, max_rows: int = 500) -> dict[str, Any]:
         """Read rendered business data without reading browser credentials."""

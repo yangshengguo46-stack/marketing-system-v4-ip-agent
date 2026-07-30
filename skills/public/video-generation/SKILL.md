@@ -46,6 +46,7 @@ python /mnt/skills/public/video-generation/scripts/generate.py \
   --reference-images /path/to/ref1.jpg \
   --output-file /mnt/user-data/outputs/generated-video.mp4 \
   --aspect-ratio 16:9 \
+  --model doubao-seedance-2-0-260128 \
   --receipt-file /mnt/user-data/outputs/generated-video.receipt.json
 ```
 
@@ -55,6 +56,7 @@ Parameters:
 - `--reference-images`: Absolute paths to reference image (optional)
 - `--output-file`: Absolute path to output image file (required)
 - `--aspect-ratio`: Aspect ratio of the generated image (optional, default: 16:9)
+- `--model`: Volcengine Seedance model ID for this generation (optional). When video-workbench context provides a concrete `preferred_video_model`, pass that exact value. Omit this flag when it is `auto`.
 - `--receipt-file`: Standard executor receipt path (required inside a Personal-IP production)
 
 [!NOTE]

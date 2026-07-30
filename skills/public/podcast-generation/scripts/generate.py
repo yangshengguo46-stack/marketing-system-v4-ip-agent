@@ -6,12 +6,13 @@ import logging
 import mimetypes
 import os
 import random
+import re
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 import requests
 
@@ -25,6 +26,8 @@ DEFAULT_TTS_MAX_RETRIES = 4
 DEFAULT_MAX_WORKERS = 4
 DEFAULT_MINIMAX_MAX_WORKERS = 1
 MEDIA_EXECUTION_CONTRACT_VERSION = "personal-ip-media-execution-v1"
+VOLCENGINE_TTS_V3_URL = "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
+VOLCENGINE_TTS_V3_RESOURCE = "seed-tts-2.0"
 
 
 def _utc_now() -> str:
@@ -65,17 +68,74 @@ def _unknown_cost() -> dict:
 
 class ScriptLine:
     def __init__(
-        self, speaker: Literal["male", "female"] = "male", paragraph: str = ""
+        self,
+        speaker: Literal["male", "female"] = "male",
+        paragraph: str = "",
+        *,
+        voice_type: str | None = None,
+        speech_rate: int = 0,
+        loudness_rate: int = 0,
+        context_texts: list[str] | None = None,
     ):
         self.speaker = speaker
         self.paragraph = paragraph
+        self.voice_type = voice_type
+        self.speech_rate = speech_rate
+        self.loudness_rate = loudness_rate
+        self.context_texts = context_texts or []
+
+
+def _line_rate(value, *, field: str) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, bool):
+        raise ValueError(f"{field} must be an integer between -50 and 100")
+    try:
+        result = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field} must be an integer between -50 and 100") from exc
+    if (
+        str(value).strip() not in {str(result), f"{result}.0"}
+        or result < -50
+        or result > 100
+    ):
+        raise ValueError(f"{field} must be an integer between -50 and 100")
+    return result
+
+
+def _line_voice(value) -> str | None:
+    if value is None or not str(value).strip():
+        return None
+    voice = str(value).strip()
+    if not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", voice):
+        raise ValueError(
+            "voice_type must contain only letters, numbers, dot, underscore, colon or hyphen"
+        )
+    return voice
+
+
+def _line_context_texts(value, *, fallback=None) -> list[str]:
+    raw = value
+    if raw is None and fallback is not None:
+        raw = [fallback]
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or len(raw) > 4:
+        raise ValueError("context_texts must be an array with at most four items")
+    result: list[str] = []
+    for item in raw:
+        text = " ".join(str(item or "").split())
+        if not text or len(text) > 500:
+            raise ValueError("each context_texts item must contain 1 to 500 characters")
+        result.append(text)
+    return result
 
 
 class Script:
     def __init__(
         self,
         locale: Literal["en", "zh"] = "en",
-        lines: Optional[list[ScriptLine]] = None,
+        lines: list[ScriptLine] | None = None,
     ):
         self.locale = locale
         self.lines = lines or []
@@ -83,11 +143,32 @@ class Script:
     @classmethod
     def from_dict(cls, data: dict) -> "Script":
         script = cls(locale=data.get("locale", "en"))
-        for line in data.get("lines", []):
+        for index, line in enumerate(data.get("lines", [])):
+            if not isinstance(line, dict):
+                raise ValueError(f"lines[{index}] must be an object")
+            speaker = str(line.get("speaker", "male")).strip()
+            if speaker not in {"male", "female"}:
+                raise ValueError(f"lines[{index}].speaker must be male or female")
+            paragraph = str(line.get("paragraph", "")).strip()
+            if not paragraph:
+                raise ValueError(f"lines[{index}].paragraph must not be empty")
             script.lines.append(
                 ScriptLine(
-                    speaker=line.get("speaker", "male"),
-                    paragraph=line.get("paragraph", ""),
+                    speaker=speaker,
+                    paragraph=paragraph,
+                    voice_type=_line_voice(line.get("voice_type", line.get("voice"))),
+                    speech_rate=_line_rate(
+                        line.get("speech_rate"),
+                        field=f"lines[{index}].speech_rate",
+                    ),
+                    loudness_rate=_line_rate(
+                        line.get("loudness_rate"),
+                        field=f"lines[{index}].loudness_rate",
+                    ),
+                    context_texts=_line_context_texts(
+                        line.get("context_texts"),
+                        fallback=line.get("context_text"),
+                    ),
                 )
             )
         return script
@@ -112,7 +193,7 @@ def _resolve_provider(
 
 def _resolve_tts_provider() -> str:
     has_volc = bool(
-        os.getenv("VOLCENGINE_TTS_APPID") and os.getenv("VOLCENGINE_TTS_ACCESS_TOKEN")
+        os.getenv("VOLCENGINE_TTS_API_KEY") or os.getenv("VOLCENGINE_TTS_ACCESS_TOKEN")
     )
     provider = _resolve_provider("PODCAST_GENERATION_PROVIDER", "volcengine", has_volc)
     if provider not in ("volcengine", "minimax"):
@@ -120,6 +201,48 @@ def _resolve_tts_provider() -> str:
             f"Unknown podcast provider: {provider!r} (use 'volcengine' or 'minimax')"
         )
     return provider
+
+
+def _volcengine_v3_api_key() -> str | None:
+    return os.getenv("VOLCENGINE_TTS_API_KEY") or (
+        os.getenv("VOLCENGINE_TTS_ACCESS_TOKEN")
+        if not os.getenv("VOLCENGINE_TTS_APPID")
+        else None
+    )
+
+
+def _decode_concatenated_json(raw: bytes) -> list[dict]:
+    """Decode the V3 chunked stream, which may omit newlines between objects."""
+
+    text = raw.decode("utf-8")
+    decoder = json.JSONDecoder()
+    index = 0
+    payloads: list[dict] = []
+    while index < len(text):
+        while index < len(text) and text[index].isspace():
+            index += 1
+        if index >= len(text):
+            break
+        payload, index = decoder.raw_decode(text, index)
+        if not isinstance(payload, dict):
+            raise ValueError("Volcengine TTS V3 returned a non-object stream item")
+        payloads.append(payload)
+    return payloads
+
+
+def _response_bytes(response) -> bytes:
+    iterator = getattr(response, "iter_content", None)
+    if callable(iterator):
+        return b"".join(
+            chunk if isinstance(chunk, bytes) else str(chunk).encode("utf-8")
+            for chunk in iterator(chunk_size=64 * 1024)
+            if chunk
+        )
+    content = getattr(response, "content", b"")
+    if isinstance(content, bytes) and content:
+        return content
+    text = getattr(response, "text", "")
+    return str(text).encode("utf-8")
 
 
 def _default_max_retries() -> int:
@@ -138,7 +261,7 @@ def _default_max_workers(provider: str) -> int:
     return DEFAULT_MAX_WORKERS
 
 
-def _parse_retry_after(response) -> Optional[float]:
+def _parse_retry_after(response) -> float | None:
     """Return the server-provided Retry-After (seconds), if any."""
     headers = getattr(response, "headers", None) or {}
     value = headers.get("Retry-After")
@@ -148,7 +271,7 @@ def _parse_retry_after(response) -> Optional[float]:
         return None
 
 
-def _backoff_sleep(attempt: int, retry_after: Optional[float]) -> None:
+def _backoff_sleep(attempt: int, retry_after: float | None) -> None:
     """Sleep with exponential backoff + jitter, honoring Retry-After when present.
 
     Jitter de-synchronizes concurrent workers that all got rate-limited at once,
@@ -161,15 +284,134 @@ def _backoff_sleep(attempt: int, retry_after: Optional[float]) -> None:
 def text_to_speech_volcengine(
     text: str,
     voice_type: str,
-    max_retries: Optional[int] = None,
-    request_metadata: Optional[dict] = None,
-) -> Optional[bytes]:
+    max_retries: int | None = None,
+    request_metadata: dict | None = None,
+    *,
+    speech_rate: int = 0,
+    loudness_rate: int = 0,
+    context_texts: list[str] | None = None,
+) -> bytes | None:
     """Convert text to speech using Volcengine TTS (returns base64-decoded mp3 bytes).
 
     Retries with exponential backoff on transient HTTP errors (429 / 5xx).
     """
+    speech_rate = _line_rate(speech_rate, field="speech_rate")
+    loudness_rate = _line_rate(loudness_rate, field="loudness_rate")
+    contexts = _line_context_texts(context_texts)
+    api_key = _volcengine_v3_api_key()
+    if api_key:
+        resource = os.getenv("VOLCENGINE_TTS_RESOURCE_ID", VOLCENGINE_TTS_V3_RESOURCE)
+        request_id = str(uuid.uuid4())
+        context_digest = (
+            hashlib.sha256(
+                json.dumps(
+                    contexts,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
+            if contexts
+            else None
+        )
+        if request_metadata is not None:
+            request_metadata.update(
+                {
+                    "request_id": request_id,
+                    "voice": voice_type,
+                    "model": resource,
+                    "protocol": "v3-http-unidirectional",
+                    "speech_rate": speech_rate,
+                    "loudness_rate": loudness_rate,
+                    "context_texts_count": len(contexts),
+                    "context_texts_sha256": context_digest,
+                }
+            )
+        payload = {
+            "user": {"uid": "personal-ip-agent"},
+            "req_params": {
+                "text": text,
+                "speaker": voice_type,
+                "audio_params": {
+                    "format": "mp3",
+                    "sample_rate": 24000,
+                    "speech_rate": speech_rate,
+                    "loudness_rate": loudness_rate,
+                },
+            },
+        }
+        if contexts:
+            payload["req_params"]["context_texts"] = contexts
+        headers = {
+            "X-Api-Key": api_key,
+            "X-Api-Resource-Id": resource,
+            "X-Api-Request-Id": request_id,
+            "Content-Type": "application/json",
+        }
+        if max_retries is None:
+            max_retries = _default_max_retries()
+        for attempt in range(max_retries + 1):
+            try:
+                response = requests.post(
+                    os.getenv("VOLCENGINE_TTS_BASE_URL", VOLCENGINE_TTS_V3_URL),
+                    json=payload,
+                    headers=headers,
+                    timeout=60,
+                    stream=True,
+                )
+            except Exception as exc:
+                logger.error(f"Volcengine TTS V3 network error: {exc}")
+                if attempt < max_retries:
+                    _backoff_sleep(attempt, None)
+                    continue
+                return None
+            if response.status_code == 429 or response.status_code >= 500:
+                logger.warning(
+                    f"Volcengine TTS V3 transient HTTP {response.status_code} "
+                    f"(attempt {attempt + 1}/{max_retries + 1})"
+                )
+                if attempt < max_retries:
+                    _backoff_sleep(attempt, _parse_retry_after(response))
+                    continue
+                return None
+            if response.status_code != 200:
+                logger.error(f"Volcengine TTS V3 HTTP error: {response.status_code}")
+                return None
+            try:
+                chunks: list[bytes] = []
+                terminal = False
+                for item in _decode_concatenated_json(_response_bytes(response)):
+                    code = item.get("code")
+                    if code == 0 and item.get("data"):
+                        chunks.append(base64.b64decode(item["data"]))
+                    elif code == 20000000:
+                        terminal = True
+                    elif code not in (0, None):
+                        logger.error(
+                            "Volcengine TTS V3 provider error %s: %s",
+                            code,
+                            item.get("message") or item.get("msg") or "unknown error",
+                        )
+                        return None
+                if chunks and terminal:
+                    return b"".join(chunks)
+                logger.error("Volcengine TTS V3 returned no complete audio stream")
+                return None
+            except (ValueError, TypeError, base64.binascii.Error) as exc:
+                logger.error(f"Volcengine TTS V3 decode error: {exc}")
+                return None
+        return None
+
     app_id = os.getenv("VOLCENGINE_TTS_APPID")
     access_token = os.getenv("VOLCENGINE_TTS_ACCESS_TOKEN")
+    if not (app_id and access_token):
+        logger.error("Volcengine TTS credentials are not configured")
+        return None
+    if speech_rate != 0 or loudness_rate != 0 or contexts:
+        logger.error(
+            "Per-line speech_rate, loudness_rate and context_texts require "
+            "the Volcengine V3 single-key route"
+        )
+        return None
     cluster = os.getenv("VOLCENGINE_TTS_CLUSTER", "volcano_tts")
     if max_retries is None:
         max_retries = _default_max_retries()
@@ -235,9 +477,9 @@ def text_to_speech_volcengine(
 def text_to_speech_minimax(
     text: str,
     voice_id: str,
-    max_retries: Optional[int] = None,
-    request_metadata: Optional[dict] = None,
-) -> Optional[bytes]:
+    max_retries: int | None = None,
+    request_metadata: dict | None = None,
+) -> bytes | None:
     """Convert text to speech using MiniMax t2a_v2 (returns hex-decoded mp3 bytes).
 
     Retries with exponential backoff on HTTP 429/5xx and on retryable base_resp
@@ -318,7 +560,7 @@ def text_to_speech_minimax(
     return None
 
 
-def _process_line(args: tuple) -> tuple[int, Optional[bytes]]:
+def _process_line(args: tuple) -> tuple[int, bytes | None]:
     """Process a single script line for TTS. Returns (index, audio_bytes)."""
     i, line, total, provider = args[:4]
     request_metadata = args[4] if len(args) > 4 else None
@@ -339,24 +581,32 @@ def _process_line(args: tuple) -> tuple[int, Optional[bytes]]:
                 request_metadata=request_metadata,
             )
     else:
-        if line.speaker == "male":
-            voice = "zh_male_yangguangqingnian_moon_bigtts"
+        if line.voice_type:
+            voice = line.voice_type
+        elif line.speaker == "male":
+            voice = os.getenv("VOLCENGINE_TTS_VOICE_MALE", "zh_male_dayi_uranus_bigtts")
         else:
-            voice = "zh_female_sajiaonvyou_moon_bigtts"
-        if request_metadata is None:
+            voice = os.getenv(
+                "VOLCENGINE_TTS_VOICE_FEMALE", "zh_female_vv_uranus_bigtts"
+            )
+        controls = bool(line.speech_rate or line.loudness_rate or line.context_texts)
+        if request_metadata is None and not controls:
             audio = text_to_speech_volcengine(line.paragraph, voice)
         else:
             audio = text_to_speech_volcengine(
                 line.paragraph,
                 voice,
                 request_metadata=request_metadata,
+                speech_rate=line.speech_rate,
+                loudness_rate=line.loudness_rate,
+                context_texts=line.context_texts,
             )
     if not audio:
         logger.warning(f"Failed to generate audio for line {i + 1}")
     return (i, audio)
 
 
-def tts_node(script: Script, execution_metadata: Optional[dict] = None) -> list[bytes]:
+def tts_node(script: Script, execution_metadata: dict | None = None) -> list[bytes]:
     """Convert script lines to audio chunks using TTS with multi-threading.
 
     Concurrency is owned by the resolved provider (see _default_max_workers);
@@ -371,13 +621,23 @@ def tts_node(script: Script, execution_metadata: Optional[dict] = None) -> list[
     provider = _resolve_tts_provider()
     if execution_metadata is not None:
         execution_metadata["provider"] = provider
-    max_workers = _default_max_workers(provider)
-    if provider == "volcengine" and not (
-        os.getenv("VOLCENGINE_TTS_APPID") and os.getenv("VOLCENGINE_TTS_ACCESS_TOKEN")
+    has_per_line_controls = any(
+        line.voice_type or line.speech_rate or line.loudness_rate or line.context_texts
+        for line in script.lines
+    )
+    if has_per_line_controls and (
+        provider != "volcengine" or not _volcengine_v3_api_key()
     ):
         raise ValueError(
-            "Volcengine TTS selected but VOLCENGINE_TTS_APPID / "
-            "VOLCENGINE_TTS_ACCESS_TOKEN are not set"
+            "Per-line voice_type, speech_rate, loudness_rate and context_texts "
+            "require the Volcengine V3 single-key route"
+        )
+    max_workers = _default_max_workers(provider)
+    if provider == "volcengine" and not (
+        os.getenv("VOLCENGINE_TTS_API_KEY") or os.getenv("VOLCENGINE_TTS_ACCESS_TOKEN")
+    ):
+        raise ValueError(
+            "Volcengine TTS selected but VOLCENGINE_TTS_API_KEY is not set"
         )
     if provider == "minimax" and not os.getenv("MINIMAX_API_KEY"):
         raise ValueError("MiniMax TTS selected but MINIMAX_API_KEY is not set")
@@ -394,7 +654,7 @@ def tts_node(script: Script, execution_metadata: Optional[dict] = None) -> list[
         for i, line in enumerate(script.lines)
     ]
 
-    results: dict[int, Optional[bytes]] = {}
+    results: dict[int, bytes | None] = {}
     failed_indices: list[int] = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(_process_line, task): task[0] for task in tasks}
@@ -447,12 +707,12 @@ def generate_markdown(script: Script, title: str = "Podcast Script") -> str:
 def generate_podcast(
     script_file: str,
     output_file: str,
-    transcript_file: Optional[str] = None,
-    receipt_file: Optional[str] = None,
+    transcript_file: str | None = None,
+    receipt_file: str | None = None,
 ) -> str:
     started_at = _utc_now()
     execution_metadata: dict = {}
-    with open(script_file, "r", encoding="utf-8") as f:
+    with open(script_file, encoding="utf-8") as f:
         script_json = json.load(f)
     if "lines" not in script_json:
         raise ValueError(
@@ -490,6 +750,17 @@ def generate_podcast(
         lines = execution_metadata.get("lines") or []
         request_ids = [item["request_id"] for item in lines if item.get("request_id")]
         voices = sorted({str(item["voice"]) for item in lines if item.get("voice")})
+        line_controls = [
+            {
+                "line_number": item.get("line_number"),
+                "voice": item.get("voice"),
+                "speech_rate": item.get("speech_rate", 0),
+                "loudness_rate": item.get("loudness_rate", 0),
+                "context_texts_count": item.get("context_texts_count", 0),
+                "context_texts_sha256": item.get("context_texts_sha256"),
+            }
+            for item in lines
+        ]
         _write_receipt(
             receipt_file,
             {
@@ -508,6 +779,7 @@ def generate_podcast(
                     "line_count": len(script.lines),
                     "voices": voices,
                     "request_ids": request_ids,
+                    "line_controls": line_controls,
                 },
                 "inputs": input_artifacts,
                 "outputs": outputs,
@@ -520,6 +792,17 @@ def generate_podcast(
             lines = execution_metadata.get("lines") or []
             request_ids = [
                 item["request_id"] for item in lines if item.get("request_id")
+            ]
+            line_controls = [
+                {
+                    "line_number": item.get("line_number"),
+                    "voice": item.get("voice"),
+                    "speech_rate": item.get("speech_rate", 0),
+                    "loudness_rate": item.get("loudness_rate", 0),
+                    "context_texts_count": item.get("context_texts_count", 0),
+                    "context_texts_sha256": item.get("context_texts_sha256"),
+                }
+                for item in lines
             ]
             _write_receipt(
                 receipt_file,
@@ -538,6 +821,7 @@ def generate_podcast(
                         "locale": script.locale,
                         "line_count": len(script.lines),
                         "request_ids": request_ids,
+                        "line_controls": line_controls,
                     },
                     "inputs": input_artifacts,
                     "outputs": [],

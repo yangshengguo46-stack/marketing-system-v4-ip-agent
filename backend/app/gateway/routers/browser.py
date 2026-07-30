@@ -2,6 +2,9 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
+import sys
+from collections.abc import Mapping
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
@@ -11,6 +14,8 @@ from app.gateway.browser_capability import browser_capability
 from deerflow.config.paths import get_paths
 from deerflow.personal_ip.browser_profiles import (
     browser_login_challenge,
+    browser_login_cookie_rule,
+    browser_login_page_succeeded,
     browser_login_succeeded,
     build_browser_account_target,
     get_browser_account_target,
@@ -42,6 +47,22 @@ def _should_apply_browser_seed(current: str | None, seed: str | None) -> bool:
     if not current or current == "about:blank":
         return True
     return _normalize_browser_seed_url(current) != _normalize_browser_seed_url(seed)
+
+
+def _native_account_login_available(
+    enabled: bool,
+    *,
+    platform: str | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> bool:
+    """Whether this Gateway can present a real headed account-login window."""
+    if not enabled:
+        return False
+    runtime_platform = platform or sys.platform
+    if runtime_platform in {"darwin", "win32"}:
+        return True
+    runtime_environ = environ if environ is not None else os.environ
+    return bool(runtime_environ.get("DISPLAY") or runtime_environ.get("WAYLAND_DISPLAY"))
 
 
 def _browser_tools_enabled() -> bool:
@@ -195,11 +216,11 @@ async def browser_stream(
     thread_id: str | None = None,
     account_id: str | None = None,
 ) -> None:
-    """Bidirectional live browser stream.
+    """Own a browser-view or account-login session.
 
-    Server → client: JSON ``{"type":"frame","data":"<base64 jpeg>"}`` frames
-    captured via CDP screencast. Client → server: input events (click, move,
-    down, up, wheel, key, text, navigate) that drive the live page.
+    Thread viewers and no-display account logins use the bidirectional CDP
+    screencast/input protocol. Local account login instead launches a real
+    headed persistent Chromium and uses this socket only for lifecycle/status.
     """
     user = await _authenticate_ws(websocket)
     if user is None:
@@ -325,11 +346,20 @@ async def browser_stream(
         value = extra.get(key)
         return value.strip() or None if isinstance(value, str) else None
 
+    native_account_login = account_id is not None and _native_account_login_available(
+        _cfg_bool("native_account_login", True),
+    )
     manager = get_browser_session_manager()
+    if native_account_login and target is not None:
+        # A retained account session may have been opened headlessly by an
+        # earlier agent operation. Explicit manual login owns this account's
+        # browser session, so replace it before requesting a headed window.
+        with contextlib.suppress(Exception):
+            await manager.close_session(target.session_key)
     try:
         session_lease = manager.acquire_session(
             target.session_key if target is not None else resource_id,
-            headless=_cfg_bool("headless", True),
+            headless=False if native_account_login else _cfg_bool("headless", True),
             timeout_ms=_cfg_int("timeout_ms", 30000),
             viewport={"width": _cfg_int("viewport_width", 1280), "height": _cfg_int("viewport_height", 720)},
             cdp_url=_cfg_str("cdp_url"),
@@ -386,11 +416,28 @@ async def browser_stream(
         if browser_login_challenge(account_login_platform, url):
             login_challenge_seen = True
             return
-        if browser_login_succeeded(
+        login_succeeded = browser_login_succeeded(
             account_login_platform,
             url,
             challenge_seen=login_challenge_seen,
-        ):
+        )
+        if not login_succeeded:
+            cookie_rule = browser_login_cookie_rule(account_login_platform, url)
+            if cookie_rule is not None:
+                with contextlib.suppress(Exception):
+                    login_succeeded = await session.has_first_party_cookie_set(
+                        domains=cookie_rule.hosts,
+                        cookie_sets=cookie_rule.cookie_sets,
+                    )
+        if not login_succeeded and account_login_platform == "douyin":
+            with contextlib.suppress(Exception):
+                page_text = await session.get_text(max_chars=8_000)
+                login_succeeded = browser_login_page_succeeded(
+                    account_login_platform,
+                    url,
+                    page_text,
+                )
+        if login_succeeded:
             login_success_reported = True
             await _send_payload({"type": "account_authenticated"})
 
@@ -411,7 +458,7 @@ async def browser_stream(
                     last_url = url
                     await _send_payload({"type": "url", "url": url})
                     await _send_tabs()
-                    await _report_account_login(url)
+                await _report_account_login(url)
 
     def _queue_input(event: dict) -> None:
         nonlocal pending_move, pending_wheel
@@ -495,31 +542,58 @@ async def browser_stream(
                         await _send_url()
                         await _send_tabs()
 
-    pump_task = asyncio.create_task(_pump_frames())
+    pump_task: asyncio.Task | None = None
     input_task: asyncio.Task | None = None
     reader_task: asyncio.Task | None = None
     poll_task: asyncio.Task | None = None
+    screencast_started = False
     try:
+        await _send_payload(
+            {
+                "type": "presentation",
+                "mode": "native_window" if native_account_login else "embedded_stream",
+            },
+        )
         # Seed the live page from the latest browser_view URL. A thread can have
         # a stale browser session from an earlier panel/live attempt; if that
         # page differs from the latest visible browser artifact, align Live with
         # what the user expects instead of requiring an off/on reconnect.
-        seed = websocket.query_params.get("seed") or default_seed
+        # Account login always uses the server-registered platform entry URL.
+        # A stale or modified frontend seed must never open the wrong site in a
+        # credential-bearing account profile. Thread viewers may still request
+        # their current artifact URL.
+        seed = default_seed if account_id is not None else websocket.query_params.get("seed") or default_seed
         if seed and validate_browser_url(seed) is None:
-            with contextlib.suppress(Exception):
-                current = await session.current_url()
-                if _should_apply_browser_seed(current, seed):
-                    await session.navigate(seed)
-        try:
-            await session.start_screencast(_on_frame)
-        except BrowserLiveViewerError:
-            await websocket.close(code=4409)
-            return
+            if native_account_login:
+                try:
+                    await session.open_single_page(seed)
+                except Exception as exc:
+                    logger.error(
+                        "native account login navigation failed: account_id=%s err_type=%s",
+                        account_id,
+                        type(exc).__name__,
+                    )
+                    await websocket.close(code=4502)
+                    return
+            else:
+                with contextlib.suppress(Exception):
+                    current = await session.current_url()
+                    if _should_apply_browser_seed(current, seed):
+                        await session.navigate(seed)
+        if not native_account_login:
+            try:
+                await session.start_screencast(_on_frame)
+                screencast_started = True
+            except BrowserLiveViewerError:
+                await websocket.close(code=4409)
+                return
+            pump_task = asyncio.create_task(_pump_frames())
         await _send_url()
         await _send_tabs()
         with contextlib.suppress(Exception):
             await _report_account_login(await session.current_url())
-        input_task = asyncio.create_task(_process_inputs())
+        if not native_account_login:
+            input_task = asyncio.create_task(_process_inputs())
         reader_task = asyncio.create_task(_read_inputs())
         poll_task = asyncio.create_task(_poll_location())
         await reader_task
@@ -528,14 +602,21 @@ async def browser_stream(
     except Exception as exc:
         logger.exception("browser stream error: resource_id=%s err=%s", resource_id, exc)
     finally:
-        pump_task.cancel()
+        if pump_task is not None:
+            pump_task.cancel()
         if input_task is not None:
             input_task.cancel()
         if reader_task is not None:
             reader_task.cancel()
         if poll_task is not None:
             poll_task.cancel()
-        with contextlib.suppress(Exception):
-            await session.stop_screencast(_on_frame)
+        if screencast_started:
+            with contextlib.suppress(Exception):
+                await session.stop_screencast(_on_frame)
         session_lease.__exit__(None, None, None)
+        if native_account_login and target is not None:
+            # Close the headed login window and flush the persistent profile.
+            # The agent will later reopen the same profile headlessly.
+            with contextlib.suppress(Exception):
+                await manager.close_session(target.session_key)
         reset_current_user(token)

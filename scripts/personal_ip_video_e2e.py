@@ -20,15 +20,42 @@ if str(HARNESS) not in sys.path:
     sys.path.insert(0, str(HARNESS))
 
 from deerflow.config.database_config import DatabaseConfig  # noqa: E402
-from deerflow.persistence.engine import close_engine, get_session_factory, init_engine_from_config  # noqa: E402
-from deerflow.persistence.personal_ip_video_productions import PersonalIPVideoProductionRepository  # noqa: E402
+from deerflow.persistence.engine import (  # noqa: E402
+    close_engine,
+    get_session_factory,
+    init_engine_from_config,
+)
+from deerflow.persistence.personal_ip_video_productions import (  # noqa: E402
+    PersonalIPVideoProductionRepository,
+)
 from deerflow.personal_ip.media_execution import normalize_media_execution_receipt  # noqa: E402
-from deerflow.personal_ip.video_acceptance import artifact_for_path, run_delivery_qa, verify_local_receipt_outputs  # noqa: E402
+from deerflow.personal_ip.video_acceptance import (  # noqa: E402
+    artifact_for_path,
+    run_delivery_qa,
+    verify_local_receipt_outputs,
+)
 
-MEDIA_EXECUTOR = ROOT / "skills" / "public" / "volcengine-stack" / "scripts" / "run_media_executor.py"
-PROJECT_MEDIAKIT = ROOT / ".deer-flow" / "bin" / ("mediakit-cli.exe" if os.name == "nt" else "mediakit-cli")
+MEDIA_EXECUTOR = (
+    ROOT
+    / "skills"
+    / "public"
+    / "volcengine-stack"
+    / "scripts"
+    / "run_media_executor.py"
+)
+PROJECT_MEDIAKIT = (
+    ROOT
+    / ".deer-flow"
+    / "bin"
+    / ("mediakit-cli.exe" if os.name == "nt" else "mediakit-cli")
+)
 PROJECT_FFMPEG_DIR = ROOT / ".deer-flow" / "toolchains" / "ffmpeg" / "bin"
-KNOWN_ZERO_COST = {"status": "known", "amount": 0, "currency": "CNY", "basis": "local acceptance execution"}
+KNOWN_ZERO_COST = {
+    "status": "known",
+    "amount": 0,
+    "currency": "CNY",
+    "basis": "local acceptance execution",
+}
 
 
 def _canonical_json(value: Any) -> str:
@@ -98,7 +125,9 @@ def _run_receipt_command(
         existing = _load_json(receipt_file)
         if existing.get("status") == "failed":
             if not expect_failure:
-                raise RuntimeError(f"failed receipt requires a new retry receipt: {receipt_file}")
+                raise RuntimeError(
+                    f"failed receipt requires a new retry receipt: {receipt_file}"
+                )
             return existing
     argv = [
         sys.executable,
@@ -138,16 +167,31 @@ def _run_receipt_command(
             ]
         )
     else:
-        argv.extend(["--cost-status", "known", "--cost-amount", "0", "--cost-currency", "CNY", "--cost-basis", "local acceptance execution"])
+        argv.extend(
+            [
+                "--cost-status",
+                "known",
+                "--cost-amount",
+                "0",
+                "--cost-currency",
+                "CNY",
+                "--cost-basis",
+                "local acceptance execution",
+            ]
+        )
     if receipt_file.is_file():
         argv.append("--resume")
     argv.extend(["--", *command])
-    completed = subprocess.run(argv, cwd=ROOT, env=environment, capture_output=True, text=True, check=False)
+    completed = subprocess.run(
+        argv, cwd=ROOT, env=environment, capture_output=True, text=True, check=False
+    )
     if expect_failure:
         if completed.returncode == 0:
             raise RuntimeError("simulated failed attempt unexpectedly succeeded")
     elif completed.returncode != 0:
-        raise RuntimeError(f"media executor failed: {(completed.stdout or completed.stderr).strip()[:1_000]}")
+        raise RuntimeError(
+            f"media executor failed: {(completed.stdout or completed.stderr).strip()[:1_000]}"
+        )
     receipt = _load_json(receipt_file)
     if not expect_failure:
         verify_local_receipt_outputs(receipt)
@@ -235,27 +279,61 @@ def _acceptance_documents(work_dir: Path) -> dict[str, Path]:
     }
     _write_json_once(
         paths["source"],
-        {"title": "Agent receipt acceptance", "script": "A receipt card becomes a finished vertical video while every execution step remains auditable."},
+        {
+            "title": "Agent receipt acceptance",
+            "script": "A receipt card becomes a finished vertical video while every execution step remains auditable.",
+        },
     )
     _write_json_once(
         paths["blueprint"],
-        {"beats": ["script enters", "provider retry", "verified delivery"], "duration_seconds": 2, "aspect_ratio": "9:16"},
+        {
+            "beats": ["script enters", "provider retry", "verified delivery"],
+            "duration_seconds": 2,
+            "aspect_ratio": "9:16",
+        },
     )
     _write_json_once(
         paths["asset_prompt"],
-        {"prompt": "A clean cobalt-blue receipt card on a dark studio background, centered, vertical composition", "style": "minimal cinematic product illustration", "negative_prompt": "text, watermark, logo"},
+        {
+            "prompt": "A clean cobalt-blue receipt card on a dark studio background, centered, vertical composition",
+            "style": "minimal cinematic product illustration",
+            "negative_prompt": "text, watermark, logo",
+        },
     )
     _write_json_once(
         paths["storyboard"],
-        {"shots": [{"id": "shot-01", "duration_seconds": 2, "description": "The blue receipt card moves forward while verification marks illuminate."}]},
+        {
+            "shots": [
+                {
+                    "id": "shot-01",
+                    "duration_seconds": 2,
+                    "description": "The blue receipt card moves forward while verification marks illuminate.",
+                }
+            ]
+        },
     )
     _write_json_once(
         paths["video_prompt"],
-        {"title": "Receipt acceptance shot", "subject": "blue receipt card", "camera": {"movement": "slow push in"}, "duration_seconds": 2, "audio": []},
+        {
+            "title": "Receipt acceptance shot",
+            "subject": "blue receipt card",
+            "camera": {"movement": "slow push in"},
+            "duration_seconds": 2,
+            "audio": [],
+        },
     )
     _write_json_once(
         paths["voice_script"],
-        {"title": "Receipt acceptance", "locale": "en", "lines": [{"speaker": "male", "paragraph": "Hello Deer. Every output is verified before delivery."}]},
+        {
+            "title": "Receipt acceptance",
+            "locale": "en",
+            "lines": [
+                {
+                    "speaker": "male",
+                    "paragraph": "Hello Deer. Every output is verified before delivery.",
+                }
+            ],
+        },
     )
     return paths
 
@@ -268,17 +346,28 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
     receipts = work_dir / "receipts"
     outputs.mkdir(exist_ok=True)
     receipts.mkdir(exist_ok=True)
-    ffmpeg = _tool_path(args.ffmpeg, "ffmpeg.exe" if os.name == "nt" else "ffmpeg", "ffmpeg")
-    ffprobe = _tool_path(args.ffprobe, "ffprobe.exe" if os.name == "nt" else "ffprobe", "ffprobe")
+    ffmpeg = _tool_path(
+        args.ffmpeg, "ffmpeg.exe" if os.name == "nt" else "ffmpeg", "ffmpeg"
+    )
+    ffprobe = _tool_path(
+        args.ffprobe, "ffprobe.exe" if os.name == "nt" else "ffprobe", "ffprobe"
+    )
     environment = _executor_environment(ffmpeg)
 
-    await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(work_dir / "ledger")))
+    await init_engine_from_config(
+        DatabaseConfig(backend="sqlite", sqlite_dir=str(work_dir / "ledger"))
+    )
     session_factory = get_session_factory()
     if session_factory is None:
         raise RuntimeError("acceptance ledger is unavailable")
     repository = PersonalIPVideoProductionRepository(session_factory)
     source = _load_json(documents["source"])
-    delivery_spec = {"aspect_ratio": "9:16", "duration_seconds": 2, "duration_tolerance_seconds": 0.25, "require_audio": True}
+    delivery_spec = {
+        "aspect_ratio": "9:16",
+        "duration_seconds": 2,
+        "duration_tolerance_seconds": 0.25,
+        "require_audio": True,
+    }
     production = await repository.begin(
         owner_user_id=args.owner_user_id,
         operation_key=args.operation_key,
@@ -288,8 +377,17 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         source_kind="script",
         source=source,
         delivery_spec=delivery_spec,
-        provider_policy={"image": ["seedream"], "video": ["seedance"], "speech": ["doubao-speech"], "finishing": ["mediakit-cli", "ffmpeg"]},
-        budget={"currency": "CNY", "paid_calls_require_explicit_approval": True, "local_acceptance_limit": 0},
+        provider_policy={
+            "image": ["seedream"],
+            "video": ["seedance"],
+            "speech": ["doubao-speech"],
+            "finishing": ["mediakit-cli", "ffmpeg"],
+        },
+        budget={
+            "currency": "CNY",
+            "paid_calls_require_explicit_approval": True,
+            "local_acceptance_limit": 0,
+        },
     )
     production_id = production["id"]
     source_ref = artifact_for_path(documents["source"])["ref"]
@@ -318,7 +416,19 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         executor="ffmpeg-local-seedream-simulator",
         capability="image_generation",
         job_kind="seedream_asset",
-        command=[ffmpeg, "-v", "error", "-f", "lavfi", "-i", "color=c=0x246BFD:s=360x640", "-frames:v", "1", "-y", str(asset)],
+        command=[
+            ffmpeg,
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=0x246BFD:s=360x640",
+            "-frames:v",
+            "1",
+            "-y",
+            str(asset),
+        ],
         environment=environment,
         request_id="mock-seedream-request-1",
     )
@@ -383,7 +493,21 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         executor="ffmpeg-local-seedance-simulator",
         capability="video_generation",
         job_kind="seedance_shot",
-        command=[ffmpeg, "-v", "error", "-f", "lavfi", "-i", "color=c=0x10182F:s=360x640:d=2:r=25", "-c:v", "mpeg4", "-pix_fmt", "yuv420p", "-y", str(shot)],
+        command=[
+            ffmpeg,
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=0x10182F:s=360x640:d=2:r=25",
+            "-c:v",
+            "mpeg4",
+            "-pix_fmt",
+            "yuv420p",
+            "-y",
+            str(shot),
+        ],
         environment=environment,
         task_id="mock-seedance-task-attempt-2",
         request_id="mock-seedance-request-attempt-2",
@@ -409,7 +533,10 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         entity_type="candidate",
         entity_id="shot-01:candidate-2",
         payload={"checks": {"aspect_ratio": True, "reference_asset_present": True}},
-        input_refs=[asset_receipt["outputs"][0]["ref"], shot_receipt["outputs"][0]["ref"]],
+        input_refs=[
+            asset_receipt["outputs"][0]["ref"],
+            shot_receipt["outputs"][0]["ref"],
+        ],
         output_refs=[shot_receipt["outputs"][0]["ref"]],
     )
     await _append_business_event(
@@ -421,7 +548,10 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         status="succeeded",
         entity_type="candidate",
         entity_id="shot-01:candidate-2",
-        payload={"selected": True, "reason": "only retry passed local consistency checks"},
+        payload={
+            "selected": True,
+            "reason": "only retry passed local consistency checks",
+        },
         input_refs=[shot_receipt["outputs"][0]["ref"]],
         output_refs=[shot_receipt["outputs"][0]["ref"]],
     )
@@ -436,7 +566,19 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         executor="ffmpeg-local-speech-simulator",
         capability="speech_generation",
         job_kind="voiceover",
-        command=[ffmpeg, "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-c:a", "pcm_s16le", "-y", str(voice)],
+        command=[
+            ffmpeg,
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=2",
+            "-c:a",
+            "pcm_s16le",
+            "-y",
+            str(voice),
+        ],
         environment=environment,
         request_id="mock-speech-request-1",
     )
@@ -451,10 +593,14 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     final = outputs / "final.mp4"
-    use_mediakit = args.finisher == "mediakit" or (args.finisher == "auto" and PROJECT_MEDIAKIT.is_file())
+    use_mediakit = args.finisher == "mediakit" or (
+        args.finisher == "auto" and PROJECT_MEDIAKIT.is_file()
+    )
     if use_mediakit:
         if not PROJECT_MEDIAKIT.is_file():
-            raise RuntimeError("official MediaKit CLI is not built; run make mediakit-build")
+            raise RuntimeError(
+                "official MediaKit CLI is not built; run make mediakit-build"
+            )
         finisher_executor = "mediakit-cli"
         finish_command = [
             str(PROJECT_MEDIAKIT),
@@ -476,7 +622,22 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         ]
     else:
         finisher_executor = "ffmpeg"
-        finish_command = [ffmpeg, "-v", "error", "-i", str(shot), "-i", str(voice), "-c:v", "copy", "-c:a", "aac", "-shortest", "-y", str(final)]
+        finish_command = [
+            ffmpeg,
+            "-v",
+            "error",
+            "-i",
+            str(shot),
+            "-i",
+            str(voice),
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-shortest",
+            "-y",
+            str(final),
+        ]
     final_receipt = _run_receipt_command(
         receipt_file=receipts / "finishing-attempt-1.json",
         input_files=[shot, voice],
@@ -500,7 +661,9 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         receipt=final_receipt,
     )
 
-    qa = run_delivery_qa(final, delivery_spec=delivery_spec, ffmpeg_path=ffmpeg, ffprobe_path=ffprobe)
+    qa = run_delivery_qa(
+        final, delivery_spec=delivery_spec, ffmpeg_path=ffmpeg, ffprobe_path=ffprobe
+    )
     final_ref = final_receipt["outputs"][0]["ref"]
     await _append_business_event(
         repository,
@@ -527,7 +690,11 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         status="succeeded",
         entity_type="delivery",
         entity_id="delivery-v1",
-        payload={"accepted": True, "qa_event_key": "delivery:qa:v1", "artifact": qa["artifact"]},
+        payload={
+            "accepted": True,
+            "qa_event_key": "delivery:qa:v1",
+            "artifact": qa["artifact"],
+        },
         input_refs=[final_ref],
         output_refs=[final_ref],
         provider=finisher_executor,
@@ -541,7 +708,13 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         "current_stage": completed["current_stage"],
         "event_count": completed["event_count"],
         "event_types": [event["event_type"] for event in completed["events"]],
-        "task_ids": sorted({event["provider_task_id"] for event in completed["events"] if event.get("provider_task_id")}),
+        "task_ids": sorted(
+            {
+                event["provider_task_id"]
+                for event in completed["events"]
+                if event.get("provider_task_id")
+            }
+        ),
         "final_artifact": qa["artifact"],
         "qa_passed": qa["passed"],
         "finisher": finisher_executor,
@@ -550,7 +723,10 @@ async def _run_local(args: argparse.Namespace) -> dict[str, Any]:
         "paid_calls_executed": 0,
     }
     summary_path = work_dir / "acceptance-summary.json"
-    summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    summary_path.write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return summary
 
 
@@ -655,20 +831,270 @@ def _paid_checkpoints(args: argparse.Namespace) -> dict[str, Any]:
         "contract_version": "personal-ip-paid-media-checkpoints-v1",
         "executed": False,
         "call_count": len(checkpoints),
-        "target": {"aspect_ratio": "9:16", "duration_seconds": 2, "resolution": "provider default preview"},
-        "prerequisites": ["explicit approval in the active user session", "provider credentials", "make volcengine-install for MediaKit"],
+        "target": {
+            "aspect_ratio": "9:16",
+            "duration_seconds": 2,
+            "resolution": "provider default preview",
+        },
+        "prerequisites": [
+            "explicit approval in the active user session",
+            "provider credentials",
+            "make volcengine-install for MediaKit",
+        ],
         "checkpoints": checkpoints,
         "after_each_call": "ingest the emitted receipt with personal_ip_ingest_media_execution; never reconstruct provider evidence from stdout",
     }
     path = work_dir / "paid-checkpoints.json"
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return {"path": str(path), **payload}
+
+
+async def _ingest_real_acceptance(args: argparse.Namespace) -> dict[str, Any]:
+    """Seal already-executed provider receipts into one recoverable ledger."""
+
+    work_dir = args.work_dir.resolve()
+    inputs = work_dir / "inputs"
+    outputs = work_dir / "paid-outputs"
+    receipts = work_dir / "paid-receipts"
+    documents = {
+        "source": inputs / "source-script.json",
+        "blueprint": inputs / "blueprint.json",
+        "storyboard": inputs / "storyboard.json",
+    }
+    required = [
+        *documents.values(),
+        receipts / "asset.json",
+        receipts / "shot.json",
+        receipts / "voice.json",
+        receipts / "finishing.json",
+        receipts / "finishing-attempt-2.json",
+        receipts / "finishing-attempt-3.json",
+        receipts / "delivery-normalize.json",
+        work_dir / "qa" / "delivery" / "acceptance-report.json",
+        outputs / "delivery.mp4",
+    ]
+    missing = [str(path) for path in required if not path.is_file()]
+    if missing:
+        raise RuntimeError(
+            f"real acceptance is missing {len(missing)} artifact(s): {missing[0]}"
+        )
+
+    await init_engine_from_config(
+        DatabaseConfig(backend="sqlite", sqlite_dir=str(work_dir / "real-ledger"))
+    )
+    session_factory = get_session_factory()
+    if session_factory is None:
+        raise RuntimeError("real acceptance ledger is unavailable")
+    repository = PersonalIPVideoProductionRepository(session_factory)
+    source = _load_json(documents["source"])
+    production = await repository.begin(
+        owner_user_id=args.owner_user_id,
+        operation_key=args.operation_key,
+        title=str(source.get("title") or "Volcengine minimal real acceptance"),
+        subject_id=None,
+        target_account_ids=[],
+        source_kind="script",
+        source=source,
+        delivery_spec={
+            "aspect_ratio": "9:16",
+            "duration_seconds": 4,
+            "duration_tolerance_seconds": 0.25,
+            "require_audio": True,
+        },
+        provider_policy={
+            "image": ["seedream"],
+            "video": ["seedance"],
+            "speech": ["doubao-speech"],
+            "finishing": ["mediakit-cli", "ffmpeg"],
+        },
+        budget={
+            "currency": "CNY",
+            "paid_calls_require_explicit_approval": True,
+            "approval_ref": args.approval_ref,
+        },
+    )
+    production_id = production["id"]
+    source_ref = artifact_for_path(documents["source"])["ref"]
+    blueprint = artifact_for_path(documents["blueprint"])
+    await _append_business_event(
+        repository,
+        production_id,
+        owner_user_id=args.owner_user_id,
+        event_key="real:blueprint:v1",
+        event_type="blueprint_sealed",
+        status="succeeded",
+        entity_type="production",
+        entity_id=production_id,
+        payload={"artifact": blueprint, "acceptance": "minimal-real-provider-loop"},
+        input_refs=[source_ref],
+        output_refs=[blueprint["ref"]],
+    )
+
+    receipt_specs_before_storyboard = [
+        ("asset.json", "real:asset:attempt-1", "scene", "asset-01"),
+    ]
+    receipt_specs_after_storyboard = [
+        ("shot.json", "real:shot-01:attempt-1", "candidate", "shot-01:candidate-1"),
+        ("voice.json", "real:voice:attempt-1", "audio", "voice-01"),
+        ("finishing.json", "real:finishing:attempt-1", "timeline", "timeline-v1"),
+        (
+            "finishing-attempt-2.json",
+            "real:finishing:attempt-2",
+            "timeline",
+            "timeline-v1",
+        ),
+        (
+            "finishing-attempt-3.json",
+            "real:finishing:attempt-3",
+            "timeline",
+            "timeline-v1",
+        ),
+        (
+            "delivery-normalize.json",
+            "real:delivery-normalize:attempt-1",
+            "delivery",
+            "delivery-v1",
+        ),
+    ]
+    ingested_receipts: list[dict[str, Any]] = []
+    for filename, event_key, entity_type, entity_id in receipt_specs_before_storyboard:
+        receipt = _load_json(receipts / filename)
+        if receipt.get("status") == "succeeded":
+            verify_local_receipt_outputs(receipt)
+        await _ingest_receipt(
+            repository,
+            production_id,
+            owner_user_id=args.owner_user_id,
+            event_key=event_key,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            receipt=receipt,
+        )
+        ingested_receipts.append(receipt)
+
+    storyboard = artifact_for_path(documents["storyboard"])
+    await _append_business_event(
+        repository,
+        production_id,
+        owner_user_id=args.owner_user_id,
+        event_key="real:storyboard:v1",
+        event_type="storyboard_sealed",
+        status="succeeded",
+        entity_type="production",
+        entity_id=production_id,
+        payload={"artifact": storyboard, "shot_count": 1},
+        input_refs=[blueprint["ref"]],
+        output_refs=[storyboard["ref"]],
+    )
+    for filename, event_key, entity_type, entity_id in receipt_specs_after_storyboard:
+        receipt = _load_json(receipts / filename)
+        if receipt.get("status") == "succeeded":
+            verify_local_receipt_outputs(receipt)
+        await _ingest_receipt(
+            repository,
+            production_id,
+            owner_user_id=args.owner_user_id,
+            event_key=event_key,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            receipt=receipt,
+        )
+        ingested_receipts.append(receipt)
+
+    qa_path = work_dir / "qa" / "delivery" / "acceptance-report.json"
+    qa = _load_json(qa_path)
+    delivery_qa = qa.get("delivery")
+    if not isinstance(delivery_qa, dict):
+        raise RuntimeError("real acceptance report has no delivery QA object")
+    final_artifact = artifact_for_path(outputs / "delivery.mp4")
+    qa_artifact = artifact_for_path(qa_path)
+    await _append_business_event(
+        repository,
+        production_id,
+        owner_user_id=args.owner_user_id,
+        event_key="real:delivery:qa:v1",
+        event_type="delivery_qa_completed",
+        status="succeeded" if delivery_qa.get("passed") is True else "failed",
+        entity_type="delivery",
+        entity_id="delivery-v1",
+        payload={**delivery_qa, "report_artifact": qa_artifact},
+        input_refs=[final_artifact["ref"], qa_artifact["ref"]],
+        output_refs=[final_artifact["ref"]],
+        provider="ffmpeg_ffprobe",
+    )
+    if delivery_qa.get("passed") is not True:
+        raise RuntimeError("real delivery QA did not pass")
+    completed = await _append_business_event(
+        repository,
+        production_id,
+        owner_user_id=args.owner_user_id,
+        event_key="real:delivery:v1",
+        event_type="delivery_completed",
+        status="succeeded",
+        entity_type="delivery",
+        entity_id="delivery-v1",
+        payload={
+            "accepted": True,
+            "qa_event_key": "real:delivery:qa:v1",
+            "artifact": final_artifact,
+        },
+        input_refs=[qa_artifact["ref"]],
+        output_refs=[final_artifact["ref"]],
+        provider="project-ffmpeg-8.1.2",
+    )
+    summary = {
+        "contract_version": "personal-ip-video-e2e-real-acceptance-v1",
+        "mode": "real-volcengine-minimal",
+        "production_id": production_id,
+        "operation_key": args.operation_key,
+        "status": completed["status"],
+        "current_stage": completed["current_stage"],
+        "event_count": completed["event_count"],
+        "event_types": [event["event_type"] for event in completed["events"]],
+        "provider_task_ids": sorted(
+            {
+                str(receipt["task_id"])
+                for receipt in ingested_receipts
+                if receipt.get("task_id")
+            }
+        ),
+        "provider_request_ids": sorted(
+            {
+                str(receipt["request_id"])
+                for receipt in ingested_receipts
+                if receipt.get("request_id")
+            }
+        ),
+        "paid_calls_executed": 3,
+        "paid_cost": {
+            "status": "unknown",
+            "reason": "provider billing API is not connected",
+        },
+        "failed_local_attempts_preserved": sum(
+            receipt.get("status") == "failed" for receipt in ingested_receipts
+        ),
+        "qa_passed": True,
+        "final_artifact": final_artifact,
+        "ledger": str((work_dir / "real-ledger" / "deerflow.db").resolve()),
+        "approval_ref": args.approval_ref,
+    }
+    summary_path = work_dir / "real-acceptance-summary.json"
+    summary_path.write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return summary
 
 
 async def _async_main(args: argparse.Namespace) -> int:
     try:
         if args.command == "local":
             result = await _run_local(args)
+        elif args.command == "ingest-real":
+            result = await _ingest_real_acceptance(args)
         else:
             result = _paid_checkpoints(args)
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
@@ -677,22 +1103,40 @@ async def _async_main(args: argparse.Namespace) -> int:
         print(f"Personal-IP video E2E failed: {exc}", file=sys.stderr)
         return 1
     finally:
-        if args.command == "local":
+        if args.command in {"local", "ingest-real"}:
             await close_engine()
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    local = subparsers.add_parser("local", help="Run/resume the free local acceptance production")
+    local = subparsers.add_parser(
+        "local", help="Run/resume the free local acceptance production"
+    )
     local.add_argument("--work-dir", type=Path, required=True)
     local.add_argument("--owner-user-id", default="video-e2e-local")
     local.add_argument("--operation-key", default="video:e2e:local-v1")
     local.add_argument("--ffmpeg")
     local.add_argument("--ffprobe")
-    local.add_argument("--finisher", choices=("auto", "mediakit", "ffmpeg"), default="auto")
-    paid = subparsers.add_parser("paid-checkpoints", help="Write, but never execute, paid provider checkpoint commands")
+    local.add_argument(
+        "--finisher", choices=("auto", "mediakit", "ffmpeg"), default="auto"
+    )
+    paid = subparsers.add_parser(
+        "paid-checkpoints",
+        help="Write, but never execute, paid provider checkpoint commands",
+    )
     paid.add_argument("--work-dir", type=Path, required=True)
+    real = subparsers.add_parser(
+        "ingest-real",
+        help="Seal already-executed real provider receipts into a recovery ledger",
+    )
+    real.add_argument("--work-dir", type=Path, required=True)
+    real.add_argument("--owner-user-id", default="video-e2e-real")
+    real.add_argument("--operation-key", default="video:e2e:real-minimal-v3")
+    real.add_argument(
+        "--approval-ref",
+        default="active-user-session:2026-07-23:direct-use",
+    )
     return asyncio.run(_async_main(parser.parse_args()))
 
 

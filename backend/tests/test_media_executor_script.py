@@ -104,6 +104,36 @@ def test_media_executor_refuses_overwrite_and_tampered_resume_input(tmp_path, mo
         MODULE.run_media_executor(**kwargs, resume=True)
 
 
+def test_mediakit_executor_prefers_project_local_ffmpeg_toolchain(tmp_path, monkeypatch) -> None:
+    source = tmp_path / "source.bin"
+    output = tmp_path / "output.bin"
+    receipt_path = tmp_path / "receipt.json"
+    source.write_bytes(b"input")
+    toolchain = tmp_path / "toolchain"
+    toolchain.mkdir()
+    (toolchain / "ffmpeg").write_bytes(b"binary")
+    (toolchain / "ffprobe").write_bytes(b"binary")
+    monkeypatch.setattr(MODULE, "PROJECT_TOOLCHAIN_BIN", toolchain)
+    captured = {}
+
+    def fake_run(command, **kwargs):
+        captured["environment"] = kwargs["env"]
+        output.write_bytes(b"output")
+        return MODULE.subprocess.CompletedProcess(command, 0, stdout="{}", stderr="")
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    MODULE.run_media_executor(
+        command=["mediakit-cli"],
+        input_files=[str(source)],
+        output_files=[str(output)],
+        receipt_file=str(receipt_path),
+        provider="volcengine-local",
+        executor="mediakit-cli",
+    )
+
+    assert captured["environment"]["PATH"].split(MODULE.os.pathsep)[0] == str(toolchain)
+
+
 def test_paid_checkpoints_are_written_without_executing_provider_calls(tmp_path) -> None:
     runner = SCRIPT_PATH.parents[4] / "scripts" / "personal_ip_video_e2e.py"
     completed = subprocess.run(

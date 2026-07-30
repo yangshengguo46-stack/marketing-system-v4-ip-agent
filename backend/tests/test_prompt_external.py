@@ -106,6 +106,26 @@ def test_load_prompt_messages_returns_system_user() -> None:
     assert "<current_memory>" in messages[1].content
 
 
+def test_ip_agent_memory_prompt_excludes_transient_operating_state() -> None:
+    variables = {
+        "current_memory": "{}",
+        "conversation": "User: continue the current video project",
+        "correction_hint": "",
+        "staleness_review_section": "",
+        "consolidation_section": "",
+    }
+
+    messages = load_prompt_messages(
+        "memory_update",
+        variables,
+        agent_name="ip-agent",
+    )
+
+    assert "current task, temporary project" in messages[0].content
+    assert "tool/Skill names" in messages[0].content
+    assert "durable new user" in messages[0].content
+
+
 def test_load_prompt_messages_system_byte_stable_across_vars() -> None:
     # The system message has no variables -> renders byte-identical regardless of
     # the per-call vars (prefix-cache friendly, mirrors lead agent's static system).

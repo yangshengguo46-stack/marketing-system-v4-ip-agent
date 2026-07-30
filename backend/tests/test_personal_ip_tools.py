@@ -2,29 +2,51 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
 from deerflow.personal_ip.runtime import PersonalIPRuntimeServices, configure_personal_ip_runtime
+from deerflow.skills.parser import parse_skill_file
+from deerflow.skills.tool_policy import allowed_tool_names_for_skills
+from deerflow.skills.types import SkillCategory
 from deerflow.tools.builtins import (
     personal_ip_begin_video_production_tool,
     personal_ip_collect_browser_page_tool,
     personal_ip_collect_browser_portfolio_today_tool,
     personal_ip_collect_douyin_browser_page_tool,
+    personal_ip_compile_approved_video_assembly_tool,
+    personal_ip_compile_generated_shot_qa_tool,
+    personal_ip_compile_video_asset_manifest_tool,
+    personal_ip_compile_video_continuity_tool,
+    personal_ip_compile_video_material_selection_tool,
+    personal_ip_compile_video_narration_timing_tool,
+    personal_ip_compile_video_narration_tool,
+    personal_ip_compile_video_plan_tool,
+    personal_ip_compile_video_storyboard_tool,
     personal_ip_ingest_media_execution_tool,
+    personal_ip_inspect_local_video_material_tool,
     personal_ip_metrics_aggregate_tool,
     personal_ip_operating_cockpit_tool,
     personal_ip_performance_inventory_tool,
     personal_ip_platform_observation_inventory_tool,
     personal_ip_read_platform_observation_tool,
+    personal_ip_read_strategy_context_tool,
     personal_ip_read_video_production_tool,
     personal_ip_record_browser_observation_tool,
+    personal_ip_record_strategy_tool,
     personal_ip_record_video_production_event_tool,
+    personal_ip_render_local_remotion_scene_tool,
+    personal_ip_render_locked_video_delivery_tool,
+    personal_ip_run_local_generated_shot_qa_tool,
     personal_ip_select_browser_account_tool,
     personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,
+)
+from deerflow.tools.builtins.personal_ip_brand_tools import (
+    _personal_ip_read_strategy_context,
 )
 from deerflow.tools.builtins.personal_ip_tools import (
     _personal_ip_begin_video_production,
@@ -45,6 +67,8 @@ from deerflow.tools.builtins.personal_ip_tools import (
     _personal_ip_sync_douyin_post,
 )
 from deerflow.tools.tools import BUILTIN_TOOLS
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.mark.asyncio
@@ -129,14 +153,29 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     names = {tool.name for tool in BUILTIN_TOOLS}
     assert personal_ip_metrics_aggregate_tool.name == "personal_ip_metrics_aggregate"
     assert personal_ip_ingest_media_execution_tool.name == "personal_ip_ingest_media_execution"
+    assert personal_ip_inspect_local_video_material_tool.name == "personal_ip_inspect_local_video_material"
     assert personal_ip_operating_cockpit_tool.name == "personal_ip_operating_cockpit"
     assert personal_ip_collect_browser_page_tool.name == "personal_ip_collect_browser_page"
     assert personal_ip_collect_browser_portfolio_today_tool.name == "personal_ip_collect_browser_portfolio_today"
     assert personal_ip_collect_douyin_browser_page_tool.name == "personal_ip_collect_douyin_browser_page"
+    assert personal_ip_compile_video_plan_tool.name == "personal_ip_compile_video_plan"
+    assert personal_ip_compile_video_asset_manifest_tool.name == "personal_ip_compile_video_asset_manifest"
+    assert personal_ip_compile_video_storyboard_tool.name == "personal_ip_compile_video_storyboard"
+    assert personal_ip_compile_video_narration_tool.name == "personal_ip_compile_video_narration"
+    assert personal_ip_compile_video_continuity_tool.name == "personal_ip_compile_video_continuity"
+    assert personal_ip_compile_video_material_selection_tool.name == "personal_ip_compile_video_material_selection"
+    assert personal_ip_compile_generated_shot_qa_tool.name == "personal_ip_compile_generated_shot_qa"
+    assert personal_ip_run_local_generated_shot_qa_tool.name == "personal_ip_run_local_generated_shot_qa"
+    assert personal_ip_render_locked_video_delivery_tool.name == "personal_ip_render_locked_video_delivery"
+    assert personal_ip_render_local_remotion_scene_tool.name == "personal_ip_render_local_remotion_scene"
+    assert personal_ip_compile_video_narration_timing_tool.name == "personal_ip_compile_video_narration_timing"
+    assert personal_ip_compile_approved_video_assembly_tool.name == "personal_ip_compile_approved_video_assembly"
     assert personal_ip_performance_inventory_tool.name == "personal_ip_performance_inventory"
     assert personal_ip_platform_observation_inventory_tool.name == "personal_ip_platform_observation_inventory"
     assert personal_ip_read_platform_observation_tool.name == "personal_ip_read_platform_observation"
     assert personal_ip_read_video_production_tool.name == "personal_ip_read_video_production"
+    assert personal_ip_record_strategy_tool.name == "personal_ip_record_strategy"
+    assert personal_ip_read_strategy_context_tool.name == "personal_ip_read_strategy_context"
     assert personal_ip_begin_video_production_tool.name == "personal_ip_begin_video_production"
     assert personal_ip_record_video_production_event_tool.name == "personal_ip_record_video_production_event"
     assert personal_ip_record_browser_observation_tool.name == "personal_ip_record_browser_observation"
@@ -147,13 +186,28 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     assert {
         "personal_ip_metrics_aggregate",
         "personal_ip_ingest_media_execution",
+        "personal_ip_inspect_local_video_material",
         "personal_ip_operating_cockpit",
         "personal_ip_collect_browser_page",
         "personal_ip_collect_browser_portfolio_today",
+        "personal_ip_compile_video_plan",
+        "personal_ip_compile_video_asset_manifest",
+        "personal_ip_compile_video_storyboard",
+        "personal_ip_compile_video_narration",
+        "personal_ip_compile_video_continuity",
+        "personal_ip_compile_video_material_selection",
+        "personal_ip_compile_video_narration_timing",
+        "personal_ip_compile_generated_shot_qa",
+        "personal_ip_run_local_generated_shot_qa",
+        "personal_ip_render_locked_video_delivery",
+        "personal_ip_render_local_remotion_scene",
+        "personal_ip_compile_approved_video_assembly",
         "personal_ip_performance_inventory",
         "personal_ip_platform_observation_inventory",
         "personal_ip_read_platform_observation",
         "personal_ip_read_video_production",
+        "personal_ip_record_strategy",
+        "personal_ip_read_strategy_context",
         "personal_ip_begin_video_production",
         "personal_ip_record_video_production_event",
         "personal_ip_record_browser_observation",
@@ -165,6 +219,81 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     assert "account_id" not in schema.get("properties", {})
     browser_portfolio_schema = personal_ip_collect_browser_portfolio_today_tool.tool_call_schema.model_json_schema()
     assert "account_id" not in browser_portfolio_schema.get("properties", {})
+
+
+@pytest.mark.asyncio
+async def test_strategy_context_returns_only_the_latest_strategy() -> None:
+    brand = SimpleNamespace(
+        get_latest_strategy=AsyncMock(
+            return_value={
+                "id": "strategy-1",
+                "subject_id": "subject-1",
+                "stage": "launch_package_ready",
+            }
+        ),
+    )
+    configure_personal_ip_runtime(
+        PersonalIPRuntimeServices(
+            brand=brand,
+            connections=SimpleNamespace(),
+            metrics=SimpleNamespace(),
+            publish_receipts=SimpleNamespace(),
+        )
+    )
+
+    payload = json.loads(
+        await _personal_ip_read_strategy_context(
+            SimpleNamespace(context={"user_id": "user-1"}),
+            subject_id="subject-1",
+        )
+    )
+
+    assert payload["strategy"]["id"] == "strategy-1"
+    assert set(payload) == {"operation_status", "strategy", "subject_id"}
+    brand.get_latest_strategy.assert_awaited_once_with("subject-1", owner_user_id="user-1")
+
+
+def test_video_tool_descriptions_expose_nested_contract_requirements() -> None:
+    storyboard_description = personal_ip_compile_video_storyboard_tool.tool_call_schema.model_json_schema()["properties"]["shots"]["description"]
+    assert "duration_seconds" in storyboard_description
+    assert "scene_id" in storyboard_description
+    assert "first_frame" in storyboard_description
+    assert "last_frame" in storyboard_description
+    assert "preserve_elements" in storyboard_description
+    assert "change_elements" in storyboard_description
+    qa_policy_description = personal_ip_run_local_generated_shot_qa_tool.tool_call_schema.model_json_schema()["properties"]["policy"]["description"]
+    receipt_description = personal_ip_ingest_media_execution_tool.tool_call_schema.model_json_schema()["properties"]["receipt"]["description"]
+    assert "expected_duration_seconds" in qa_policy_description
+    assert "personal-ip-media-execution-v1" in receipt_description
+    assert "size_bytes" in receipt_description
+
+
+def test_personal_ip_operator_keeps_native_tools_visible_with_mediakit_skill() -> None:
+    operator = parse_skill_file(
+        REPO_ROOT / "skills" / "public" / "personal-ip-operator" / "SKILL.md",
+        category=SkillCategory.PUBLIC,
+    )
+    mediakit = parse_skill_file(
+        REPO_ROOT / "skills" / "public" / "byted-mediakit-video" / "SKILL.md",
+        category=SkillCategory.PUBLIC,
+    )
+
+    assert operator is not None
+    assert mediakit is not None
+    allowed = allowed_tool_names_for_skills([operator, mediakit])
+    assert allowed is not None
+
+    personal_ip_tool_names = {tool.name for tool in BUILTIN_TOOLS if tool.name.startswith("personal_ip_")}
+    assert personal_ip_tool_names <= allowed
+    assert {
+        "bash",
+        "browser_navigate",
+        "personal_ip_begin_video_production",
+        "personal_ip_ingest_media_execution",
+        "personal_ip_read_video_production",
+        "present_files",
+        "view_image",
+    } <= allowed
 
 
 @pytest.mark.asyncio
@@ -245,12 +374,12 @@ async def test_native_cockpit_and_video_tools_use_owner_scoped_product_services(
         video_productions=video_productions,
     )
     configure_personal_ip_runtime(services)
-    build = AsyncMock(return_value={"contract_version": "personal-ip-operating-cockpit-v1", "stages": {}})
+    build = AsyncMock(return_value={"contract_version": "personal-ip-operating-cockpit-v4", "stages": {}})
     monkeypatch.setattr(
         "deerflow.tools.builtins.personal_ip_tools._operating_cockpit_service",
         lambda _services: SimpleNamespace(build=build),
     )
-    runtime = SimpleNamespace(context={"user_id": "user-1"})
+    runtime = SimpleNamespace(context={"user_id": "user-1", "thread_id": "thread-video-1"})
 
     cockpit = json.loads(await _personal_ip_operating_cockpit(runtime))
     created = json.loads(
@@ -265,6 +394,7 @@ async def test_native_cockpit_and_video_tools_use_owner_scoped_product_services(
             delivery_spec={"aspect_ratio": "16:9"},
             provider_policy={"video": ["seedance"]},
             budget={"currency": "CNY", "hard_limit": 100},
+            production_mode="generative_cinematic",
         )
     )
     event = json.loads(
@@ -288,12 +418,14 @@ async def test_native_cockpit_and_video_tools_use_owner_scoped_product_services(
     )
     detail = json.loads(await _personal_ip_read_video_production(runtime, "video-production-1"))
 
-    assert cockpit["contract_version"] == "personal-ip-operating-cockpit-v1"
+    assert cockpit["contract_version"] == "personal-ip-operating-cockpit-v4"
     assert created["id"] == "video-production-1"
     assert event["event_count"] == 1
     assert detail["events"][0]["event_type"] == "storyboard_sealed"
     build.assert_awaited_once_with(owner_user_id="user-1")
     assert video_productions.begin.await_args.kwargs["subject_id"] is None
+    assert video_productions.begin.await_args.kwargs["production_mode"] == "generative_cinematic"
+    assert video_productions.begin.await_args.kwargs["thread_id"] == "thread-video-1"
     assert video_productions.append_event.await_args.kwargs["occurred_at"].isoformat() == "2026-07-22T05:00:00+00:00"
     video_productions.get.assert_awaited_once_with("video-production-1", owner_user_id="user-1")
 
@@ -428,8 +560,25 @@ async def test_collect_douyin_browser_page_tool_uses_account_profile_and_returns
 
 
 @pytest.mark.asyncio
-async def test_collect_browser_page_tool_supports_non_douyin_account(monkeypatch) -> None:
-    accounts = SimpleNamespace(get=AsyncMock(return_value={"id": "acct-xhs", "platform": "xiaohongshu", "status": "active"}))
+async def test_collect_browser_page_tool_supports_non_douyin_account(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    from deerflow.personal_ip.browser_profiles import (
+        clear_browser_account_target,
+        get_browser_account_target,
+    )
+
+    accounts = SimpleNamespace(
+        get=AsyncMock(
+            return_value={
+                "id": "acct-xhs",
+                "platform": "xiaohongshu",
+                "display_name": "小红书主账号",
+                "status": "active",
+            }
+        )
+    )
     configure_personal_ip_runtime(
         PersonalIPRuntimeServices(
             accounts=accounts,
@@ -457,6 +606,13 @@ async def test_collect_browser_page_tool_supports_non_douyin_account(monkeypatch
         "deerflow.tools.builtins.personal_ip_tools._browser_platform_collection_service",
         lambda _services: SimpleNamespace(collect_creator_page=collect),
     )
+    monkeypatch.setattr(
+        "deerflow.tools.builtins.personal_ip_tools.get_paths",
+        lambda: SimpleNamespace(
+            prepare_user_dir_for_raw_id=lambda user_id: user_id,
+            ensure_browser_profile_dir=lambda account_id, user_id: tmp_path / user_id / account_id,
+        ),
+    )
 
     @contextmanager
     def acquire(**_kwargs):
@@ -464,8 +620,10 @@ async def test_collect_browser_page_tool_supports_non_douyin_account(monkeypatch
 
     monkeypatch.setattr("deerflow.tools.builtins.personal_ip_tools.acquire_account_browser_session", acquire)
 
+    runtime = SimpleNamespace(context={"user_id": "user-1", "thread_id": "thread-1"})
+    clear_browser_account_target(owner_user_id="user-1", thread_id="thread-1")
     raw = await _personal_ip_collect_browser_page(
-        SimpleNamespace(context={"user_id": "user-1"}),
+        runtime,
         account_id="acct-xhs",
         observation_key="xiaohongshu:audience:2026-07-22T10",
         dataset="audience_analytics",
@@ -477,6 +635,14 @@ async def test_collect_browser_page_tool_supports_non_douyin_account(monkeypatch
     assert payload["record_count"] == 1
     assert payload["records"] == [{}]
     collect.assert_awaited_once()
+    selected = get_browser_account_target(
+        owner_user_id="user-1",
+        thread_id="thread-1",
+    )
+    assert selected is not None
+    assert selected.account_id == "acct-xhs"
+    assert selected.session_key == "account:user-1:acct-xhs"
+    clear_browser_account_target(owner_user_id="user-1", thread_id="thread-1")
 
 
 @pytest.mark.asyncio

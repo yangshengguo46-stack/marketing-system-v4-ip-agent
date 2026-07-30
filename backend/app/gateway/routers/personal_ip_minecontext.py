@@ -1,4 +1,4 @@
-"""User-visible consent and lifecycle controls for the local MineContext source."""
+"""User-visible lifecycle controls for the local MineContext source."""
 
 from __future__ import annotations
 
@@ -22,6 +22,10 @@ class MineContextSyncRequest(BaseModel):
     limit: int = Field(default=10, ge=1, le=100)
 
 
+class MineContextEnableRequest(BaseModel):
+    retention_days: int = Field(default=30, ge=1, le=3650)
+
+
 async def _owner_id(request: Request) -> str:
     return str((await get_current_user_from_request(request)).id)
 
@@ -36,13 +40,28 @@ def _http_error(exc: Exception) -> HTTPException:
 
 @router.get("")
 async def minecontext_status(request: Request) -> dict[str, Any]:
-    return await asyncio.to_thread(get_minecontext_service(request).status, await _owner_id(request))
+    return await asyncio.to_thread(get_minecontext_service(request).ensure_default, await _owner_id(request))
 
 
 @router.post("/authorize")
 async def authorize_minecontext(body: MineContextConsent, request: Request) -> dict[str, Any]:
     try:
         return await asyncio.to_thread(get_minecontext_service(request).authorize, await _owner_id(request), body)
+    except (PermissionError, RuntimeError, ValueError) as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post("/enable")
+async def enable_minecontext(
+    body: MineContextEnableRequest,
+    request: Request,
+) -> dict[str, Any]:
+    try:
+        return await asyncio.to_thread(
+            get_minecontext_service(request).enable_default,
+            await _owner_id(request),
+            retention_days=body.retention_days,
+        )
     except (PermissionError, RuntimeError, ValueError) as exc:
         raise _http_error(exc) from exc
 

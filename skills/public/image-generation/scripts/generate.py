@@ -155,6 +155,7 @@ def _generate_image_volcengine(
     *,
     prompt_file: str | None = None,
     receipt_file: str | None = None,
+    model: str | None = None,
 ) -> str:
     """Generate or edit an image through Volcengine Ark Seedream.
 
@@ -169,7 +170,9 @@ def _generate_image_volcengine(
 
     started_at = _utc_now()
     request_id = None
-    model = os.getenv("VOLCENGINE_IMAGE_MODEL", VOLCENGINE_IMAGE_DEFAULT_MODEL)
+    selected_model = (
+        model or os.getenv("VOLCENGINE_IMAGE_MODEL") or VOLCENGINE_IMAGE_DEFAULT_MODEL
+    )
     normalized_prompt = _minimax_prompt(prompt)
     parameters = {
         "aspect_ratio": aspect_ratio,
@@ -188,7 +191,7 @@ def _generate_image_volcengine(
     inputs.extend(_file_artifact(path) for path in reference_images)
     try:
         body = {
-            "model": model,
+            "model": selected_model,
             "prompt": normalized_prompt,
             "size": parameters["size"],
             "sequential_image_generation": "disabled",
@@ -210,7 +213,15 @@ def _generate_image_volcengine(
         )
         response.raise_for_status()
         payload = response.json()
-        request_id = payload.get("request_id") or payload.get("id")
+        response_headers = getattr(response, "headers", {}) or {}
+        request_id = (
+            payload.get("request_id")
+            or payload.get("id")
+            or response_headers.get("x-request-id")
+            or response_headers.get("X-Request-Id")
+            or response_headers.get("x-tt-logid")
+            or response_headers.get("X-Tt-Logid")
+        )
         images = payload.get("data") or []
         if not images:
             raise Exception("Volcengine Seedream returned no image data")
@@ -231,7 +242,7 @@ def _generate_image_volcengine(
                 "capability": "image_generation",
                 "provider": "volcengine",
                 "executor": "image-generation-skill",
-                "model": model,
+                "model": selected_model,
                 "status": "succeeded",
                 "task_id": None,
                 "request_id": request_id,
@@ -256,7 +267,7 @@ def _generate_image_volcengine(
                 "capability": "image_generation",
                 "provider": "volcengine",
                 "executor": "image-generation-skill",
-                "model": model,
+                "model": selected_model,
                 "status": "failed",
                 "task_id": None,
                 "request_id": request_id,
@@ -406,8 +417,9 @@ def generate_image(
     output_file: str,
     aspect_ratio: str = "16:9",
     receipt_file: str | None = None,
+    model: str | None = None,
 ) -> str:
-    with open(prompt_file, "r", encoding="utf-8") as f:
+    with open(prompt_file, encoding="utf-8") as f:
         prompt = f.read()
     provider = _resolve_provider(
         "IMAGE_GENERATION_PROVIDER", "gemini", bool(os.getenv("GEMINI_API_KEY"))
@@ -420,6 +432,7 @@ def generate_image(
             aspect_ratio,
             prompt_file=prompt_file,
             receipt_file=receipt_file,
+            model=model,
         )
     if provider == "minimax":
         return _generate_image_minimax(
@@ -464,17 +477,24 @@ if __name__ == "__main__":
         required=False,
         help="Write a personal-ip-media-execution-v1 JSON receipt",
     )
+    parser.add_argument(
+        "--model",
+        required=False,
+        help="Volcengine Seedream model ID for this generation only",
+    )
     args = parser.parse_args()
 
     try:
         print(
             generate_image(
-                args.prompt_file,
-                args.reference_images,
-                args.output_file,
-                args.aspect_ratio,
-                args.receipt_file,
+                prompt_file=args.prompt_file,
+                reference_images=args.reference_images,
+                output_file=args.output_file,
+                aspect_ratio=args.aspect_ratio,
+                receipt_file=args.receipt_file,
+                model=args.model,
             )
         )
     except Exception as e:
         print(f"Error while generating image: {e}")
+        raise SystemExit(1) from e

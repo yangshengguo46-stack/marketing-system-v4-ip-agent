@@ -16,6 +16,10 @@ from deerflow.personal_ip.browser_profiles import get_browser_account_target, se
 from deerflow.personal_ip.browser_publishing import normalize_publication_url, verify_browser_publication_evidence
 from deerflow.personal_ip.hllm_creator import HLLMCreatorAdapter
 from deerflow.personal_ip.runtime import get_personal_ip_runtime
+from deerflow.personal_ip.strategy_methodology import (
+    PERSONAL_IP_STRATEGY_METHOD_VERSION,
+    strategy_stage_index,
+)
 from deerflow.runtime.user_context import resolve_runtime_user_id
 from deerflow.tools.types import Runtime
 
@@ -104,8 +108,6 @@ async def _personal_ip_run_preflight(
     subject_ids: list[str],
     target_account_ids: list[str],
     history: list[dict],
-    audience_profile: dict,
-    creator_profile: dict,
     target: dict,
     variant_count: int = 3,
     local_context_evidence_ids: list[str] | None = None,
@@ -121,8 +123,6 @@ async def _personal_ip_run_preflight(
         subject_ids: Owner-scoped subjects represented by the preflight.
         target_account_ids: Accounts this prediction may later publish to.
         history: Chronological published content with aggregate metrics.
-        audience_profile: Aggregate cohort traits and revisable audience hypotheses.
-        creator_profile: Creator voice, boundaries, positioning and business intent.
         target: Draft content id, title, description and content type to evaluate.
         variant_count: Number of creative variants, from 1 to 8.
         local_context_evidence_ids: Optional sealed MineContext evidence ids; both preflight and HLLM-profile purposes must already be authorized.
@@ -134,7 +134,40 @@ async def _personal_ip_run_preflight(
         services = get_personal_ip_runtime()
         if services.preflights is None:
             raise RuntimeError("Personal-IP preflight persistence is not available")
+        if services.brand is None:
+            raise RuntimeError("Personal-IP brand persistence is not available")
         owner_user_id = resolve_runtime_user_id(runtime)
+        normalized_subject_ids = list(dict.fromkeys(subject_ids))
+        if not normalized_subject_ids:
+            raise ValueError("preflight requires at least one Personal-IP subject")
+        strategy_contexts: list[dict] = []
+        for subject_id in normalized_subject_ids:
+            strategy = await services.brand.get_latest_strategy(
+                subject_id,
+                owner_user_id=owner_user_id,
+            )
+            if strategy is None:
+                raise ValueError(f"Personal-IP strategy not found for subject {subject_id}")
+            if strategy_stage_index(strategy["stage"]) < strategy_stage_index("launch_package_ready"):
+                raise ValueError(f"Personal-IP launch package is not ready for subject {subject_id}")
+            strategy_contexts.append(
+                {
+                    "stage": strategy["stage"],
+                    "mode": strategy["mode"],
+                    "person_model": strategy["person_model"],
+                    "business_model": strategy["business_model"],
+                    "positioning_candidates": strategy["positioning_candidates"],
+                    "launch_package": strategy["launch_package"],
+                }
+            )
+        creator_profile = {
+            "method_version": PERSONAL_IP_STRATEGY_METHOD_VERSION,
+            "operating_strategies": strategy_contexts,
+        }
+        audience_profile = {
+            "epistemic_status": "aggregate_history_only_revisable",
+            "published_sample_count": len(history),
+        }
         local_context_evidence: list[dict] = []
         requested_evidence_ids = list(dict.fromkeys(local_context_evidence_ids or []))
         if requested_evidence_ids:
@@ -171,7 +204,7 @@ async def _personal_ip_run_preflight(
         sealed = await services.preflights.seal(
             owner_user_id=owner_user_id,
             operation_key=operation_key,
-            subject_ids=subject_ids,
+            subject_ids=normalized_subject_ids,
             target_account_ids=target_account_ids,
             request=request,
             result=result,

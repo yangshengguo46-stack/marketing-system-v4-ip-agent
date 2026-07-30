@@ -60,6 +60,6 @@ checksums for all 504 official files plus the license, package metadata, CLI
 and search boundary. No
 upstream prebuilt application binary is included. `make minecontext-install`
 creates an ignored project-local Python environment linked to this source.
-MineContext remains an optional, per-owner local observation sidecar; DeerFlow
-is the only agent runtime and receives only the versioned minimized evidence
-contract.
+`make install` includes that runtime in the normal product installation.
+MineContext remains a per-owner local observation sidecar; DeerFlow is the only
+agent runtime and receives only the versioned minimized evidence contract.

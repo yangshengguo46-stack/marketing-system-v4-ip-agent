@@ -23,15 +23,26 @@ def _event(
         "sequence": sequence,
         "event_type": event_type,
         "stage": {
+            "video_plan_compiled": "blueprint",
             "blueprint_sealed": "blueprint",
+            "asset_manifest_compiled": "assets",
+            "material_selection_compiled": "assets",
             "asset_generation_completed": "assets",
             "storyboard_sealed": "storyboard",
+            "storyboard_compiled": "storyboard",
+            "continuity_compiled": "consistency",
+            "generated_shot_qa_compiled": "consistency",
             "shot_generation_failed": "generation",
             "shot_generation_completed": "generation",
             "consistency_checked": "consistency",
             "review_requested": "selection",
             "review_recorded": "selection",
             "voice_generated": "finishing",
+            "narration_contract_compiled": "finishing",
+            "narration_timing_compiled": "finishing",
+            "assembly_admitted": "finishing",
+            "timeline_revision_compiled": "finishing",
+            "final_edit_locked": "finishing",
             "media_processing_completed": "finishing",
             "delivery_qa_completed": "delivery",
         }[event_type],
@@ -48,6 +59,312 @@ def _event(
         "occurred_at": f"2026-07-22T05:{sequence:02d}:00+00:00",
         "created_at": f"2026-07-22T05:{sequence:02d}:00+00:00",
     }
+
+
+def test_video_workbench_projects_typed_mode_contracts_without_a_second_state_store() -> None:
+    production = {
+        "id": "video-production-typed",
+        "production_mode": "faceless_material",
+        "status": "running",
+        "current_stage": "storyboard",
+        "source_kind": "script",
+        "source": {"script": "一条素材视频", "production_mode": "faceless_material"},
+        "delivery_spec": {"aspect_ratio": "9:16"},
+        "provider_policy": {},
+        "budget": {},
+        "events": [
+            _event(
+                1,
+                "video_plan_compiled",
+                payload={
+                    "contract_version": "personal-ip-video-plan-v1",
+                    "production_mode": "faceless_material",
+                    "sha256": "a" * 64,
+                    "validation": {"passed": True},
+                    "plan": {"title": "素材视频"},
+                },
+            ),
+            _event(
+                2,
+                "asset_manifest_compiled",
+                payload={
+                    "contract_version": "personal-ip-video-asset-manifest-v1",
+                    "production_mode": "faceless_material",
+                    "sha256": "b" * 64,
+                    "validation": {"passed": True},
+                    "assets": [
+                        {
+                            "id": "asset-stock-1",
+                            "type": "scene",
+                            "name": "数据看板",
+                            "source_ref": "https://example.com/stock/1",
+                            "license": "CC-BY-4.0",
+                            "allowed_for_use": True,
+                            "sha256": "c" * 64,
+                        }
+                    ],
+                },
+            ),
+            _event(
+                3,
+                "asset_generation_completed",
+                entity_type="scene",
+                entity_id="asset-stock-1",
+                payload={
+                    "asset_version": 2,
+                    "outputs": [{"ref": "artifact://asset-stock-1-v2.png", "sha256": "e" * 64}],
+                },
+            ),
+            _event(
+                4,
+                "storyboard_compiled",
+                payload={
+                    "contract_version": "personal-ip-video-storyboard-v1",
+                    "production_mode": "faceless_material",
+                    "sha256": "d" * 64,
+                    "validation": {"passed": True},
+                    "shots": [
+                        {
+                            "id": "shot-1",
+                            "order": 1,
+                            "duration_seconds": 5,
+                            "narration_text": "智能体统筹全部账号。",
+                            "visual_subject": "全平台看板",
+                            "composition_strategy": "full_bleed",
+                        }
+                    ],
+                },
+            ),
+            _event(
+                5,
+                "material_selection_compiled",
+                payload={
+                    "contract_version": "personal-ip-video-material-selection-v1",
+                    "sha256": "f" * 64,
+                    "selections": [{"shot_id": "shot-1", "asset_id": "asset-stock-1"}],
+                },
+            ),
+            _event(
+                6,
+                "narration_timing_compiled",
+                payload={
+                    "contract_version": "personal-ip-video-narration-timing-v1",
+                    "sha256": "9" * 64,
+                    "actual_duration_seconds": 4.8,
+                    "segments": [
+                        {
+                            "id": "shot-1",
+                            "duration_seconds": 4.8,
+                            "audio_ref": "artifact://voice/shot-1.mp3",
+                            "audio_sha256": "8" * 64,
+                        }
+                    ],
+                },
+            ),
+        ],
+    }
+
+    workbench = build_video_workbench_read_model(production)
+
+    assert workbench["production_mode"] == "faceless_material"
+    assert workbench["domain_contracts"]["plan"]["sha256"] == "a" * 64
+    assert workbench["domain_contracts"]["asset_manifest"]["validation"]["passed"] is True
+    assert workbench["domain_contracts"]["storyboard"]["contract_version"] == "personal-ip-video-storyboard-v1"
+    assert workbench["assets"][0]["license"] == "CC-BY-4.0"
+    assert workbench["assets"][0]["source_ref"] == "https://example.com/stock/1"
+    assert workbench["assets"][0]["version"] == 2
+    assert len(workbench["assets"]) == 1
+    assert workbench["shots"][0]["spec"]["narration_text"] == "智能体统筹全部账号。"
+    assert workbench["storyboard"]["shot_count"] == 1
+    assert workbench["domain_contracts"]["material_selection"]["selections"][0]["asset_id"] == "asset-stock-1"
+    assert workbench["domain_contracts"]["narration_timing"]["actual_duration_seconds"] == 4.8
+    assert workbench["timeline"]["tracks"][0]["type"] == "audio"
+    assert workbench["timeline"]["tracks"][0]["clips"][0]["source_sha256"] == "8" * 64
+
+
+def test_video_workbench_projects_continuity_qa_narration_and_admitted_timeline() -> None:
+    production = {
+        "id": "video-production-film",
+        "production_mode": "generative_cinematic",
+        "status": "running",
+        "current_stage": "finishing",
+        "source_kind": "script",
+        "source": {"script": "微电影", "production_mode": "generative_cinematic"},
+        "delivery_spec": {},
+        "provider_policy": {},
+        "budget": {},
+        "events": [
+            _event(
+                1,
+                "continuity_compiled",
+                payload={
+                    "contract_version": "personal-ip-video-continuity-v1",
+                    "sha256": "1" * 64,
+                    "validation": {"passed": True},
+                    "entries": [
+                        {
+                            "shot_id": "shot-1",
+                            "order": 1,
+                            "before_state_sha256": "2" * 64,
+                            "after_state_sha256": "3" * 64,
+                        }
+                    ],
+                },
+            ),
+            _event(
+                2,
+                "generated_shot_qa_compiled",
+                entity_type="candidate",
+                entity_id="shot-1:candidate-1",
+                payload={
+                    "contract_version": "personal-ip-generated-shot-qa-v1",
+                    "shot_id": "shot-1",
+                    "candidate_id": "shot-1:candidate-1",
+                    "artifact": {"ref": "artifact://shot-1.mp4", "sha256": "a" * 64},
+                    "gates": {"technical": True, "first_frame_anchor": True, "internal_cuts": True},
+                    "automated_gate_passed": True,
+                    "sha256": "4" * 64,
+                },
+                output_refs=["contract://qa/1"],
+            ),
+            _event(
+                3,
+                "narration_contract_compiled",
+                payload={
+                    "contract_version": "personal-ip-video-narration-v1",
+                    "sha256": "5" * 64,
+                    "segments": [{"id": "shot-1", "text": "第一句"}],
+                },
+            ),
+            _event(
+                4,
+                "assembly_admitted",
+                entity_type="timeline",
+                entity_id="timeline-v1",
+                payload={
+                    "contract_version": "personal-ip-approved-assembly-v1",
+                    "sha256": "6" * 64,
+                    "fps": 24,
+                    "duration_seconds": 4,
+                    "timeline": [
+                        {
+                            "order": 1,
+                            "shot_id": "shot-1",
+                            "timeline_start_seconds": 0,
+                            "duration_seconds": 4,
+                            "source_ref": "artifact://shot-1.mp4",
+                            "source_sha256": "a" * 64,
+                        }
+                    ],
+                },
+            ),
+        ],
+    }
+
+    workbench = build_video_workbench_read_model(production)
+
+    assert workbench["domain_contracts"]["continuity"]["entries"][0]["shot_id"] == "shot-1"
+    assert workbench["domain_contracts"]["narration"]["segments"][0]["text"] == "第一句"
+    assert workbench["domain_contracts"]["assembly"]["duration_seconds"] == 4
+    assert workbench["candidates"][0]["quality"]["automated_gate_passed"] is True
+    assert workbench["timeline"]["fps"] == 24
+    assert workbench["timeline"]["tracks"][0]["clips"][0]["source_sha256"] == "a" * 64
+
+
+def test_video_workbench_prefers_latest_shared_timeline_revision() -> None:
+    production = {
+        "id": "video-production-film",
+        "production_mode": "generative_cinematic",
+        "status": "running",
+        "current_stage": "finishing",
+        "source_kind": "script",
+        "source": {"script": "微电影", "production_mode": "generative_cinematic"},
+        "delivery_spec": {},
+        "provider_policy": {},
+        "budget": {},
+        "events": [
+            _event(
+                1,
+                "assembly_admitted",
+                entity_type="timeline",
+                entity_id="timeline-v1",
+                payload={
+                    "contract_version": "personal-ip-approved-assembly-v1",
+                    "fps": 24,
+                    "duration_seconds": 5,
+                    "timeline": [
+                        {
+                            "shot_id": "shot-1",
+                            "timeline_start_seconds": 0,
+                            "duration_seconds": 5,
+                            "source_ref": "artifact://shot-1-v1.mp4",
+                            "source_sha256": "a" * 64,
+                        }
+                    ],
+                },
+            ),
+            _event(
+                2,
+                "timeline_revision_compiled",
+                entity_type="timeline",
+                entity_id="timeline-r2",
+                payload={
+                    "contract_version": "personal-ip-video-timeline-revision-v1",
+                    "revision_id": "timeline-r2",
+                    "base_revision_id": "timeline-v1",
+                    "author_kind": "human",
+                    "intent": "缩短镜头",
+                    "fps": 24,
+                    "duration_seconds": 4,
+                    "tracks": [
+                        {
+                            "id": "video",
+                            "type": "video",
+                            "clips": [
+                                {
+                                    "id": "clip-1",
+                                    "shot_id": "shot-1",
+                                    "start_sec": 0,
+                                    "duration_sec": 4,
+                                    "source_in_sec": 0.5,
+                                    "source_ref": "artifact://shot-1-v2.mp4",
+                                    "source_sha256": "b" * 64,
+                                    "selected_candidate_id": "shot-1:candidate-2",
+                                    "volume": 1,
+                                    "transition": "none",
+                                }
+                            ],
+                        }
+                    ],
+                    "operations": [{"id": "edit-1", "type": "trim", "clip_id": "clip-1"}],
+                    "sha256": "c" * 64,
+                },
+            ),
+            _event(
+                3,
+                "final_edit_locked",
+                entity_type="timeline",
+                entity_id="final-lock-1",
+                payload={
+                    "contract_version": "personal-ip-video-final-edit-lock-v1",
+                    "source_revision_id": "timeline-r2",
+                    "source_timeline_sha256": "c" * 64,
+                    "ready_for_delivery_qa": True,
+                    "sha256": "d" * 64,
+                },
+            ),
+        ],
+    }
+
+    workbench = build_video_workbench_read_model(production)
+
+    assert workbench["domain_contracts"]["timeline_revision"]["revision_id"] == "timeline-r2"
+    assert workbench["timeline"]["revision_id"] == "timeline-r2"
+    assert workbench["timeline"]["duration_sec"] == 4
+    assert workbench["timeline"]["tracks"][0]["clips"][0]["source_sha256"] == "b" * 64
+    assert workbench["timeline"]["revisions"][0]["author_kind"] == "human"
+    assert workbench["timeline"]["locked"] is True
+    assert workbench["domain_contracts"]["final_edit_lock"]["source_revision_id"] == "timeline-r2"
 
 
 def test_video_workbench_is_derived_from_the_immutable_event_ledger() -> None:
@@ -182,6 +499,70 @@ def test_video_workbench_is_derived_from_the_immutable_event_ledger() -> None:
     assert workbench["delivery"]["artifacts"][0]["sha256"] == "d" * 64
 
 
+def test_video_workbench_marks_delivery_qa_stale_after_a_late_timeline_edit() -> None:
+    production = {
+        "id": "video-production-1",
+        "status": "running",
+        "current_stage": "finishing",
+        "source_kind": "script",
+        "source": {"script": "先交付再返工"},
+        "delivery_spec": {},
+        "provider_policy": {},
+        "budget": {},
+        "events": [
+            _event(
+                1,
+                "delivery_qa_completed",
+                entity_type="delivery",
+                entity_id="delivery-v1",
+                payload={
+                    "contract_version": "personal-ip-delivery-qa-v1",
+                    "passed": True,
+                    "checks": {"decode": {"passed": True}},
+                },
+                output_refs=["artifact://old-final.mp4"],
+            ),
+            _event(
+                2,
+                "timeline_revision_compiled",
+                entity_type="timeline",
+                entity_id="timeline-r1",
+                payload={
+                    "contract_version": "personal-ip-video-timeline-revision-v1",
+                    "production_mode": "faceless_material",
+                    "revision_id": "timeline-r1",
+                    "fps": 24,
+                    "duration_seconds": 1,
+                    "tracks": [],
+                    "operations": [],
+                    "sha256": "c" * 64,
+                },
+            ),
+            _event(
+                3,
+                "final_edit_locked",
+                entity_type="timeline",
+                entity_id="final-lock-1",
+                payload={
+                    "contract_version": "personal-ip-video-final-edit-lock-v1",
+                    "source_revision_id": "timeline-r1",
+                    "source_timeline_sha256": "c" * 64,
+                    "ready_for_delivery_qa": True,
+                    "sha256": "d" * 64,
+                },
+            ),
+        ],
+    }
+
+    workbench = build_video_workbench_read_model(production)
+
+    assert workbench["timeline"]["locked"] is True
+    assert workbench["delivery"]["qa_events"][0]["payload"]["passed"] is True
+    assert workbench["delivery"]["current_qa_event"] is None
+    assert workbench["delivery"]["qa_passed"] is None
+    assert workbench["delivery"]["qa_stale"] is True
+
+
 def test_video_workbench_exposes_only_meaningful_unanswered_confirmations() -> None:
     production = {
         "id": "video-production-1",
@@ -201,6 +582,42 @@ def test_video_workbench_exposes_only_meaningful_unanswered_confirmations() -> N
     workbench = build_video_workbench_read_model(production)
 
     assert [item["kind"] for item in workbench["confirmations"]] == ["paid_provider_call"]
+
+
+def test_video_workbench_exposes_only_latest_reissued_confirmation_for_same_candidate() -> None:
+    production = {
+        "id": "video-production-1",
+        "status": "awaiting_review",
+        "current_stage": "selection",
+        "source_kind": "idea",
+        "source": {"idea": "test"},
+        "delivery_spec": {},
+        "provider_policy": {},
+        "budget": {},
+        "events": [
+            _event(
+                1,
+                "review_requested",
+                status="awaiting_review",
+                entity_type="candidate",
+                entity_id="shot-01:candidate-2",
+                payload={"review_kind": "candidate_selection", "qa_event_ref": "pending"},
+            ),
+            _event(
+                2,
+                "review_requested",
+                status="awaiting_review",
+                entity_type="candidate",
+                entity_id="shot-01:candidate-2",
+                payload={"review_kind": "candidate_selection", "qa_event_ref": "contract://qa/current"},
+            ),
+        ],
+    }
+
+    workbench = build_video_workbench_read_model(production)
+
+    assert [item["event_key"] for item in workbench["confirmations"]] == ["event-key-2"]
+    assert workbench["candidates"][0]["review"]["event_key"] == "event-key-2"
 
 
 def test_approved_selection_review_marks_the_candidate_selected() -> None:

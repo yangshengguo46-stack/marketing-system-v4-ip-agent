@@ -18,23 +18,23 @@
 config_version: 31
 
 # ============================================================================
-# MineContext — optional local observation source (restart required)
+# MineContext — bundled local observation source (restart required)
 # ============================================================================
-# Disabled by default. Setting enabled=true only makes the local sidecar
-# available: every owner must still choose exact scopes/purposes and press
-# Start. No screenshot or file watcher starts on Gateway boot.
-# Install from the complete pinned Apache-2.0 source with:
-#   make minecontext-install
-# Provider credentials are read only from the six explicitly named
-# MINECONTEXT_* variables and are never copied into DeerFlow model evidence.
+# Installed with `make install`. New owners start automatically with screen
+# summaries enabled at the bounded interval below; folder monitoring remains
+# off until an exact directory is configured. Settings can disable or clear it.
+# The ordinary VOLCENGINE_API_KEY is reused by default. MINECONTEXT_* variables
+# remain optional overrides and are never copied into model evidence.
 minecontext:
-  enabled: false
+  enabled: true
+  auto_enable_new_owners: true
   source_path: third_party/volcengine/MineContext
   # runtime_python: .deer-flow/toolchains/minecontext/bin/python
   host: 127.0.0.1
   port_start: 17400
   port_end: 17500
-  start_timeout_seconds: 20
+  # MineContext 首次冷启动在普通个人电脑上可能需要约 90 秒。
+  start_timeout_seconds: 120
   stop_timeout_seconds: 5
   max_owner_processes: 2
   default_retention_days: 30
@@ -42,6 +42,13 @@ minecontext:
   min_screen_interval_seconds: 60
   max_evidence_records: 2000
   max_sync_results: 20
+  fallback_api_key_env: VOLCENGINE_API_KEY
+  default_vlm_base_url: https://ark.cn-beijing.volces.com/api/v3
+  default_vlm_model: doubao-seed-2-0-pro-260215
+  default_embedding_base_url: https://ark.cn-beijing.volces.com/api/v3
+  default_embedding_model: doubao-embedding-vision-250615
+  vlm_provider: doubao
+  embedding_provider: doubao
 
 # ============================================================================
 # Logging
@@ -865,6 +872,8 @@ tools:
   #   group: browser
   #   use: deerflow.community.browser_automation.tools:browser_navigate_tool
   #   headless: true                   # Set false only for local, trusted debugging
+  #   native_account_login: true       # Local UI opens a real headed per-account login window;
+  #                                    # servers without a graphical desktop fall back to Live.
   #   timeout_ms: 30000                # Per-action navigation/interaction timeout
   #   viewport_width: 1280
   #   viewport_height: 720
@@ -1757,7 +1766,7 @@ agents_api:
 # ============================================================================
 # Allow the agent to autonomously create and improve skills in skills/custom/.
 skill_evolution:
-  enabled: false # Set to true to allow agent-managed writes under skills/custom
+  enabled: true # Personal-IP video templates use scanner-gated, per-user Skill writes
   moderation_model_name: null # Model for LLM-based security scanning (null = use default model)
   security_fail_closed: true # Moderation model unavailable: true blocks all writes; false allows non-executable content with a warning (executable is always blocked)
 

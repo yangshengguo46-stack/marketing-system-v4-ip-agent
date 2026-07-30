@@ -16,6 +16,9 @@ from typing import Any
 from urllib.parse import unquote, urlsplit, urlunsplit
 
 CONTRACT_VERSION = "personal-ip-media-execution-v1"
+PROJECT_TOOLCHAIN_BIN = (
+    Path(__file__).resolve().parents[4] / ".deer-flow" / "toolchains" / "ffmpeg" / "bin"
+)
 
 
 def _utc_now() -> str:
@@ -33,7 +36,9 @@ def _sanitized_source_ref(value: str) -> str:
     return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
 
 
-def _artifact(path: str, *, source_ref: str | None = None, downloaded_at: str | None = None) -> dict[str, Any]:
+def _artifact(
+    path: str, *, source_ref: str | None = None, downloaded_at: str | None = None
+) -> dict[str, Any]:
     resolved = Path(path).resolve()
     digest = hashlib.sha256()
     with resolved.open("rb") as handle:
@@ -43,7 +48,8 @@ def _artifact(path: str, *, source_ref: str | None = None, downloaded_at: str | 
         "ref": resolved.as_uri(),
         "sha256": digest.hexdigest(),
         "size_bytes": resolved.stat().st_size,
-        "mime_type": mimetypes.guess_type(resolved.name)[0] or "application/octet-stream",
+        "mime_type": mimetypes.guess_type(resolved.name)[0]
+        or "application/octet-stream",
     }
     if source_ref is not None:
         result["source_ref"] = _sanitized_source_ref(source_ref)
@@ -110,12 +116,21 @@ def _cost(
         return {"status": "unknown", "reason": reason}
     if status not in {"known", "estimated"}:
         raise ValueError("cost_status must be known, estimated or unknown")
-    if isinstance(amount, bool) or amount is None or not math.isfinite(amount) or amount < 0:
+    if (
+        isinstance(amount, bool)
+        or amount is None
+        or not math.isfinite(amount)
+        or amount < 0
+    ):
         raise ValueError("known or estimated cost requires a non-negative amount")
     currency_value = str(currency or "").strip().upper()
     if not currency_value:
         raise ValueError("known or estimated cost requires a currency")
-    result: dict[str, Any] = {"status": status, "amount": amount, "currency": currency_value}
+    result: dict[str, Any] = {
+        "status": status,
+        "amount": amount,
+        "currency": currency_value,
+    }
     if basis:
         result["basis"] = " ".join(basis.split())
     return result
@@ -149,45 +164,82 @@ def _load_resumable_receipt(
         receipt = json.loads(target.read_text(encoding="utf-8"))
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         raise ValueError("existing receipt cannot be resumed") from exc
-    if receipt.get("contract_version") != CONTRACT_VERSION or receipt.get("status") != "succeeded":
-        raise ValueError("existing receipt is not a resumable succeeded execution; use a new receipt file for a retry")
-    expected_identity = (provider.strip(), executor.strip(), capability, model.strip() if model else None)
-    actual_identity = (receipt.get("provider"), receipt.get("executor"), receipt.get("capability"), receipt.get("model"))
+    if (
+        receipt.get("contract_version") != CONTRACT_VERSION
+        or receipt.get("status") != "succeeded"
+    ):
+        raise ValueError(
+            "existing receipt is not a resumable succeeded execution; use a new receipt file for a retry"
+        )
+    expected_identity = (
+        provider.strip(),
+        executor.strip(),
+        capability,
+        model.strip() if model else None,
+    )
+    actual_identity = (
+        receipt.get("provider"),
+        receipt.get("executor"),
+        receipt.get("capability"),
+        receipt.get("model"),
+    )
     if actual_identity != expected_identity:
         raise ValueError("existing receipt belongs to a different executor request")
     parameters = receipt.get("parameters")
     if not isinstance(parameters, dict):
         raise ValueError("existing receipt has invalid executor parameters")
     expected_retry_of = " ".join(retry_of.split()) if retry_of else None
-    if (parameters.get("job_kind"), parameters.get("attempt"), parameters.get("retry_of")) != (job_kind, attempt, expected_retry_of):
+    if (
+        parameters.get("job_kind"),
+        parameters.get("attempt"),
+        parameters.get("retry_of"),
+    ) != (job_kind, attempt, expected_retry_of):
         raise ValueError("existing receipt belongs to a different executor attempt")
     inputs = receipt.get("inputs")
     if not isinstance(inputs, list) or len(inputs) != len(input_files):
         raise ValueError("existing receipt inputs do not match the declared inputs")
     expected_input_paths = [Path(path).resolve() for path in input_files]
-    actual_input_paths = [_path_from_file_ref(str(item.get("ref") or "")) for item in inputs if isinstance(item, dict)]
+    actual_input_paths = [
+        _path_from_file_ref(str(item.get("ref") or ""))
+        for item in inputs
+        if isinstance(item, dict)
+    ]
     if actual_input_paths != expected_input_paths:
         raise ValueError("existing receipt inputs do not match the declared inputs")
     for item, path in zip(inputs, actual_input_paths, strict=True):
         current = _artifact(str(path)) if path.is_file() else None
-        if current is None or item.get("size_bytes") != current["size_bytes"] or item.get("sha256") != current["sha256"]:
+        if (
+            current is None
+            or item.get("size_bytes") != current["size_bytes"]
+            or item.get("sha256") != current["sha256"]
+        ):
             raise ValueError("existing receipt input verification failed")
     outputs = receipt.get("outputs")
     if not isinstance(outputs, list) or len(outputs) != len(output_files):
         raise ValueError("existing receipt outputs do not match the declared outputs")
     expected_paths = [Path(path).resolve() for path in output_files]
-    actual_paths = [_path_from_file_ref(str(item.get("ref") or "")) for item in outputs if isinstance(item, dict)]
+    actual_paths = [
+        _path_from_file_ref(str(item.get("ref") or ""))
+        for item in outputs
+        if isinstance(item, dict)
+    ]
     if actual_paths != expected_paths:
         raise ValueError("existing receipt outputs do not match the declared outputs")
     for item, path in zip(outputs, actual_paths, strict=True):
         current = _artifact(str(path)) if path.is_file() else None
-        if current is None or item.get("size_bytes") != current["size_bytes"] or item.get("sha256") != current["sha256"]:
+        if (
+            current is None
+            or item.get("size_bytes") != current["size_bytes"]
+            or item.get("sha256") != current["sha256"]
+        ):
             raise ValueError("existing receipt output verification failed")
     if output_sources:
         actual_sources = [item.get("source_ref") for item in outputs]
         expected_sources = [_sanitized_source_ref(source) for source in output_sources]
         if actual_sources != expected_sources:
-            raise ValueError("existing receipt download sources do not match the declared outputs")
+            raise ValueError(
+                "existing receipt download sources do not match the declared outputs"
+            )
     return receipt
 
 
@@ -225,7 +277,12 @@ def run_media_executor(
         raise ValueError("provider and executor are required")
     if status_mode not in {"succeeded", "running"}:
         raise ValueError("status_mode must be succeeded or running")
-    if capability not in {"image_generation", "video_generation", "speech_generation", "media_processing"}:
+    if capability not in {
+        "image_generation",
+        "video_generation",
+        "speech_generation",
+        "media_processing",
+    }:
         raise ValueError("unsupported media execution capability")
     if isinstance(attempt, bool) or attempt < 1:
         raise ValueError("attempt must be a positive integer")
@@ -234,7 +291,9 @@ def run_media_executor(
         raise ValueError("output_sources must align with output_files")
     receipt_target = Path(receipt_file).resolve()
     if receipt_target.exists() and not resume:
-        raise ValueError("receipt already exists; use --resume for a succeeded execution or a new receipt file for a retry")
+        raise ValueError(
+            "receipt already exists; use --resume for a succeeded execution or a new receipt file for a retry"
+        )
     if resume:
         replay = _load_resumable_receipt(
             receipt_file,
@@ -257,6 +316,17 @@ def run_media_executor(
     if "mediakit" in executor.lower():
         environment["MEDIAKIT_SURFACE"] = "skill"
         environment["MEDIAKIT_RUNTIME"] = "deerflow"
+        ffmpeg = PROJECT_TOOLCHAIN_BIN / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+        ffprobe = PROJECT_TOOLCHAIN_BIN / (
+            "ffprobe.exe" if os.name == "nt" else "ffprobe"
+        )
+        if ffmpeg.is_file() and ffprobe.is_file():
+            existing_path = environment.get("PATH", "")
+            environment["PATH"] = (
+                f"{PROJECT_TOOLCHAIN_BIN}{os.pathsep}{existing_path}"
+                if existing_path
+                else str(PROJECT_TOOLCHAIN_BIN)
+            )
     completed = subprocess.run(
         command,
         capture_output=True,
@@ -266,7 +336,9 @@ def run_media_executor(
     )
     parsed = _parse_json_output(completed.stdout)
     resolved_task_id = task_id or _find_identifier(parsed, {"task_id", "taskid"})
-    resolved_request_id = request_id or _find_identifier(parsed, {"request_id", "requestid"})
+    resolved_request_id = request_id or _find_identifier(
+        parsed, {"request_id", "requestid"}
+    )
     base = {
         "contract_version": CONTRACT_VERSION,
         "capability": capability,
@@ -323,7 +395,11 @@ def run_media_executor(
         receipt = {**base, "status": "running", "completed_at": None, "outputs": []}
         _write_receipt(receipt_file, receipt)
         return receipt
-    missing = [str(Path(path).resolve()) for path in output_files if not Path(path).resolve().is_file()]
+    missing = [
+        str(Path(path).resolve())
+        for path in output_files
+        if not Path(path).resolve().is_file()
+    ]
     if not output_files or missing:
         receipt = {
             **base,
@@ -331,7 +407,11 @@ def run_media_executor(
             "outputs": [],
             "failure": {
                 "category": "missing_output",
-                "message": (f"executor did not create {len(missing)} declared output file(s)" if output_files else "synchronous executor declared no output files"),
+                "message": (
+                    f"executor did not create {len(missing)} declared output file(s)"
+                    if output_files
+                    else "synchronous executor declared no output files"
+                ),
                 "retryable": False,
             },
         }
@@ -357,18 +437,27 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", action="append", default=[], dest="input_files")
     parser.add_argument("--output", action="append", default=[], dest="output_files")
-    parser.add_argument("--output-source", action="append", default=[], dest="output_sources")
+    parser.add_argument(
+        "--output-source", action="append", default=[], dest="output_sources"
+    )
     parser.add_argument("--receipt-file", required=True)
     parser.add_argument("--provider", required=True)
     parser.add_argument("--executor", required=True)
     parser.add_argument("--model")
     parser.add_argument(
         "--capability",
-        choices=("image_generation", "video_generation", "speech_generation", "media_processing"),
+        choices=(
+            "image_generation",
+            "video_generation",
+            "speech_generation",
+            "media_processing",
+        ),
         default="media_processing",
     )
     parser.add_argument("--job-kind", default="media_processing")
-    parser.add_argument("--status-mode", choices=("succeeded", "running"), default="succeeded")
+    parser.add_argument(
+        "--status-mode", choices=("succeeded", "running"), default="succeeded"
+    )
     parser.add_argument("--task-id")
     parser.add_argument("--request-id")
     parser.add_argument("--attempt", type=int, default=1)
@@ -376,11 +465,15 @@ def main() -> int:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--failure-category", default="executor_failed")
     parser.add_argument("--failure-retryable", action="store_true")
-    parser.add_argument("--cost-status", choices=("known", "estimated", "unknown"), default="unknown")
+    parser.add_argument(
+        "--cost-status", choices=("known", "estimated", "unknown"), default="unknown"
+    )
     parser.add_argument("--cost-amount", type=float)
     parser.add_argument("--cost-currency")
     parser.add_argument("--cost-basis")
-    parser.add_argument("--cost-unknown-reason", default="executor billing API is not connected")
+    parser.add_argument(
+        "--cost-unknown-reason", default="executor billing API is not connected"
+    )
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
@@ -413,7 +506,9 @@ def main() -> int:
     except Exception as exc:
         print(f"Media executor failed: {exc}")
         return 1
-    print(json.dumps(receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    print(
+        json.dumps(receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    )
     return 0
 
 

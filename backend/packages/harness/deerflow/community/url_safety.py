@@ -8,6 +8,7 @@ from collections.abc import Callable
 from urllib.parse import urlparse
 
 _BLOCKED_HOSTNAMES = {"localhost", "metadata.google.internal"}
+_PROXY_FAKE_IP_NETWORK = ipaddress.ip_network("198.18.0.0/15")
 
 
 def resolve_host_addresses(hostname: str) -> list[ipaddress._BaseAddress]:
@@ -35,6 +36,7 @@ def validate_public_http_url(
     url: str,
     *,
     allow_private_addresses: bool = False,
+    allow_proxy_fake_ip: bool = False,
     action: str = "fetch",
     resolver: Callable[[str], list[ipaddress._BaseAddress]] | None = None,
 ) -> str | None:
@@ -73,6 +75,15 @@ def validate_public_http_url(
         if not candidates:
             return "Error: URL host could not be resolved"
 
-    if any(is_blocked_address(addr) for addr in candidates):
+    def is_blocked_candidate(address: ipaddress._BaseAddress) -> bool:
+        # Clash-style transparent proxies intentionally resolve public domains
+        # into RFC 2544's benchmarking range and translate them later. Permit
+        # that range only for a domain name and only for callers that opt in;
+        # a user-entered literal 198.18.x.x address remains blocked.
+        if allow_proxy_fake_ip and literal_ip is None and address in _PROXY_FAKE_IP_NETWORK:
+            return False
+        return is_blocked_address(address)
+
+    if any(is_blocked_candidate(addr) for addr in candidates):
         return f"Error: Refusing to {action} a private, loopback, or metadata address"
     return None

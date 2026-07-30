@@ -118,6 +118,21 @@ def _to_data_url(image_path: str) -> str:
     return f"data:{_guess_mime(image_path)};base64,{b64}"
 
 
+def _prompt_text(raw: str) -> str:
+    """Use a structured prompt's explicit prompt field when it has one."""
+
+    text = raw.strip()
+    try:
+        payload = json.loads(text)
+    except (ValueError, json.JSONDecodeError):
+        return text
+    if isinstance(payload, dict):
+        prompt = payload.get("prompt")
+        if isinstance(prompt, str) and prompt.strip():
+            return prompt.strip()
+    return text
+
+
 def _poll_video_task(
     host: str, auth: str, task_id: str, max_attempts: int = 120, interval: int = 3
 ) -> str:
@@ -217,6 +232,7 @@ def _generate_video_volcengine(
     *,
     prompt_file: str | None = None,
     receipt_file: str | None = None,
+    model: str | None = None,
 ) -> str:
     api_key = os.getenv("VOLCENGINE_API_KEY")
     if not api_key:
@@ -225,7 +241,9 @@ def _generate_video_volcengine(
     started_at = _utc_now()
     task_id = None
     request_id = None
-    model = os.getenv("VOLCENGINE_VIDEO_MODEL", VOLCENGINE_VIDEO_DEFAULT_MODEL)
+    selected_model = (
+        model or os.getenv("VOLCENGINE_VIDEO_MODEL") or VOLCENGINE_VIDEO_DEFAULT_MODEL
+    )
     parameters = {
         "ratio": aspect_ratio,
         "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
@@ -273,7 +291,7 @@ def _generate_video_volcengine(
             }
         )
         body = {
-            "model": model,
+            "model": selected_model,
             "content": content,
             "resolution": parameters["resolution"],
             "ratio": aspect_ratio,
@@ -293,7 +311,14 @@ def _generate_video_volcengine(
         response.raise_for_status()
         created = response.json()
         task_id = created.get("id") or created.get("task_id")
-        request_id = created.get("request_id")
+        response_headers = getattr(response, "headers", {}) or {}
+        request_id = (
+            created.get("request_id")
+            or response_headers.get("x-request-id")
+            or response_headers.get("X-Request-Id")
+            or response_headers.get("x-tt-logid")
+            or response_headers.get("X-Tt-Logid")
+        )
         if not task_id:
             raise Exception("Volcengine Seedance returned no task ID")
         completed = _poll_volcengine_task(host, auth, task_id)
@@ -305,7 +330,7 @@ def _generate_video_volcengine(
                 "capability": "video_generation",
                 "provider": "volcengine",
                 "executor": "video-generation-skill",
-                "model": model,
+                "model": selected_model,
                 "status": "succeeded",
                 "task_id": task_id,
                 "request_id": request_id,
@@ -326,7 +351,7 @@ def _generate_video_volcengine(
                 "capability": "video_generation",
                 "provider": "volcengine",
                 "executor": "video-generation-skill",
-                "model": model,
+                "model": selected_model,
                 "status": "failed",
                 "task_id": task_id,
                 "request_id": request_id,
@@ -357,7 +382,7 @@ def _generate_video_volcengine(
                 "capability": "video_generation",
                 "provider": "volcengine",
                 "executor": "video-generation-skill",
-                "model": model,
+                "model": selected_model,
                 "status": "failed",
                 "task_id": task_id,
                 "request_id": request_id,
@@ -472,9 +497,10 @@ def generate_video(
     output_file: str,
     aspect_ratio: str = "16:9",
     receipt_file: str | None = None,
+    model: str | None = None,
 ) -> str:
-    with open(prompt_file, "r", encoding="utf-8") as f:
-        prompt = f.read()
+    with open(prompt_file, encoding="utf-8") as f:
+        prompt = _prompt_text(f.read())
     provider = _resolve_provider(
         "VIDEO_GENERATION_PROVIDER", "gemini", bool(os.getenv("GEMINI_API_KEY"))
     )
@@ -486,6 +512,7 @@ def generate_video(
             aspect_ratio,
             prompt_file=prompt_file,
             receipt_file=receipt_file,
+            model=model,
         )
     if provider == "minimax":
         # MiniMax video uses resolution/duration, not aspect_ratio; aspect_ratio ignored.
@@ -527,17 +554,24 @@ if __name__ == "__main__":
         required=False,
         help="Write a personal-ip-media-execution-v1 JSON receipt",
     )
+    parser.add_argument(
+        "--model",
+        required=False,
+        help="Volcengine Seedance model ID for this generation only",
+    )
     args = parser.parse_args()
 
     try:
         print(
             generate_video(
-                args.prompt_file,
-                args.reference_images,
-                args.output_file,
-                args.aspect_ratio,
-                args.receipt_file,
+                prompt_file=args.prompt_file,
+                reference_images=args.reference_images,
+                output_file=args.output_file,
+                aspect_ratio=args.aspect_ratio,
+                receipt_file=args.receipt_file,
+                model=args.model,
             )
         )
     except Exception as e:
         print(f"Error while generating video: {e}")
+        raise SystemExit(1) from e

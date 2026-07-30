@@ -1,3 +1,4 @@
+import ipaddress
 import logging
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,7 +11,11 @@ from starlette.websockets import WebSocketDisconnect
 
 from app.gateway.auth.models import User
 from app.gateway.routers import browser as browser_router
-from app.gateway.routers.browser import _should_apply_browser_seed, _ws_origin_allowed
+from app.gateway.routers.browser import (
+    _native_account_login_available,
+    _should_apply_browser_seed,
+    _ws_origin_allowed,
+)
 
 
 class _FakeWebSocket:
@@ -247,6 +252,21 @@ def test_browser_stream_seed_ignores_hash_and_trailing_slash_for_same_page():
     )
 
 
+@pytest.mark.parametrize("platform", ["darwin", "win32"])
+def test_native_account_login_available_on_desktop_platforms(platform):
+    assert _native_account_login_available(True, platform=platform, environ={})
+
+
+def test_native_account_login_available_on_linux_with_display():
+    assert _native_account_login_available(True, platform="linux", environ={"DISPLAY": ":0"})
+    assert _native_account_login_available(True, platform="linux", environ={"WAYLAND_DISPLAY": "wayland-0"})
+
+
+def test_native_account_login_falls_back_without_graphical_desktop():
+    assert not _native_account_login_available(True, platform="linux", environ={})
+    assert not _native_account_login_available(False, platform="darwin", environ={})
+
+
 def test_ws_origin_allowed_without_origin_header():
     # Native ws clients / tests do not send Origin — allow them.
     assert _ws_origin_allowed(_FakeWebSocket({"host": "app.example.com"})) is True
@@ -321,3 +341,19 @@ def test_validate_browser_url_rejects_private_and_non_http(monkeypatch):
     assert validate_browser_url("ftp://example.com") is not None
     # A normal public URL passes (returns None = allowed).
     assert validate_browser_url("https://github.com/bytedance/deer-flow") is None
+
+
+def test_validate_browser_url_allows_proxy_fake_ip_only_for_domain(monkeypatch):
+    """Transparent-proxy fake DNS must not turn into an SSRF bypass."""
+    from deerflow.community.browser_automation import tools as browser_tools
+    from deerflow.community.browser_automation import validate_browser_url
+
+    monkeypatch.setattr(browser_tools, "_get_tool_config", lambda _tool_name: {})
+    monkeypatch.setattr(
+        browser_tools,
+        "_resolve_host_addresses",
+        lambda _hostname: [ipaddress.ip_address("198.18.1.233")],
+    )
+
+    assert validate_browser_url("https://creator.douyin.com/") is None
+    assert validate_browser_url("https://198.18.1.233/") is not None

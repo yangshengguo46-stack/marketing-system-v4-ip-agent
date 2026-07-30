@@ -59,9 +59,9 @@ capabilities:
   speech:
     product: Doubao Speech
     integration: skill:podcast-generation
-    credentials:
-      - VOLCENGINE_TTS_APPID
-      - VOLCENGINE_TTS_ACCESS_TOKEN
+    credential: VOLCENGINE_TTS_API_KEY
+    credential_header: X-Api-Key
+    legacy_credential_alias: VOLCENGINE_TTS_ACCESS_TOKEN
   media_editing_and_understanding:
     product: AI MediaKit
     integration:

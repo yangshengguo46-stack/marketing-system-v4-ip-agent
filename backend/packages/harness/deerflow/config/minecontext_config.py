@@ -1,4 +1,4 @@
-"""Fail-closed operator configuration for the optional local MineContext source."""
+"""Operator configuration for the bundled local MineContext source."""
 
 from __future__ import annotations
 
@@ -8,17 +8,18 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 class MineContextConfig(BaseModel):
     """Startup-only limits for per-owner MineContext sidecars.
 
-    ``enabled`` only makes the integration available. It never starts capture;
-    each owner must still grant a scoped consent and explicitly start it.
+    The Personal-IP product enables the bundled source for new owners by
+    default. An owner can still disable it persistently from Settings.
     """
 
-    enabled: bool = False
+    enabled: bool = True
+    auto_enable_new_owners: bool = True
     source_path: str = "third_party/volcengine/MineContext"
     runtime_python: str | None = None
     host: str = "127.0.0.1"
     port_start: int = Field(default=17400, ge=1024, le=65535)
     port_end: int = Field(default=17500, ge=1024, le=65535)
-    start_timeout_seconds: float = Field(default=20.0, ge=1.0, le=120.0)
+    start_timeout_seconds: float = Field(default=120.0, ge=1.0, le=120.0)
     stop_timeout_seconds: float = Field(default=5.0, ge=0.1, le=30.0)
     max_owner_processes: int = Field(default=2, ge=1, le=32)
     default_retention_days: int = Field(default=30, ge=1, le=365)
@@ -32,6 +33,13 @@ class MineContextConfig(BaseModel):
     embedding_base_url_env: str = "MINECONTEXT_EMBEDDING_BASE_URL"
     embedding_api_key_env: str = "MINECONTEXT_EMBEDDING_API_KEY"
     embedding_model_env: str = "MINECONTEXT_EMBEDDING_MODEL"
+    fallback_api_key_env: str = "VOLCENGINE_API_KEY"
+    default_vlm_base_url: str = "https://ark.cn-beijing.volces.com/api/v3"
+    default_vlm_model: str = "doubao-seed-2-0-pro-260215"
+    default_embedding_base_url: str = "https://ark.cn-beijing.volces.com/api/v3"
+    default_embedding_model: str = "doubao-embedding-vision-250615"
+    vlm_provider: str = "doubao"
+    embedding_provider: str = "doubao"
 
     @field_validator("host")
     @classmethod
@@ -48,6 +56,7 @@ class MineContextConfig(BaseModel):
         "embedding_base_url_env",
         "embedding_api_key_env",
         "embedding_model_env",
+        "fallback_api_key_env",
     )
     @classmethod
     def validate_environment_name(cls, value: str) -> str:
@@ -55,6 +64,14 @@ class MineContextConfig(BaseModel):
         if not value or not value.replace("_", "A").isalnum() or not value[0].isalpha():
             raise ValueError("MineContext credential settings must name explicit environment variables")
         return value
+
+    @field_validator("vlm_provider", "embedding_provider")
+    @classmethod
+    def validate_provider(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"doubao", "openai"}:
+            raise ValueError("MineContext provider must be 'doubao' or 'openai'")
+        return normalized
 
     @model_validator(mode="after")
     def validate_ranges(self) -> MineContextConfig:

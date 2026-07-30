@@ -100,6 +100,33 @@ def test_volcengine_seedance_full_flow(monkeypatch, tmp_path):
     assert "seedance-task-1" in msg
 
 
+def test_volcengine_seedance_extracts_explicit_prompt_from_json(monkeypatch, tmp_path):
+    monkeypatch.setenv("VOLCENGINE_API_KEY", "v")
+    captured = {}
+
+    def fake_post(url, headers=None, json=None, **kw):
+        captured["json"] = json
+        return FakeResp({"id": "T-json"})
+
+    def fake_get(url, headers=None, **kw):
+        if url.endswith("/T-json"):
+            return FakeResp(
+                {"status": "succeeded", "content": {"video_url": "https://d/v"}}
+            )
+        return FakeResp(content=b"V")
+
+    monkeypatch.setattr(vid.requests, "post", fake_post)
+    monkeypatch.setattr(vid.requests, "get", fake_get)
+    prompt_file = tmp_path / "prompt.json"
+    prompt_file.write_text(
+        '{"prompt":"棱镜缓慢旋转","duration_seconds":4}', encoding="utf-8"
+    )
+
+    vid.generate_video(str(prompt_file), [], str(tmp_path / "out.mp4"), "9:16")
+
+    assert captured["json"]["content"][0]["text"] == "棱镜缓慢旋转"
+
+
 def test_volcengine_seedance_writes_verified_execution_receipt(monkeypatch, tmp_path):
     import hashlib
     import json
@@ -132,13 +159,14 @@ def test_volcengine_seedance_writes_verified_execution_receipt(monkeypatch, tmp_
         str(output_file),
         "9:16",
         str(receipt_file),
+        model="doubao-seedance-2-0-fast-260128",
     )
     receipt = json.loads(receipt_file.read_text(encoding="utf-8"))
 
     assert receipt["contract_version"] == "personal-ip-media-execution-v1"
     assert receipt["capability"] == "video_generation"
     assert receipt["provider"] == "volcengine"
-    assert receipt["model"] == "doubao-seedance-2-0-260128"
+    assert receipt["model"] == "doubao-seedance-2-0-fast-260128"
     assert receipt["task_id"] == "seedance-task-2"
     assert receipt["request_id"] == "ark-request-2"
     assert receipt["status"] == "succeeded"

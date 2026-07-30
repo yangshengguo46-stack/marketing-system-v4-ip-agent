@@ -21,6 +21,7 @@ class PersonalIPVideoProductionRow(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     owner_user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    thread_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     operation_key: Mapped[str] = mapped_column(String(256), nullable=False)
     contract_version: Mapped[str] = mapped_column(String(64), nullable=False)
     title: Mapped[str] = mapped_column(String(256), nullable=False)
@@ -54,6 +55,11 @@ class PersonalIPVideoProductionRow(Base):
             "operation_key",
             name="uq_personal_ip_video_productions_owner_operation",
         ),
+        UniqueConstraint(
+            "owner_user_id",
+            "thread_id",
+            name="uq_personal_ip_video_productions_owner_thread",
+        ),
         CheckConstraint("source_kind IN ('idea','script')", name="ck_personal_ip_video_productions_source_kind"),
         CheckConstraint(
             "status IN ('draft','running','awaiting_review','blocked','completed','cancelled')",
@@ -64,6 +70,7 @@ class PersonalIPVideoProductionRow(Base):
             name="ck_personal_ip_video_productions_stage",
         ),
         Index("ix_personal_ip_video_productions_owner_updated", "owner_user_id", "updated_at"),
+        Index("ix_personal_ip_video_productions_owner_thread", "owner_user_id", "thread_id"),
     )
 
 

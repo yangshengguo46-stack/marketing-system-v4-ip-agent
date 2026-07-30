@@ -651,8 +651,13 @@ class TestIPAgentProductChecks:
         config.write_text("minecontext:\n  enabled: true\n", encoding="utf-8")
         monkeypatch.setattr(doctor, "_verify_minecontext_source", lambda _root: {"commit": "171c7a9"})
         for name in (
-            "MINECONTEXT_VLM_BASE_URL", "MINECONTEXT_VLM_API_KEY", "MINECONTEXT_VLM_MODEL",
-            "MINECONTEXT_EMBEDDING_BASE_URL", "MINECONTEXT_EMBEDDING_API_KEY", "MINECONTEXT_EMBEDDING_MODEL",
+            "MINECONTEXT_VLM_BASE_URL",
+            "MINECONTEXT_VLM_API_KEY",
+            "MINECONTEXT_VLM_MODEL",
+            "MINECONTEXT_EMBEDDING_BASE_URL",
+            "MINECONTEXT_EMBEDDING_API_KEY",
+            "MINECONTEXT_EMBEDDING_MODEL",
+            "VOLCENGINE_API_KEY",
         ):
             monkeypatch.delenv(name, raising=False)
 
@@ -662,7 +667,20 @@ class TestIPAgentProductChecks:
         assert results[1].status == "warn"
         assert "minecontext-install" in (results[1].fix or "")
         assert results[2].status == "warn"
-        assert "MINECONTEXT_VLM_API_KEY" in results[2].detail
+        assert "VOLCENGINE_API_KEY" in results[2].detail
+
+    def test_minecontext_doctor_accepts_shared_volcengine_key(self, tmp_path, monkeypatch):
+        config = tmp_path / "config.yaml"
+        config.write_text("minecontext:\n  enabled: true\n", encoding="utf-8")
+        runtime = tmp_path / ".deer-flow" / "toolchains" / "minecontext" / ("Scripts/python.exe" if sys.platform.startswith("win") else "bin/python")
+        runtime.parent.mkdir(parents=True)
+        runtime.write_text("fixture", encoding="utf-8")
+        monkeypatch.setattr(doctor, "_verify_minecontext_source", lambda _root: {"commit": "171c7a9"})
+        monkeypatch.setenv("VOLCENGINE_API_KEY", "secret")
+
+        results = doctor.check_minecontext(tmp_path, config)
+
+        assert [result.status for result in results] == ["ok", "ok", "ok"]
 
     def test_capability_manifest_requires_exact_eight_platforms(self, tmp_path):
         manifest = tmp_path / "product" / "volcengine" / "capabilities.yaml"
@@ -688,6 +706,7 @@ class TestIPAgentProductChecks:
     def test_product_credentials_distinguish_optional_cloud_from_missing_generation(self, monkeypatch):
         for name in (
             "VOLCENGINE_API_KEY",
+            "VOLCENGINE_TTS_API_KEY",
             "VOLCENGINE_TTS_APPID",
             "VOLCENGINE_TTS_ACCESS_TOKEN",
             "MEDIAKIT_API_KEY",
@@ -702,17 +721,28 @@ class TestIPAgentProductChecks:
         assert by_label["AI MediaKit cloud"].status == "ok"
         assert "optional" in by_label["AI MediaKit cloud"].detail
 
-    def test_product_credentials_report_complete_pairs_without_values(self, monkeypatch):
+    def test_product_credentials_report_single_tts_key_without_values(self, monkeypatch):
         monkeypatch.setenv("VOLCENGINE_API_KEY", "secret-ark")
-        monkeypatch.setenv("VOLCENGINE_TTS_APPID", "secret-app")
-        monkeypatch.setenv("VOLCENGINE_TTS_ACCESS_TOKEN", "secret-token")
+        monkeypatch.setenv("VOLCENGINE_TTS_API_KEY", "secret-speech")
         monkeypatch.setenv("MEDIAKIT_API_KEY", "secret-media")
 
         results = doctor.check_volcengine_product_credentials()
         rendered = " ".join(result.detail for result in results)
 
         assert all(result.status == "ok" for result in results)
+        assert "AppID is not required" in rendered
         assert "secret-" not in rendered
+
+    def test_product_credentials_accept_legacy_tts_key_name_without_appid(self, monkeypatch):
+        monkeypatch.delenv("VOLCENGINE_TTS_API_KEY", raising=False)
+        monkeypatch.delenv("VOLCENGINE_TTS_APPID", raising=False)
+        monkeypatch.setenv("VOLCENGINE_TTS_ACCESS_TOKEN", "secret-speech")
+
+        results = doctor.check_volcengine_product_credentials()
+        speech = next(result for result in results if result.label == "Doubao Speech")
+
+        assert speech.status == "ok"
+        assert "AppID is not required" in speech.detail
 
     def test_local_media_toolchain_prefers_project_binaries(self, tmp_path, monkeypatch):
         ffmpeg_dir = tmp_path / ".deer-flow" / "toolchains" / "ffmpeg" / "bin"

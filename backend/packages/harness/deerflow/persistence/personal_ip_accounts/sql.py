@@ -20,9 +20,6 @@ _ACCOUNT_FIELDS = frozenset(
         "display_name",
         "handle",
         "avatar_url",
-        "promise_to_audience",
-        "primary_audience",
-        "business_goal",
         "status",
     }
 )
@@ -37,8 +34,17 @@ class PersonalIPAccountRepository:
     @staticmethod
     def _to_dict(row: PersonalIPAccountRow) -> dict[str, Any]:
         data = row.to_dict()
-        data["content_pillars"] = data.pop("content_pillars_json") or []
-        data["voice_and_boundaries"] = data.pop("voice_and_boundaries_json") or []
+        # Kept as physical compatibility columns until a later destructive
+        # migration, but removed from the account contract. Identity truth is
+        # versioned at the subject level.
+        for legacy_field in (
+            "promise_to_audience",
+            "primary_audience",
+            "content_pillars_json",
+            "voice_and_boundaries_json",
+            "business_goal",
+        ):
+            data.pop(legacy_field, None)
         data["metadata"] = data.pop("metadata_json") or {}
         for key in ("created_at", "updated_at"):
             value = data.get(key)
@@ -55,11 +61,6 @@ class PersonalIPAccountRepository:
         subject_id: str | None = None,
         handle: str | None = None,
         avatar_url: str | None = None,
-        promise_to_audience: str = "",
-        primary_audience: str = "",
-        content_pillars: list[str] | None = None,
-        voice_and_boundaries: list[str] | None = None,
-        business_goal: str = "",
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         now = datetime.now(UTC)
@@ -78,11 +79,6 @@ class PersonalIPAccountRepository:
                 display_name=display_name,
                 handle=handle,
                 avatar_url=avatar_url,
-                promise_to_audience=promise_to_audience,
-                primary_audience=primary_audience,
-                content_pillars_json=list(content_pillars or []),
-                voice_and_boundaries_json=list(voice_and_boundaries or []),
-                business_goal=business_goal,
                 status="active",
                 metadata_json=dict(metadata or {}),
                 created_at=now,
@@ -159,10 +155,6 @@ class PersonalIPAccountRepository:
             for key in _ACCOUNT_FIELDS:
                 if key in updates:
                     setattr(row, key, updates[key])
-            if "content_pillars" in updates:
-                row.content_pillars_json = list(updates["content_pillars"] or [])
-            if "voice_and_boundaries" in updates:
-                row.voice_and_boundaries_json = list(updates["voice_and_boundaries"] or [])
             if "metadata" in updates:
                 row.metadata_json = dict(updates["metadata"] or {})
             row.updated_at = datetime.now(UTC)

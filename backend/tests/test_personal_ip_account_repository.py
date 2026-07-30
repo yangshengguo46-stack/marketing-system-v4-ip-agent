@@ -17,16 +17,12 @@ async def test_personal_ip_account_crud_and_owner_isolation(tmp_path):
         platform="douyin",
         display_name="老杨说 AI",
         handle="laoyang-ai",
-        promise_to_audience="把复杂 AI 讲明白",
-        primary_audience="想用 AI 做生意的个体创业者",
-        content_pillars=["AI 智能体", "个人 IP"],
-        voice_and_boundaries=["直接", "不承诺暴富"],
-        business_goal="获得高质量咨询线索",
         metadata={"positioning_version": 3},
     )
 
     assert created["id"].startswith("acct-")
-    assert created["content_pillars"] == ["AI 智能体", "个人 IP"]
+    assert "content_pillars" not in created
+    assert "promise_to_audience" not in created
     assert created["metadata"] == {"positioning_version": 3}
     assert await repo.get(created["id"], owner_user_id="user-2") is None
     assert await repo.list("user-2") == []
@@ -35,14 +31,12 @@ async def test_personal_ip_account_crud_and_owner_isolation(tmp_path):
         created["id"],
         owner_user_id="user-1",
         updates={
-            "business_goal": "销售本地智能体",
-            "content_pillars": ["本地智能体"],
+            "display_name": "老杨的 AI 智能体",
             "metadata": {"positioning_version": 4},
         },
     )
     assert updated is not None
-    assert updated["business_goal"] == "销售本地智能体"
-    assert updated["content_pillars"] == ["本地智能体"]
+    assert updated["display_name"] == "老杨的 AI 智能体"
 
     assert await repo.delete(created["id"], owner_user_id="user-2") is False
     assert await repo.delete(created["id"], owner_user_id="user-1") is True

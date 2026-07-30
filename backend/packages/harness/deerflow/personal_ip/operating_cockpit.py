@@ -7,7 +7,7 @@ from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
 
-OPERATING_COCKPIT_CONTRACT_VERSION = "personal-ip-operating-cockpit-v1"
+OPERATING_COCKPIT_CONTRACT_VERSION = "personal-ip-operating-cockpit-v4"
 _HISTORY_LIMIT = 500
 _RECENT_LIMIT = 20
 VIDEO_PRODUCTION_STAGES = (
@@ -33,17 +33,6 @@ def _stage(*, total: int, pending: int, **details: int) -> dict[str, Any]:
     return {"state": state, "total": total, "pending": pending, **details}
 
 
-def _model_ready(account: dict[str, Any]) -> bool:
-    return all(
-        (
-            str(account.get("primary_audience") or "").strip(),
-            str(account.get("promise_to_audience") or "").strip(),
-            account.get("content_pillars") or [],
-            str(account.get("business_goal") or "").strip(),
-        )
-    )
-
-
 def _project(items: list[dict[str, Any]], fields: tuple[str, ...]) -> list[dict[str, Any]]:
     return [{field: item.get(field) for field in fields if field in item} for item in items[:_RECENT_LIMIT]]
 
@@ -56,6 +45,7 @@ class PersonalIPOperatingCockpitService:
         *,
         subjects,
         accounts,
+        brand,
         preflights,
         publish_receipts,
         metrics,
@@ -66,6 +56,7 @@ class PersonalIPOperatingCockpitService:
     ) -> None:
         self._subjects = subjects
         self._accounts = accounts
+        self._brand = brand
         self._preflights = preflights
         self._publish_receipts = publish_receipts
         self._metrics = metrics
@@ -81,6 +72,7 @@ class PersonalIPOperatingCockpitService:
         (
             subjects,
             accounts,
+            strategies,
             preflights,
             receipts,
             metrics,
@@ -91,6 +83,7 @@ class PersonalIPOperatingCockpitService:
         ) = await asyncio.gather(
             self._subjects.list(owner, include_archived=False),
             self._accounts.list(owner, include_archived=False),
+            self._brand.list_strategies(owner, limit=_HISTORY_LIMIT),
             self._preflights.list(owner, limit=_HISTORY_LIMIT),
             self._publish_receipts.list(owner, limit=_HISTORY_LIMIT),
             self._metrics.list(owner, limit=_HISTORY_LIMIT),
@@ -100,7 +93,15 @@ class PersonalIPOperatingCockpitService:
             self._video_productions.list(owner, limit=_HISTORY_LIMIT),
         )
 
-        accounts_needing_model_input = sorted(account["id"] for account in accounts if not _model_ready(account))
+        latest_strategy_by_subject: dict[str, dict[str, Any]] = {}
+        for strategy in strategies:
+            key = str(strategy.get("subject_id") or "")
+            if key and key not in latest_strategy_by_subject:
+                latest_strategy_by_subject[key] = strategy
+        validated_strategy_subject_ids = {subject_id for subject_id, strategy in latest_strategy_by_subject.items() if strategy.get("stage") in {"commercial_signal_observed", "scaling"}}
+        subjects_needing_strategy = sorted(str(subject["id"]) for subject in subjects if str(subject.get("id")) not in latest_strategy_by_subject)
+        subjects_needing_strategy_validation = sorted(str(subject["id"]) for subject in subjects if str(subject.get("id")) not in validated_strategy_subject_ids)
+        strategy_stage_counts = Counter(str(strategy.get("stage") or "evidence_collecting") for strategy in latest_strategy_by_subject.values())
         receipt_preflight_ids = {str(receipt.get("preflight_id")) for receipt in receipts if receipt.get("preflight_id")}
         preflights_awaiting_publish = sorted(preflight["id"] for preflight in preflights if preflight.get("status") == "sealed" and preflight.get("id") not in receipt_preflight_ids)
         published_receipts = [receipt for receipt in receipts if receipt.get("status") == "published"]
@@ -115,6 +116,7 @@ class PersonalIPOperatingCockpitService:
         platforms = sorted({str(account.get("platform")) for account in accounts if account.get("platform")})
 
         histories = {
+            "strategies": strategies,
             "preflights": preflights,
             "publish_receipts": receipts,
             "metrics": metrics,
@@ -142,9 +144,15 @@ class PersonalIPOperatingCockpitService:
             },
             "stages": {
                 "modeling": _stage(
-                    total=len(accounts),
-                    pending=len(accounts_needing_model_input),
-                    ready=len(accounts) - len(accounts_needing_model_input),
+                    total=len(subjects),
+                    pending=len(subjects_needing_strategy_validation),
+                    ready=len(validated_strategy_subject_ids),
+                    subjects_needing_strategy=len(subjects_needing_strategy),
+                    launch_packages_ready=strategy_stage_counts["launch_package_ready"],
+                    pilots_running=strategy_stage_counts["pilot_running"],
+                    commercial_signals_observed=strategy_stage_counts["commercial_signal_observed"],
+                    strategies_validated=(strategy_stage_counts["commercial_signal_observed"] + strategy_stage_counts["scaling"]),
+                    strategy_versions=len(strategies),
                 ),
                 "preflight": _stage(
                     total=len(preflights),
@@ -176,12 +184,31 @@ class PersonalIPOperatingCockpitService:
                 ),
             },
             "queues": {
-                "accounts_needing_model_input": accounts_needing_model_input,
+                "subjects_needing_strategy_validation": subjects_needing_strategy_validation,
                 "preflights_awaiting_publish": preflights_awaiting_publish,
                 "published_receipts_awaiting_metrics": published_awaiting_metrics,
                 "published_receipts_awaiting_retrospective": published_awaiting_retrospective,
             },
             "recent": {
+                "strategies": _project(
+                    strategies,
+                    (
+                        "id",
+                        "subject_id",
+                        "version",
+                        "stage",
+                        "mode",
+                        "method_version",
+                        "person_model",
+                        "business_model",
+                        "benchmark_research",
+                        "positioning_candidates",
+                        "launch_package",
+                        "validation",
+                        "content_digest",
+                        "created_at",
+                    ),
+                ),
                 "preflights": _project(
                     preflight_summaries,
                     (

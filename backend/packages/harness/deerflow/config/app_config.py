@@ -250,7 +250,7 @@ class AppConfig(BaseModel):
         default_factory=MineContextConfig,
         description=format_field_description(
             "minecontext",
-            field_doc="Optional local observation source. Operator enablement never substitutes for per-owner consent or starts capture automatically.",
+            field_doc="Bundled local observation source. New owners start with the safe Personal-IP defaults and may disable or clear it from Settings.",
         ),
     )
     loop_detection: LoopDetectionConfig = Field(default_factory=LoopDetectionConfig, description="Loop detection middleware configuration")

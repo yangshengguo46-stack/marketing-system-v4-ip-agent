@@ -1,11 +1,30 @@
 from .clarification_tool import ask_clarification_tool
 from .minecontext_tools import personal_ip_minecontext_evidence_tool, personal_ip_minecontext_sync_tool
+from .personal_ip_brand_tools import (
+    personal_ip_read_strategy_context_tool,
+    personal_ip_record_strategy_tool,
+)
 from .personal_ip_tools import (
     personal_ip_begin_video_production_tool,
     personal_ip_collect_browser_page_tool,
     personal_ip_collect_browser_portfolio_today_tool,
     personal_ip_collect_douyin_browser_page_tool,
+    personal_ip_compile_approved_video_assembly_tool,
+    personal_ip_compile_generated_shot_qa_tool,
+    personal_ip_compile_video_asset_manifest_tool,
+    personal_ip_compile_video_continuity_tool,
+    personal_ip_compile_video_material_selection_tool,
+    personal_ip_compile_video_narration_timing_tool,
+    personal_ip_compile_video_narration_tool,
+    personal_ip_compile_video_pattern_tool,
+    personal_ip_compile_video_plan_tool,
+    personal_ip_compile_video_skill_candidate_tool,
+    personal_ip_compile_video_storyboard_tool,
+    personal_ip_compile_video_timeline_revision_tool,
     personal_ip_ingest_media_execution_tool,
+    personal_ip_inspect_local_video_material_tool,
+    personal_ip_interpolate_video_candidate_tool,
+    personal_ip_lock_video_final_edit_tool,
     personal_ip_metrics_aggregate_tool,
     personal_ip_operating_cockpit_tool,
     personal_ip_performance_inventory_tool,
@@ -14,6 +33,9 @@ from .personal_ip_tools import (
     personal_ip_read_video_production_tool,
     personal_ip_record_browser_observation_tool,
     personal_ip_record_video_production_event_tool,
+    personal_ip_render_local_remotion_scene_tool,
+    personal_ip_render_locked_video_delivery_tool,
+    personal_ip_run_local_generated_shot_qa_tool,
     personal_ip_select_browser_account_tool,
     personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,
@@ -35,8 +57,8 @@ from .present_file_tool import present_file_tool
 from .review_skill_package_tool import review_skill_package
 from .setup_agent_tool import setup_agent
 from .task_tool import task_tool
-from .update_agent_tool import update_agent
 from .ui_tars_tools import ui_tars_desktop_step_tool
+from .update_agent_tool import update_agent
 from .view_image_tool import view_image_tool
 
 __all__ = [
@@ -48,11 +70,26 @@ __all__ = [
     "personal_ip_collect_browser_page_tool",
     "personal_ip_collect_browser_portfolio_today_tool",
     "personal_ip_collect_douyin_browser_page_tool",
+    "personal_ip_compile_video_asset_manifest_tool",
+    "personal_ip_compile_approved_video_assembly_tool",
+    "personal_ip_compile_generated_shot_qa_tool",
+    "personal_ip_compile_video_continuity_tool",
+    "personal_ip_compile_video_material_selection_tool",
+    "personal_ip_compile_video_narration_tool",
+    "personal_ip_compile_video_narration_timing_tool",
+    "personal_ip_compile_video_plan_tool",
+    "personal_ip_compile_video_pattern_tool",
+    "personal_ip_compile_video_skill_candidate_tool",
+    "personal_ip_compile_video_storyboard_tool",
+    "personal_ip_compile_video_timeline_revision_tool",
     "personal_ip_finish_browser_publish_tool",
     "personal_ip_metrics_aggregate_tool",
     "personal_ip_minecontext_evidence_tool",
     "personal_ip_minecontext_sync_tool",
     "personal_ip_ingest_media_execution_tool",
+    "personal_ip_inspect_local_video_material_tool",
+    "personal_ip_interpolate_video_candidate_tool",
+    "personal_ip_lock_video_final_edit_tool",
     "personal_ip_operating_cockpit_tool",
     "personal_ip_promote_evidence_tool",
     "personal_ip_prepare_browser_publish_tool",
@@ -60,13 +97,18 @@ __all__ = [
     "personal_ip_platform_observation_inventory_tool",
     "personal_ip_read_platform_observation_tool",
     "personal_ip_read_evidence_promotion_tool",
+    "personal_ip_read_strategy_context_tool",
+    "personal_ip_record_strategy_tool",
     "personal_ip_read_preflight_tool",
     "personal_ip_read_publish_receipt_tool",
     "personal_ip_read_retrospective_tool",
     "personal_ip_read_video_production_tool",
     "personal_ip_record_browser_observation_tool",
     "personal_ip_record_video_production_event_tool",
+    "personal_ip_render_locked_video_delivery_tool",
     "personal_ip_record_publish_attempt_tool",
+    "personal_ip_render_local_remotion_scene_tool",
+    "personal_ip_run_local_generated_shot_qa_tool",
     "personal_ip_run_preflight_tool",
     "personal_ip_seal_retrospective_tool",
     "personal_ip_select_browser_account_tool",

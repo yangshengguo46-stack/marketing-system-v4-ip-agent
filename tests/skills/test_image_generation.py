@@ -122,13 +122,14 @@ def test_volcengine_seedream_writes_verified_execution_receipt(monkeypatch, tmp_
         str(output_file),
         "9:16",
         str(receipt_file),
+        model="doubao-seedream-4-5-251128",
     )
     receipt = json.loads(receipt_file.read_text(encoding="utf-8"))
 
     assert receipt["contract_version"] == "personal-ip-media-execution-v1"
     assert receipt["capability"] == "image_generation"
     assert receipt["request_id"] == "seedream-request-1"
-    assert receipt["model"] == "doubao-seedream-5-0-260128"
+    assert receipt["model"] == "doubao-seedream-4-5-251128"
     assert (
         receipt["outputs"][0]["sha256"]
         == hashlib.sha256(b"VERIFIED-SEEDREAM").hexdigest()

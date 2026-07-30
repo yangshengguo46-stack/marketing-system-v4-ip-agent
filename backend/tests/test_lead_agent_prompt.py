@@ -484,6 +484,15 @@ def test_system_prompt_template_requires_virtual_paths_for_output_images():
     assert "Call `present_files` for the image before referencing it" in template
 
 
+def test_system_prompt_defaults_to_reversible_action_instead_of_over_clarifying():
+    template = prompt_module.SYSTEM_PROMPT_TEMPLATE
+
+    assert "Default to action" in template
+    assert "several implementation approaches are valid" in template
+    assert "Autonomy First" in template
+    assert "Suggestions (`suggestion`)" not in template
+
+
 def test_system_prompt_template_preserves_placeholders():
     """Ensure the chunking-rule edit didn't drop any f-string placeholder
     consumed by apply_prompt_template(). A missing placeholder would

@@ -15,7 +15,12 @@ from urllib.parse import urlsplit, urlunsplit
 from deerflow.community.url_safety import resolve_host_addresses, validate_public_http_url
 from deerflow.config import get_app_config
 from deerflow.config.paths import get_paths
-from deerflow.personal_ip.browser_profiles import BROWSER_PLATFORMS, browser_login_succeeded, build_browser_account_target
+from deerflow.personal_ip.browser_profiles import (
+    BROWSER_PLATFORMS,
+    browser_login_cookie_rule,
+    browser_login_succeeded,
+    build_browser_account_target,
+)
 
 _BROWSER_DATASETS = {
     "account_profile",
@@ -71,8 +76,8 @@ _BROWSER_DASHBOARD_METRIC_ADAPTERS: dict[str, BrowserDashboardMetricAdapter] = {
     "xiaohongshu": BrowserDashboardMetricAdapter(
         {
             **_COMMON_SOCIAL_METRICS,
-            "impressions": ("曝光量",),
-            "views": ("观看量", "浏览量", "笔记浏览量"),
+            "impressions": ("曝光量", "曝光数"),
+            "views": ("观看量", "观看数", "浏览量", "笔记浏览量"),
         }
     ),
     "x": BrowserDashboardMetricAdapter(
@@ -117,6 +122,11 @@ class BrowserPlatformCollectionError(ValueError):
 DouyinBrowserCollectionError = BrowserPlatformCollectionError
 
 
+def _is_playwright_timeout_error(exc: Exception) -> bool:
+    """Recognize a navigation timeout without importing optional Playwright."""
+    return exc.__class__.__name__ == "TimeoutError" and exc.__class__.__module__.startswith("playwright.")
+
+
 def _config_int(extra: dict[str, Any], key: str, default: int) -> int:
     value = extra.get(key)
     return value if isinstance(value, int) and not isinstance(value, bool) else default
@@ -157,6 +167,13 @@ def acquire_account_browser_session(*, owner_user_id: str, account: dict[str, An
         return validate_public_http_url(
             url,
             allow_private_addresses=_config_bool(extra, "allow_private_addresses", False),
+            # Clash and similar local proxies commonly answer public creator
+            # hosts with RFC 2544 fake-IP addresses (198.18.0.0/15). Browser
+            # Control already permits that exact proxy range while continuing
+            # to reject real private, loopback and metadata targets. Account
+            # collection must use the same policy or a successfully logged-in
+            # profile is blocked before its public creator dashboard loads.
+            allow_proxy_fake_ip=True,
             action="browse",
             resolver=resolve_host_addresses,
         )
@@ -535,10 +552,26 @@ class BrowserPlatformCollectionService:
                     raise BrowserPlatformCollectionError("observation_key already records a different browser collection")
                 return existing
         requested_url = _target_url(target_url, platform=platform) if target_url else None
+        if requested_url is None and dataset_key == "dashboard":
+            # A retained account session can be sitting on any page visited by
+            # an earlier login, publish or collection operation. Dashboard
+            # collection is a request for a fresh dashboard read, so route it
+            # to the platform's registered analytics/home page instead of
+            # interpreting whichever stale page happens to be open.
+            requested_url = _target_url(platform_config.dashboard_url, platform=platform)
 
         before_url = str(await session.current_url() or "")
         if requested_url is not None:
-            await session.navigate(requested_url)
+            try:
+                await session.navigate(requested_url)
+            except Exception as exc:
+                # Some creator backends render their authenticated SPA but
+                # never finish Playwright's DOMContentLoaded wait. The visible
+                # page is still collectible, so only a genuine navigation
+                # timeout may continue into the normal URL/login and rendered-
+                # DOM checks below. All other failures stay loud.
+                if not _is_playwright_timeout_error(exc):
+                    raise
         elif not browser_login_succeeded(platform, before_url):
             await session.navigate(platform_config.start_url)
 
@@ -546,7 +579,16 @@ class BrowserPlatformCollectionService:
             await asyncio.sleep(self._settle_seconds)
 
         current_url = str(await session.current_url() or requested_url or platform_config.start_url)
-        if requested_url is None and not browser_login_succeeded(platform, current_url):
+        login_succeeded = browser_login_succeeded(platform, current_url)
+        if not login_succeeded:
+            cookie_rule = browser_login_cookie_rule(platform, current_url)
+            cookie_checker = getattr(session, "has_first_party_cookie_set", None)
+            if cookie_rule is not None and callable(cookie_checker):
+                login_succeeded = await cookie_checker(
+                    domains=cookie_rule.hosts,
+                    cookie_sets=cookie_rule.cookie_sets,
+                )
+        if not login_succeeded:
             return await self._unavailable(
                 owner_user_id=owner_user_id,
                 account_id=account_id,
@@ -558,7 +600,11 @@ class BrowserPlatformCollectionService:
 
         extracted = await session.extract_business_page(max_chars=60_000, max_rows=500)
         capture_attempts = 1
-        maximum_attempts = 6 if self._settle_seconds else 1
+        # Douyin's creator home can remain on its own loading shell longer
+        # when several independent platform profiles are refreshed together.
+        # Keep polling rendered DOM rather than returning a false empty result;
+        # the UI now exposes this wait as account-collection progress.
+        maximum_attempts = (12 if platform == "douyin" else 6) if self._settle_seconds else 1
         while not _rendered_data_ready(extracted) and capture_attempts < maximum_attempts:
             await asyncio.sleep(self._settle_seconds)
             extracted = await session.extract_business_page(max_chars=60_000, max_rows=500)
@@ -566,7 +612,8 @@ class BrowserPlatformCollectionService:
         if not isinstance(extracted, dict):
             raise BrowserPlatformCollectionError(f"{platform_config.label} creator page extraction returned no structured data")
         source_url = _safe_url(extracted.get("url") or current_url)
-        if not browser_login_succeeded(platform, source_url):
+        _target_url(source_url, platform=platform)
+        if not login_succeeded and not browser_login_succeeded(platform, source_url):
             return await self._unavailable(
                 owner_user_id=owner_user_id,
                 account_id=account_id,

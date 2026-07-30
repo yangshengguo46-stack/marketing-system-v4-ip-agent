@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 
@@ -12,9 +13,14 @@ pod = load("podcast-generation")
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
     for k in [
+        "VOLCENGINE_TTS_API_KEY",
         "VOLCENGINE_TTS_APPID",
         "VOLCENGINE_TTS_ACCESS_TOKEN",
         "VOLCENGINE_TTS_CLUSTER",
+        "VOLCENGINE_TTS_RESOURCE_ID",
+        "VOLCENGINE_TTS_BASE_URL",
+        "VOLCENGINE_TTS_VOICE_MALE",
+        "VOLCENGINE_TTS_VOICE_FEMALE",
         "MINIMAX_API_KEY",
         "PODCAST_GENERATION_PROVIDER",
         "MINIMAX_API_HOST",
@@ -31,6 +37,11 @@ def clean_env(monkeypatch):
 def test_resolve_prefers_volcengine(monkeypatch):
     monkeypatch.setenv("VOLCENGINE_TTS_APPID", "a")
     monkeypatch.setenv("VOLCENGINE_TTS_ACCESS_TOKEN", "t")
+    assert pod._resolve_tts_provider() == "volcengine"
+
+
+def test_resolve_accepts_volcengine_v3_single_key(monkeypatch):
+    monkeypatch.setenv("VOLCENGINE_TTS_API_KEY", "single-key")
     assert pod._resolve_tts_provider() == "volcengine"
 
 
@@ -126,6 +137,199 @@ def test_volcengine_tts_decodes_base64(monkeypatch):
     monkeypatch.setattr(pod.requests, "post", fake_post)
     out = pod.text_to_speech_volcengine("hi", "zh_male_yangguangqingnian_moon_bigtts")
     assert out == b"volcbytes"
+
+
+def test_volcengine_v3_single_key_decodes_concatenated_stream(monkeypatch):
+    import base64
+    import json
+
+    monkeypatch.setenv("VOLCENGINE_TTS_API_KEY", "single-key")
+    captured = {}
+    stream = (
+        json.dumps({"code": 0, "data": base64.b64encode(b"hello").decode()})
+        + json.dumps({"code": 0, "data": base64.b64encode(b"-world").decode()})
+        + json.dumps({"code": 20000000, "message": "OK"})
+    ).encode()
+
+    class StreamResp:
+        status_code = 200
+        headers = {}
+
+        def iter_content(self, chunk_size=None):
+            assert chunk_size
+            yield stream[:17]
+            yield stream[17:]
+
+    def fake_post(url, headers=None, json=None, **kwargs):
+        captured.update(
+            {"url": url, "headers": headers, "json": json, "kwargs": kwargs}
+        )
+        return StreamResp()
+
+    monkeypatch.setattr(pod.requests, "post", fake_post)
+    metadata = {}
+    out = pod.text_to_speech_volcengine(
+        "你好", "zh_female_vv_uranus_bigtts", request_metadata=metadata
+    )
+
+    assert out == b"hello-world"
+    assert captured["url"].endswith("/api/v3/tts/unidirectional")
+    assert captured["headers"]["X-Api-Key"] == "single-key"
+    assert captured["headers"]["X-Api-Resource-Id"] == "seed-tts-2.0"
+    assert captured["json"]["req_params"]["speaker"] == "zh_female_vv_uranus_bigtts"
+    assert captured["kwargs"]["stream"] is True
+    assert metadata["protocol"] == "v3-http-unidirectional"
+
+
+def test_volcengine_v3_applies_per_line_performance_controls(monkeypatch):
+    import base64
+    import hashlib
+    import json
+
+    monkeypatch.setenv("VOLCENGINE_TTS_API_KEY", "single-key")
+    captured = {}
+    stream = (
+        json.dumps({"code": 0, "data": base64.b64encode(b"voice").decode()})
+        + json.dumps({"code": 20000000, "message": "OK"})
+    ).encode()
+
+    class StreamResp:
+        status_code = 200
+        headers = {}
+
+        def iter_content(self, chunk_size=None):
+            yield stream
+
+    def fake_post(url, headers=None, json=None, **kwargs):
+        captured.update({"json": json, "headers": headers})
+        return StreamResp()
+
+    monkeypatch.setattr(pod.requests, "post", fake_post)
+    metadata = {}
+    contexts = ["冷静、警觉、利落；句尾短促落下。"]
+    out = pod.text_to_speech_volcengine(
+        "一道焊缝正在悄悄变宽。",
+        "zh_male_m191_uranus_bigtts",
+        request_metadata=metadata,
+        speech_rate=24,
+        loudness_rate=8,
+        context_texts=contexts,
+    )
+
+    assert out == b"voice"
+    req = captured["json"]["req_params"]
+    assert req["audio_params"]["speech_rate"] == 24
+    assert req["audio_params"]["loudness_rate"] == 8
+    assert req["context_texts"] == contexts
+    assert metadata["speech_rate"] == 24
+    assert metadata["loudness_rate"] == 8
+    assert metadata["context_texts_count"] == 1
+    assert (
+        metadata["context_texts_sha256"]
+        == hashlib.sha256(
+            json.dumps(contexts, ensure_ascii=False, separators=(",", ":")).encode()
+        ).hexdigest()
+    )
+    assert contexts[0] not in json.dumps(metadata, ensure_ascii=False)
+
+
+def test_script_lines_validate_and_keep_per_line_volcengine_controls():
+    script = pod.Script.from_dict(
+        {
+            "locale": "zh",
+            "lines": [
+                {
+                    "speaker": "male",
+                    "paragraph": "第一句",
+                    "voice_type": "zh_male_m191_uranus_bigtts",
+                    "speech_rate": 22,
+                    "loudness_rate": 10,
+                    "context_text": "克制、坚定，不拖尾。",
+                }
+            ],
+        }
+    )
+
+    line = script.lines[0]
+    assert line.voice_type == "zh_male_m191_uranus_bigtts"
+    assert line.speech_rate == 22
+    assert line.loudness_rate == 10
+    assert line.context_texts == ["克制、坚定，不拖尾。"]
+
+    with pytest.raises(ValueError, match="speech_rate"):
+        pod.Script.from_dict(
+            {
+                "lines": [
+                    {
+                        "speaker": "male",
+                        "paragraph": "越界",
+                        "speech_rate": 101,
+                    }
+                ]
+            }
+        )
+
+
+def test_process_line_passes_volcengine_controls_without_raw_receipt_context(
+    monkeypatch,
+):
+    monkeypatch.setenv("VOLCENGINE_TTS_API_KEY", "single-key")
+    captured = {}
+
+    def fake_tts(text, voice_type, **kwargs):
+        captured.update({"text": text, "voice_type": voice_type, **kwargs})
+        metadata = kwargs["request_metadata"]
+        metadata.update(
+            {
+                "request_id": "request-1",
+                "voice": voice_type,
+                "model": "seed-tts-2.0",
+                "speech_rate": kwargs["speech_rate"],
+                "loudness_rate": kwargs["loudness_rate"],
+                "context_texts_count": len(kwargs["context_texts"]),
+                "context_texts_sha256": "a" * 64,
+            }
+        )
+        return b"x"
+
+    monkeypatch.setattr(pod, "text_to_speech_volcengine", fake_tts)
+    line = pod.ScriptLine(
+        speaker="male",
+        paragraph="落锤句",
+        voice_type="zh_male_m191_uranus_bigtts",
+        speech_rate=20,
+        loudness_rate=10,
+        context_texts=["克制、坚定、干净落下。"],
+    )
+    metadata = {}
+
+    _idx, audio = pod._process_line((0, line, 1, "volcengine", metadata))
+
+    assert audio == b"x"
+    assert captured["voice_type"] == "zh_male_m191_uranus_bigtts"
+    assert captured["speech_rate"] == 20
+    assert captured["loudness_rate"] == 10
+    assert captured["context_texts"] == ["克制、坚定、干净落下。"]
+    assert "克制" not in json.dumps(metadata, ensure_ascii=False)
+
+
+def test_tts_node_rejects_per_line_controls_outside_volcengine_v3(monkeypatch):
+    line = pod.ScriptLine(
+        speaker="male",
+        paragraph="不应静默丢失控制",
+        speech_rate=20,
+    )
+    script = pod.Script(locale="zh", lines=[line])
+
+    monkeypatch.setenv("MINIMAX_API_KEY", "m")
+    with pytest.raises(ValueError, match="Volcengine V3 single-key"):
+        pod.tts_node(script)
+
+    monkeypatch.delenv("MINIMAX_API_KEY")
+    monkeypatch.setenv("VOLCENGINE_TTS_APPID", "legacy")
+    monkeypatch.setenv("VOLCENGINE_TTS_ACCESS_TOKEN", "legacy-token")
+    with pytest.raises(ValueError, match="Volcengine V3 single-key"):
+        pod.tts_node(script)
 
 
 def test_volcengine_tts_writes_request_complete_verified_receipt(monkeypatch, tmp_path):

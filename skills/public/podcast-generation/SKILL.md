@@ -35,9 +35,16 @@ Generate a structured JSON script file in `/mnt/user-data/workspace/` with namin
 The JSON structure:
 ```json
 {
-  "locale": "en",
+  "locale": "zh",
   "lines": [
-    {"speaker": "male", "paragraph": "dialogue text"},
+    {
+      "speaker": "male",
+      "paragraph": "dialogue text",
+      "voice_type": "zh_male_m191_uranus_bigtts",
+      "speech_rate": 20,
+      "loudness_rate": 8,
+      "context_texts": ["克制、警觉、利落；句尾短促落下。"]
+    },
     {"speaker": "female", "paragraph": "dialogue text"}
   ]
 }
@@ -90,6 +97,17 @@ Fields:
 - `lines`: Array of dialogue lines
   - `speaker`: Either "male" or "female"
   - `paragraph`: The dialogue text for this speaker
+  - `voice_type`: Optional provider voice ID for this line
+  - `speech_rate`: Optional integer from -50 to 100; defaults to 0
+  - `loudness_rate`: Optional integer from -50 to 100; defaults to 0
+  - `context_texts`: Optional array of up to four performance/context
+    directions, each no longer than 500 characters; `context_text` is accepted
+    as a single-item alias
+
+Per-line performance controls require the Volcengine V3 single-key route.
+Legacy AppID execution rejects them rather than silently losing the requested
+performance. Raw `context_texts` are never copied into receipts; only their
+count and SHA-256 digest are retained.
 
 ## Script Writing Guidelines
 
@@ -176,9 +194,12 @@ After generation:
 ## Requirements
 
 The following environment variables must be set:
-- For Volcengine: `VOLCENGINE_TTS_APPID` and `VOLCENGINE_TTS_ACCESS_TOKEN`
+- For Volcengine V3: `VOLCENGINE_TTS_API_KEY` (the local compatibility alias
+  `VOLCENGINE_TTS_ACCESS_TOKEN` is also accepted when no legacy AppID is set)
 - For MiniMax: `MINIMAX_API_KEY`
-- `VOLCENGINE_TTS_CLUSTER`: Volcengine TTS cluster (optional, defaults to "volcano_tts")
+- `VOLCENGINE_TTS_RESOURCE_ID`: optional V3 resource (defaults to `seed-tts-2.0`)
+- `VOLCENGINE_TTS_VOICE_MALE` / `VOLCENGINE_TTS_VOICE_FEMALE`: optional current
+  voice IDs
 
 ## Notes
 
@@ -192,7 +213,8 @@ The following environment variables must be set:
 
 Auto-selected by environment variables:
 
-- `VOLCENGINE_TTS_APPID` + `VOLCENGINE_TTS_ACCESS_TOKEN` set → Volcengine TTS (default).
+- `VOLCENGINE_TTS_API_KEY` set → Volcengine V3 HTTP TTS (default).
+- A legacy AppID + access token pair remains supported for older customer installs.
 - Only `MINIMAX_API_KEY` set → MiniMax TTS (`/v1/t2a_v2`).
 - Force with `PODCAST_GENERATION_PROVIDER=volcengine|minimax`.
 

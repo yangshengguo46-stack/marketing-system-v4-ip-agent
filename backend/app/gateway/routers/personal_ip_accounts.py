@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
+import shutil
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -12,20 +16,12 @@ from app.gateway.deps import (
     get_personal_ip_account_repo,
     get_personal_ip_subject_repo,
 )
+from deerflow.community.browser_automation import get_browser_session_manager
+from deerflow.config.paths import get_paths
+from deerflow.personal_ip.browser_profiles import build_browser_account_target
 
 router = APIRouter(prefix="/api/personal-ip", tags=["personal-ip"])
-
-
-def _clean_list(values: list[str]) -> list[str]:
-    cleaned: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        item = value.strip()
-        if not item or item in seen:
-            continue
-        cleaned.append(item)
-        seen.add(item)
-    return cleaned
+logger = logging.getLogger(__name__)
 
 
 class PersonalIPAccountCreateRequest(BaseModel):
@@ -34,22 +30,12 @@ class PersonalIPAccountCreateRequest(BaseModel):
     display_name: str = Field(min_length=1, max_length=128)
     handle: str | None = Field(default=None, max_length=128)
     avatar_url: str | None = Field(default=None, max_length=4096)
-    promise_to_audience: str = Field(default="", max_length=4000)
-    primary_audience: str = Field(default="", max_length=4000)
-    content_pillars: list[str] = Field(default_factory=list, max_length=32)
-    voice_and_boundaries: list[str] = Field(default_factory=list, max_length=32)
-    business_goal: str = Field(default="", max_length=4000)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("platform", "display_name")
     @classmethod
     def strip_required_text(cls, value: str) -> str:
         return value.strip()
-
-    @field_validator("content_pillars", "voice_and_boundaries")
-    @classmethod
-    def normalize_lists(cls, value: list[str]) -> list[str]:
-        return _clean_list(value)
 
 
 class PersonalIPAccountUpdateRequest(BaseModel):
@@ -58,11 +44,6 @@ class PersonalIPAccountUpdateRequest(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=128)
     handle: str | None = Field(default=None, max_length=128)
     avatar_url: str | None = Field(default=None, max_length=4096)
-    promise_to_audience: str | None = Field(default=None, max_length=4000)
-    primary_audience: str | None = Field(default=None, max_length=4000)
-    content_pillars: list[str] | None = Field(default=None, max_length=32)
-    voice_and_boundaries: list[str] | None = Field(default=None, max_length=32)
-    business_goal: str | None = Field(default=None, max_length=4000)
     status: Literal["active", "archived"] | None = None
     metadata: dict[str, Any] | None = None
 
@@ -70,11 +51,6 @@ class PersonalIPAccountUpdateRequest(BaseModel):
     @classmethod
     def strip_optional_required_text(cls, value: str | None) -> str | None:
         return value.strip() if value is not None else None
-
-    @field_validator("content_pillars", "voice_and_boundaries")
-    @classmethod
-    def normalize_optional_lists(cls, value: list[str] | None) -> list[str] | None:
-        return _clean_list(value) if value is not None else None
 
 
 class PersonalIPSubjectCreateRequest(BaseModel):
@@ -239,6 +215,59 @@ async def update_personal_ip_account(
     if account is None:
         raise HTTPException(status_code=404, detail="Personal-IP account not found")
     return account
+
+
+@router.post("/accounts/{account_id}/logout")
+async def logout_personal_ip_account(
+    account_id: str,
+    request: Request,
+) -> dict[str, Any]:
+    """End one platform login and erase its persisted browser credentials."""
+    user_id = await _current_user_id(request)
+    repo = get_personal_ip_account_repo(request)
+    account = await repo.get(account_id, owner_user_id=user_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Personal-IP account not found")
+
+    profile_dir = get_paths().browser_profile_dir(account_id, user_id=user_id)
+    try:
+        target = build_browser_account_target(
+            owner_user_id=user_id,
+            account_id=account_id,
+            platform=account["platform"],
+            display_name=account["display_name"],
+            user_data_dir=profile_dir,
+        )
+        await get_browser_session_manager().close_session(target.session_key)
+        if profile_dir.exists():
+            await asyncio.to_thread(shutil.rmtree, profile_dir)
+    except (OSError, ValueError) as exc:
+        logger.exception(
+            "Failed to clear browser login for account_id=%s user_id=%s",
+            account_id,
+            user_id,
+        )
+        raise HTTPException(status_code=500, detail="Platform logout failed") from exc
+
+    metadata = dict(account.get("metadata") or {})
+    metadata.pop("browser_authenticated_at", None)
+    metadata.update(
+        {
+            "browser_authenticated": False,
+            "connection_mode": "local_browser_profile",
+            "connection_state": "pending_login",
+            "execution_ready": False,
+            "logged_out_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    updated = await repo.update(
+        account_id,
+        owner_user_id=user_id,
+        updates={"metadata": metadata},
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Personal-IP account not found")
+    return updated
 
 
 @router.delete("/accounts/{account_id}")

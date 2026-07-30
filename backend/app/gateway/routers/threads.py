@@ -481,8 +481,10 @@ async def delete_thread_data(thread_id: str, request: Request) -> ThreadDeleteRe
     """
     from app.gateway.deps import get_thread_store
 
+    user_id = get_effective_user_id()
+
     # Clean local filesystem
-    response = _delete_thread_data(thread_id, user_id=get_effective_user_id())
+    response = _delete_thread_data(thread_id, user_id=user_id)
 
     # Remove checkpoints (best-effort)
     checkpointer = getattr(request.app.state, "checkpointer", None)
@@ -501,13 +503,62 @@ async def delete_thread_data(thread_id: str, request: Request) -> ThreadDeleteRe
     except Exception:
         logger.debug("Could not delete thread_meta for %s (not critical)", sanitize_log_param(thread_id))
 
-    # Tear down any live browser session (best-effort). Sessions are keyed only
-    # by thread_id, so leaving one alive after the owner deletes the thread lets
-    # a later caller who guesses the id reuse the retained page/cookies.
+    # Delete the run journal and run metadata too. A thread is a complete
+    # conversation boundary; leaving these rows behind keeps its hidden context
+    # available after the user deleted the visible conversation.
+    event_store = getattr(request.app.state, "run_event_store", None)
+    if event_store is not None:
+        try:
+            try:
+                await event_store.delete_by_thread(thread_id, user_id=user_id)
+            except TypeError:
+                await event_store.delete_by_thread(thread_id)
+        except Exception:
+            logger.debug("Could not delete run events for %s (not critical)", sanitize_log_param(thread_id))
+
+    run_store = getattr(request.app.state, "run_store", None)
+    run_manager = getattr(request.app.state, "run_manager", None)
+    if run_store is not None:
+        try:
+            while True:
+                rows = await run_store.list_by_thread(thread_id, user_id=user_id, limit=1000)
+                if not rows:
+                    break
+                for row in rows:
+                    run_id = str(row.get("run_id") or "")
+                    if not run_id:
+                        continue
+                    if run_manager is not None:
+                        await run_manager.cleanup(run_id, delay=0)
+                    await run_store.delete(run_id)
+                if len(rows) < 1000:
+                    break
+        except Exception:
+            logger.debug("Could not delete run metadata for %s (not critical)", sanitize_log_param(thread_id))
+
+    # Tear down both the generic thread browser and any account-scoped browser
+    # selected by this thread. Closing the process-local session preserves the
+    # account profile on disk, while clearing the selection removes temporary
+    # conversation context.
     try:
         from deerflow.community.browser_automation import get_browser_session_manager
+        from deerflow.personal_ip.browser_profiles import (
+            clear_browser_account_target,
+            get_browser_account_target,
+        )
 
-        await get_browser_session_manager().close_session(thread_id)
+        manager = get_browser_session_manager()
+        target = get_browser_account_target(
+            owner_user_id=user_id,
+            thread_id=thread_id,
+        )
+        await manager.close_session(thread_id)
+        if target is not None:
+            await manager.close_session(target.session_key)
+        clear_browser_account_target(
+            owner_user_id=user_id,
+            thread_id=thread_id,
+        )
     except ImportError:
         pass  # Playwright is an optional dependency.
     except Exception:

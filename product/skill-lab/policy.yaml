@@ -1,0 +1,38 @@
+schema_version: ip-agent-skill-lab-v1
+mode: evaluation_only
+
+sources:
+  skillhone:
+    repository: https://github.com/Tencent/SkillHone
+    revision: 69f6003949459d7e47629c6bb8b472eccb592678
+    license: MIT
+    vendor_root: product/skill-lab/vendor
+
+boundaries:
+  active_skill_root: skills/public
+  lab_skill_root: product/skill-lab/vendor
+  expose_lab_to_customer_agent: false
+  allow_live_skill_self_modification: false
+  allow_eval_repo_in_optimizer_context: false
+  allow_credentials_in_traces: false
+
+promotion:
+  require_version_history: true
+  require_rollback: true
+  require_held_out_regression: true
+  require_distinct_publication_evidence: 3
+  require_cross_account_evidence_for_portable: true
+  minimum_probe_improvement: 0.02
+  reject_regression_at_or_below: -0.04
+
+adoption:
+  permitted_outputs:
+    - proposal
+    - redacted_probe_result
+    - versioned_candidate
+    - reviewed_promotion
+  forbidden_outputs:
+    - direct_live_edit
+    - leaked_eval_item
+    - leaked_gold_answer
+    - credential_or_token

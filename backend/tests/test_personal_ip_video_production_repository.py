@@ -12,6 +12,61 @@ from deerflow.persistence.personal_ip_video_productions import PersonalIPVideoPr
 
 
 @pytest.mark.asyncio
+async def test_video_production_is_one_task_thread_and_legacy_projects_can_bind_once(
+    tmp_path,
+) -> None:
+    await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
+    sf = get_session_factory()
+    assert sf is not None
+    productions = PersonalIPVideoProductionRepository(sf)
+
+    task = await productions.begin(
+        owner_user_id="user-1",
+        thread_id="thread-video-1",
+        operation_key="video:task:1",
+        title="第一条视频",
+        subject_id=None,
+        target_account_ids=[],
+        source_kind="idea",
+        source={"idea": "任务式视频创作"},
+        delivery_spec={},
+        provider_policy={},
+        budget={},
+    )
+    assert task["thread_id"] == "thread-video-1"
+    assert [item["id"] for item in await productions.list("user-1", thread_id="thread-video-1")] == [task["id"]]
+
+    legacy = await productions.begin(
+        owner_user_id="user-1",
+        operation_key="video:legacy:1",
+        title="旧视频项目",
+        subject_id=None,
+        target_account_ids=[],
+        source_kind="idea",
+        source={"idea": "迁入历史任务"},
+        delivery_spec={},
+        provider_policy={},
+        budget={},
+    )
+    bound = await productions.bind_thread(
+        legacy["id"],
+        owner_user_id="user-1",
+        thread_id="thread-video-legacy",
+    )
+    assert bound is not None
+    assert bound["thread_id"] == "thread-video-legacy"
+
+    with pytest.raises(ValueError, match="already bound"):
+        await productions.bind_thread(
+            legacy["id"],
+            owner_user_id="user-1",
+            thread_id="thread-video-other",
+        )
+
+    await close_engine()
+
+
+@pytest.mark.asyncio
 async def test_video_production_keeps_immutable_request_and_append_only_stage_receipts(tmp_path) -> None:
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()

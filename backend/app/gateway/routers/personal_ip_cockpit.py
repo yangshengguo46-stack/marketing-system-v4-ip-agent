@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request
 from app.gateway.deps import (
     get_current_user_from_request,
     get_personal_ip_account_repo,
+    get_personal_ip_brand_repo,
     get_personal_ip_evidence_promotion_repo,
     get_personal_ip_metric_repo,
     get_personal_ip_platform_observation_repo,
@@ -27,6 +28,7 @@ def _cockpit_service(request: Request) -> PersonalIPOperatingCockpitService:
     return PersonalIPOperatingCockpitService(
         subjects=get_personal_ip_subject_repo(request),
         accounts=get_personal_ip_account_repo(request),
+        brand=get_personal_ip_brand_repo(request),
         preflights=get_personal_ip_preflight_repo(request),
         publish_receipts=get_personal_ip_publish_receipt_repo(request),
         metrics=get_personal_ip_metric_repo(request),

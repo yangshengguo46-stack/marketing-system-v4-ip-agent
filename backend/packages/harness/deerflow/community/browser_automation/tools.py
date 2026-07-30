@@ -169,6 +169,7 @@ def validate_browser_url(url: str, *, tool_name: str = "browser_navigate") -> st
     return validate_public_http_url(
         url,
         allow_private_addresses=allow_private,
+        allow_proxy_fake_ip=True,
         action="browse",
         resolver=_resolve_host_addresses,
     )

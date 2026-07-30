@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -70,6 +71,25 @@ def _manual_consent(**updates) -> MineContextConsent:
     return MineContextConsent(**values)
 
 
+def test_default_runtime_path_matches_product_installer(tmp_path: Path) -> None:
+    runtime = tmp_path / ".deer-flow" / "toolchains" / "minecontext" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    runtime.parent.mkdir(parents=True)
+    if os.name != "nt":
+        base_interpreter = tmp_path / "base-python"
+        base_interpreter.write_text("fixture", encoding="utf-8")
+        runtime.symlink_to(base_interpreter)
+    service = MineContextService(
+        config=MineContextConfig(enabled=True),
+        paths=SimpleNamespace(
+            base_dir=tmp_path / "backend-state",
+            user_dir=lambda owner: tmp_path / "users" / owner,
+        ),
+        project_root=tmp_path,
+    )
+
+    assert service._runtime_python() == runtime
+
+
 def test_default_disabled_requires_operator_and_owner_authorization(tmp_path: Path) -> None:
     launched: list[dict] = []
     service = _service(tmp_path, enabled=False, launched=launched)
@@ -102,6 +122,77 @@ def test_manual_mode_never_enables_screenshot_or_file_capture(tmp_path: Path) ->
     assert generated["completion"]["enabled"] is False
     assert generated["api_auth"]["enabled"] is True
     assert generated["web"]["host"] == "127.0.0.1"
+
+
+def test_new_owner_is_authorized_and_started_with_default_screen_context(
+    tmp_path: Path,
+) -> None:
+    launched: list[dict] = []
+    service = _service(tmp_path, enabled=True, launched=launched)
+
+    status = service.ensure_default("owner-a", strict=True)
+
+    assert status["authorized"] is True
+    assert status["running"] is True
+    assert status["scopes"] == [
+        "screen",
+        "files",
+        "people",
+        "projects",
+        "work_activity",
+    ]
+    assert status["purposes"] == [
+        "persona_modeling",
+        "audience_modeling",
+        "hllm_user_profile",
+        "preflight",
+        "retrospective",
+    ]
+    generated = yaml.safe_load(Path(launched[0]["command"][5]).read_text(encoding="utf-8"))
+    assert generated["capture"]["screenshot"]["enabled"] is True
+    assert generated["capture"]["folder_monitor"]["enabled"] is False
+    assert generated["vlm_model"]["provider"] == "doubao"
+    assert generated["embedding_model"]["provider"] == "doubao"
+
+
+def test_existing_active_consent_is_migrated_to_default_on_profile(tmp_path: Path) -> None:
+    launched: list[dict] = []
+    service = _service(tmp_path, enabled=True, launched=launched)
+    service.authorize("owner-a", _manual_consent(retention_days=14))
+
+    status = service.ensure_default("owner-a", strict=True)
+
+    assert status["running"] is True
+    assert status["collection_mode"] == "bounded_continuous"
+    assert status["retention_days"] == 14
+    generated = yaml.safe_load(Path(launched[0]["command"][5]).read_text(encoding="utf-8"))
+    assert generated["capture"]["screenshot"]["enabled"] is True
+
+
+def test_owner_opt_out_is_not_automatically_restarted(tmp_path: Path) -> None:
+    launched: list[dict] = []
+    service = _service(tmp_path, enabled=True, launched=launched)
+    service.ensure_default("owner-a", strict=True)
+    service.revoke("owner-a")
+
+    status = service.ensure_default("owner-a", strict=True)
+
+    assert status["authorized"] is False
+    assert status["running"] is False
+    assert len(launched) == 1
+
+
+def test_clear_all_preserves_default_off_preference(tmp_path: Path) -> None:
+    launched: list[dict] = []
+    service = _service(tmp_path, enabled=True, launched=launched)
+    service.ensure_default("owner-a", strict=True)
+    service.clear("owner-a", scope="all")
+
+    status = service.ensure_default("owner-a", strict=True)
+
+    assert status["authorized"] is False
+    assert status["running"] is False
+    assert len(launched) == 1
 
 
 def test_continuous_capture_requires_specific_scope_and_confirmation(tmp_path: Path) -> None:

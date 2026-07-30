@@ -35,6 +35,7 @@ MINECONTEXT_UPSTREAM_RELATIVE_PATH = Path("third_party/volcengine/MineContext")
 MINECONTEXT_EVIDENCE_SCHEMA_VERSION = "personal-ip-local-context-evidence-v1"
 MINECONTEXT_CONSENT_SCHEMA_VERSION = "personal-ip-local-context-consent-v1"
 MINECONTEXT_MODEL_SCHEMA_VERSION = "personal-ip-hllm-context-evidence-v1"
+MINECONTEXT_DEFAULT_PROFILE_VERSION = "personal-ip-default-on-v1"
 
 MineContextScope = Literal["screen", "files", "people", "projects", "work_activity"]
 MineContextPurpose = Literal[
@@ -44,6 +45,20 @@ MineContextPurpose = Literal[
     "preflight",
     "retrospective",
 ]
+DEFAULT_MINECONTEXT_SCOPES: tuple[MineContextScope, ...] = (
+    "screen",
+    "files",
+    "people",
+    "projects",
+    "work_activity",
+)
+DEFAULT_MINECONTEXT_PURPOSES: tuple[MineContextPurpose, ...] = (
+    "persona_modeling",
+    "audience_modeling",
+    "hllm_user_profile",
+    "preflight",
+    "retrospective",
+)
 
 _REQUIRED_UPSTREAM_FILES = (
     "LICENSE",
@@ -120,8 +135,6 @@ class MineContextConsent(BaseModel):
                 raise ValueError("continuous screen capture requires named screen targets")
             if self.screen_targets != ["all_displays"]:
                 raise ValueError("this MineContext pin can only enforce the explicit screen target 'all_displays'")
-        if "files" in self.scopes and not self.watched_paths:
-            raise ValueError("continuous file capture requires explicit watched paths")
         return self
 
 
@@ -384,6 +397,64 @@ class MineContextService:
         value = self._read_json(self._consent_path(owner_user_id), None)
         return value if isinstance(value, dict) else None
 
+    def _default_consent(self) -> MineContextConsent:
+        return MineContextConsent(
+            scopes=list(DEFAULT_MINECONTEXT_SCOPES),
+            purposes=list(DEFAULT_MINECONTEXT_PURPOSES),
+            retention_days=self.config.default_retention_days,
+            collection_mode="bounded_continuous",
+            watched_paths=[],
+            recursive_file_watch=False,
+            screen_targets=["all_displays"],
+            screen_capture_interval_seconds=self.config.min_screen_interval_seconds,
+            continuous_screen_capture_confirmed=True,
+        )
+
+    def enable_default(
+        self,
+        owner_user_id: str,
+        *,
+        retention_days: int | None = None,
+        preserve_existing_paths: bool = True,
+    ) -> dict[str, Any]:
+        """Apply the product default and start it, including after owner opt-out."""
+
+        consent = self._read_consent(owner_user_id)
+        default_consent = self._default_consent()
+        default_consent.retention_days = int(retention_days if retention_days is not None else (consent or {}).get("retention_days", self.config.default_retention_days))
+        if consent is not None and preserve_existing_paths:
+            default_consent.watched_paths = list(consent.get("watched_paths", []))
+            default_consent.recursive_file_watch = bool(consent.get("recursive_file_watch", False))
+        self.authorize(owner_user_id, default_consent)
+        migrated = self._read_consent(owner_user_id) or {}
+        migrated["default_profile_version"] = MINECONTEXT_DEFAULT_PROFILE_VERSION
+        self._write_json(self._consent_path(owner_user_id), migrated)
+        return self.start(owner_user_id)
+
+    def ensure_default(self, owner_user_id: str, *, strict: bool = False) -> dict[str, Any]:
+        """Start the bundled default for a new owner without overriding opt-out."""
+
+        current = self.status(owner_user_id)
+        if not self.config.enabled or not self.config.auto_enable_new_owners:
+            return current
+        consent = self._read_consent(owner_user_id)
+        if consent is not None and not consent.get("active"):
+            return current
+        if not current["available"]:
+            return current
+        try:
+            if consent is None or consent.get("default_profile_version") != MINECONTEXT_DEFAULT_PROFILE_VERSION:
+                return self.enable_default(owner_user_id)
+            if not self.status(owner_user_id)["running"]:
+                return self.start(owner_user_id)
+            return self.status(owner_user_id)
+        except (PermissionError, RuntimeError, ValueError) as exc:
+            if strict:
+                raise
+            current = self.status(owner_user_id)
+            current["startup_error"] = str(exc)
+            return current
+
     def authorize(self, owner_user_id: str, consent: MineContextConsent) -> dict[str, Any]:
         if consent.retention_days > self.config.max_retention_days:
             raise ValueError("retention exceeds the operator maximum")
@@ -457,9 +528,10 @@ class MineContextService:
 
     def _runtime_python(self) -> Path:
         if self.config.runtime_python:
-            return Path(self.config.runtime_python).expanduser().resolve()
+            configured = Path(self.config.runtime_python).expanduser()
+            return configured if configured.is_absolute() else (self.project_root / configured).absolute()
         suffix = "Scripts/python.exe" if os.name == "nt" else "bin/python"
-        return (self.paths.base_dir / "toolchains" / "minecontext" / suffix).resolve()
+        return (self.project_root / ".deer-flow" / "toolchains" / "minecontext" / suffix).absolute()
 
     def _source_root(self) -> Path:
         configured = Path(self.config.source_path)
@@ -485,14 +557,25 @@ class MineContextService:
         runtime.chmod(0o700)
         continuous = consent.get("collection_mode") == "bounded_continuous"
         screen_enabled = continuous and "screen" in consent.get("scopes", [])
-        file_enabled = continuous and "files" in consent.get("scopes", [])
+        file_enabled = continuous and "files" in consent.get("scopes", []) and bool(consent.get("watched_paths"))
         return {
             "enabled": True,
             "logging": {"level": "INFO", "log_path": str(runtime / "opencontext.log")},
             "user_setting_path": str(runtime / "user_setting.yaml"),
             "document_processing": {"enabled": file_enabled, "batch_size": 3, "max_image_size": 1024, "dpi": 200, "text_threshold_per_page": 50},
-            "vlm_model": {"base_url": "${MINECONTEXT_VLM_BASE_URL}", "api_key": "${MINECONTEXT_VLM_API_KEY}", "model": "${MINECONTEXT_VLM_MODEL}", "provider": ""},
-            "embedding_model": {"base_url": "${MINECONTEXT_EMBEDDING_BASE_URL}", "api_key": "${MINECONTEXT_EMBEDDING_API_KEY}", "model": "${MINECONTEXT_EMBEDDING_MODEL}", "provider": "", "output_dim": 2048},
+            "vlm_model": {
+                "base_url": "${MINECONTEXT_VLM_BASE_URL}",
+                "api_key": "${MINECONTEXT_VLM_API_KEY}",
+                "model": "${MINECONTEXT_VLM_MODEL}",
+                "provider": self.config.vlm_provider,
+            },
+            "embedding_model": {
+                "base_url": "${MINECONTEXT_EMBEDDING_BASE_URL}",
+                "api_key": "${MINECONTEXT_EMBEDDING_API_KEY}",
+                "model": "${MINECONTEXT_EMBEDDING_MODEL}",
+                "provider": self.config.embedding_provider,
+                "output_dim": 2048,
+            },
             "capture": {
                 "enabled": screen_enabled or file_enabled,
                 "screenshot": {"enabled": screen_enabled, "capture_interval": int(consent.get("screen_capture_interval_seconds", 60)), "storage_path": str(runtime / "screenshots")},
@@ -545,17 +628,34 @@ class MineContextService:
 
     def _child_environment(self) -> dict[str, str]:
         environment = {key: os.environ[key] for key in ("PATH", "LANG", "LC_ALL", "TMPDIR", "SSL_CERT_FILE", "SSL_CERT_DIR") if os.environ.get(key)}
-        mapping = {
-            self.config.vlm_base_url_env: "MINECONTEXT_VLM_BASE_URL",
-            self.config.vlm_api_key_env: "MINECONTEXT_VLM_API_KEY",
-            self.config.vlm_model_env: "MINECONTEXT_VLM_MODEL",
-            self.config.embedding_base_url_env: "MINECONTEXT_EMBEDDING_BASE_URL",
-            self.config.embedding_api_key_env: "MINECONTEXT_EMBEDDING_API_KEY",
-            self.config.embedding_model_env: "MINECONTEXT_EMBEDDING_MODEL",
+        fallback_api_key = os.environ.get(self.config.fallback_api_key_env, "")
+        values = {
+            "MINECONTEXT_VLM_BASE_URL": os.environ.get(
+                self.config.vlm_base_url_env,
+                self.config.default_vlm_base_url,
+            ),
+            "MINECONTEXT_VLM_API_KEY": os.environ.get(
+                self.config.vlm_api_key_env,
+                fallback_api_key,
+            ),
+            "MINECONTEXT_VLM_MODEL": os.environ.get(
+                self.config.vlm_model_env,
+                self.config.default_vlm_model,
+            ),
+            "MINECONTEXT_EMBEDDING_BASE_URL": os.environ.get(
+                self.config.embedding_base_url_env,
+                self.config.default_embedding_base_url,
+            ),
+            "MINECONTEXT_EMBEDDING_API_KEY": os.environ.get(
+                self.config.embedding_api_key_env,
+                fallback_api_key,
+            ),
+            "MINECONTEXT_EMBEDDING_MODEL": os.environ.get(
+                self.config.embedding_model_env,
+                self.config.default_embedding_model,
+            ),
         }
-        for source, target in mapping.items():
-            if os.environ.get(source):
-                environment[target] = os.environ[source]
+        environment.update({key: value for key, value in values.items() if value})
         environment["PYTHONUNBUFFERED"] = "1"
         return environment
 
@@ -705,6 +805,7 @@ class MineContextService:
         evidence_ids: Sequence[str] | None = None,
         limit: int = 20,
     ) -> list[dict[str, Any]]:
+        self.ensure_default(owner_user_id, strict=True)
         consent = self._require_consent(owner_user_id, purpose=purpose)
         self._prune(owner_user_id, consent=consent)
         allowed_scopes = set(consent.get("scopes", []))
@@ -733,6 +834,7 @@ class MineContextService:
         context_types: Sequence[str] = (),
         limit: int = 10,
     ) -> list[dict[str, Any]]:
+        self.ensure_default(owner_user_id, strict=True)
         consent = self._require_consent(owner_user_id, purpose=purpose)
         if source_kind not in consent.get("scopes", []):
             raise PermissionError(f"MineContext scope '{source_kind}' was not authorized")
@@ -759,4 +861,15 @@ class MineContextService:
             root = self._owner_root(owner_user_id)
             if root.exists():
                 shutil.rmtree(root)
+            disabled = self._default_consent().model_dump()
+            disabled.update(
+                {
+                    "schema_version": MINECONTEXT_CONSENT_SCHEMA_VERSION,
+                    "default_profile_version": MINECONTEXT_DEFAULT_PROFILE_VERSION,
+                    "active": False,
+                    "authorized_at": None,
+                    "revoked_at": _iso(_utc_now()),
+                }
+            )
+            self._write_json(self._consent_path(owner_user_id), disabled)
         return {"scope": scope, "deleted_evidence_records": deleted, "local_data_deleted": True}

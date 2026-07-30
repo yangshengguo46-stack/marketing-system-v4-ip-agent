@@ -1,4 +1,4 @@
-"""Native DeerFlow read/sync tools for consented local MineContext evidence."""
+"""Native DeerFlow read/sync tools for default-on local MineContext evidence."""
 
 from __future__ import annotations
 
@@ -33,8 +33,8 @@ async def _personal_ip_minecontext_sync(
 ) -> str:
     """Sync minimized local context summaries through the MineContext boundary.
 
-    This tool cannot start capture or widen consent. It only searches a running,
-    explicitly authorized owner sidecar and returns sealed summaries without raw
+    For a new owner the service starts the bundled default automatically. It
+    searches that owner sidecar and returns sealed summaries without raw
     screenshots, document text, file paths, vectors or credentials.
 
     Args:

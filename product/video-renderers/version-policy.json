@@ -1,0 +1,28 @@
+{
+  "contract_version": "personal-ip-video-renderer-policy-v1",
+  "default_renderer": "hyperframes",
+  "available_renderers": [
+    "hyperframes",
+    "remotion"
+  ],
+  "dependencies": {
+    "@remotion/cli": "4.0.488",
+    "gsap": "3.14.2",
+    "hyperframes": "0.7.57",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "remotion": "4.0.488",
+    "zod": "4.3.6"
+  },
+  "licenses": {
+    "hyperframes": "Apache-2.0",
+    "gsap": "Standard no charge",
+    "remotion": "Remotion License"
+  },
+  "remotion": {
+    "bundled": true,
+    "version": "4.0.488",
+    "mode": "mvp-validation",
+    "distribution_gate": "Confirm current Remotion license eligibility or obtain a company license before customer distribution."
+  }
+}

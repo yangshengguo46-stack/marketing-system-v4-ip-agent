@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -10,10 +11,72 @@ from deerflow.personal_ip.browser_collection import (
     BrowserPlatformCollectionService,
     DouyinBrowserCollectionError,
     DouyinBrowserCollectionService,
+    acquire_account_browser_session,
     parse_browser_dashboard_metrics,
     parse_douyin_content_inventory,
     parse_douyin_dashboard_summary,
 )
+
+
+def test_account_browser_collection_uses_proxy_fake_ip_safe_url_policy(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    captured: dict[str, object] = {}
+    validation_calls: list[dict[str, object]] = []
+
+    @contextmanager
+    def acquire_session(_session_key, **kwargs):
+        captured.update(kwargs)
+        yield "browser-session"
+
+    def validate(url, **kwargs):
+        validation_calls.append({"url": url, **kwargs})
+        return None
+
+    monkeypatch.setattr(
+        "deerflow.personal_ip.browser_collection.get_app_config",
+        lambda: SimpleNamespace(get_tool_config=lambda _name: SimpleNamespace(model_extra={"allow_private_addresses": False})),
+    )
+    monkeypatch.setattr(
+        "deerflow.personal_ip.browser_collection.get_paths",
+        lambda: SimpleNamespace(
+            prepare_user_dir_for_raw_id=lambda value: value,
+            ensure_browser_profile_dir=lambda _account_id, user_id: tmp_path / user_id,
+        ),
+    )
+    monkeypatch.setattr(
+        "deerflow.personal_ip.browser_collection.validate_public_http_url",
+        validate,
+    )
+    monkeypatch.setattr(
+        "deerflow.community.browser_automation.session.get_browser_session_manager",
+        lambda: SimpleNamespace(acquire_session=acquire_session),
+    )
+
+    with acquire_account_browser_session(
+        owner_user_id="owner-1",
+        account={
+            "id": "acct-xhs",
+            "platform": "xiaohongshu",
+            "display_name": "小红书",
+            "status": "active",
+        },
+    ) as session:
+        assert session == "browser-session"
+        url_guard = captured["url_guard"]
+        assert callable(url_guard)
+        assert url_guard("https://creator.xiaohongshu.com/") is None
+
+    assert validation_calls == [
+        {
+            "url": "https://creator.xiaohongshu.com/",
+            "allow_private_addresses": False,
+            "allow_proxy_fake_ip": True,
+            "action": "browse",
+            "resolver": validation_calls[0]["resolver"],
+        }
+    ]
 
 
 @pytest.mark.parametrize(
@@ -34,6 +97,16 @@ def test_browser_dashboard_metric_adapters_cover_all_eight_platforms(platform: s
 
     assert parsed["metrics"] == expected
     assert parsed["window"]["kind"] == "today"
+
+
+def test_xiaohongshu_dashboard_parser_recognizes_exact_labels_and_window() -> None:
+    parsed = parse_browser_dashboard_metrics(
+        "xiaohongshu",
+        "统计周期 近7日 曝光数 1 观看数 0",
+    )
+
+    assert parsed["metrics"] == {"impressions": 1, "views": 0}
+    assert parsed["window"]["kind"] == "last_7_days"
 
 
 def test_browser_dashboard_metric_adapter_does_not_relabel_longer_window_as_today() -> None:
@@ -110,7 +183,7 @@ async def test_browser_platform_collection_captures_generic_rendered_business_da
     assert kwargs["coverage"]["platform_adapter"] == "x_dashboard_rendered_labels_v1"
     assert kwargs["summary"]["direct_metrics"] == {"impressions": 12_345}
     assert kwargs["summary"]["metric_window"]["kind"] == "last_28_days"
-    session.navigate.assert_not_awaited()
+    session.navigate.assert_awaited_once_with("https://analytics.x.com/")
 
 
 @pytest.mark.asyncio
@@ -127,6 +200,73 @@ async def test_browser_platform_collection_rejects_cross_platform_navigation() -
             target_url="https://creator.douyin.com/creator-micro/home",
             session=SimpleNamespace(),
         )
+
+
+@pytest.mark.asyncio
+async def test_browser_collection_accepts_an_authenticated_same_host_landing_page() -> None:
+    navigation_timeout = type(
+        "TimeoutError",
+        (Exception,),
+        {"__module__": "playwright._impl._errors"},
+    )
+    accounts = SimpleNamespace(
+        get=AsyncMock(
+            return_value={
+                "id": "acct-channels",
+                "platform": "wechat_channels",
+                "status": "active",
+            }
+        )
+    )
+    observations = SimpleNamespace(
+        record=AsyncMock(
+            side_effect=lambda **kwargs: {
+                "id": "platform-observation-channels",
+                "platform": "wechat_channels",
+                **kwargs,
+            }
+        )
+    )
+    session = SimpleNamespace(
+        current_url=AsyncMock(
+            side_effect=[
+                "about:blank",
+                "https://channels.weixin.qq.com/platform",
+            ]
+        ),
+        navigate=AsyncMock(side_effect=navigation_timeout()),
+        has_first_party_cookie_set=AsyncMock(return_value=True),
+        extract_business_page=AsyncMock(
+            return_value={
+                "url": "https://channels.weixin.qq.com/platform",
+                "title": "视频号助手",
+                "visible_text": "视频号助手 内容管理 数据概览 粉丝 10 播放量 200",
+                "text_truncated": False,
+                "headings": ["数据概览"],
+                "tables": [],
+                "data_blocks": ["粉丝 10", "播放量 200"],
+                "links": [],
+            }
+        ),
+        screenshot_bytes=AsyncMock(return_value=b"channels"),
+    )
+    service = BrowserPlatformCollectionService(
+        accounts=accounts,
+        observations=observations,
+        settle_seconds=0,
+    )
+
+    result = await service.collect_creator_page(
+        owner_user_id="user-1",
+        account_id="acct-channels",
+        observation_key="channels:dashboard:fresh",
+        dataset="dashboard",
+        session=session,
+    )
+
+    assert result["status"] == "partial"
+    session.has_first_party_cookie_set.assert_awaited_once()
+    session.extract_business_page.assert_awaited_once()
 
 
 def test_douyin_content_inventory_parser_normalizes_post_metrics() -> None:
@@ -245,7 +385,7 @@ async def test_douyin_browser_collection_seals_visible_business_data_with_covera
     assert kwargs["summary"]["table_row_count"] == 2
     assert kwargs["coverage"]["pagination_state"] == "single_loaded_page"
     assert len(kwargs["evidence"]["screenshot_sha256"]) == 64
-    session.navigate.assert_not_awaited()
+    session.navigate.assert_awaited_once_with("https://creator.douyin.com/creator-micro/home")
 
 
 @pytest.mark.asyncio
@@ -253,7 +393,12 @@ async def test_douyin_browser_collection_navigates_only_to_safe_creator_urls() -
     accounts = SimpleNamespace(get=AsyncMock(return_value={"id": "acct-1", "platform": "douyin", "status": "active"}))
     observations = SimpleNamespace(record=AsyncMock())
     session = SimpleNamespace(
-        current_url=AsyncMock(return_value="about:blank"),
+        current_url=AsyncMock(
+            side_effect=[
+                "about:blank",
+                "https://creator.douyin.com/creator-micro/content/manage",
+            ]
+        ),
         navigate=AsyncMock(),
         extract_business_page=AsyncMock(
             return_value={

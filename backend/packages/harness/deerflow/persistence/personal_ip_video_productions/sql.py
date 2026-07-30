@@ -19,17 +19,25 @@ from deerflow.persistence.personal_ip_video_productions.model import (
     PersonalIPVideoProductionEventRow,
     PersonalIPVideoProductionRow,
 )
+from deerflow.personal_ip.video_contracts import normalize_production_mode, validate_compiled_video_contract
 from deerflow.utils.time import coerce_iso
 
 VIDEO_PRODUCTION_CONTRACT_VERSION = "personal-ip-video-production-v1"
 
 VIDEO_EVENT_STAGES: dict[str, str] = {
+    "video_plan_compiled": "blueprint",
     "blueprint_sealed": "blueprint",
     "asset_registered": "assets",
+    "asset_manifest_compiled": "assets",
+    "material_inspection_compiled": "assets",
+    "material_selection_compiled": "assets",
     "asset_generation_requested": "assets",
     "asset_generation_completed": "assets",
     "asset_generation_failed": "assets",
     "storyboard_sealed": "storyboard",
+    "storyboard_compiled": "storyboard",
+    "continuity_compiled": "consistency",
+    "generated_shot_qa_compiled": "consistency",
     "shot_generation_requested": "generation",
     "shot_generation_completed": "generation",
     "shot_generation_failed": "generation",
@@ -38,11 +46,16 @@ VIDEO_EVENT_STAGES: dict[str, str] = {
     "review_requested": "selection",
     "review_recorded": "selection",
     "voice_generated": "finishing",
+    "narration_contract_compiled": "finishing",
+    "narration_timing_compiled": "finishing",
     "voice_generation_requested": "finishing",
     "media_processing_requested": "finishing",
     "media_processing_completed": "finishing",
     "media_processing_failed": "finishing",
     "edit_completed": "finishing",
+    "assembly_admitted": "finishing",
+    "timeline_revision_compiled": "finishing",
+    "final_edit_locked": "finishing",
     "delivery_qa_completed": "delivery",
     "delivery_completed": "delivery",
 }
@@ -56,12 +69,19 @@ VIDEO_EVENT_STATUSES = {
     "rejected",
 }
 VIDEO_EVENT_ALLOWED_STATUSES: dict[str, set[str]] = {
+    "video_plan_compiled": {"succeeded"},
     "blueprint_sealed": {"succeeded"},
     "asset_registered": {"succeeded"},
+    "asset_manifest_compiled": {"succeeded"},
+    "material_inspection_compiled": {"succeeded"},
+    "material_selection_compiled": {"succeeded"},
     "asset_generation_requested": {"running"},
     "asset_generation_completed": {"succeeded"},
     "asset_generation_failed": {"failed"},
     "storyboard_sealed": {"succeeded"},
+    "storyboard_compiled": {"succeeded"},
+    "continuity_compiled": {"succeeded"},
+    "generated_shot_qa_compiled": {"succeeded", "failed"},
     "shot_generation_requested": {"planned", "running"},
     "shot_generation_completed": {"succeeded"},
     "shot_generation_failed": {"failed"},
@@ -70,11 +90,16 @@ VIDEO_EVENT_ALLOWED_STATUSES: dict[str, set[str]] = {
     "review_requested": {"awaiting_review"},
     "review_recorded": {"approved", "rejected"},
     "voice_generated": {"succeeded", "failed"},
+    "narration_contract_compiled": {"succeeded"},
+    "narration_timing_compiled": {"succeeded"},
     "voice_generation_requested": {"running"},
     "media_processing_requested": {"running"},
     "media_processing_completed": {"succeeded"},
     "media_processing_failed": {"failed"},
     "edit_completed": {"succeeded", "failed"},
+    "assembly_admitted": {"succeeded"},
+    "timeline_revision_compiled": {"succeeded"},
+    "final_edit_locked": {"succeeded"},
     "delivery_qa_completed": {"succeeded", "failed"},
     "delivery_completed": {"succeeded"},
 }
@@ -88,6 +113,22 @@ VIDEO_ENTITY_TYPES = {
     "audio",
     "timeline",
     "delivery",
+    "asset",
+}
+
+COMPILED_VIDEO_EVENT_CONTRACTS: dict[str, tuple[str, str]] = {
+    "video_plan_compiled": ("personal-ip-video-plan-v1", "production"),
+    "asset_manifest_compiled": ("personal-ip-video-asset-manifest-v1", "production"),
+    "material_inspection_compiled": ("personal-ip-video-material-inspection-v1", "asset"),
+    "material_selection_compiled": ("personal-ip-video-material-selection-v1", "production"),
+    "storyboard_compiled": ("personal-ip-video-storyboard-v1", "production"),
+    "continuity_compiled": ("personal-ip-video-continuity-v1", "production"),
+    "generated_shot_qa_compiled": ("personal-ip-generated-shot-qa-v1", "candidate"),
+    "narration_contract_compiled": ("personal-ip-video-narration-v1", "production"),
+    "narration_timing_compiled": ("personal-ip-video-narration-timing-v1", "production"),
+    "assembly_admitted": ("personal-ip-approved-assembly-v1", "timeline"),
+    "timeline_revision_compiled": ("personal-ip-video-timeline-revision-v1", "timeline"),
+    "final_edit_locked": ("personal-ip-video-final-edit-lock-v1", "timeline"),
 }
 
 
@@ -159,6 +200,7 @@ class PersonalIPVideoProductionRepository:
         data = row.to_dict()
         data["target_account_ids"] = data.pop("target_account_ids_json") or []
         data["source"] = data.pop("source_json") or {}
+        data["production_mode"] = data["source"].get("production_mode")
         data["delivery_spec"] = data.pop("delivery_spec_json") or {}
         data["provider_policy"] = data.pop("provider_policy_json") or {}
         data["budget"] = data.pop("budget_json") or {}
@@ -216,8 +258,11 @@ class PersonalIPVideoProductionRepository:
         delivery_spec: dict[str, Any],
         provider_policy: dict[str, Any],
         budget: dict[str, Any],
+        production_mode: str | None = None,
+        thread_id: str | None = None,
     ) -> dict[str, Any]:
         owner = _clean_required(owner_user_id, field="owner_user_id", limit=64)
+        thread_key = _clean_optional(thread_id, field="thread_id", limit=64)
         operation = _clean_required(operation_key, field="operation_key", limit=256)
         title_key = _clean_required(title, field="title", limit=256)
         subject_key = _clean_optional(subject_id, field="subject_id", limit=64)
@@ -226,6 +271,10 @@ class PersonalIPVideoProductionRepository:
             raise ValueError("source_kind must be idea or script")
         target_ids = _normalized_ids(target_account_ids, field="target_account_ids", limit=200)
         source_snapshot = _json_snapshot(source, field="source", expected=dict)
+        if "production_mode" in source_snapshot:
+            raise ValueError("source.production_mode is reserved; use the production_mode argument")
+        if production_mode is not None:
+            source_snapshot["production_mode"] = normalize_production_mode(production_mode)
         delivery_snapshot = _json_snapshot(delivery_spec, field="delivery_spec", expected=dict)
         provider_snapshot = _json_snapshot(provider_policy, field="provider_policy", expected=dict)
         budget_snapshot = _json_snapshot(budget, field="budget", expected=dict)
@@ -237,6 +286,7 @@ class PersonalIPVideoProductionRepository:
             "source_kind": source_kind_key,
             "subject_id": subject_key,
             "target_account_ids": target_ids,
+            "thread_id": thread_key,
             "title": title_key,
         }
         request_digest = _digest(request_payload)
@@ -263,6 +313,7 @@ class PersonalIPVideoProductionRepository:
             row = PersonalIPVideoProductionRow(
                 id=f"video-production-{uuid.uuid4().hex}",
                 owner_user_id=owner,
+                thread_id=thread_key,
                 operation_key=operation,
                 contract_version=VIDEO_PRODUCTION_CONTRACT_VERSION,
                 title=title_key,
@@ -301,10 +352,19 @@ class PersonalIPVideoProductionRepository:
             result["events"] = await self._events(session, row.id)
             return result
 
-    async def list(self, owner_user_id: str, *, status: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    async def list(
+        self,
+        owner_user_id: str,
+        *,
+        status: str | None = None,
+        thread_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
         statement = select(PersonalIPVideoProductionRow).where(PersonalIPVideoProductionRow.owner_user_id == owner_user_id)
         if status is not None:
             statement = statement.where(PersonalIPVideoProductionRow.status == status)
+        if thread_id is not None:
+            statement = statement.where(PersonalIPVideoProductionRow.thread_id == _clean_required(thread_id, field="thread_id", limit=64))
         statement = statement.order_by(
             PersonalIPVideoProductionRow.updated_at.desc(),
             PersonalIPVideoProductionRow.id.desc(),
@@ -312,6 +372,43 @@ class PersonalIPVideoProductionRepository:
         async with self._sf() as session:
             rows = (await session.execute(statement)).scalars()
             return [self._production_dict(row) for row in rows]
+
+    async def bind_thread(
+        self,
+        production_id: str,
+        *,
+        owner_user_id: str,
+        thread_id: str,
+    ) -> dict[str, Any] | None:
+        """Bind a legacy production to its one customer-visible task thread."""
+
+        owner = _clean_required(owner_user_id, field="owner_user_id", limit=64)
+        thread_key = _clean_required(thread_id, field="thread_id", limit=64)
+        async with self._sf() as session:
+            row = await session.get(PersonalIPVideoProductionRow, production_id)
+            if row is None or row.owner_user_id != owner:
+                return None
+            if row.thread_id not in {None, thread_key}:
+                raise ValueError("Video production is already bound to another task")
+            conflict = (
+                await session.execute(
+                    select(PersonalIPVideoProductionRow).where(
+                        PersonalIPVideoProductionRow.owner_user_id == owner,
+                        PersonalIPVideoProductionRow.thread_id == thread_key,
+                        PersonalIPVideoProductionRow.id != row.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if conflict is not None:
+                raise ValueError("Task already owns another video production")
+            if row.thread_id is None:
+                row.thread_id = thread_key
+                row.updated_at = datetime.now(UTC)
+                await session.commit()
+                await session.refresh(row)
+            result = self._production_dict(row)
+            result["events"] = await self._events(session, row.id)
+            return result
 
     async def append_event(
         self,
@@ -364,6 +461,27 @@ class PersonalIPVideoProductionRepository:
                 raise ValueError("delivery QA must reference at least one output")
         if event_type_key == "delivery_completed" and not output_snapshot:
             raise ValueError("delivery_completed must reference at least one output")
+        compiled_contract = COMPILED_VIDEO_EVENT_CONTRACTS.get(event_type_key)
+        if compiled_contract is not None:
+            compiled_contract_version, compiled_entity_type = compiled_contract
+            validate_compiled_video_contract(
+                payload_snapshot,
+                contract_version=compiled_contract_version,
+                production_id=production_id,
+            )
+            if entity_type_key != compiled_entity_type:
+                raise ValueError(f"{event_type_key} must target a {compiled_entity_type} entity")
+            if compiled_entity_type == "production" and entity_id_key != production_id:
+                raise ValueError("compiled video contracts must target their production entity")
+            if not output_snapshot:
+                raise ValueError("compiled video contracts must reference their sealed output")
+            if event_type_key == "generated_shot_qa_compiled":
+                if payload_snapshot.get("candidate_id") != entity_id_key:
+                    raise ValueError("generated shot QA candidate_id must match its event entity")
+                if payload_snapshot.get("automated_gate_passed") is not (status_key == "succeeded"):
+                    raise ValueError("generated shot QA gate must match event status")
+            if event_type_key == "material_inspection_compiled" and payload_snapshot.get("asset_id") != entity_id_key:
+                raise ValueError("material inspection asset_id must match its event entity")
 
         async with self._sf() as session:
             production_statement = (
@@ -377,6 +495,15 @@ class PersonalIPVideoProductionRepository:
             production = (await session.execute(production_statement)).scalar_one_or_none()
             if production is None or production.owner_user_id != owner:
                 return None
+            if compiled_contract is not None:
+                production_mode = (production.source_json or {}).get("production_mode")
+                validation_kwargs: dict[str, Any] = {
+                    "contract_version": compiled_contract_version,
+                    "production_id": production.id,
+                }
+                if production_mode is not None:
+                    validation_kwargs["production_mode"] = production_mode
+                validate_compiled_video_contract(payload_snapshot, **validation_kwargs)
             existing_statement = select(PersonalIPVideoProductionEventRow).where(
                 PersonalIPVideoProductionEventRow.production_id == production.id,
                 PersonalIPVideoProductionEventRow.event_key == event_key_value,
@@ -407,6 +534,35 @@ class PersonalIPVideoProductionRepository:
                 return result
             if production.status in {"completed", "cancelled"}:
                 raise ValueError("terminal video production cannot accept new events")
+            latest_lock: PersonalIPVideoProductionEventRow | None = None
+            if event_type_key in {"delivery_qa_completed", "delivery_completed"}:
+                latest_revision_statement = (
+                    select(PersonalIPVideoProductionEventRow)
+                    .where(
+                        PersonalIPVideoProductionEventRow.production_id == production.id,
+                        PersonalIPVideoProductionEventRow.event_type == "timeline_revision_compiled",
+                        PersonalIPVideoProductionEventRow.status == "succeeded",
+                    )
+                    .order_by(PersonalIPVideoProductionEventRow.sequence.desc())
+                    .limit(1)
+                )
+                latest_revision = (await session.execute(latest_revision_statement)).scalar_one_or_none()
+                if latest_revision is not None:
+                    latest_lock_statement = (
+                        select(PersonalIPVideoProductionEventRow)
+                        .where(
+                            PersonalIPVideoProductionEventRow.production_id == production.id,
+                            PersonalIPVideoProductionEventRow.event_type == "final_edit_locked",
+                            PersonalIPVideoProductionEventRow.status == "succeeded",
+                        )
+                        .order_by(PersonalIPVideoProductionEventRow.sequence.desc())
+                        .limit(1)
+                    )
+                    latest_lock = (await session.execute(latest_lock_statement)).scalar_one_or_none()
+                    if latest_lock is None:
+                        raise ValueError("delivery QA requires final_edit_locked after a timeline revision")
+                    if (latest_lock.payload_json or {}).get("source_timeline_sha256") != (latest_revision.payload_json or {}).get("sha256"):
+                        raise ValueError("delivery QA requires a lock for the latest timeline revision")
             if event_type_key == "delivery_completed":
                 qa_statement = (
                     select(PersonalIPVideoProductionEventRow)
@@ -418,6 +574,8 @@ class PersonalIPVideoProductionRepository:
                     .order_by(PersonalIPVideoProductionEventRow.sequence.desc())
                 )
                 qa_events = list((await session.execute(qa_statement)).scalars())
+                if latest_lock is not None:
+                    qa_events = [event for event in qa_events if event.sequence > latest_lock.sequence]
                 passed_qa = [event for event in qa_events if (event.payload_json or {}).get("passed") is True]
                 if not passed_qa:
                     raise ValueError("delivery_completed requires a successful delivery QA event")

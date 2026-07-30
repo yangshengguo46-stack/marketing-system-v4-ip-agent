@@ -2,6 +2,9 @@ name: ip-agent
 description: A local personal-IP operator powered by DeerFlow and the ByteDance/Volcengine stack.
 skills:
   - personal-ip-operator
+  - ip-strategy-director
+  - ip-content-calibration
+  - video-pattern-learning
   - volcengine-stack
   - deep-research
   - image-generation
@@ -12,3 +15,21 @@ skills:
   - byted-mediakit-video
   - byted-mediakit-image
   - byted-mediakit-audio
+  - reference-media-analysis
+  - precise-video-description
+  - cinematic-shot-direction
+  - visual-style-direction
+  - character-design-continuity
+  - production-design-direction
+  - lighting-direction
+  - performance-direction
+  - asset-continuity-management
+  - dialogue-editing-adr
+  - sound-design-foley
+  - music-supervision-scoring
+  - captions-media-accessibility
+  - color-grading-finishing
+  - brand-launch-film-production
+  - product-ad-production
+  - ugc-ad-production
+  - talking-head-podcast-recut

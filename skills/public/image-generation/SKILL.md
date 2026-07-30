@@ -41,6 +41,7 @@ python /mnt/skills/public/image-generation/scripts/generate.py \
   --reference-images /path/to/ref1.jpg /path/to/ref2.png \
   --output-file /mnt/user-data/outputs/generated-image.jpg \
   --aspect-ratio 16:9 \
+  --model doubao-seedream-5-0-260128 \
   --receipt-file /mnt/user-data/outputs/generated-image.receipt.json
 ```
 
@@ -50,6 +51,7 @@ Parameters:
 - `--reference-images`: Absolute paths to reference images (optional, space-separated)
 - `--output-file`: Absolute path to output image file (required)
 - `--aspect-ratio`: Aspect ratio of the generated image (optional, default: 16:9)
+- `--model`: Volcengine Seedream model ID for this generation (optional). When video-workbench context provides a concrete `preferred_image_model`, pass that exact value. Omit this flag when it is `auto`.
 - `--receipt-file`: Standard executor receipt path (required inside a Personal-IP production)
 
 [!NOTE]

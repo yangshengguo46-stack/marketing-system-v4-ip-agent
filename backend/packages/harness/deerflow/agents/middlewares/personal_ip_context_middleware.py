@@ -21,21 +21,17 @@ _AUTHORITY_CONTRACT = "\n".join(
         "A conversation is never bound to one account: compare and aggregate across all relevant accounts when asked.",
         "Before publishing, spending, messaging or computer control, identify the target account for that operation.",
         "Receipts must name the exact subject, account, platform, data source and observation or execution time.",
+        "Account login state is authoritative. An operation_ready=false value does not mean the browser login expired.",
+        "Use the dedicated strategy and evidence readers for commercial positioning, content and performance details.",
     ]
 )
 _MODEL_FIELDS = (
     "id",
     "subject_id",
-    "subject",
     "platform",
     "display_name",
     "handle",
-    "promise_to_audience",
-    "primary_audience",
-    "content_pillars",
-    "voice_and_boundaries",
-    "business_goal",
-    "metadata",
+    "status",
 )
 
 
@@ -52,7 +48,7 @@ def _runtime_portfolio(request: ModelRequest) -> dict[str, Any] | None:
 
 def _project_subject(subject: object) -> dict[str, Any] | None:
     if isinstance(subject, dict):
-        return {
+        projected = {
             key: subject.get(key)
             for key in (
                 "id",
@@ -61,11 +57,42 @@ def _project_subject(subject: object) -> dict[str, Any] | None:
                 "relationship",
                 "description",
                 "status",
-                "metadata",
             )
             if key in subject
         }
+        return projected
     return None
+
+
+def _project_account(account: dict[str, Any]) -> dict[str, Any]:
+    projected = {key: account.get(key) for key in _MODEL_FIELDS if key in account}
+    metadata = account.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    state = str(metadata.get("connection_state") or metadata.get("connection_status") or "").strip().lower()
+    authenticated = metadata.get("browser_authenticated") is True or state in {
+        "actionable",
+        "authenticated",
+        "connected",
+        "logged_in",
+        "ready",
+    }
+    if authenticated:
+        state = "logged_in" if state not in {"actionable", "ready"} else "actionable"
+    elif not state:
+        state = "pending_login"
+    connection = {
+        "state": state,
+        "browser_authenticated": authenticated,
+        "operation_ready": metadata.get("execution_ready") is True,
+    }
+    authenticated_at = metadata.get("browser_authenticated_at")
+    if isinstance(authenticated_at, str) and authenticated_at.strip():
+        connection["browser_authenticated_at"] = authenticated_at
+    collection_status = metadata.get("collection_status")
+    if isinstance(collection_status, str) and collection_status.strip():
+        connection["collection_status"] = collection_status
+    projected["connection"] = connection
+    return projected
 
 
 def _render_portfolio(portfolio: dict[str, Any]) -> str:
@@ -74,10 +101,7 @@ def _render_portfolio(portfolio: dict[str, Any]) -> str:
     for account in portfolio["accounts"]:
         if not isinstance(account, dict):
             continue
-        projected = {key: account.get(key) for key in _MODEL_FIELDS if key in account}
-        if "subject" in projected:
-            projected["subject"] = _project_subject(projected["subject"])
-        accounts.append(projected)
+        accounts.append(_project_account(account))
     payload = json.dumps(
         {"subjects": subjects, "accounts": accounts},
         ensure_ascii=False,

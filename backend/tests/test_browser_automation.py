@@ -278,6 +278,53 @@ async def test_wheel_input_scrolls_viewport_center_without_pointer_location():
 
 
 @pytest.mark.asyncio
+async def test_text_input_uses_committed_browser_text_path():
+    session = BrowserSession(
+        MagicMock(),
+        headless=True,
+        timeout_ms=1000,
+        viewport={"width": 1000, "height": 500},
+    )
+    page = MagicMock()
+    page.keyboard.insert_text = AsyncMock()
+    session._ensure_page = AsyncMock(return_value=page)
+
+    await session._dispatch_input({"type": "text", "text": "验证码 20"})
+
+    page.keyboard.insert_text.assert_awaited_once_with("验证码 20")
+
+
+@pytest.mark.asyncio
+async def test_open_single_page_navigates_and_closes_restored_tabs():
+    session = BrowserSession(
+        MagicMock(),
+        headless=False,
+        timeout_ms=1000,
+        viewport={"width": 1000, "height": 500},
+    )
+    login_page = MagicMock()
+    login_page.url = "https://creator.douyin.com/"
+    login_page.goto = AsyncMock()
+    login_page.is_closed.return_value = False
+    stale_page = MagicMock()
+    stale_page.is_closed.return_value = False
+    stale_page.close = AsyncMock()
+    session._context = MagicMock()
+    session._context.pages = [stale_page, login_page]
+    session._ensure_page = AsyncMock(return_value=login_page)
+
+    url = await session._open_single_page("https://creator.douyin.com/")
+
+    assert url == "https://creator.douyin.com/"
+    login_page.goto.assert_awaited_once_with(
+        "https://creator.douyin.com/",
+        wait_until="domcontentloaded",
+    )
+    stale_page.close.assert_awaited_once()
+    assert session._page is login_page
+
+
+@pytest.mark.asyncio
 async def test_wheel_input_falls_back_to_native_wheel_when_js_scroll_fails():
     session = BrowserSession(
         MagicMock(),
@@ -309,13 +356,25 @@ async def test_live_frame_returns_base64_jpeg_screenshot():
         viewport={"width": 1000, "height": 500},
     )
     page = MagicMock()
-    page.screenshot = AsyncMock(return_value=b"\xff\xd8jpeg-bytes")
+    cdp_session = MagicMock()
+    cdp_session.send = AsyncMock(return_value={"data": "/9hq cGVnLWJ5dGVz".replace(" ", "")})
+    page.context.new_cdp_session = AsyncMock(return_value=cdp_session)
     session._ensure_page = AsyncMock(return_value=page)
 
     frame = await session._live_frame()
 
     assert frame == "/9hq cGVnLWJ5dGVz".replace(" ", "")
-    page.screenshot.assert_awaited_once_with(type="jpeg", quality=_LIVE_FRAME_JPEG_QUALITY)
+    page.context.new_cdp_session.assert_awaited_once_with(page)
+    cdp_session.send.assert_awaited_once_with(
+        "Page.captureScreenshot",
+        {
+            "format": "jpeg",
+            "quality": _LIVE_FRAME_JPEG_QUALITY,
+            "fromSurface": True,
+            "captureBeyondViewport": False,
+            "optimizeForSpeed": True,
+        },
+    )
 
 
 @pytest.mark.asyncio
@@ -351,6 +410,66 @@ async def test_business_page_extraction_reads_visible_dom_without_browser_creden
     assert "document.cookie" not in evaluated_script
     assert "localStorage" not in evaluated_script
     assert "sessionStorage" not in evaluated_script
+
+
+@pytest.mark.asyncio
+async def test_get_text_includes_child_frames():
+    session = BrowserSession(
+        MagicMock(),
+        headless=True,
+        timeout_ms=1000,
+        viewport={"width": 1000, "height": 500},
+    )
+    main_frame = MagicMock()
+    main_frame.inner_text = AsyncMock(return_value="main")
+    child_frame = MagicMock()
+    child_frame.inner_text = AsyncMock(return_value="机构服务权益 达人管理")
+    page = MagicMock()
+    page.frames = [main_frame, child_frame]
+    session._ensure_page = AsyncMock(return_value=page)
+
+    text = await session._get_text(1000)
+
+    assert text == "main\n机构服务权益 达人管理"
+
+
+@pytest.mark.asyncio
+async def test_first_party_cookie_verification_returns_only_a_boolean():
+    session = BrowserSession(
+        MagicMock(),
+        headless=True,
+        timeout_ms=1000,
+        viewport={"width": 1000, "height": 500},
+    )
+    page = MagicMock()
+    page.context.cookies = AsyncMock(
+        return_value=[
+            {
+                "domain": "channels.weixin.qq.com",
+                "name": "wxuin",
+                "value": "must-never-leave-the-browser-owner",
+            },
+            {
+                "domain": "channels.weixin.qq.com",
+                "name": "sessionid",
+                "value": "must-never-leave-the-browser-owner",
+            },
+            {
+                "domain": "evil.example",
+                "name": "pass_ticket",
+                "value": "cross-site-cookie",
+            },
+        ],
+    )
+    session._ensure_page = AsyncMock(return_value=page)
+
+    verified = await session._has_first_party_cookie_set(
+        ("channels.weixin.qq.com",),
+        (("wxuin", "sessionid"),),
+    )
+
+    assert verified is True
+    assert isinstance(verified, bool)
 
 
 @pytest.mark.asyncio
@@ -662,12 +781,15 @@ async def test_live_frame_screenshots_current_active_page_after_switch():
         viewport={"width": 1000, "height": 500},
     )
     new_page = MagicMock()
-    new_page.screenshot = AsyncMock(return_value=b"\xff\xd8new-page")
+    cdp_session = MagicMock()
+    cdp_session.send = AsyncMock(return_value={"data": "/9huZXctcGFnZQ=="})
+    new_page.context.new_cdp_session = AsyncMock(return_value=cdp_session)
     session._ensure_page = AsyncMock(return_value=new_page)
 
     frame = await session._live_frame()
 
-    new_page.screenshot.assert_awaited_once_with(type="jpeg", quality=_LIVE_FRAME_JPEG_QUALITY)
+    new_page.context.new_cdp_session.assert_awaited_once_with(new_page)
+    cdp_session.send.assert_awaited_once()
     assert frame  # base64 payload of the new page
 
 
