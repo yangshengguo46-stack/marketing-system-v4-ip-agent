@@ -156,6 +156,17 @@ IP Agent distribution note:
   Permanent deletion requires a fresh server preview, the exact confirmation
   phrase, backup acknowledgement and MineContext deletion; stale state digests
   fail closed. Run `make personal-ip-data-lifecycle-acceptance`.
+- Repeated first-use and destructive-flow development uses
+  `scripts/ip_agent_test_mode.py` through `make ip-test-start`,
+  `make ip-test-reset`, `make ip-test-status` and `make ip-test-stop`.
+  Test mode must stay fixed to `backend/.deer-flow-ip-test`, use its own
+  absolute SQLite directory, USER/agent memory, MineContext data, browser
+  profiles and copied extensions configuration, and expose
+  `NEXT_PUBLIC_IP_AGENT_TEST_MODE=1` so the workspace is visibly marked.
+  Reset must refuse an unmarked/tampered directory, stop the local stack and
+  atomically rotate only the fixed test directory into a recoverable
+  timestamped snapshot. It must never delete or rewrite the normal
+  `backend/.deer-flow` owner state.
 - Keep the Chinese workspace sidebar distinction explicit: `新对话` creates a
   thread, while `历史对话` opens the complete thread index from immediately
   below `定时任务`. Do not label both entries simply as `对话`.
@@ -582,6 +593,9 @@ make config      # Generate local config files from the examples
 make check       # Check that required tools are installed
 make install     # Install dependencies; install pre-commit hooks only in a Git checkout
 make ip-clean-install  # Full credential-free source-archive acceptance gate
+make ip-test-start     # Start the isolated first-use/manual E2E environment
+make ip-test-reset     # Snapshot and reset only the isolated test environment
+make ip-test-status    # Show the active isolated paths and database state
 make dev         # Start all services with hot-reload (Gateway + Frontend + Nginx)
 make start       # Start all services in production mode (local, optimized)
 make stop        # Stop all running services

@@ -43,6 +43,8 @@ extensions_config.json
 coverage.xml
 coverage/
 .deer-flow/
+backend/.deer-flow-ip-test/
+backend/.deer-flow-ip-test-snapshots/
 /dist/
 .claude/
 skills/custom/*

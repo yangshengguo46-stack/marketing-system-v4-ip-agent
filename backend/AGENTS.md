@@ -1017,6 +1017,18 @@ and re-reads owner state, rejects stale previews, removes credential/OAuth
 rows, and clears MineContext. Run
 `make personal-ip-data-lifecycle-acceptance`.
 
+For repeatable first-use acceptance, `scripts/ip_agent_test_mode.py` owns a
+separate local runtime at `backend/.deer-flow-ip-test`. It clones the current
+config while forcing an absolute test-only SQLite directory, disabled
+scheduler and disabled IM channel connections; it also isolates USER/agent
+memory, MineContext, thread files, browser profiles and extensions
+configuration. `make ip-test-start` launches that profile and
+`NEXT_PUBLIC_IP_AGENT_TEST_MODE=1` marks the frontend. `make ip-test-reset`
+stops the stack, validates the fixed-path marker, rotates the complete test
+state into `backend/.deer-flow-ip-test-snapshots/<UTC timestamp>` and prepares
+a fresh state. Never implement this reset by deleting or sharing
+`backend/.deer-flow`, and never accept an arbitrary reset target.
+
 The IP Agent distribution stores operated people/brands/organizations in
 `deerflow.persistence.personal_ip_subjects` and their platform accounts in
 `deerflow.persistence.personal_ip_accounts`. Gateway routes under

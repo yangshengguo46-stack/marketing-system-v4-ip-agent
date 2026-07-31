@@ -50,6 +50,7 @@ evidence.
 | AUD-TST-002 | P0 | Frontend startup | Default Playwright allowed 120 seconds, while the audited production build needed about 165 seconds. | Default web-server startup timeout is 300 seconds and the mock suite can reach test execution. | done |
 | AUD-TST-003 | P0 | Test isolation | Mocked web-fetch tests used the machine's live DNS; Clash RFC 2544 fake-IP answers caused 11 false failures. | Browserless, Crawl4AI and fastCRW unit tests inject deterministic public DNS while private/metadata rejection tests remain active. | done |
 | AUD-TST-004 | P0 | Full-stack isolation | The real-backend Playwright build inherited `frontend/.env` and could call a developer gateway on port 8001 instead of its temporary replay gateway. | The config explicitly clears both public backend URLs and forces same-origin rewrites to the ephemeral gateway. | done |
+| AUD-TST-005 | P0 | Manual E2E isolation | Repeated first-use testing reused the normal owner database, conversations, learned memory, MineContext and browser profiles, requiring destructive factory resets between trials. | `make ip-test-start` uses a fixed marked test home with independent SQLite/config/extensions/user state and a visible UI banner; `make ip-test-reset` refuses unmarked/tampered targets, stops services, rotates only that test home to a recoverable snapshot and preserves the normal runtime. Unit tests plus a live create/reset/recovery probe pass. | done |
 | AUD-QA-001 | P0 | Regression | The full backend suite had environment-sensitive failures and the root suite had one package-fixture failure. | Root suite, backend suite, frontend unit suite and `pnpm check` are green from the moved checkout. | done |
 | AUD-QA-002 | P1 | Build performance | Next production build is unusually slow and reports whole-project NFT tracing from a dynamic artifact route. | Scope the traced filesystem path, remove the warning and record a repeatable build time below the Playwright startup budget. | done |
 | AUD-LOOP-001 | P0 | Strategy | No local strategy version or launch-ready natural incubation has been persisted. | Complete one natural subject conversation through real benchmark evidence, alternatives, launch package, pilot and validation. | external gate |
@@ -93,6 +94,15 @@ evidence.
   Gateway and temporary SQLite at migration head `0020`; the UI created a
   product subject, the API read the persisted row, an account was attached and
   the refreshed UI rendered both.
+- Isolated manual test mode passed 5 backend safety tests, 1 frontend flag
+  test and `pnpm check`. A live Gateway used
+  `backend/.deer-flow-ip-test/data/deerflow.db`; the probe thread
+  `test-mode-reset-probe` was present only in the timestamped reset snapshot,
+  the fresh test state had no database, and the normal runtime remained at
+  zero threads, subjects and accounts. The in-app browser's stale internal
+  connection-error page was security-blocked from further navigation, so the
+  visible banner is covered by the compiled frontend path rather than claimed
+  as a successful browser observation in this acceptance.
 - IP influence-asset regression: 331 backend Personal-IP/migration tests
   passed; strategy v4, account diagnosis v2 and the differentiation package
   passed Ruff; the internal differentiation capability validated and the

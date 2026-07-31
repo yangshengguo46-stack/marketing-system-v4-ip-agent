@@ -559,6 +559,20 @@ On a trusted development machine without host nginx, the supported
 `http://localhost:3000`. `make dev` remains the nginx-backed `local-proxy`
 profile at `http://localhost:2026`; production uses managed ingress or the
 bundled Docker stack. See [docs/RUNTIME_PROFILES.md](docs/RUNTIME_PROFILES.md).
+
+For repeated first-use IP-Agent testing, run `make ip-test-start` instead of
+using the normal local state. Test mode clones the current runtime
+configuration but stores its SQLite database, conversations, memory,
+MineContext data, browser profiles and extension state under the ignored
+`backend/.deer-flow-ip-test/` directory. The workspace displays a persistent
+测试模式 banner. `make ip-test-reset` stops the local stack, moves the entire
+test state to a recoverable timestamped snapshot under
+`backend/.deer-flow-ip-test-snapshots/`, and prepares a clean owner without
+touching `backend/.deer-flow`. Use `make ip-test-status` to inspect the active
+paths and `make ip-test-stop` to stop the stack. Hosted model calls in test mode
+can still consume provider quota; paid media, publishing and other external
+changes retain their normal approval gates.
+
 On Windows, run the local development flow from Git Bash. Native `cmd.exe` and PowerShell shells are not supported for the bash-based service scripts, and WSL is not guaranteed because some scripts rely on Git for Windows utilities such as `cygpath`.
 
 1. **Check prerequisites**:

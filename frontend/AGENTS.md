@@ -277,10 +277,16 @@ Backend API URLs are optional; an nginx proxy is used by default:
 
 ```
 NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8001
+NEXT_PUBLIC_IP_AGENT_TEST_MODE=1
 NEXT_PUBLIC_LANGGRAPH_BASE_URL=http://localhost:8001/api
 ```
 
 Leave these unset for the standard `make dev` / Docker flow, where nginx serves the public `/api/langgraph/*` prefix and rewrites it to Gateway's native `/api/*` routes.
+Only `make ip-test-start` should set `NEXT_PUBLIC_IP_AGENT_TEST_MODE=1`; the
+workspace then renders the persistent test-mode data-isolation banner. Do not
+derive this indicator from a query string or local storage, because the backend
+database and owner filesystem must actually be isolated before the UI claims
+test mode.
 
 ## Resources
 

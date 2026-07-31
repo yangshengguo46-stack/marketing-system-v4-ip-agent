@@ -1,10 +1,11 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor hllm-lite ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install ip-test-prepare ip-test-start ip-test-reset ip-test-status ip-test-stop personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor hllm-lite ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 PNPM ?= pnpm
 BACKEND_UV_RUN = cd backend && uv run
+IP_TEST_RUN = cd backend && PYTHONPATH=.. uv run python -m scripts.ip_agent_test_mode
 VIDEO_E2E_DIR ?= .deer-flow/acceptance/video-e2e
 VIDEO_E2E_FINISHER ?= auto
 
@@ -25,6 +26,10 @@ help:
 	@echo "  make ip-init         - Install the default local personal-IP Agent"
 	@echo "  make ip-package      - Build and smoke-test the complete source archive"
 	@echo "  make ip-package-verify PACKAGE=... - Verify an existing source archive"
+	@echo "  make ip-test-start   - Start the isolated local IP-Agent test environment"
+	@echo "  make ip-test-reset   - Rotate test state to a recoverable snapshot and prepare a clean state"
+	@echo "  make ip-test-status  - Show the isolated test-state paths and readiness"
+	@echo "  make ip-test-stop    - Stop the local test environment"
 	@echo "  make personal-ip-publish-acceptance - Run local-only eight-platform publish recovery checks"
 	@echo "  make personal-ip-cost-acceptance - Run video hard-budget reservation/retry/concurrency checks"
 	@echo "  make personal-ip-data-lifecycle-acceptance - Verify credential-safe backup, restore and whole-domain deletion"
@@ -97,6 +102,21 @@ ip-package:
 ip-package-verify:
 	@test -n "$(PACKAGE)" || (echo "Set PACKAGE=/path/to/ip-agent-source-*.tar.gz" && exit 2)
 	@$(PYTHON) ./scripts/package_ip_agent.py verify "$(PACKAGE)" --smoke
+
+ip-test-prepare:
+	@$(IP_TEST_RUN) prepare
+
+ip-test-start:
+	@$(IP_TEST_RUN) start
+
+ip-test-reset:
+	@$(IP_TEST_RUN) reset
+
+ip-test-status:
+	@$(IP_TEST_RUN) status
+
+ip-test-stop:
+	@$(IP_TEST_RUN) stop
 
 personal-ip-publish-acceptance:
 	@$(MAKE) -C backend personal-ip-publish-acceptance

@@ -33,10 +33,36 @@ export PATH="$REPO_ROOT/.deer-flow/toolchains/ffmpeg/bin:$REPO_ROOT/.deer-flow/b
 
 # ── Load .env ────────────────────────────────────────────────────────────────
 
+# Test mode still needs provider keys from the repository .env, but its
+# operator-selected isolation paths must win over any same-named entries in
+# that file. Capture them before sourcing and restore them immediately after.
+IP_TEST_MODE_REQUESTED="${IP_AGENT_TEST_MODE:-}"
+IP_TEST_DEER_FLOW_HOME="${DEER_FLOW_HOME:-}"
+IP_TEST_CONFIG_PATH="${DEER_FLOW_CONFIG_PATH:-}"
+IP_TEST_EXTENSIONS_CONFIG_PATH="${DEER_FLOW_EXTENSIONS_CONFIG_PATH:-}"
+IP_TEST_PROJECT_ROOT="${DEER_FLOW_PROJECT_ROOT:-}"
+
 if [ -f "$REPO_ROOT/.env" ]; then
     set -a
     source "$REPO_ROOT/.env"
     set +a
+fi
+
+if [ "$IP_TEST_MODE_REQUESTED" = "1" ]; then
+    if [ -z "$IP_TEST_DEER_FLOW_HOME" ] ||
+        [ -z "$IP_TEST_CONFIG_PATH" ] ||
+        [ -z "$IP_TEST_EXTENSIONS_CONFIG_PATH" ] ||
+        [ -z "$IP_TEST_PROJECT_ROOT" ]; then
+        echo "IP-Agent test mode requires fixed home, config, extensions and project-root paths."
+        exit 1
+    fi
+    export IP_AGENT_TEST_MODE=1
+    export NEXT_PUBLIC_IP_AGENT_TEST_MODE=1
+    export DEER_FLOW_AUTH_DISABLED=1
+    export DEER_FLOW_HOME="$IP_TEST_DEER_FLOW_HOME"
+    export DEER_FLOW_CONFIG_PATH="$IP_TEST_CONFIG_PATH"
+    export DEER_FLOW_EXTENSIONS_CONFIG_PATH="$IP_TEST_EXTENSIONS_CONFIG_PATH"
+    export DEER_FLOW_PROJECT_ROOT="$IP_TEST_PROJECT_ROOT"
 fi
 
 _pick_python() {
