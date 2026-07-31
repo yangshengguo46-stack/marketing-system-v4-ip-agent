@@ -225,7 +225,17 @@ def nested_section_value(lines: list[str], section_path: str, key: str) -> str |
 
 
 def tools_include_name(lines: list[str], tool_name: str) -> bool:
-    """Return True when the top-level tools list has an active item name."""
+    """Return True when the top-level tools list has an active item name.
+
+    YAML permits sequence items below a top-level key to be either indented or
+    indentationless. Config upgrades currently emit the latter:
+
+        tools:
+        - name: browser_navigate
+
+    Keep scanning zero-indented list items until another top-level mapping key
+    begins; otherwise local startup can sync away the required browser extra.
+    """
     inside = False
     for raw in lines:
         line = _strip_comment(raw)
@@ -239,12 +249,11 @@ def tools_include_name(lines: list[str], tool_name: str) -> bool:
             continue
         stripped = line.lstrip()
         indent = len(line) - len(stripped)
-        if indent == 0:
-            inside = False
-            continue
         name_match = _LIST_ITEM_NAME_RE.match(line)
         if name_match and _unquote(name_match.group(1).strip()) == tool_name:
             return True
+        if indent == 0 and not stripped.startswith("-"):
+            inside = False
     return False
 
 

@@ -157,6 +157,16 @@ def test_detect_from_config_browser_via_browser_navigate_tool(tmp_path):
     assert detect.detect_from_config(cfg) == ["browser"]
 
 
+def test_detect_from_config_browser_via_indentless_yaml_sequence(tmp_path):
+    """Accept the sequence style emitted by the product config upgrader."""
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "tools:\n- name: image_search\n  group: web\n- name: browser_navigate\n  group: browser\ntool_search:\n  enabled: false\n",
+    )
+
+    assert detect.detect_from_config(cfg) == ["browser"]
+
+
 def test_detect_from_config_ignores_commented_browser_tool(tmp_path):
     cfg = tmp_path / "config.yaml"
     cfg.write_text(
