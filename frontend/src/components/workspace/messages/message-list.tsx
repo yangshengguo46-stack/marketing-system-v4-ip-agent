@@ -50,6 +50,7 @@ import {
   hasPresentFiles,
   isAssistantMessageGroupStreaming,
   isHiddenFromUIMessage,
+  shouldShowGlobalThinkingPlaceholder,
   type MessageGroup as ThreadMessageGroup,
 } from "@/core/messages/utils";
 import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
@@ -408,19 +409,11 @@ export function MessageList({
   const [branchingMessageId, setBranchingMessageId] = useState<string | null>(
     null,
   );
-  const hasActiveAssistantText = useMemo(() => {
-    let lastHumanIndex = -1;
-    for (let i = groupedMessages.length - 1; i >= 0; i--) {
-      if (groupedMessages[i]?.type === "human") {
-        lastHumanIndex = i;
-        break;
-      }
-    }
-    if (lastHumanIndex === -1) return false;
-    return groupedMessages
-      .slice(lastHumanIndex)
-      .some((g) => g.type === "assistant");
-  }, [groupedMessages]);
+  const showGlobalThinkingPlaceholder = useMemo(
+    () =>
+      shouldShowGlobalThinkingPlaceholder(groupedMessages, thread.isLoading),
+    [groupedMessages, thread.isLoading],
+  );
   const rehypePlugins = useRehypeSplitWordsIntoSpans(thread.isLoading);
   const lastGroupIndex = groupedMessages.length - 1;
   const turnUsageMessagesByGroupIndex =
@@ -1049,7 +1042,7 @@ export function MessageList({
               </div>
             );
           })}
-          {thread.isLoading && !hasActiveAssistantText && (
+          {showGlobalThinkingPlaceholder && (
             <div className="text-muted-foreground flex w-full items-center gap-2 py-2 text-sm">
               <Loader2Icon className="size-4 animate-spin" />
               {t.common.thinking}

@@ -992,7 +992,8 @@ Then make sure DeerFlow is running (default at `http://localhost:2026`) and use 
 
 **What you can do**:
 
-- Send messages to DeerFlow and get streaming responses
+- Send messages to DeerFlow and get streaming responses with one concise
+  `Thinking…` status before visible agent activity begins
 - Choose execution modes: flash (fast), standard, pro (planning), ultra (sub-agents)
 - Check DeerFlow health, list models/skills/agents
 - Manage threads and conversation history

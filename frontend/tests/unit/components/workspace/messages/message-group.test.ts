@@ -36,7 +36,7 @@ describe("MessageGroup", () => {
       { isLoading: true },
     );
 
-    expect(html).toContain("Understanding your request");
+    expect(html).toContain("Thinking");
     expect(html).not.toContain("Private internal planning");
   });
 

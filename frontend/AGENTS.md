@@ -102,7 +102,11 @@ tool names, Skill names, commands or local paths. `message-list.tsx` mounts
 customer-safe activity labels from `core/tools/utils.ts` and shows the generic
 thinking label before the first useful tool call arrives. Keep this processing
 surface live during long browser/model operations so the product never appears
-frozen, while implementation detail remains hidden.
+frozen, while implementation detail remains hidden. The list-level generic
+thinking placeholder exists only before the current human turn has any
+assistant surface; once an `assistant:processing`, normal assistant,
+clarification, file or subagent group exists, that group exclusively owns the
+status so two thinking rows can never stack.
 
 ### Key Patterns
 

@@ -14,6 +14,7 @@ import {
   hasContent,
   hasReasoning,
   isAssistantMessageGroupStreaming,
+  shouldShowGlobalThinkingPlaceholder,
   stripUploadedFilesTag,
   visibleAssistantContent,
 } from "@/core/messages/utils";
@@ -96,6 +97,45 @@ test("aggregates token usage messages once per assistant turn", () => {
       (groupMessages) => groupMessages?.map((message) => message.id) ?? null,
     ),
   ).toEqual([null, null, ["ai-1", "ai-2"], null, ["ai-3"]]);
+});
+
+describe("global thinking placeholder", () => {
+  test("shows only before the current turn has an assistant surface", () => {
+    const groups = getMessageGroups([
+      { id: "human-1", type: "human", content: "Question" },
+    ] as Message[]);
+
+    expect(shouldShowGlobalThinkingPlaceholder(groups, true)).toBe(true);
+    expect(shouldShowGlobalThinkingPlaceholder(groups, false)).toBe(false);
+  });
+
+  test("lets an active processing group own the single thinking indicator", () => {
+    const groups = getMessageGroups([
+      { id: "human-1", type: "human", content: "Question" },
+      {
+        id: "ai-reasoning",
+        type: "ai",
+        content: "",
+        additional_kwargs: { reasoning_content: "Private planning" },
+      },
+    ] as Message[]);
+
+    expect(groups.map((group) => group.type)).toEqual([
+      "human",
+      "assistant:processing",
+    ]);
+    expect(shouldShowGlobalThinkingPlaceholder(groups, true)).toBe(false);
+  });
+
+  test("does not mistake a previous assistant turn for the current one", () => {
+    const groups = getMessageGroups([
+      { id: "human-1", type: "human", content: "First" },
+      { id: "ai-1", type: "ai", content: "Answer" },
+      { id: "human-2", type: "human", content: "Second" },
+    ] as Message[]);
+
+    expect(shouldShowGlobalThinkingPlaceholder(groups, true)).toBe(true);
+  });
 });
 
 describe("branchable assistant groups", () => {

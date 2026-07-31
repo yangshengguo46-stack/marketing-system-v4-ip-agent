@@ -156,6 +156,35 @@ export function getMessageGroups(messages: Message[]): MessageGroup[] {
   return groups;
 }
 
+export function shouldShowGlobalThinkingPlaceholder(
+  groups: MessageGroup[],
+  isLoading: boolean,
+): boolean {
+  if (!isLoading) {
+    return false;
+  }
+
+  let lastHumanIndex = -1;
+  for (let index = groups.length - 1; index >= 0; index -= 1) {
+    if (groups[index]?.type === "human") {
+      lastHumanIndex = index;
+      break;
+    }
+  }
+  if (lastHumanIndex === -1) {
+    return false;
+  }
+
+  // Every assistant group owns its own visible surface while streaming:
+  // processing shows MessageGroup's waiter/tool activity, a plain assistant
+  // group shows MessageListItem, and clarification/subagent/file groups render
+  // their dedicated UI. The list-level waiter is only the gap before the first
+  // assistant group arrives.
+  return !groups
+    .slice(lastHumanIndex + 1)
+    .some((group) => group.type.startsWith("assistant"));
+}
+
 export function getBranchableAssistantGroupIds(
   groups: MessageGroup[],
   isCurrentTurnLoading: boolean,
@@ -634,10 +663,7 @@ export function stripInternalMarkers(content: string): string {
   return content.replace(INTERNAL_MARKER_RE, "").trim();
 }
 
-export function visibleAssistantContent(
-  content: string,
-  locale = "en-US",
-) {
+export function visibleAssistantContent(content: string, locale = "en-US") {
   if (
     /configured LLM provider is temporarily unavailable after multiple retries/i.test(
       content,
