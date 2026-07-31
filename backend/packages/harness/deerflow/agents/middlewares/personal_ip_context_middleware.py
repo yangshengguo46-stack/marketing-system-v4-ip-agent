@@ -39,6 +39,35 @@ _AUTHORITY_CONTRACT = "\n".join(
         "Use the dedicated strategy and evidence readers for commercial positioning, content and performance details.",
     ]
 )
+_STRATEGIC_GROUNDING_CONTRACT = "\n".join(
+    [
+        "## Personal-IP decision grounding contract",
+        "Research is evidence acquisition, never the strategy or the deliverable.",
+        "Use search only to identify and verify current sources. The useful result must connect entity truth, intended influence, desired behavior, economic objective and operating capacity to a testable decision.",
+        "When the user supplies a benchmark name or link, first verify the exact account and inspect representative works, visible audience response and the observable conversion path.",
+        "At most two discovery searches may be used for one named benchmark. Search snippets, profiles and articles "
+        "about an account are not representative-work evidence; after the cap, verify an already-found exact source "
+        "or request the user's artifact.",
+        "If the exact benchmark or its representative content cannot be verified, state the failed coverage and ask "
+        "for the exact link, screenshots or exported samples in ordinary conversation; do not pivot to a generic "
+        "industry query or render a clarification card.",
+        "Separate observations, inferences and hypotheses. Never invent quantified outcomes, costs, platform support, account performance or customer behavior.",
+        "Do not turn a person's or business's problem into broad industry consulting. Keep advice inside the influence-to-behavior-to-economic-result loop unless the user explicitly asks for another scope.",
+        "Before prescribing a direction, ground it in the relevant entity facts, proof, audience or buyer, objective, "
+        "offer or conversion path and production capacity already known. Ask one material question when a missing fact "
+        "can change the decision.",
+        "Treat inability to appear on camera, shoot or edit as a production constraint, not as a prompt for generic web advice. Choose and test a suitable performance and production mode from the user's actual capacity.",
+        "After evidence collection, synthesize fit, mismatch and transferable mechanisms through the product's strategy and creative methodology, then propose the smallest pilot with a predicted signal and failure rule.",
+    ]
+)
+_BENCHMARK_EVIDENCE_EXHAUSTED_CONTRACT = "\n".join(
+    [
+        "## Benchmark evidence stop",
+        "Benchmark verification is exhausted for this turn: repeated rendered-page attempts were blocked.",
+        "Do not search again, do not use image search, do not create a research to-do and do not claim that articles or snippets prove the account's content mechanisms.",
+        "Reply now in ordinary conversation. State the exact coverage gap and ask for one exact link, screenshot set or exported sample.",
+    ]
+)
 _NARRATIVE_INTERVIEW_SYSTEM = "\n".join(
     [
         "You are the bounded narrative interviewer for an IP influence-asset strategy.",
@@ -206,9 +235,21 @@ def _is_first_use_orientation_request(messages: list) -> bool:
         "没对标",
         "想做",
         "想打造",
+        "个人ip",
+        "个人 ip",
+        "打造个人",
+        "打造品牌",
+        "做账号",
+        "账号怎么做",
         "定位",
         "孵化",
         "起号",
+        "不温不火",
+        "生意不好",
+        "没客人",
+        "获客",
+        "引流",
+        "影响力",
         "first time",
         "new user",
         "new here",
@@ -262,6 +303,193 @@ def _has_concrete_operation_signal(text: str) -> bool:
     return any(signal in normalized for signal in concrete_operation_signals)
 
 
+def _prefers_conversational_evidence_followup(messages: list) -> bool:
+    message = _latest_real_user_message(messages)
+    if message is None or _has_non_text_input(message):
+        return False
+    text = _message_text(message).strip().lower()
+    if not text:
+        return False
+    if "没有对标" in text or "没对标" in text or "no benchmark" in text:
+        return False
+    own_account_signals = (
+        "我的账号",
+        "我账号",
+        "我们账号",
+        "我的抖音",
+        "我的小红书",
+        "我的视频号",
+        "my account",
+        "our account",
+    )
+    if any(signal in text for signal in own_account_signals):
+        return False
+    approval_signals = (
+        "发布",
+        "付费",
+        "购买",
+        "充值",
+        "删除",
+        "注销",
+        "发消息",
+        "发送给",
+        "修改设置",
+        "publish",
+        "purchase",
+        "pay",
+        "delete",
+        "send message",
+    )
+    if any(signal in text for signal in approval_signals):
+        return False
+    explicit_benchmark_signals = (
+        "对标",
+        "分析这个账号",
+        "研究这个账号",
+        "账号怎么样",
+        "benchmark",
+        "analyze this account",
+        "review this account",
+    )
+    if any(signal in text for signal in explicit_benchmark_signals):
+        return True
+    inspect_signals = ("看看", "看一下", "看下", "看一看")
+    if not any(signal in text for signal in inspect_signals):
+        return False
+    direct_or_general_signals = (
+        "这个视频",
+        "这条视频",
+        "这段视频",
+        "这个脚本",
+        "这份素材",
+        "这个链接",
+        "附件",
+        "行业",
+        "市场",
+        "新闻",
+        "趋势",
+        "规则",
+        "政策",
+        "平台",
+        "http://",
+        "https://",
+    )
+    return not any(signal in text for signal in direct_or_general_signals)
+
+
+def _tool_name(tool: object) -> str:
+    if isinstance(tool, dict):
+        function = tool.get("function")
+        if isinstance(function, dict) and isinstance(function.get("name"), str):
+            return function["name"]
+        return str(tool.get("name") or "")
+    return str(getattr(tool, "name", "") or "")
+
+
+def _tool_call_count(messages: list, tool_name: str) -> int:
+    count = 0
+    for message in messages:
+        for tool_call in getattr(message, "tool_calls", None) or []:
+            if isinstance(tool_call, dict) and tool_call.get("name") == tool_name:
+                count += 1
+    return count
+
+
+def _compacted_search_evidence(request: ModelRequest) -> int:
+    state = request.state if isinstance(request.state, dict) else {}
+    summary = state.get("summary_text")
+    if not isinstance(summary, str):
+        return 0
+    normalized = summary.lower()
+    markers = (
+        "通过公开网页搜索",
+        "搜索获取",
+        "搜索结果",
+        "web search",
+        "search results",
+    )
+    return 1 if any(marker in normalized for marker in markers) else 0
+
+
+def _failed_browser_verification_count(messages: list) -> int:
+    browser_call_ids: set[str] = set()
+    for message in messages:
+        for tool_call in getattr(message, "tool_calls", None) or []:
+            if not isinstance(tool_call, dict) or tool_call.get("name") != "browser_navigate":
+                continue
+            call_id = tool_call.get("id")
+            if isinstance(call_id, str):
+                browser_call_ids.add(call_id)
+    failure_markers = (
+        "验证码",
+        "attention required",
+        "cloudflare",
+        "access denied",
+        "timeout",
+        "timed out",
+        "no interactive elements",
+    )
+    count = 0
+    for message in messages:
+        if getattr(message, "type", None) != "tool":
+            continue
+        if getattr(message, "tool_call_id", None) not in browser_call_ids:
+            continue
+        content = _message_text(message).lower()
+        if any(marker in content for marker in failure_markers):
+            count += 1
+    return count
+
+
+def _has_verified_representative_work(messages: list) -> bool:
+    representative_call_ids: set[str] = set()
+    representative_url_signals = (
+        "douyin.com/video/",
+        "xiaohongshu.com/explore/",
+        "youtube.com/watch",
+        "youtu.be/",
+        "tiktok.com/@",  # Later constrained to a /video/ path below.
+        "instagram.com/p/",
+        "instagram.com/reel/",
+        "x.com/",  # Later constrained to a /status/ path below.
+        "mp.weixin.qq.com/s/",
+    )
+    for message in messages:
+        for tool_call in getattr(message, "tool_calls", None) or []:
+            if not isinstance(tool_call, dict) or tool_call.get("name") != "browser_navigate":
+                continue
+            args = tool_call.get("args")
+            url = str(args.get("url") or "").lower() if isinstance(args, dict) else ""
+            is_representative = any(signal in url for signal in representative_url_signals)
+            if "tiktok.com/@" in url:
+                is_representative = "/video/" in url
+            if "x.com/" in url:
+                is_representative = "/status/" in url
+            call_id = tool_call.get("id")
+            if is_representative and isinstance(call_id, str):
+                representative_call_ids.add(call_id)
+    if not representative_call_ids:
+        return False
+    failure_markers = (
+        "验证码",
+        "attention required",
+        "cloudflare",
+        "access denied",
+        "timeout",
+        "timed out",
+        "no interactive elements",
+    )
+    for message in messages:
+        if getattr(message, "type", None) != "tool":
+            continue
+        if getattr(message, "tool_call_id", None) not in representative_call_ids:
+            continue
+        content = _message_text(message).lower()
+        if content and not any(marker in content for marker in failure_markers):
+            return True
+    return False
+
+
 def _portfolio_experience(portfolio: dict[str, Any]) -> str:
     return "new_owner" if not portfolio["subjects"] and not portfolio["accounts"] else "returning_owner"
 
@@ -294,6 +522,9 @@ def _narrative_entity_type(text: str) -> str:
     brand_signals = (
         "品牌",
         "门店",
+        "烧烤店",
+        "饭店",
+        "餐厅",
         "电商",
         "餐饮",
         "brand",
@@ -621,14 +852,83 @@ class PersonalIPContextMiddleware(AgentMiddleware):
         )
         return injected.override(messages=messages)
 
+    @staticmethod
+    def _guard_benchmark_result(
+        request: ModelRequest,
+        result: ModelCallResult,
+    ) -> ModelCallResult:
+        messages = list(request.messages)
+        if (
+            _runtime_agent_name(request) != _CUSTOMER_AGENT_NAME
+            or not _prefers_conversational_evidence_followup(messages)
+        ):
+            return result
+        message = _ai_message_from_result(result)
+        if message is None or message.tool_calls or _has_verified_representative_work(messages):
+            return result
+        research_attempts = (
+            _tool_call_count(messages, "web_search")
+            + _tool_call_count(messages, "image_search")
+            + _tool_call_count(messages, "browser_navigate")
+            + _compacted_search_evidence(request)
+        )
+        if research_attempts == 0:
+            return result
+        latest_user = _latest_real_user_message(messages)
+        latest_text = _message_text(latest_user) if latest_user is not None else ""
+        is_chinese = any("\u4e00" <= char <= "\u9fff" for char in latest_text)
+        if is_chinese:
+            content = (
+                "我现在还不能给你下对标结论。公开检索和二手报道最多只能确认这个账号的身份线索或外围说法，"
+                "但我没有核验到它的代表作；在这种证据下，不能把钩子、叙事、镜头、表演和转化机制说成已经"
+                "拆明白，更不能直接套到你的账号上。\n\n"
+                "请把它的主页链接和你最想学的 3 条视频链接发给我；也可以直接传截图或录屏。拿到原始内容后，"
+                "我会分开给你：它真正有效的机制、不能照抄的表面形式、与你自身条件的匹配与冲突，以及一个"
+                "可拍摄、可测量成败的首条试验视频。"
+            )
+        else:
+            content = (
+                "I cannot make a benchmark judgment yet. Public search and secondary articles can establish identity "
+                "clues, but I have not verified representative works, so they cannot prove the account's hook, story, "
+                "visual, performance or conversion mechanisms.\n\n"
+                "Please send the account page and the three videos you most want to learn from, or upload screenshots "
+                "or a screen recording. I will separate transferable mechanisms from surface expression, test the fit "
+                "against your constraints and design one measurable pilot."
+            )
+        updated = clone_ai_message_with_tool_calls(message, [], content=content)
+        additional_kwargs = dict(updated.additional_kwargs or {})
+        additional_kwargs["personal_ip_benchmark_evidence_gap"] = True
+        updated = updated.model_copy(
+            update={
+                "additional_kwargs": additional_kwargs,
+                "invalid_tool_calls": [],
+            }
+        )
+        return _replace_ai_message(result, message, updated)
+
     def _inject(self, request: ModelRequest) -> ModelRequest:
         portfolio = _runtime_portfolio(request)
         if portfolio is None:
             return request
+        request_messages = list(request.messages)
+        conversational_evidence = (
+            _runtime_agent_name(request) == _CUSTOMER_AGENT_NAME
+            and _prefers_conversational_evidence_followup(request_messages)
+        )
+        failed_browser_verifications = (
+            _failed_browser_verification_count(request_messages)
+            if conversational_evidence
+            else 0
+        )
+        contracts = [SystemMessage(content=_AUTHORITY_CONTRACT)]
+        if _runtime_agent_name(request) == _CUSTOMER_AGENT_NAME:
+            contracts.append(SystemMessage(content=_STRATEGIC_GROUNDING_CONTRACT))
+        if failed_browser_verifications >= 2:
+            contracts.append(SystemMessage(content=_BENCHMARK_EVIDENCE_EXHAUSTED_CONTRACT))
         messages = _insert_after_leading_system_messages(
-            list(request.messages),
+            request_messages,
             [
-                SystemMessage(content=_AUTHORITY_CONTRACT),
+                *contracts,
                 HumanMessage(
                     content=_render_portfolio(portfolio),
                     additional_kwargs={
@@ -638,7 +938,29 @@ class PersonalIPContextMiddleware(AgentMiddleware):
                 ),
             ],
         )
-        return request.override(messages=messages)
+        tools = request.tools
+        if conversational_evidence:
+            tools = [
+                tool
+                for tool in request.tools
+                if _tool_name(tool) not in {"ask_clarification", "image_search"}
+            ]
+            discovery_searches = (
+                _tool_call_count(request_messages, "web_search")
+                + _compacted_search_evidence(request)
+            )
+            if discovery_searches >= 2:
+                tools = [tool for tool in tools if _tool_name(tool) != "web_search"]
+            if _tool_call_count(request_messages, "browser_navigate") >= 2:
+                tools = [tool for tool in tools if _tool_name(tool) != "browser_navigate"]
+            if failed_browser_verifications >= 2:
+                tools = [
+                    tool
+                    for tool in tools
+                    if not _tool_name(tool).startswith("browser_")
+                    and _tool_name(tool) not in {"web_search", "write_todos"}
+                ]
+        return request.override(messages=messages, tools=tools)
 
     @override
     def wrap_model_call(
@@ -654,7 +976,10 @@ class PersonalIPContextMiddleware(AgentMiddleware):
             if status == "ready":
                 return handler(self._transition_request(request))
             return rendered
-        return handler(self._inject(request))
+        return self._guard_benchmark_result(
+            request,
+            handler(self._inject(request)),
+        )
 
     @override
     async def awrap_model_call(
@@ -670,4 +995,7 @@ class PersonalIPContextMiddleware(AgentMiddleware):
             if status == "ready":
                 return await handler(self._transition_request(request))
             return rendered
-        return await handler(self._inject(request))
+        return self._guard_benchmark_result(
+            request,
+            await handler(self._inject(request)),
+        )

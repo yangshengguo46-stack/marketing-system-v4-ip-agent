@@ -439,6 +439,19 @@ IP Agent distribution note:
   Do not default to earliest memory or sensitive history; skip/stop/correct and
   internal-only boundaries belong to the user. Supplied script, asset, link and
   direct-strategy operations bypass or interrupt this boundary.
+- Public-web research is only an evidence-acquisition layer for Personal-IP;
+  never let a search summary or generic industry playbook become the strategy.
+  A named benchmark gets at most two discovery searches. Search snippets,
+  profile pages and secondary articles may establish identity leads but are
+  not representative-work evidence. After two failed rendered verifications,
+  stop search/browser/image-search planning and ask in ordinary conversation
+  for the exact account page plus three representative videos, screenshots or
+  a recording. `PersonalIPContextMiddleware` must guard a final benchmark claim
+  when no representative work was verified, including after message
+  compaction. Keep the generic `deep-research` Skill out of the default
+  `ip-agent` config; product strategy and creative synthesis own the judgment.
+  The Volcengine provider's public fallback uses strict safe search and filters
+  unsafe or query-irrelevant results before returning evidence.
 - `deerflow.personal_ip.video_method_distillation` adapts the MIT-licensed
   Cangjie RIA-TV++ workflow for long-form video, recorded courses, interviews
   and podcasts. It may consume only a sealed `personal-ip-video-pattern-v1`

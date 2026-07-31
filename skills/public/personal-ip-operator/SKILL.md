@@ -195,6 +195,26 @@ philosophical diagnoses.
    preflight.
 4. Inspect evidence before strategy: prior content, comments, metrics, source
    documents and competitor examples.
+   Research is evidence acquisition, never the Personal-IP deliverable. A
+   search result or generic industry playbook cannot substitute for entity and
+   business truth, mechanism extraction, creative judgment or a measured
+   pilot. When the user names a benchmark, verify the exact account and inspect
+   representative works plus visible audience/conversion evidence. If that
+   target cannot be verified, report the coverage gap and request its exact
+   link, screenshots or exported samples through one ordinary conversational
+   question, not a clarification card; do not change the question into generic
+   advice for the user's industry.
+   Compare observations and inferred mechanisms against this subject's proof,
+   objective, offer, conversion path and production capacity. Return what fits,
+   what does not, the smallest adapted pilot, predicted signal and failure
+   rule. Treat inability to appear on camera, shoot or edit as a production
+   constraint to test through performance coaching, faceless, staff/customer
+   viewpoint, voiceover or generated-presenter options—not as a generic search
+   topic.
+   Use at most two discovery searches for one named benchmark. Search snippets,
+   profile pages and articles about the account may identify it, but they are
+   not representative-work evidence. After the cap, verify an exact source
+   already found or request the user's artifact instead of varying queries.
    Do not give precise spending, posting-time, audience-size or benchmark
    prescriptions until the latest operating strategy and relevant recent
    performance evidence have been inspected.

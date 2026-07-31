@@ -145,6 +145,16 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > to earliest memory or sensitive history, and the user can correct, skip,
 > stop or mark material internal-only. Concrete supplied scripts, assets, links
 > and direct strategy requests bypass or interrupt the interview.
+> Open-web search is evidence acquisition, not the IP Agent's deliverable.
+> When a user names a benchmark account, the Agent may make at most two
+> discovery searches, then verifies representative works. Search snippets,
+> profile pages and secondary articles cannot prove hooks, narrative, visual
+> language, performance or conversion mechanisms. If representative work is
+> unavailable or blocked, the Agent asks in ordinary conversation for the
+> account page plus three example videos/screenshots instead of showing a form,
+> changing the question into generic industry advice or inventing a finished
+> benchmark analysis. The public fallback uses strict safe search and removes
+> unsafe or query-irrelevant results before they enter model context.
 > IP is treated as an influence asset for a person, brand, product or
 > organization: attributable public expectations that can change attention,
 > trust, choice or action. Reach is distribution, not the asset. The private

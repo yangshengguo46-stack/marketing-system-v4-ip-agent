@@ -2,6 +2,29 @@
 
 ## Select benchmarks
 
+Benchmark work is mechanism extraction, not a name search. For a benchmark
+supplied by the user:
+
+1. verify the exact platform/account and source URL;
+2. inspect representative works and observable audience or conversion evidence;
+3. record the content promise, audience occasion, proof, hook/tension,
+   emotion, narrative, visual/sound/performance system and conversion path;
+4. distinguish direct observations from inference;
+5. compare transferable mechanisms and mismatches with the subject's proof,
+   objective, offer and production capacity;
+6. adapt the smallest pilot and define its predicted signal and failure rule.
+
+If the named account or representative content is blocked, ambiguous or
+unverifiable, request the exact link, screenshots or exported samples in one
+ordinary conversational question rather than a clarification card. Never
+substitute a generic industry query and present those results as benchmark
+analysis.
+
+Use at most two discovery searches for one named benchmark. Search snippets,
+profile pages and articles about the account can identify leads, but they are
+not representative-work evidence and cannot prove content mechanisms. After
+the cap, verify an exact source already found or request the user's artifact.
+
 Choose at least three real accounts with complementary value:
 
 - one close business-model analogue;

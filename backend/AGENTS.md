@@ -192,7 +192,9 @@ Public-web discovery should use `web_search` before Browser Control. The
 Web Search without changing the lead agent's `/chat/completions` conversation
 runtime. It disables provider-side response storage, bounds source/result/token
 settings, sanitizes returned citation URLs and may fall back to DuckDuckGo when
-Ark reports that Web Search is not activated. Browser Control remains for
+Ark reports that Web Search is not activated. That fallback uses strict safe
+search, a public-URL boundary and query-relevance/unsafe-content filtering;
+filtered material never enters model context. Browser Control remains for
 rendered verification, authentication and interaction.
 
 ## Architecture
@@ -1039,7 +1041,12 @@ The middleware converts that private tool call into ordinary assistant text,
 persists only a version/status/turn/entity marker, and either asks one
 answer-grounded follow-up, stops, or hands sufficient evidence to the full
 agent in the same turn. Concrete script/asset/link/direction operations bypass
-or interrupt the gate.
+or interrupt the gate. For a named benchmark, the same middleware injects the
+strategy-grounding contract, removes clarification-card and image-search tools,
+caps discovery at two searches across compaction, stops after two blocked
+rendered verifications and guards final model text unless a representative
+post/video page was actually verified. Secondary articles and search snippets
+may identify the account but cannot complete content-mechanism analysis.
 Account ids are operation targets and receipt fields only. Keep the middleware
 before `SkillActivationMiddleware`, and preserve tests for owner isolation,
 cross-account portfolio access, the zero-model ordinary first reply,

@@ -93,6 +93,7 @@ def test_private_operating_intelligence_is_enabled() -> None:
 
 
 def test_first_use_orientation_precedes_generic_research() -> None:
+    configured = set(_agent_config()["skills"])
     soul = (
         ROOT / "product" / "defaults" / "agents" / "ip-agent" / "SOUL.md"
     ).read_text(encoding="utf-8")
@@ -107,11 +108,11 @@ def test_first_use_orientation_precedes_generic_research() -> None:
     ).read_text(encoding="utf-8")
 
     normalized_soul = " ".join(soul.lower().split())
-    assert "material questions without a model or tool call" in normalized_soul
-    assert "target group and core problem" in normalized_soul
+    assert "normal narrative-strategy conversation without a model or tool call" in normalized_soul
+    assert "one entity-appropriate grand-tour invitation" in normalized_soul
     assert "preserve the same strict boundary" in normalized_soul
     assert "do not load a skill file, browse/search" in normalized_soul
-    assert "ask exactly one conversational question" in normalized_soul
+    assert "ask no more than one material question at a time" in normalized_soul
     assert "do not apply this delay to a concrete supplied script, asset or link" in " ".join(
         operator.lower().split()
     )
@@ -119,6 +120,9 @@ def test_first_use_orientation_precedes_generic_research() -> None:
     assert "product-specific onboarding gates take precedence" in " ".join(
         research.lower().split()
     )
+    assert "deep-research" not in configured
+    assert "research is evidence acquisition, not the strategy or deliverable" in normalized_soul
+    assert "do not replace it with a generic industry search" in normalized_soul
 
 
 def test_upstream_media_skills_keep_hidden_evaluations() -> None:

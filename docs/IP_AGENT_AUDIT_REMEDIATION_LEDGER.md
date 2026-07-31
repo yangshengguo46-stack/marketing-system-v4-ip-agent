@@ -67,6 +67,8 @@ evidence.
 | AUD-CAL-001 | P0 | Content evidence | Pilot/preflight guidance separated hypotheses from evidence in prose, but formal contracts could still contain neural shorthand or unsupported viral certainty and did not freeze distribution assumptions. | Strategy v4 and audience-preflight v2 tests require evidence level, observable mechanism, predicted signal, failure condition, distribution assumptions and uncertainty; neural shortcuts and viral guarantees are rejected; a first pilot with no account history stays an explicit unmeasured cold-start hypothesis. | done |
 | AUD-DIAG-001 | P0 | Account diagnosis | Connected accounts had collection and metrics surfaces but no unified evidence-bound decision for continuing, adjusting or starting over; platform folklore could outrank content and low reach could be mistaken for a dead account. | Native context/compiler tests cover owner scope, seven content layers, the full commercial funnel, three distinct measured posts, complete commercial-outcome coverage from observations no older than 30 days, server-bound intent/conversion states, non-hostile language, repairable restrictions, latest-within-24-hours/same-reason/seven-day/exhausted-remediation structural evidence and rejection of low-reach-only replacement; all eight platform Skills validate against dated first-party sources. | done |
 | AUD-IP-001 | P0 | IP scope | The operating model still treated IP mainly as a creator strategy; products were not first-class subjects and no immutable contract connected influence, differentiation, creative encoding and observed adoption/economic effects. | Migration 0020, repository and native-tool tests prove owner isolation, idempotency, product subjects, candidate/pilot gates, three-supportive-observation downstream validation, strategy/preflight/cockpit/account-diagnosis linkage; strategy v4 separates influence, behavioral and economic goals; the differentiation Skill validates and frontend type/check plus the real-backend product-subject scenario pass. | done |
+| AUD-BENCH-001 | P0 | Benchmark judgment | A named benchmark triggered generic deep research; after CAPTCHA/search failure the Agent changed the question into broad restaurant advice and presented secondary snippets as a completed professional analysis. | Empty-owner IP/business distress enters narrative intake without tools; named-benchmark research removes the generic research Skill, uses at most two discovery searches across compaction, rejects clarification cards and image-search drift, stops after two blocked page verifications and replaces any final claim that lacks a verified representative work with one ordinary artifact request. Real UI + Gateway replay of “请看看贵厨笔记这个对标账号” ends with the account-page/three-video request and no restaurant playbook. | done |
+| AUD-SRCH-001 | P0 | Search safety | The public fallback could return query-irrelevant adult spam when Ark Web Search was not activated. | Fallback calls DuckDuckGo with strict safe search, accepts public URLs only, removes unsafe and query-irrelevant entries, reports filtered coverage and returns no evidence when the exact live query has no safe relevant result. | done |
 
 ## Execution order
 
@@ -131,6 +133,19 @@ evidence.
   openings, correction/skip/private/stop control, sensitive-memory
   non-defaults, direct-task bypass and same-turn transition to the full Agent
   when enough evidence exists.
+- Benchmark-judgment acceptance replayed the reported “贵厨笔记” failure through
+  the live Next.js UI and Gateway. “普通人打造个人IP难度会不会很大呀？” entered the
+  zero-tool narrative opening. The named benchmark made exactly two discovery
+  searches, did not search generic restaurant operations, did not render a
+  clarification card and ended with a normal account-page/three-video request
+  because no representative work was verified. Focused middleware and product
+  stack/search regression passed 106 tests and three changed internal method
+  packages passed deterministic review. The public fallback regression passed
+  15 provider tests; the exact previously polluted query returned zero safe
+  results and no adult entry. The complete backend passed 9,046 tests with 71
+  explicit external-dependency skips, and the root suite passed 111 tests. A
+  final own-account/benchmark scope refinement then passed its 58 focused
+  regressions and Ruff.
 - Full-backend gate: `make test` passed 8,979 tests with 71 explicit
   live/external-dependency skips in 629.51 seconds. The autouse fixture now
   isolates auth and owner-contract tests from a checkout-local

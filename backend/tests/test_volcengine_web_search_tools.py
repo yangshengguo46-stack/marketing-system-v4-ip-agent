@@ -185,6 +185,59 @@ def test_tool_not_open_falls_back_and_is_cached(monkeypatch):
     assert "secret provider detail" not in json.dumps(first, ensure_ascii=False)
 
 
+def test_ddg_fallback_is_strict_and_drops_unsafe_or_irrelevant_results():
+    from deerflow.community.volcengine_web_search.tools import _run_ddg_fallback
+
+    raw_results = [
+        {
+            "title": "[H69 Verse] Infinity's Pleasure Castle",
+            "href": "https://susmeat.example/item",
+            "body": "Music and SFX by Horny Studio.",
+        },
+        {
+            "title": "完全无关的体育新闻",
+            "href": "https://news.example/sports",
+            "body": "今天的比赛结果。",
+        },
+        {
+            "title": "贵厨笔记账号介绍",
+            "href": "https://example.com/guichu",
+            "body": "贵厨笔记是餐饮内容账号。",
+        },
+        {
+            "title": "贵厨笔记成人视频",
+            "href": "https://bad.example/guichu",
+            "body": "色情内容。",
+        },
+    ]
+
+    with patch(
+        "deerflow.community.ddg_search.tools._search_text",
+        return_value=raw_results,
+    ) as search:
+        result = _run_ddg_fallback("贵厨笔记 内容结构 餐饮门店", 5)
+
+    search.assert_called_once_with(
+        query="贵厨笔记 内容结构 餐饮门店",
+        max_results=10,
+        region="wt-wt",
+        safesearch="on",
+        backend="duckduckgo",
+    )
+    assert result == {
+        "query": "贵厨笔记 内容结构 餐饮门店",
+        "total_results": 1,
+        "results": [
+            {
+                "title": "贵厨笔记账号介绍",
+                "url": "https://example.com/guichu",
+                "content": "贵厨笔记是餐饮内容账号。",
+            }
+        ],
+        "filtered_results": 3,
+    }
+
+
 def test_tool_not_open_without_fallback_returns_safe_error(monkeypatch):
     from deerflow.community.volcengine_web_search.tools import web_search_tool
 

@@ -1,13 +1,14 @@
 ---
 name: deep-research
-description: Use this skill instead of WebSearch for ANY question requiring web research. Trigger on queries like "what is X", "explain X", "compare X and Y", "research X", or before content generation tasks. Provides systematic multi-angle research methodology instead of single superficial searches. Use this proactively when the user's question needs online information.
+description: Conduct multi-source open-web research for general factual questions that require several current sources. This is an evidence-gathering method, not a Personal-IP strategy, benchmark-analysis or content-generation workflow; product-specific agents and supplied artifacts take precedence.
 ---
 
 # Deep Research Skill
 
 ## Overview
 
-This skill provides a systematic methodology for conducting thorough web research. **Load this skill BEFORE starting any content generation task** to ensure you gather sufficient information from multiple angles, depths, and sources.
+This skill provides a systematic methodology for conducting thorough general
+web research when several current sources are materially necessary.
 
 Product-specific onboarding gates take precedence over this generic research
 default. In particular, do not load or run deep research before the first
@@ -17,9 +18,16 @@ fact; research becomes eligible only when that fact can make source and
 benchmark selection meaningful. A concrete supplied script, asset or link may
 still be handled directly under its owning workflow.
 
+For Personal-IP, brand, product, creator, account-diagnosis or benchmark work,
+research can only gather and verify evidence. It must never replace entity
+modeling, business judgment, benchmark mechanism extraction, creative
+synthesis or a measured pilot. If an exact named benchmark cannot be verified,
+ask for the source artifact instead of changing the question into generic
+industry advice.
+
 ## When to Use This Skill
 
-**Always load this skill when:**
+**Use this skill when:**
 
 ### Research Questions
 - User asks "what is X", "explain X", "research X", "investigate X"
@@ -27,12 +35,8 @@ still be handled directly under its owning workflow.
 - The question requires current, comprehensive information from multiple sources
 - A single web search would be insufficient to answer properly
 
-### Content Generation (Pre-research)
-- Creating presentations (PPT/slides)
-- Creating frontend designs or UI mockups
-- Writing articles, reports, or documentation
-- Producing videos or multimedia content
-- Any content that requires real-world information, examples, or current data
+Do not load it merely because another workflow will create content. The owning
+workflow decides whether current external evidence is necessary.
 
 ## Core Principle
 

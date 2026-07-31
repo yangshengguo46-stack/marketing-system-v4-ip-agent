@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from ipaddress import ip_address
 from typing import Any
 from urllib.parse import urlparse
@@ -163,16 +164,64 @@ def _extract_result(payload: dict[str, Any], query: str) -> dict[str, Any] | Non
 
 
 def _run_ddg_fallback(query: str, max_results: int) -> dict[str, Any]:
-    from deerflow.community.ddg_search.tools import web_search_tool as ddg_search_tool
+    from deerflow.community.ddg_search.tools import _search_text
 
-    raw = ddg_search_tool.invoke({"query": query, "max_results": max_results})
-    try:
-        parsed = json.loads(raw)
-    except (TypeError, json.JSONDecodeError):
-        return {"error": "Public web fallback returned an unexpected response", "query": query}
-    if not isinstance(parsed, dict):
-        return {"error": "Public web fallback returned an unexpected response", "query": query}
-    return parsed
+    raw_results = _search_text(
+        query=query,
+        max_results=min(max_results * 2, 20),
+        region="wt-wt",
+        safesearch="on",
+        backend="duckduckgo",
+    )
+    query_terms = [
+        term
+        for term in re.findall(r"[a-z0-9]{3,}|[\u3400-\u9fff]{2,}", query.lower())
+        if term
+    ]
+    unsafe_markers = (
+        "成人视频",
+        "成人内容",
+        "色情",
+        "做爱",
+        "射脸",
+        "自拍偷拍",
+        "无码",
+        "hentai",
+        "porn",
+        "horny",
+        "xxx",
+        "onlyfans",
+    )
+    normalized_results: list[dict[str, str]] = []
+    filtered_results = 0
+    for raw in raw_results:
+        if not isinstance(raw, dict):
+            filtered_results += 1
+            continue
+        title = str(raw.get("title") or "").strip()
+        url = _safe_public_url(raw.get("href", raw.get("link")))
+        content = str(raw.get("body", raw.get("snippet")) or "").strip()
+        haystack = f"{title}\n{url}\n{content}".lower()
+        relevant = any(term in haystack for term in query_terms)
+        unsafe = any(marker in haystack for marker in unsafe_markers)
+        if not url or not relevant or unsafe:
+            filtered_results += 1
+            continue
+        normalized_results.append(
+            {
+                "title": title,
+                "url": url,
+                "content": content,
+            }
+        )
+        if len(normalized_results) >= max_results:
+            break
+    return {
+        "query": query,
+        "total_results": len(normalized_results),
+        "results": normalized_results,
+        "filtered_results": filtered_results,
+    }
 
 
 def _fallback_result(
