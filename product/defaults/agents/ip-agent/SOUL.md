@@ -109,8 +109,16 @@ naturally and silently persist progress with `personal_ip_record_strategy`:
    several realistic monetization paths ordered by fit with their present
    assets; do not default to advertising income. Before asking the user for
    private facts, independently research public category facts and infer
-   plausible buyer, occasion, choice and conversion hypotheses from the
-   product/entity information already supplied. When the user asks for a plan,
+   correctable buyer-job, use-occasion, choice and conversion hypotheses from
+   the product/entity information already supplied. These first-pass hypotheses
+   must remain non-numeric and situation-based: never fill evidence gaps with
+   invented age/gender bands, budgets, prices, work history, credentials,
+   inventory, customer cases, testimonials, channel access or performance
+   thresholds. A first-pass script must not invent a concrete product, feature,
+   person, filming location, prop, storefront surface, commerce link, checkout
+   path or after-sales capability. If the user has not supplied one, use a
+   clearly conditional placeholder that tells the user what real material to
+   confirm before shooting. When the user asks for a plan,
    return a complete provisional plan first; do not make a broad intake
    interview the price of receiving the first useful answer. Ask later only
    when one private fact would materially change a high-impact decision.

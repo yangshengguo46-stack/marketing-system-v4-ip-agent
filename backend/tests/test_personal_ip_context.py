@@ -279,11 +279,7 @@ def test_ip_agent_injects_decision_grounding_before_benchmark_research():
 
     injected = PersonalIPContextMiddleware()._inject(request)
 
-    contracts = "\n".join(
-        message.content
-        for message in injected.messages
-        if isinstance(message, SystemMessage)
-    )
+    contracts = "\n".join(message.content for message in injected.messages if isinstance(message, SystemMessage))
     assert "Research is evidence acquisition, never the strategy or the deliverable" in contracts
     assert "ask for the exact link, screenshots or exported samples" in contracts
     assert "do not pivot to a generic industry query" in contracts
@@ -335,17 +331,8 @@ def test_named_benchmark_research_uses_a_real_tool_allowlist():
 def test_product_benchmark_starts_with_one_compact_forced_discovery_call():
     request = ModelRequest(
         model=object(),
-        system_message=SystemMessage(
-            content="full operating prompt with every Skill and every tool"
-        ),
-        messages=[
-            HumanMessage(
-                content=(
-                    "我有一家金店，主要产品是黄金礼品。我想参考抖音账号‘贵厨笔记’"
-                    "做一个类似但不照抄的账号。你自己查、自己判断，直接给我一套初步完整方案。"
-                )
-            )
-        ],
+        system_message=SystemMessage(content="full operating prompt with every Skill and every tool"),
+        messages=[HumanMessage(content=("我有一家金店，主要产品是黄金礼品。我想参考抖音账号‘贵厨笔记’做一个类似但不照抄的账号。你自己查、自己判断，直接给我一套初步完整方案。"))],
         tools=[
             SimpleNamespace(name="web_search"),
             SimpleNamespace(name="browser_navigate"),
@@ -380,9 +367,7 @@ def test_product_benchmark_starts_with_one_compact_forced_discovery_call():
     assert result is expected
     bounded_request = handler.call_args.args[0]
     assert bounded_request.system_message.content != request.system_message.content
-    assert "one bounded evidence-acquisition action" in (
-        bounded_request.system_message.content
-    )
+    assert "one bounded evidence-acquisition action" in (bounded_request.system_message.content)
     assert len(bounded_request.messages) == 1
     assert "黄金礼品" in bounded_request.messages[0].content
     assert [tool.name for tool in bounded_request.tools] == ["web_search"]
@@ -466,11 +451,7 @@ def test_named_benchmark_discovery_stops_after_two_search_attempts():
     injected = PersonalIPContextMiddleware()._inject(request)
 
     assert [tool.name for tool in injected.tools] == ["browser_navigate"]
-    contracts = "\n".join(
-        message.content
-        for message in injected.messages
-        if isinstance(message, SystemMessage)
-    )
+    contracts = "\n".join(message.content for message in injected.messages if isinstance(message, SystemMessage))
     assert "At most two discovery searches" in contracts
     assert "articles about an account are not representative-work evidence" in contracts
 
@@ -570,11 +551,7 @@ def test_named_benchmark_two_failed_page_verifications_force_artifact_request():
     injected = PersonalIPContextMiddleware()._inject(request)
 
     assert injected.tools == []
-    contracts = "\n".join(
-        message.content
-        for message in injected.messages
-        if isinstance(message, SystemMessage)
-    )
+    contracts = "\n".join(message.content for message in injected.messages if isinstance(message, SystemMessage))
     assert "Benchmark verification is exhausted" in contracts
     assert "ask for one exact link, screenshot set or exported sample" in contracts
 
@@ -639,11 +616,7 @@ def test_named_benchmark_final_answer_survives_verified_representative_work():
                 ],
             ),
             ToolMessage(
-                content=(
-                    "Navigated to https://www.douyin.com/video/123456789.\n"
-                    "Title: 贵厨笔记代表作\n"
-                    "视频正文、可见互动与完整页面内容已经读取。"
-                ),
+                content=("Navigated to https://www.douyin.com/video/123456789.\nTitle: 贵厨笔记代表作\n视频正文、可见互动与完整页面内容已经读取。"),
                 tool_call_id="verified-video",
             ),
         ],
@@ -664,7 +637,76 @@ def test_named_benchmark_final_answer_survives_verified_representative_work():
     assert result is expected
 
 
-def test_product_plus_benchmark_routes_to_one_bounded_complete_preliminary_plan():
+def _adaptation_method_metadata() -> str:
+    names = (
+        "build-cinematic-ip-system",
+        "ip-strategy-director",
+        "design-ip-differentiation",
+        "engineer-desire-behavior",
+        "develop-theme-premise",
+        "audit-ip-continuity",
+    )
+    return "\n\n".join(f"## Skill: {name}\n- Description: method for {name}\n- Allowed tools: (all)\n- Location: /mnt/skills/{name}/SKILL.md" for name in names)
+
+
+def _adaptation_method_messages() -> list:
+    metadata = _adaptation_method_metadata()
+    describe_call = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "describe_skill",
+                "args": {"name": ("select:build-cinematic-ip-system,ip-strategy-director,design-ip-differentiation,engineer-desire-behavior,develop-theme-premise,audit-ip-continuity")},
+                "id": "describe-methods",
+                "type": "tool_call",
+            }
+        ],
+    )
+    read_calls = []
+    read_results = []
+    for index, name in enumerate(
+        (
+            "build-cinematic-ip-system",
+            "ip-strategy-director",
+            "design-ip-differentiation",
+            "engineer-desire-behavior",
+            "develop-theme-premise",
+            "audit-ip-continuity",
+        )
+    ):
+        call_id = f"read-method-{index}"
+        read_calls.append(
+            {
+                "name": "read_file",
+                "args": {
+                    "description": "读取当前方法正文用于有证据边界的内部策略审查",
+                    "path": f"/mnt/skills/{name}/SKILL.md",
+                },
+                "id": call_id,
+                "type": "tool_call",
+            }
+        )
+        read_results.append(
+            ToolMessage(
+                content=(f"# {name}\nApply the product-specific {name} method. Require observable choices, evidence, tradeoffs, a repeatable dramatic engine and a falsifiable pilot."),
+                tool_call_id=call_id,
+                additional_kwargs={
+                    "skill_context_entry": {
+                        "path": f"/mnt/skills/{name}/SKILL.md",
+                        "description": f"method for {name}",
+                    }
+                },
+            )
+        )
+    return [
+        describe_call,
+        ToolMessage(content=metadata, tool_call_id="describe-methods"),
+        AIMessage(content="", tool_calls=read_calls),
+        *read_results,
+    ]
+
+
+def test_product_plus_benchmark_discovers_strategy_methods_before_synthesis():
     request = ModelRequest(
         model=object(),
         system_message=SystemMessage(content="full operating prompt with every Skill and every tool"),
@@ -690,6 +732,7 @@ def test_product_plus_benchmark_routes_to_one_bounded_complete_preliminary_plan(
         tools=[
             SimpleNamespace(name="web_search"),
             SimpleNamespace(name="browser_navigate"),
+            SimpleNamespace(name="describe_skill"),
             SimpleNamespace(name="read_file"),
             SimpleNamespace(name="personal_ip_operating_cockpit"),
             SimpleNamespace(name="personal_ip_begin_video_production"),
@@ -703,129 +746,150 @@ def test_product_plus_benchmark_routes_to_one_bounded_complete_preliminary_plan(
             }
         ),
     )
-    structured = AIMessage(
-        content="",
-        tool_calls=[
-            {
-                "name": "personal_ip_preliminary_plan",
-                "args": {
-                    "evidence_boundary": "已确认用户经营黄金礼品、对标为贵厨笔记及其主页定位；代表作与转化链路尚未核验。",
-                    "strategic_thesis": "把黄金礼品从款式陈列转成人情表达，再引流到私域，但先按假设测试。",
-                        "audience_hypotheses": [
-                            {
-                                "segment": "22-35岁需要送礼但不会选的人",
-                                "occasion": "婚庆、纪念日和重要关系表达",
-                                "reason": "需要降低选礼决策成本并避免送错。",
-                        },
-                        {
-                            "segment": "重视长期价值的家庭购买者",
-                            "occasion": "新生儿、长辈寿礼和家庭纪念",
-                            "reason": "希望礼物同时承载关系与可留存价值。",
-                        },
-                    ],
-                    "benchmark_transfer": [
-                        "借鉴场景身份带来的可信叙事入口",
-                        "借鉴弱广告、强情境的内容组织方式",
-                    ],
-                    "unverified_or_do_not_copy": [
-                        "尚不能确认贵厨笔记代表作的钩子和转化机制",
-                        "不复制服务员人设和泛人生金句",
-                    ],
-                    "content_series": [
-                            {
-                                "name": "这份金礼为什么这样选",
-                                "promise": "把送礼对象、场合和预算翻译成选择逻辑",
-                                "format": "礼物特写加店员旁白，每条60-90秒",
-                        },
-                        {
-                            "name": "一件礼物的一生",
-                            "promise": "讲清黄金礼品被赠送、保存和再次想起的关系价值",
-                            "format": "真实订单证据授权后再拍，禁止编造顾客故事",
-                        },
-                    ],
-                        "conversion_path": [
-                            "内容解决送什么",
-                            "主页引导添加企业微信并进粉丝群",
-                            "成交后赠送小克重黄金换用户晒单",
-                    ],
-                        "production_modes": [
-                            "先测试本人或店员出镜的可信度，每条75秒",
-                            "同时准备手部实拍加旁白的无脸版本作对照",
-                    ],
-                    "pilot": {
-                        "concept": "同一预算，送妈妈和送伴侣为什么不能选同一件金礼",
-                        "hook": "花差不多的钱送黄金，体面保值，大家都夸。",
-                        "outline": "先给冲突，然后告诉用户3000元预算直接推荐20克手镯。",
-                        "format": "真人半身版与手部旁白版各拍一条",
-                        "signals": [
-                            "完播率≥30%就算方向成立",
-                            "评论咨询率达到10%就算有意向",
-                            "连续3条未达标就换方向",
-                        ],
-                        "failure_rule": "连续发布3条，任意2个指标未达到阈值就判定失败。",
-                    },
-                        "assumptions": [
-                            "暂按门店具备基础定制或选款能力处理",
-                            "暂不假设全国成交能力和具体客单价",
-                            "发够10条以后一定会获得稳定流量",
-                    ],
-                    "next_evidence": "下一轮优先自主核验三条代表作，并用首轮两种拍法的数据修正人设与内容结构。",
-                },
-                "id": "preliminary-plan",
-                "type": "tool_call",
-            }
-        ],
-    )
-    handler = Mock(return_value=structured)
+    handler = Mock()
 
     result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
 
-    assert isinstance(result, AIMessage)
-    assert result.tool_calls == []
-    assert "初步完整方案" in result.content
-    assert "证据边界" in result.content
-    assert "黄金礼品" in result.content
-    assert "谁为什么来买" not in result.content
-    assert "完整复刻" not in result.content
-    assert "10倍" not in result.content
-    assert "3000元" not in result.content
-    assert "20克" not in result.content
-    assert "≥30%" not in result.content
-    assert "达到10%" not in result.content
-    assert "任意2个指标" not in result.content
-    assert "22-35岁" not in result.content
-    assert "60-90秒" not in result.content
-    assert "75秒" not in result.content
-    assert "企业微信" not in result.content
-    assert "私域" not in result.content
-    assert "赠送小克重黄金" not in result.content
-    assert "体面保值" not in result.content
-    assert "大家都夸" not in result.content
-    assert "10条以后" not in result.content
-    assert "价格、规格、交付与售后信息以拍摄当日经营事实为准" in result.content
-    assert "送礼矛盾" not in result.content
-    assert "金价或克重" not in result.content
-    assert "注意与理解" in result.content
-    assert "首轮试验" in result.content
-    bounded_request = handler.call_args.args[0]
-    assert bounded_request.system_message.content != request.system_message.content
-    assert "complete provisional plan now" in bounded_request.system_message.content
-    assert [tool["function"]["name"] for tool in bounded_request.tools] == [
-        "personal_ip_preliminary_plan"
-    ]
-    plan_schema = bounded_request.tools[0]["function"]["parameters"]
-    assert plan_schema["properties"]["audience_hypotheses"]["items"]["type"] == "string"
-    assert "conversion_path" not in plan_schema["properties"]
-    assert "pilot" not in plan_schema["properties"]
-    assert "personal_ip_begin_video_production" not in str(bounded_request.tools)
-    assert "贵厨笔记" in bounded_request.messages[-1].content
-    assert "黄金礼品" in bounded_request.messages[-1].content
-    handler.assert_called_once()
+    assert [call["name"] for call in result.tool_calls] == ["describe_skill"]
+    assert result.tool_calls[0]["args"]["name"].startswith("select:build-cinematic-ip-system")
+    handler.assert_not_called()
 
 
-def test_malformed_preliminary_plan_retries_once_then_returns_a_complete_fallback():
+def test_described_strategy_methods_are_loaded_through_read_file_before_synthesis():
     request = ModelRequest(
         model=object(),
+        messages=[
+            HumanMessage(content="你看看贵厨笔记这个账号"),
+            HumanMessage(content="我有一家金店，卖黄金礼品，也想做类似但不照抄的账号，直接给我完整方案"),
+            *_adaptation_method_messages()[:2],
+        ],
+        tools=[SimpleNamespace(name="describe_skill"), SimpleNamespace(name="read_file")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    handler = Mock()
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert [call["name"] for call in result.tool_calls] == ["read_file"] * 6
+    paths = [call["args"]["path"] for call in result.tool_calls]
+    assert "/mnt/skills/design-ip-differentiation/SKILL.md" in paths
+    assert "/mnt/skills/audit-ip-continuity/SKILL.md" in paths
+    assert all(call["args"].get("description") for call in result.tool_calls)
+    handler.assert_not_called()
+
+
+def test_failed_method_reads_are_not_counted_as_loaded_or_used_for_synthesis():
+    method_messages = _adaptation_method_messages()
+    read_call_message = method_messages[2]
+    failed_results = [
+        ToolMessage(
+            content=(f"Error invoking tool 'read_file' with kwargs {tool_call['args']} with error: description: Field required"),
+            tool_call_id=tool_call["id"],
+            status="error",
+            additional_kwargs={
+                "deerflow_tool_meta": {
+                    "status": "error",
+                    "error_type": "validation_error",
+                }
+            },
+        )
+        for tool_call in read_call_message.tool_calls
+    ]
+    request = ModelRequest(
+        model=object(),
+        messages=[
+            HumanMessage(content="你看看贵厨笔记这个账号"),
+            HumanMessage(content="我有一家金店，卖黄金礼品，给我完整方案"),
+            *method_messages[:3],
+            *failed_results,
+        ],
+        tools=[SimpleNamespace(name="describe_skill"), SimpleNamespace(name="read_file")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    handler = Mock()
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert [call["name"] for call in result.tool_calls] == ["read_file"] * 6
+    assert all(call["args"].get("description") for call in result.tool_calls)
+    handler.assert_not_called()
+
+
+def test_repeated_method_read_failure_stops_without_fake_loaded_count_or_plan():
+    method_messages = _adaptation_method_messages()
+    first_read_calls = method_messages[2].tool_calls
+
+    def failed_results(tool_calls):
+        return [
+            ToolMessage(
+                content=f"Error invoking tool 'read_file' for {tool_call['args']['path']}",
+                tool_call_id=tool_call["id"],
+                status="error",
+                additional_kwargs={
+                    "deerflow_tool_meta": {
+                        "status": "error",
+                        "error_type": "validation_error",
+                    }
+                },
+            )
+            for tool_call in tool_calls
+        ]
+
+    retry_calls = [
+        {
+            **tool_call,
+            "id": f"retry-{tool_call['id']}",
+        }
+        for tool_call in first_read_calls
+    ]
+    request = ModelRequest(
+        model=object(),
+        messages=[
+            HumanMessage(content="你看看贵厨笔记这个账号"),
+            HumanMessage(content="我有一家金店，卖黄金礼品，给我完整方案"),
+            *method_messages[:3],
+            *failed_results(first_read_calls),
+            AIMessage(content="", tool_calls=retry_calls),
+            *failed_results(retry_calls),
+        ],
+        tools=[SimpleNamespace(name="describe_skill"), SimpleNamespace(name="read_file")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    handler = Mock()
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert result.tool_calls == []
+    assert "不能把缺少专业依据的降级答案冒充完整方案" in result.content
+    metadata = result.additional_kwargs["personal_ip_preliminary_plan"]
+    assert metadata["status"] == "internal_method_load_failed"
+    assert metadata["method_count"] == 0
+    assert metadata["independent_review"] is False
+    handler.assert_not_called()
+
+
+def test_loaded_methods_produce_competing_directions_and_an_independent_final_plan():
+    request = ModelRequest(
+        model=object(),
+        system_message=SystemMessage(content="huge generic system prompt"),
         messages=[
             HumanMessage(content="你看看贵厨笔记这个账号"),
             AIMessage(
@@ -843,11 +907,116 @@ def test_malformed_preliminary_plan_retries_once_then_returns_a_complete_fallbac
                 content='{"query":"贵厨笔记 抖音","total_results":0,"results":[]}',
                 tool_call_id="search-1",
             ),
-            HumanMessage(
-                content="我有一家金店，卖黄金礼品，也想做类似但不照抄的账号，直接给我完整方案"
-            ),
+            HumanMessage(content="我有一家金店，主要产品为黄金礼品，我也想做这样的账号，你帮我策划一下"),
+            *_adaptation_method_messages(),
         ],
-        tools=[SimpleNamespace(name="web_search")],
+        tools=[SimpleNamespace(name="describe_skill"), SimpleNamespace(name="read_file")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    candidates = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_strategy_candidates",
+                "args": {
+                    "evidence_boundary": "只确认金店与黄金礼品；贵厨笔记代表作未核验。",
+                    "facts": ["经营主体是金店", "主要产品是黄金礼品"],
+                    "hypotheses": ["购买动机可能来自关系表达而非款式浏览"],
+                    "unknowns": ["真实成交理由与可公开证明尚未知"],
+                    "benchmark_transfer": ["只借用具体处境中的人物视点"],
+                    "prohibited_copy": ["不复制对标账号的身份和原台词"],
+                    "audience_use_cases": ["待验证：临近重要关系节点却不知道怎样选礼的人"],
+                    "directions": [
+                        "方向A「金店判案」：待验证假设是送礼关系中的两难可成为选择场；可信依据需由门店真实比较过程证明；代价是不做流水款陈列；每集由处境—错误选法—可核验证据—选择后果生事。",
+                        "方向B「黄金礼物档案」：待验证假设是一份礼物跨时间留下的关系证据可形成选择场；代价是必须取得真实材料授权，冷启动素材较慢。",
+                    ],
+                    "review_questions": ["哪个方向更能形成专属事实而不是泛情绪？"],
+                },
+                "id": "strategy-candidates",
+                "type": "tool_call",
+            }
+        ],
+    )
+    decision = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_strategy_decision",
+                "args": {
+                    "evidence_boundary": "目前只确认金店与黄金礼品；贵厨笔记代表作、顾客成交理由和账号数据都未核验。",
+                    "decision": "先试「金店判案」，暂缓依赖顾客故事的「黄金礼物档案」。",
+                    "rejected_or_deferred": ["黄金礼物档案：没有授权案例就会被迫编故事"],
+                    "account_direction": "不做黄金款式播报员，做关系节点里的黄金礼物决策者。",
+                    "intended_influence": "让观众先用关系处境判断礼物，而不是先看款式。",
+                    "desired_behavior": "带着送礼对象、关系难题和可核验约束提出具体问题。",
+                    "economic_hypothesis": "待验证：更具体的关系问题可能形成更高质量的商业行动，当前没有结果数据。",
+                    "audience_hypotheses": ["待验证：在重要关系节点怕送错、又不懂黄金选择逻辑的人", "待验证：需要看到真实取舍证据才会行动的人"],
+                    "proprietary_truths_to_verify": ["待用户确认可公开的送礼冲突", "待用户确认可演示的选款取舍"],
+                    "differentiation": "每条内容必须解决一个不能只靠商品参数回答的关系选择。",
+                    "reason_to_believe": "待用户确认可公开的产品细节与选择过程可以形成证据。",
+                    "sacrifice": "放弃没有处境、没有取舍的纯款式陈列和泛人生金句。",
+                    "dramatic_engine": "一个送礼人想表达关系，却因不了解对方处境面临选错风险；经营者必须在互相冲突的选择中给出有代价的判断。",
+                    "content_series": ["待验证：送妈妈和送伴侣为什么不能选同一种表达", "当有人说要体面时，他真正怕的是什么"],
+                    "conversion_path": ["内容呈现关系难题", "具体处境形成行动", "以用户确认可公开的真实结果复盘方向"],
+                    "human_mode": "由用户确认实际出镜者和可展示素材后完成取舍试拍。",
+                    "faceless_mode": "只用用户确认可展示的素材与旁白完成同一判断链。",
+                    "pilot_topic": "待验证：送妈妈和送伴侣，为什么不能只换一个款式？",
+                    "pilot_hook": "同样是黄金礼物，送错的往往不是款式，而是你以为两段关系需要同一种表达。",
+                    "script_beats": ["从用户确认可拍的真实素材中选出候选", "指出最常见的错误是只比较外观", "分别说出两段关系最怕被误解的地方", "只用已经核验的可见细节演示取舍", "承认哪些事实仍需询问", "邀请观众说出对象与最怕送错的点"],
+                    "proof_shots": ["待用户确认可公开展示的真实素材", "待用户确认并核验可支撑取舍的可见细节"],
+                    "cta": "你要送给谁，最怕对方误会什么？把这两件事说清，我再告诉你先看什么。",
+                    "observation_signals": ["是否有人复述关系选择而不只问价格", "是否出现带对象与处境的具体问题", "真人与无脸版本哪个更能形成可信判断"],
+                    "failure_rule": "如果反馈仍只停留在款式和价格，没有人描述关系处境，说明内容没有建立新的选择框架，应更换冲突或证据表达。",
+                    "next_evidence": "补贵厨笔记代表作原始材料和用户确认可公开的真实选择记录，再校正可迁移机制与首轮脚本。",
+                },
+                "id": "strategy-decision",
+                "type": "tool_call",
+            }
+        ],
+    )
+    handler = Mock(side_effect=[candidates, decision])
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert isinstance(result, AIMessage)
+    assert result.tool_calls == []
+    assert "金店判案" in result.content
+    assert "黄金礼物档案" in result.content
+    assert "关系节点里的黄金礼物决策者" in result.content
+    assert "剧本" in result.content
+    assert "送妈妈和送伴侣" in result.content
+    assert "真人" in result.content
+    assert "无脸" in result.content
+    assert "失败规则" in result.content
+    assert "用户以为自己只是在选产品" not in result.content
+    assert "先呈现一个具体决策矛盾" not in result.content
+    assert handler.call_count == 2
+    candidate_request = handler.call_args_list[0].args[0]
+    review_request = handler.call_args_list[1].args[0]
+    assert [tool["function"]["name"] for tool in candidate_request.tools] == ["personal_ip_strategy_candidates"]
+    assert "design-ip-differentiation method" in candidate_request.messages[-1].content
+    assert "黄金礼品" in candidate_request.messages[-1].content
+    assert len(candidate_request.messages[-1].content) < 30000
+    assert [tool["function"]["name"] for tool in review_request.tools] == ["personal_ip_strategy_decision"]
+    assert "方向A「金店判案」" in review_request.messages[-1].content
+    assert len(review_request.messages[-1].content) < 22000
+
+
+def test_malformed_strategy_candidates_retry_once_before_independent_judgment():
+    request = ModelRequest(
+        model=object(),
+        messages=[
+            HumanMessage(content="你看看贵厨笔记这个账号"),
+            HumanMessage(content="我有一家金店，卖黄金礼品，也想做类似但不照抄的账号，直接给我完整方案"),
+            *_adaptation_method_messages(),
+        ],
+        tools=[SimpleNamespace(name="describe_skill"), SimpleNamespace(name="read_file")],
         state={"messages": []},
         runtime=SimpleNamespace(
             context={
@@ -860,24 +1029,265 @@ def test_malformed_preliminary_plan_retries_once_then_returns_a_complete_fallbac
         content="",
         invalid_tool_calls=[
             {
-                "name": "personal_ip_preliminary_plan",
-                "args": '{"evidence_boundary":"truncated"',
-                "id": "bad-plan",
+                "name": "personal_ip_strategy_candidates",
+                "args": '{"directions":',
+                "id": "bad-candidates",
                 "error": "invalid JSON",
                 "type": "invalid_tool_call",
             }
         ],
     )
-    handler = Mock(side_effect=[malformed, malformed])
+    valid_candidates = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_strategy_candidates",
+                "args": {
+                    "evidence_boundary": "只确认黄金礼品经营事实。",
+                    "facts": ["经营黄金礼品"],
+                    "hypotheses": ["关系决策可能是内容入口"],
+                    "unknowns": ["代表作未核验"],
+                    "benchmark_transfer": ["只迁移处境叙事"],
+                    "prohibited_copy": ["不复制人设"],
+                    "audience_use_cases": ["待验证：怕送错的人"],
+                    "directions": ["关系选择方向：待验证处境冲突能否推动选择", "经营证据方向：待验证可见经营取舍能否建立信任"],
+                    "review_questions": ["哪个更不可替代"],
+                },
+                "id": "good-candidates",
+                "type": "tool_call",
+            }
+        ],
+    )
+    final = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_strategy_decision",
+                "args": {
+                    "evidence_boundary": "只确认黄金礼品经营事实。",
+                    "decision": "选择关系决策方向。",
+                    "rejected_or_deferred": ["经营证据方向暂缓"],
+                    "account_direction": "黄金关系决策者",
+                    "intended_influence": "改变选礼顺序",
+                    "desired_behavior": "带具体关系提出问题",
+                    "economic_hypothesis": "待验证：具体问题可能形成真实商业行动",
+                    "audience_hypotheses": ["待验证：怕送错的人", "待验证：需要可见选择依据的人"],
+                    "proprietary_truths_to_verify": ["待验证：真实选礼冲突"],
+                    "differentiation": "先看关系再看商品",
+                    "reason_to_believe": "待用户确认可公开展示的选择证据",
+                    "sacrifice": "不做流水陈列",
+                    "dramatic_engine": "送礼人想表达关系，却遇到选错风险，必须根据可见证据做出有代价的选择。",
+                    "content_series": ["同类礼物面对不同关系", "选择发生改变的时刻"],
+                    "conversion_path": ["处境内容", "具体问题形成行动", "真实结果复盘"],
+                    "human_mode": "真人比较",
+                    "faceless_mode": "手部实拍旁白",
+                    "pilot_topic": "送给不同关系的人怎样选",
+                    "pilot_hook": "礼物一样，关系不一样，选择就不能一样。",
+                    "script_beats": ["展示用户确认可拍的素材", "给出关系冲突", "演示取舍", "说明未知", "邀请具体提问"],
+                    "proof_shots": ["待用户确认可公开展示的选择证据"],
+                    "cta": "说出你要送给谁。",
+                    "observation_signals": ["是否出现具体关系问题", "是否有人复述选择依据"],
+                    "failure_rule": "没有具体关系问题就重做冲突。",
+                    "next_evidence": "补可核验的选礼记录。",
+                },
+                "id": "final-decision",
+                "type": "tool_call",
+            }
+        ],
+    )
+    handler = Mock(side_effect=[malformed, valid_candidates, final])
 
     result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
 
     assert "初步完整方案" in result.content
-    assert "这次没有生成出完整" not in result.content
-    assert "黄金礼品" in result.content
-    assert "供应商" not in result.content
-    assert handler.call_count == 2
-    assert handler.call_args_list[0].args[0] == handler.call_args_list[1].args[0]
+    assert "黄金关系决策者" in result.content
+    assert handler.call_count == 3
+    assert "server evidence gate" in handler.call_args_list[1].args[0].system_message.content
+
+
+def test_unverified_claims_are_rejected_and_rewritten_before_customer_rendering():
+    request = ModelRequest(
+        model=object(),
+        messages=[
+            HumanMessage(content="你看看贵厨笔记这个账号"),
+            HumanMessage(content="我有一家金店，卖黄金礼品，直接给我一个不照抄的完整方案"),
+            *_adaptation_method_messages(),
+        ],
+        tools=[SimpleNamespace(name="describe_skill"), SimpleNamespace(name="read_file")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    candidates = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_strategy_candidates",
+                "args": {
+                    "evidence_boundary": "只确认金店与黄金礼品。",
+                    "facts": ["经营黄金礼品"],
+                    "hypotheses": ["关系处境可能比款式陈列更有决策价值"],
+                    "unknowns": ["真实选择理由未知"],
+                    "benchmark_transfer": ["只迁移处境叙事机制"],
+                    "prohibited_copy": ["不复制身份和台词"],
+                    "audience_use_cases": ["待验证：怕送错礼的人", "待验证：需要可核验选择依据的人"],
+                    "directions": ["关系选择方向：待验证处境冲突能否推动选择", "经营证据方向：待验证可见经营取舍能否建立信任"],
+                    "review_questions": ["哪个方向更不可替代"],
+                },
+                "id": "gate-candidates",
+                "type": "tool_call",
+            }
+        ],
+    )
+    invalid = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_strategy_decision",
+                "args": {
+                    "evidence_boundary": "只确认金店与黄金礼品。",
+                    "decision": "选择关系方向。",
+                    "rejected_or_deferred": ["经营证据方向暂缓"],
+                    "account_direction": "黄金送礼顾问",
+                    "human_mode": "让金店8年资深选品师拿两款吊坠在柜台出镜。",
+                    "faceless_mode": "拍雕花吊坠、光面吊坠和标价签。",
+                    "pilot_topic": "90%的人都送错了",
+                    "audience_hypotheses": ["25至35岁女性用户", "本地高净值客群"],
+                    "conversion_path": ["评论区咨询", "点击商品链接", "平台内下单"],
+                    "cta": "私信工作人员，保证帮你闭眼选。",
+                    "failure_rule": "7天播放低于5000就换方向。",
+                },
+                "id": "invalid-gate-decision",
+                "type": "tool_call",
+            }
+        ],
+    )
+    corrected = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_strategy_decision",
+                "args": {
+                    "evidence_boundary": "只确认金店与黄金礼品；履历、案例、受众和经营数据均待核验。",
+                    "decision": "先试关系选择方向，经营证据方向暂缓。",
+                    "rejected_or_deferred": ["经营证据方向需要先证明有哪些专属事实"],
+                    "account_direction": "帮助用户解决黄金礼物中的关系选择，而不是只陈列款式。",
+                    "intended_influence": "改变用户先看款式再想对象的选择顺序。",
+                    "desired_behavior": "带着送礼对象和最怕选错的地方来提问。",
+                    "economic_hypothesis": "具体处境咨询可能形成商业行动，但尚无数据。",
+                    "audience_hypotheses": ["待验证：面临具体送礼选择却缺少判断依据的人", "待验证：需要看到真实取舍证据才行动的人"],
+                    "proprietary_truths_to_verify": ["待用户确认：经营中真实发生过的选择冲突", "待用户确认可公开核验的产品取舍"],
+                    "differentiation": "每条内容解决一个无法只靠商品参数回答的关系选择。",
+                    "reason_to_believe": "待用户确认可公开展示的经营证据和选择过程。",
+                    "sacrifice": "不做无处境的流水款陈列。",
+                    "dramatic_engine": "送礼人想表达关系却怕选错，经营者必须在冲突选择中给出有代价的判断。",
+                    "content_series": ["同类礼物为何不适合不同关系", "一句送得体面背后到底怕什么"],
+                    "conversion_path": ["内容呈现关系冲突", "观众提出具体处境", "经营结果回收复盘"],
+                    "human_mode": "由用户确认实际出镜者和可展示素材后完成试拍。",
+                    "faceless_mode": "只用用户确认可公开展示的素材和旁白完成同一判断链。",
+                    "pilot_topic": "待验证：送妈妈和送伴侣为什么不能只换一个款式",
+                    "pilot_hook": "送错的往往不是款式，而是你把两段关系当成了同一种表达。",
+                    "script_beats": ["从用户确认可拍的真实素材中选出候选", "说清两段关系的不同目标", "只用已核验的可见细节做取舍", "明确仍需补充的事实", "邀请观众描述自己的处境"],
+                    "proof_shots": ["待用户确认可公开展示的真实素材", "待用户确认并核验可支撑选择的可见细节"],
+                    "cta": "你要送给谁，最怕对方误会什么？",
+                    "observation_signals": ["是否有人复述关系选择", "是否出现带具体处境的提问"],
+                    "failure_rule": "如果反馈仍只停留在款式，没有人描述关系处境，就更换冲突或证据表达。",
+                    "next_evidence": "补可核验的选择记录和对标代表作。",
+                },
+                "id": "corrected-gate-decision",
+                "type": "tool_call",
+            }
+        ],
+    )
+    handler = Mock(side_effect=[candidates, invalid, corrected])
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert handler.call_count == 3
+    correction_request = handler.call_args_list[2].args[0]
+    assert "server evidence gate" in correction_request.system_message.content
+    assert "用户未提供的数字" in correction_request.system_message.content
+    assert "未经提供的从业资历" in correction_request.system_message.content
+    assert "未经提供的具体商品或商品特征" in correction_request.system_message.content
+    assert "未经提供的人员或经营场景" in correction_request.system_message.content
+    assert "未经授权的平台交易能力" in correction_request.system_message.content
+    assert "未经提供的用户群或人口画像" in correction_request.system_message.content
+    assert "未经提供的转化或分发渠道" in correction_request.system_message.content
+    assert "8年" not in result.content
+    assert "90%" not in result.content
+    assert "5000" not in result.content
+    assert "私信" not in result.content
+    assert "闭眼选" not in result.content
+    assert "吊坠" not in result.content
+    assert "柜台" not in result.content
+    assert "商品橱窗" not in result.content
+    assert "帮助用户解决黄金礼物中的关系选择" in result.content
+    plan_metadata = result.additional_kwargs["personal_ip_preliminary_plan"]
+    assert plan_metadata["evidence_gate_passed"] is True, plan_metadata
+
+
+def test_second_invalid_review_is_server_rewritten_and_never_rendered_as_plan():
+    request = ModelRequest(
+        model=object(),
+        messages=[HumanMessage(content="我有一家金店，主要产品是黄金礼品，直接给我完整方案")],
+        state={"messages": []},
+        runtime=SimpleNamespace(context={"agent_name": "ip-agent"}),
+    )
+    invalid_review = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_strategy_decision",
+                "args": {
+                    "evidence_boundary": "已确认抖音账号登录并有官方店铺。",
+                    "account_direction": "黄金礼品决策者",
+                    "economic_hypothesis": "这会降低决策成本并提升成交转化率。",
+                    "reason_to_believe": "实际销售中总结了用户真实问题。",
+                    "conversion_path": ["短视频种草", "进入商品入口", "平台内下单"],
+                    "dramatic_engine": "经营者想帮用户选礼，却遇到错误经验阻力，必须做出有代价的选择。",
+                    "pilot_topic": "送长辈的黄金礼品怎么选",
+                    "pilot_hook": "很多人选送长辈的黄金礼品都踩过坑。",
+                    "script_beats": [
+                        "说起之前遇到过用户选错礼物的真实案例",
+                        "展示黄金礼品",
+                        "讲判断方法",
+                        "引导购买",
+                    ],
+                    "proof_shots": ["拍抖音后台界面和正规标识证明是官方账号"],
+                    "observation_signals": ["完播率达到平台同品类平均水平"],
+                    "failure_rule": "如果没有行动信号就推翻方向。",
+                },
+                "id": "still-invalid-review",
+                "type": "tool_call",
+            }
+        ],
+    )
+
+    result = PersonalIPContextMiddleware._render_agentic_plan_result(
+        invalid_review,
+        request,
+        {"directions": ["待验证的黄金关系选择方向", "待验证的经营证据方向"]},
+    )
+
+    assert "抖音账号登录" not in result.content
+    assert "官方店铺" not in result.content
+    assert "商品入口" not in result.content
+    assert "平台内下单" not in result.content
+    assert "实际销售中总结" not in result.content
+    assert "用户真实问题" not in result.content
+    assert "之前遇到过用户" not in result.content
+    assert "抖音后台界面" not in result.content
+    assert "送长辈" not in result.content
+    assert "踩过坑" not in result.content
+    assert "平台同品类平均水平" not in result.content
+    assert "黄金礼品在什么处境下反而不该推荐" in result.content
+    metadata = result.additional_kwargs["personal_ip_preliminary_plan"]
+    assert metadata["evidence_gate_passed"] is True, metadata
+    assert metadata["server_rewrite_applied"] is True
 
 
 def test_new_owner_first_answer_uses_a_bounded_reflective_model_call():
@@ -1268,6 +1678,77 @@ async def test_async_new_owner_first_answer_uses_the_same_bounded_interviewer():
     compact_request = handler.await_args.args[0]
     assert [tool["function"]["name"] for tool in compact_request.tools] == ["personal_ip_narrative_turn"]
     assert "browser_navigate" not in str(compact_request.tools)
+
+
+@pytest.mark.asyncio
+async def test_async_loaded_methods_use_candidates_then_independent_review():
+    request = ModelRequest(
+        model=object(),
+        messages=[
+            HumanMessage(content="你看看贵厨笔记这个账号"),
+            HumanMessage(content="我经营黄金礼品，参考这个账号给我完整方案"),
+            *_adaptation_method_messages(),
+        ],
+        tools=[SimpleNamespace(name="describe_skill"), SimpleNamespace(name="read_file")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    candidate_message = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_strategy_candidates",
+                "args": {
+                    "evidence_boundary": "只确认黄金礼品经营事实。",
+                    "directions": ["关系决策者：待验证关系冲突能否推动选择", "黄金证据官：待验证可见取舍能否建立信任"],
+                },
+                "id": "async-candidates",
+                "type": "tool_call",
+            }
+        ],
+    )
+    decision_message = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_strategy_decision",
+                "args": {
+                    "evidence_boundary": "只确认黄金礼品经营事实。",
+                    "decision": "先试关系决策者。",
+                    "rejected_or_deferred": ["黄金证据官暂缓"],
+                    "account_direction": "黄金关系决策者",
+                    "audience_hypotheses": ["待验证：怕送错的人", "待验证：需要可见选择依据的人"],
+                    "differentiation": "先解决关系选择，再谈商品参数。",
+                    "reason_to_believe": "用待用户确认可公开的产品取舍证明。",
+                    "sacrifice": "不做无处境的流水陈列。",
+                    "dramatic_engine": "送礼人想表达关系，却面临选错风险，必须依据可见证据做出有代价的选择。",
+                    "content_series": ["同类礼物面对不同关系", "选择发生改变的时刻"],
+                    "conversion_path": ["内容建立判断", "具体问题形成行动", "真实结果回收复盘"],
+                    "pilot_topic": "同一份黄金为什么不能送给两种关系",
+                    "pilot_hook": "礼物相同，关系不同，选择就不能相同。",
+                    "script_beats": ["关系冲突", "实物比较", "有代价的选择", "行动邀请"],
+                    "observation_signals": ["是否出现具体处境提问", "是否有人复述选择依据"],
+                    "failure_rule": "如果只有款式讨论而没有关系处境，就重做冲突。",
+                },
+                "id": "async-decision",
+                "type": "tool_call",
+            }
+        ],
+    )
+    handler = AsyncMock(side_effect=[candidate_message, decision_message])
+
+    result = await PersonalIPContextMiddleware().awrap_model_call(request, handler)
+
+    assert "黄金关系决策者" in result.content
+    assert "同一份黄金" in result.content
+    assert handler.await_count == 2
+    assert handler.await_args_list[0].args[0].tool_choice == "personal_ip_strategy_candidates"
+    assert handler.await_args_list[1].args[0].tool_choice == "personal_ip_strategy_decision"
 
 
 def test_new_owner_concrete_task_keeps_execution_tools_available():

@@ -150,13 +150,14 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > has already supplied a product or brand, a benchmark account and a request
 > for an adapted direction, the Agent does not turn “who buys and why” into an
 > entry exam. It researches within a strict search/browser budget and then uses
-> one compact synthesis stage to return a complete provisional plan: evidence
-> boundary, strategic thesis, audience and use-occasion hypotheses, what to
-> transfer and not copy, content series, conversion path, human/faceless
-> production choices and one falsifiable pilot. A malformed provider function
-> response is retried once inside the same small boundary; a deterministic
-> complete fallback still answers if both attempts fail. Missing representative
-> works remain a clearly labelled evidence gap and a non-blocking next step.
+> a bounded multi-stage strategy room: it reads the relevant first-party
+> strategy and cinematic methods, creates competing directions, and submits
+> them to an independent skeptical review before returning a complete
+> provisional plan. Missing representative works remain a clearly labelled
+> evidence gap and a non-blocking next step. A server quality gate then rejects
+> any untraceable number, work history, case, audience group, channel, product
+> detail or guaranteed outcome. It asks the review stage to rewrite once and
+> never displays a result that still fails the evidence check.
 > Open-web search is evidence acquisition, not the IP Agent's deliverable.
 > When a user names a benchmark account, the Agent may make at most two
 > discovery searches, then verifies representative works. Search snippets,

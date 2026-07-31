@@ -1070,22 +1070,31 @@ When the visible dialogue already supplies a product, brand or other operating
 entity plus a benchmark lead and asks for an adapted account plan, missing
 representative works must neither license a fabricated benchmark analysis nor
 block the first useful answer. The middleware makes one compact forced-tool
-discovery call, then one flat forced-schema synthesis call using only recent
-user facts, compact credential-free research observations and the server
-portfolio projection. One equally bounded synthesis retry is allowed for
-malformed provider JSON; a deterministic complete provisional fallback must
-still answer the user if both attempts fail. The full system prompt, Skill
-catalog and ordinary tool schemas are absent from these calls. The
-natural-language result is a complete provisional
-package: evidence boundary, strategic thesis, audience/use-occasion
-hypotheses, transferable and non-transferable mechanisms, content system,
-conversion path, human/faceless production choices and one falsifiable pilot.
-Unsupported customer stories, exact performance claims, arbitrary thresholds,
-viral guarantees, multipliers, age bands, fixed schedules/durations,
-price-to-spec mappings, assumed private channels and incentive giveaways are
-forbidden. Evidence boundary, conversion path, pilot structure, signal classes
-and failure rule are server-rendered; stronger representative works remain a
-non-blocking next-evidence request.
+discovery call, discovers and reads the bounded first-party strategy/cinematic
+method set through real `describe_skill` and `read_file` tool results, generates
+two or three competing directions, and sends them to a separate skeptical
+decision/continuity review. A failed method read is never counted as loaded;
+the server retries it once and then fails closed instead of synthesizing a
+method-free plan. Candidate and review stages each receive only recent visible
+user facts, compact credential-free research evidence and bounded method
+excerpts; each may be rewritten once after a server rejection. The full system
+prompt, private catalog and unrelated tool schemas are absent from those model
+calls.
+
+Before any plan is customer-visible, a server-owned evidence gate validates the
+complete structured payload against current visible user evidence. Unsupported
+numbers, work history or credentials, customer cases or operating events,
+audience groups, conversion/distribution channels, inventory/product details,
+people/locations, commerce surfaces and guaranteed or causal outcome claims are
+rejected. Audience hypotheses must either be traceable verbatim or explicitly
+marked as a correctable hypothesis; a qualifier in another clause cannot wash
+an unsupported assertion. The rejected review is rewritten once. If it still
+fails, deterministic sanitization may retain only a product-grounded,
+explicitly provisional skeleton; the result is validated again and fails
+closed rather than exposing a dirty answer. Metadata records real loaded-method
+count, candidate count, independent review, rejection count and whether a
+server rewrite was applied. Stronger representative works remain a non-blocking
+next-evidence request.
 Account ids are operation targets and receipt fields only. Keep the middleware
 before `SkillActivationMiddleware`, and preserve tests for owner isolation,
 cross-account portfolio access, the zero-model ordinary first reply,

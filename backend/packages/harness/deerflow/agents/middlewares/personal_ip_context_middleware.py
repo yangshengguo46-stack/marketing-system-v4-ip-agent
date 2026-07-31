@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
@@ -22,6 +23,8 @@ from deerflow.agents.human_input import read_human_input_response
 from deerflow.agents.middlewares.tool_call_metadata import clone_ai_message_with_tool_calls
 from deerflow.utils.messages import get_original_user_content_text
 
+logger = logging.getLogger(__name__)
+
 _PERSONAL_IP_PORTFOLIO_CONTEXT_KEY = "personal_ip_portfolio"
 _PERSONAL_IP_CONTEXT_DATA_KEY = "personal_ip_context_data"
 _CUSTOMER_AGENT_NAME = "ip-agent"
@@ -29,8 +32,18 @@ _NARRATIVE_INTERVIEW_KEY = "personal_ip_narrative_interview"
 _NARRATIVE_TURN_TOOL_NAME = "personal_ip_narrative_turn"
 _NARRATIVE_INTERVIEW_VERSION = 1
 _PRELIMINARY_PLAN_KEY = "personal_ip_preliminary_plan"
-_PRELIMINARY_PLAN_TOOL_NAME = "personal_ip_preliminary_plan"
-_PRELIMINARY_PLAN_VERSION = 1
+_STRATEGY_CANDIDATES_TOOL_NAME = "personal_ip_strategy_candidates"
+_STRATEGY_DECISION_TOOL_NAME = "personal_ip_strategy_decision"
+_AGENTIC_PLAN_VERSION = 2
+_ADAPTATION_METHOD_NAMES = (
+    "build-cinematic-ip-system",
+    "ip-strategy-director",
+    "design-ip-differentiation",
+    "engineer-desire-behavior",
+    "develop-theme-premise",
+    "audit-ip-continuity",
+)
+_ADAPTATION_METHOD_QUERY = "select:" + ",".join(_ADAPTATION_METHOD_NAMES)
 _BENCHMARK_RESEARCH_TOOL_NAMES = frozenset(
     {
         "web_search",
@@ -100,85 +113,126 @@ _BENCHMARK_ADAPTATION_RESEARCH_SYSTEM = "\n".join(
         "Put no text outside the forced tool call.",
     ]
 )
-_PRELIMINARY_PLAN_SYSTEM = "\n".join(
+_STRATEGY_CANDIDATES_SYSTEM = "\n".join(
     [
-        "You are the bounded first-pass strategy synthesizer for an IP influence asset.",
-        "The user has supplied a product, business or entity plus a benchmark and asked for a plan.",
-        "Return a complete provisional plan now. Do not turn missing private business data into an intake interview, "
-        "and do not ask the user to restate who buys or why they choose the product before providing the first useful answer.",
-        "Use confirmed facts as facts. Infer likely audience, use occasions, choice reasons and conversion paths as explicit hypotheses from the supplied category and evidence.",
-        "A benchmark request means transfer mechanisms, not copy its persona, slogans, stories or surface expression.",
-        "When representative works are unavailable, state that boundary and keep benchmark mechanisms provisional; still provide the adapted positioning, content system, conversion path, production options and pilot.",
-        "Never invent customer stories, account behavior, exact performance, viral odds, multipliers, deadlines or platform ranking claims.",
-        "Do not prescribe exact price-to-weight mappings, fixed publishing times, paid-traffic amounts, conversion thresholds or performance targets unless the user supplied measured evidence for them.",
-        "Do not assume age bands, private-contact channels, incentive giveaways, fixed video durations or a quantity of posts that will create stable traffic.",
-        "Provide concise one-sentence fields only: at least two audience/use-occasion hypotheses, at least two repeatable content-series ideas, both human-present and faceless production options, and one pilot concept plus hook.",
-        "Keep the entire function arguments under 900 Chinese characters. The server supplies the evidence boundary, conversion path, pilot structure, signals and failure rule.",
-        "Do not expose internal capability, tool, schema or field names.",
+        "You are a senior IP strategy room generating competing, evidence-bounded directions.",
+        "The method excerpts were loaded from the product's current first-party methodology; apply them, but never expose their names, paths or tool steps to the customer.",
+        "Start from entity truth, intended influence, desired behavior and an economic hypothesis. A platform or benchmark is supporting evidence, never the thesis.",
+        "Generate two or three materially different directions. Each direction must define its "
+        "choice field, proprietary truth to prove, reason to believe, sacrifice/capacity cost, "
+        "desire conflict, repeatable dramatic engine, event generators, conversion hypothesis and "
+        "largest falsification risk in a compact paragraph. Do not write a script inside a candidate.",
+        "Separate facts, hypotheses and unknowns. Transfer benchmark mechanisms only; never copy persona, wording, stories or surface style. Unverified representative works remain unverified.",
+        "Do not invent customer stories, account behavior, numerical outcomes, viral odds, prices, "
+        "publishing schedules, platform thresholds, age/gender demographics, work history, credentials, "
+        "inventory status, testimonials or private-channel access. Do not invent concrete products, "
+        "product features, people, filming locations, storefront surfaces, commerce links, checkout or "
+        "after-sales capabilities. Use an explicit unknown or conditional placeholder instead.",
+        "Write every proprietary truth, audience claim and conversion claim as a hypothesis to verify. "
+        "Reject a direction whose core can be reproduced by replacing the product name in 'expert', "
+        "'advisor', 'daily record', 'knowledge', 'tips' or 'avoid pitfalls'. Those may be formats, not "
+        "the strategic choice.",
+        "Do not add any numeric literal unless that exact fact appears in user-supplied evidence. Do not use guaranteed or certainty language.",
         "Use the required function and put no text outside the function call.",
     ]
 )
-_PRELIMINARY_PLAN_TOOL = {
+_STRATEGY_REVIEW_SYSTEM = "\n".join(
+    [
+        "You are the independent skeptical strategy director and continuity reviewer.",
+        "Review the candidate directions against the supplied evidence. Reject generic, copyable or capacity-incompatible ideas; choose or revise one direction and explain the tradeoff.",
+        "A label such as advisor, knowledge, daily record, selection guide or avoid-pitfalls is not an "
+        "account direction. The account direction must name a product-specific public choice or conflict "
+        "that cannot survive a simple product-name swap.",
+        "The final plan must be product-specific and complete enough to act on now: account direction, "
+        "influence-behavior-economic chain, audience/use occasions, differentiation, proof and "
+        "sacrifice, repeatable dramatic engine, content series, conversion hypothesis, human-present "
+        "and faceless production modes, plus one shootable pilot script.",
+        "The script must contain a concrete hook, observable action/feedback/choice beats, proof shots, CTA, predicted qualitative signals and a falsification rule. Never fabricate cases or metrics.",
+        "The dramatic engine must show a subject pursuing a goal, an opposing force, a changed tactic or costly choice and an observable state change; an informational list formula is not a dramatic engine.",
+        "Do not add any numeric literal, age/demographic band, price, budget, weight, duration, schedule, "
+        "threshold, work history, credential, inventory status, customer case, testimonial, private "
+        "channel or guaranteed outcome unless that exact fact appears in the user-supplied evidence. "
+        "Do not use '闭眼选', '绝对', '准没错' or equivalent certainty language.",
+        "Every concrete product, feature, person, location, prop and platform-commerce surface in the "
+        "pilot must be traceable to user-supplied evidence. Otherwise write a conditional production "
+        "placeholder such as 'use a product and visible detail the user confirms can be shown'; never "
+        "make the pilot depend on an invented item, staff member, counter, link, cart or checkout path.",
+        "Keep the complete function arguments under 2600 Chinese characters. Use one concise sentence per list item; script beats describe actions rather than timestamps or camera jargon.",
+        "Treat missing evidence as a non-blocking next-evidence item, not an excuse for another intake question. Do not expose internal method, tool, schema or field names.",
+        "Use the required function and put no text outside the function call.",
+    ]
+)
+_STRATEGY_CANDIDATES_TOOL = {
     "type": "function",
     "function": {
-        "name": _PRELIMINARY_PLAN_TOOL_NAME,
-        "description": "Return one complete, evidence-bounded first-pass IP strategy and pilot.",
+        "name": _STRATEGY_CANDIDATES_TOOL_NAME,
+        "description": "Return competing evidence-bounded IP strategy directions.",
         "parameters": {
             "type": "object",
             "additionalProperties": False,
             "properties": {
-                "strategic_thesis": {"type": "string"},
-                "audience_hypotheses": {
-                    "type": "array",
-                    "minItems": 2,
-                    "maxItems": 3,
-                    "items": {"type": "string"},
-                },
-                "benchmark_transfer": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 3,
-                    "items": {"type": "string"},
-                },
-                "unverified_or_do_not_copy": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 3,
-                    "items": {"type": "string"},
-                },
-                "content_series": {
-                    "type": "array",
-                    "minItems": 2,
-                    "maxItems": 3,
-                    "items": {"type": "string"},
-                },
-                "production_modes": {
-                    "type": "array",
-                    "minItems": 2,
-                    "maxItems": 3,
-                    "items": {"type": "string"},
-                },
-                "pilot_concept": {"type": "string"},
-                "pilot_hook": {"type": "string"},
-                "assumptions": {
-                    "type": "array",
-                    "maxItems": 4,
-                    "items": {"type": "string"},
-                },
-                "next_evidence": {"type": "string"},
+                "evidence_boundary": {"type": "string", "maxLength": 500},
+                "facts": {"type": "array", "minItems": 1, "maxItems": 6, "items": {"type": "string", "maxLength": 160}},
+                "hypotheses": {"type": "array", "minItems": 1, "maxItems": 6, "items": {"type": "string", "maxLength": 180}},
+                "unknowns": {"type": "array", "minItems": 1, "maxItems": 6, "items": {"type": "string", "maxLength": 160}},
+                "benchmark_transfer": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "string", "maxLength": 180}},
+                "prohibited_copy": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "string", "maxLength": 160}},
+                "audience_use_cases": {"type": "array", "minItems": 2, "maxItems": 4, "items": {"type": "string", "maxLength": 180}},
+                "directions": {"type": "array", "minItems": 2, "maxItems": 3, "items": {"type": "string", "maxLength": 420}},
+                "review_questions": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "string", "maxLength": 160}},
             },
             "required": [
-                "strategic_thesis",
-                "audience_hypotheses",
+                "evidence_boundary",
+                "facts",
+                "hypotheses",
+                "unknowns",
                 "benchmark_transfer",
-                "unverified_or_do_not_copy",
-                "content_series",
-                "production_modes",
-                "pilot_concept",
-                "pilot_hook",
-                "assumptions",
-                "next_evidence",
+                "prohibited_copy",
+                "audience_use_cases",
+                "directions",
+                "review_questions",
             ],
+        },
+        "strict": True,
+    },
+}
+_STRATEGY_DECISION_PROPERTIES = {
+    "evidence_boundary": {"type": "string", "maxLength": 450},
+    "decision": {"type": "string", "maxLength": 300},
+    "rejected_or_deferred": {"type": "array", "minItems": 1, "maxItems": 3, "items": {"type": "string", "maxLength": 180}},
+    "account_direction": {"type": "string", "maxLength": 220},
+    "intended_influence": {"type": "string", "maxLength": 200},
+    "desired_behavior": {"type": "string", "maxLength": 180},
+    "economic_hypothesis": {"type": "string", "maxLength": 200},
+    "audience_hypotheses": {"type": "array", "minItems": 2, "maxItems": 4, "items": {"type": "string", "maxLength": 180}},
+    "proprietary_truths_to_verify": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"type": "string", "maxLength": 180}},
+    "differentiation": {"type": "string", "maxLength": 240},
+    "reason_to_believe": {"type": "string", "maxLength": 240},
+    "sacrifice": {"type": "string", "maxLength": 180},
+    "dramatic_engine": {"type": "string", "maxLength": 320},
+    "content_series": {"type": "array", "minItems": 2, "maxItems": 4, "items": {"type": "string", "maxLength": 180}},
+    "conversion_path": {"type": "array", "minItems": 3, "maxItems": 6, "items": {"type": "string", "maxLength": 160}},
+    "human_mode": {"type": "string", "maxLength": 200},
+    "faceless_mode": {"type": "string", "maxLength": 200},
+    "pilot_topic": {"type": "string", "maxLength": 120},
+    "pilot_hook": {"type": "string", "maxLength": 180},
+    "script_beats": {"type": "array", "minItems": 4, "maxItems": 8, "items": {"type": "string", "maxLength": 200}},
+    "proof_shots": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"type": "string", "maxLength": 160}},
+    "cta": {"type": "string", "maxLength": 160},
+    "observation_signals": {"type": "array", "minItems": 2, "maxItems": 5, "items": {"type": "string", "maxLength": 180}},
+    "failure_rule": {"type": "string", "maxLength": 240},
+    "next_evidence": {"type": "string", "maxLength": 200},
+}
+_STRATEGY_DECISION_TOOL = {
+    "type": "function",
+    "function": {
+        "name": _STRATEGY_DECISION_TOOL_NAME,
+        "description": "Select, stress-test and render one executable provisional IP strategy.",
+        "parameters": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": _STRATEGY_DECISION_PROPERTIES,
+            "required": list(_STRATEGY_DECISION_PROPERTIES),
         },
         "strict": True,
     },
@@ -566,11 +620,7 @@ def _is_external_benchmark_text(text: str) -> bool:
 
 
 def _has_external_benchmark_history(messages: list) -> bool:
-    return any(
-        getattr(message, "type", None) == "human"
-        and _is_external_benchmark_text(_message_text(message))
-        for message in messages
-    )
+    return any(getattr(message, "type", None) == "human" and _is_external_benchmark_text(_message_text(message)) for message in messages)
 
 
 def _is_benchmark_adaptation_request(messages: list) -> bool:
@@ -618,11 +668,7 @@ def _tool_name(tool: object) -> str:
 
 def _preferred_benchmark_research_tool(request: ModelRequest) -> str | None:
     available = {_tool_name(tool) for tool in request.tools}
-    visible_user_text = "\n".join(
-        _message_text(message)
-        for message in request.messages
-        if getattr(message, "type", None) == "human"
-    ).lower()
+    visible_user_text = "\n".join(_message_text(message) for message in request.messages if getattr(message, "type", None) == "human").lower()
     has_exact_platform_url = any(
         signal in visible_user_text
         for signal in (
@@ -692,16 +738,10 @@ def _has_usable_benchmark_lead(messages: list) -> bool:
             if isinstance(payload, dict):
                 total_results = payload.get("total_results")
                 results = payload.get("results")
-                if (isinstance(total_results, int) and total_results > 0) or (
-                    isinstance(results, list) and bool(results)
-                ):
+                if (isinstance(total_results, int) and total_results > 0) or (isinstance(results, list) and bool(results)):
                     return True
             continue
-        if name == "browser_navigate" and (
-            "navigated to " in normalized
-            or "\nurl:" in normalized
-            or "account:" in normalized
-        ):
+        if name == "browser_navigate" and ("navigated to " in normalized or "\nurl:" in normalized or "account:" in normalized):
             return True
     return False
 
@@ -927,13 +967,227 @@ def _narrative_tool_args(message: AIMessage) -> dict[str, Any] | None:
     return None
 
 
-def _preliminary_plan_tool_args(message: AIMessage) -> dict[str, Any] | None:
+def _structured_tool_args(message: AIMessage | None, tool_name: str) -> dict[str, Any] | None:
+    if message is None:
+        return None
     for tool_call in message.tool_calls or []:
-        if not isinstance(tool_call, dict) or tool_call.get("name") != _PRELIMINARY_PLAN_TOOL_NAME:
+        if not isinstance(tool_call, dict) or tool_call.get("name") != tool_name:
             continue
         args = tool_call.get("args")
         return args if isinstance(args, dict) else None
     return None
+
+
+def _adaptation_method_paths(request: ModelRequest) -> dict[str, str]:
+    describe_call_ids: set[str] = set()
+    for message in request.messages:
+        for tool_call in getattr(message, "tool_calls", None) or []:
+            if not isinstance(tool_call, dict) or tool_call.get("name") != "describe_skill":
+                continue
+            call_id = tool_call.get("id")
+            if isinstance(call_id, str):
+                describe_call_ids.add(call_id)
+
+    paths: dict[str, str] = {}
+    pattern = re.compile(
+        r"^## Skill:\s*([^\n]+).*?^- Location:\s*([^\n]+)",
+        re.MULTILINE | re.DOTALL,
+    )
+    for message in request.messages:
+        if getattr(message, "type", None) != "tool":
+            continue
+        if str(getattr(message, "tool_call_id", "") or "") not in describe_call_ids:
+            continue
+        for name, path in pattern.findall(_message_text(message)):
+            normalized_name = name.strip()
+            normalized_path = path.strip()
+            if normalized_name in _ADAPTATION_METHOD_NAMES and normalized_path.endswith("/SKILL.md"):
+                paths[normalized_name] = normalized_path
+
+    state = request.state if isinstance(request.state, dict) else {}
+    entries = state.get("skill_context")
+    if isinstance(entries, list):
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get("name")
+            path = entry.get("path")
+            if isinstance(name, str) and name in _ADAPTATION_METHOD_NAMES and isinstance(path, str) and path.endswith("/SKILL.md"):
+                paths[name] = path
+    return paths
+
+
+def _adaptation_method_discovery_message(request: ModelRequest) -> AIMessage:
+    sequence = _tool_call_count(list(request.messages), "describe_skill") + 1
+    return AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "describe_skill",
+                "args": {"name": _ADAPTATION_METHOD_QUERY},
+                "id": f"personal-ip-method-discovery-{sequence}",
+                "type": "tool_call",
+            }
+        ],
+        response_metadata={"finish_reason": "tool_calls"},
+    )
+
+
+def _adaptation_method_load_message(
+    request: ModelRequest,
+    method_paths: dict[str, str],
+    loaded_methods: dict[str, tuple[str, str]],
+) -> AIMessage:
+    sequence = _tool_call_count(list(request.messages), "read_file") + 1
+    tool_calls = []
+    for name in _ADAPTATION_METHOD_NAMES:
+        path = method_paths.get(name)
+        if path is None or name in loaded_methods:
+            continue
+        tool_calls.append(
+            {
+                "name": "read_file",
+                "args": {
+                    "description": "读取当前方法正文用于有证据边界的内部策略审查",
+                    "path": path,
+                },
+                "id": f"personal-ip-method-read-{sequence}-{name}",
+                "type": "tool_call",
+            }
+        )
+    return AIMessage(
+        content="",
+        tool_calls=tool_calls,
+        response_metadata={"finish_reason": "tool_calls"},
+    )
+
+
+def _adaptation_method_read_attempts(
+    request: ModelRequest,
+    method_paths: dict[str, str],
+) -> dict[str, int]:
+    attempts = {name: 0 for name in method_paths}
+    paths_to_names = {path: name for name, path in method_paths.items()}
+    for message in request.messages:
+        for tool_call in getattr(message, "tool_calls", None) or []:
+            if not isinstance(tool_call, dict) or tool_call.get("name") != "read_file":
+                continue
+            args = tool_call.get("args")
+            path = args.get("path") if isinstance(args, dict) else None
+            name = paths_to_names.get(path) if isinstance(path, str) else None
+            if name is not None:
+                attempts[name] += 1
+    return attempts
+
+
+def _adaptation_method_load_failure_message(
+    loaded_method_count: int,
+) -> AIMessage:
+    return AIMessage(
+        content=("这次内部策略资料没有成功读取，我不能把缺少专业依据的降级答案冒充完整方案。请直接重试这一条请求；如果仍失败，我会明确报告服务故障，不会继续消耗搜索或编造结论。"),
+        additional_kwargs={
+            _PRELIMINARY_PLAN_KEY: {
+                "version": _AGENTIC_PLAN_VERSION,
+                "status": "internal_method_load_failed",
+                "candidate_count": 0,
+                "method_count": loaded_method_count,
+                "independent_review": False,
+                "evidence_gate_passed": False,
+                "evidence_gate_rejections": 0,
+            }
+        },
+    )
+
+
+def _tool_message_is_error(message: object, content: str) -> bool:
+    if str(getattr(message, "status", "") or "").strip().lower() in {
+        "error",
+        "failed",
+        "failure",
+    }:
+        return True
+    additional_kwargs = getattr(message, "additional_kwargs", {}) or {}
+    if isinstance(additional_kwargs, dict):
+        meta = additional_kwargs.get("deerflow_tool_meta")
+        if isinstance(meta, dict) and str(meta.get("status") or "").strip().lower() in {
+            "error",
+            "failed",
+            "failure",
+        }:
+            return True
+    normalized = content.lstrip().lower()
+    return normalized.startswith(("error:", "error ", "failed:", "failed "))
+
+
+def _loaded_adaptation_methods(request: ModelRequest) -> dict[str, tuple[str, str]]:
+    read_calls: dict[str, tuple[str, str]] = {}
+    for message in request.messages:
+        for tool_call in getattr(message, "tool_calls", None) or []:
+            if not isinstance(tool_call, dict) or tool_call.get("name") != "read_file":
+                continue
+            args = tool_call.get("args")
+            path = args.get("path") if isinstance(args, dict) else None
+            call_id = tool_call.get("id")
+            if not isinstance(path, str) or not isinstance(call_id, str):
+                continue
+            name = path.rstrip("/").split("/")[-2] if "/" in path.rstrip("/") else ""
+            if name in _ADAPTATION_METHOD_NAMES and path.endswith("/SKILL.md"):
+                read_calls[call_id] = (name, path)
+
+    loaded: dict[str, tuple[str, str]] = {}
+    for message in request.messages:
+        if getattr(message, "type", None) != "tool":
+            continue
+        call_id = str(getattr(message, "tool_call_id", "") or "")
+        method = read_calls.get(call_id)
+        content = _message_text(message).strip()
+        if method is None or not content or _tool_message_is_error(message, content):
+            continue
+        name, path = method
+        loaded[name] = (path, content)
+    return loaded
+
+
+def _adaptation_research_ready(request: ModelRequest) -> bool:
+    if _runtime_agent_name(request) != _CUSTOMER_AGENT_NAME:
+        return False
+    messages = list(request.messages)
+    if not _is_benchmark_adaptation_request(messages):
+        return False
+    research_attempts = _tool_call_count(messages, "web_search") + _tool_call_count(messages, "browser_navigate") + _compacted_search_evidence(request)
+    return _has_verified_representative_work(messages) or _has_usable_benchmark_lead(messages) or research_attempts >= 1 or _preferred_benchmark_research_tool(request) is None
+
+
+def _compact_loaded_method_context(request: ModelRequest) -> str:
+    loaded = _loaded_adaptation_methods(request)
+    blocks = []
+    for name in _ADAPTATION_METHOD_NAMES:
+        method = loaded.get(name)
+        if method is None:
+            continue
+        _, body = method
+        blocks.append(f'<method name="{escape(name, quote=True)}">\n{escape(body[:2200], quote=False)}\n</method>')
+    return "\n\n".join(blocks)
+
+
+def _strategy_candidates_evidence(request: ModelRequest) -> str:
+    evidence = _compact_preliminary_plan_evidence(request)[:12000]
+    methods = _compact_loaded_method_context(request)
+    return ("<bounded_evidence>\n" + evidence + "\n</bounded_evidence>\n" + "<loaded_methods>\n" + methods + "\n</loaded_methods>\n" + "Apply the loaded methods to produce two or three competing directions now.")[:29500]
+
+
+def _strategy_review_evidence(request: ModelRequest, candidates: dict[str, Any]) -> str:
+    evidence = _compact_preliminary_plan_evidence(request)[:9500]
+    candidate_json = json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))[:10000]
+    return (
+        "<bounded_evidence>\n"
+        + evidence
+        + "\n</bounded_evidence>\n"
+        + "<candidate_directions>\n"
+        + escape(candidate_json, quote=False)
+        + "\n</candidate_directions>\n"
+        + "Independently reject, choose or revise a direction and return the executable provisional plan."
+    )[:21500]
 
 
 def _compact_benchmark_evidence(
@@ -970,22 +1224,12 @@ def _compact_benchmark_evidence(
     summary = state.get("summary_text")
     summary_section = ""
     if isinstance(summary, str) and summary.strip() and not observations:
-        summary_section = (
-            "\n<prior_unverified_summary>\n"
-            + escape(summary.strip()[:3000], quote=False)
-            + "\n</prior_unverified_summary>"
-        )
+        summary_section = "\n<prior_unverified_summary>\n" + escape(summary.strip()[:3000], quote=False) + "\n</prior_unverified_summary>"
 
     portfolio = _runtime_portfolio(request)
     portfolio_section = _render_portfolio(portfolio) if portfolio is not None else ""
-    user_section = "\n\n".join(
-        f"用户第{index + 1}段：{escape(text, quote=False)}"
-        for index, text in enumerate(visible_user_turns[-8:])
-    )
-    observation_section = "\n\n".join(
-        escape(value, quote=False)
-        for value in observations[-5:]
-    )
+    user_section = "\n\n".join(f"用户第{index + 1}段：{escape(text, quote=False)}" for index, text in enumerate(visible_user_turns[-8:]))
+    observation_section = "\n\n".join(escape(value, quote=False) for value in observations[-5:])
     return (
         "<user_supplied_context>\n"
         + user_section
@@ -1003,10 +1247,7 @@ def _compact_benchmark_evidence(
 def _compact_preliminary_plan_evidence(request: ModelRequest) -> str:
     return _compact_benchmark_evidence(
         request,
-        final_instruction=(
-            "Distinguish confirmed facts from hypotheses and produce the requested "
-            "first-pass plan."
-        ),
+        final_instruction=("Distinguish confirmed facts from hypotheses and produce the requested first-pass plan."),
     )
 
 
@@ -1026,23 +1267,6 @@ _UNSUPPORTED_AGE_BAND = re.compile(
 _UNSUPPORTED_DURATION = re.compile(
     r"(?:，|,)?\s*(?:每条|时长)?\s*\d+(?:\s*[-—–~至]\s*\d+)?\s*(?:秒|分钟)",
 )
-_UNSUPPORTED_SCHEDULE = re.compile(
-    r"(?:，|,)?\s*(?:每天|每周|每日|周更|日更).*$",
-)
-_UNSUPPORTED_TRAFFIC_ASSUMPTION = re.compile(
-    r"\d+.*(?:稳定流量|粉丝|播放|爆|转化率|流量触达)",
-)
-_UNSUPPORTED_CREATIVE_SPECIFICITY = re.compile(
-    r"(?:\d|绝对|保证|必爆|闭眼入|倍|元|块|克|预算)",
-)
-
-
-def _safe_pilot_outline(value: object) -> str:
-    return (
-        "先呈现一个具体决策矛盾，再比较不同对象或使用场景的选择逻辑，"
-        "用经营现场能够当场核验的产品、服务或流程事实演示，最后邀请用户"
-        "按自己的场景咨询；价格、规格、交付与售后信息以拍摄当日经营事实为准。"
-    )
 
 
 def _safe_provisional_text(value: object) -> str:
@@ -1062,220 +1286,451 @@ def _safe_provisional_text(value: object) -> str:
     return text.strip(" ，,；;")
 
 
-def _safe_content_format(value: object) -> str:
+def _safe_strategy_text(value: object) -> str:
     text = _safe_provisional_text(value)
-    if text and not _UNSUPPORTED_CREATIVE_SPECIFICITY.search(text):
-        return text
-    return (
-        "用经营现场可核验的产品、服务或流程实拍；"
-        "不预设价格、规格、时长或效果承诺"
-    )
-
-
-def _safe_series_idea(value: object) -> str:
-    text = _safe_provisional_text(value)
-    text = text.replace("百元到万元", "不同预算")
-    text = re.sub(
-        r"\d+(?:\.\d+)?\s*(?:元|块|万元|千元|克|g|kg|公斤)",
-        "待核验规格",
-        text,
-        flags=re.IGNORECASE,
-    )
-    if any(marker in text for marker in ("绝对", "保证", "必爆", "闭眼入")):
-        return "围绕一个具体决策场景给出可核验的选择标准，不作效果承诺"
+    text = re.sub(r"\d+(?:\.\d+)?\s*%", "未经验证的比例", text)
+    text = re.sub(r"\d+(?:\.\d+)?\s*倍", "未经验证的倍数", text)
     return text
 
 
-def _safe_production_mode(value: object) -> str:
-    text = _UNSUPPORTED_SCHEDULE.sub("", _safe_provisional_text(value))
-    return text or "先做低成本样片，实际频率由人力与试拍结果决定"
+def _safe_strategy_list(value: object) -> list[str]:
+    return [text for item in _safe_text_list(value) if (text := _safe_strategy_text(item))]
 
 
-def _safe_pilot_hook(value: object) -> str:
-    text = _safe_provisional_text(value)
-    unsupported_claim = any(
-        marker in text
-        for marker in ("保值", "都夸", "差不多的钱", "稳赚", "升值")
+_UNSUPPORTED_STRATEGY_CLAIMS = {
+    "未经提供的从业资历或证明": re.compile(
+        r"(?:\d+\s*年|多年从业|资深|专家|权威|持证|认证|老字号|祖传|"
+        r"工牌|荣誉证书|从业经验|专业(?:选品师|顾问|人士))"
+    ),
+    "未经提供的客户案例或经营事件": re.compile(
+        r"(?:过往客户|客户反馈|真实案例|真实客单|客户.*正面反馈|"
+        r"客户(?:咨询|定制|接待|需求|画像|复购)|顾客(?:说|反馈|案例|咨询|成交|选择)|"
+        r"真实客咨|客咨(?:记录|问题|案例)|真实订单|回头客|复购记录|"
+        r"很多人.*(?:选错|踩坑|遇到|不知道)|大家.*(?:选错|踩坑|遇到)|"
+        r"实际销售|销售过程中|用户真实问题|之前遇到过用户|用户选了|"
+        r"收礼人.*用不上|用户.*踩过|用户.*接受度|用户.*类型偏好|"
+        r"日常接待|日常备货|售后案例|新品到店)"
+    ),
+    "未经提供的用户群或人口画像": re.compile(
+        r"(?:年轻群体|中年群体|女性用户|男性用户|宝妈|职场人|学生党|"
+        r"本地用户|本地客群|高净值|企业客户|团购客户|投资客|"
+        r"普通用户|(?:为|面向|针对).{0,28}(?:用户|人群|客群|受众)|"
+        r"送(?:长辈|父母|妈妈|爸爸|伴侣|情侣|孩子|领导|同事|客户|员工)|"
+        r"\d+\s*岁)"
+    ),
+    "未经授权的私域或私信路径": re.compile(r"(?:私信|私域|线上下单|到店福利|联系电话|门店地址|企业号.*咨询入口)"),
+    "未经提供的转化或分发渠道": re.compile(
+        r"(?:到店|进店|评论区|留言区|账号主页|进入主页|公开渠道|官方渠道|"
+        r"线上订购|线上购买|预约|咨询入口|购买入口|"
+        r"(?:产生|发起|进行|形成|承接|具体|有效|用户)(?:咨询|购买|成交))"
+    ),
+    "未经证明的库存或产品状态": re.compile(r"(?:真实库存|在售库存|真实在售|所有推荐产品均|金店在售)"),
+    "未经提供的具体商品或商品特征": re.compile(
+        r"(?:吊坠|挂坠|手镯|项链|戒指|耳环|耳钉|金条|金豆|金钞|摆件|"
+        r"雕花|光面|磨砂|镂空|古法|硬金|足金|克重|标价签|价格签|"
+        r"正规标识|心意属性|价值属性|"
+        r"勾到衣服|无凸起|表面光滑|圆润无边|"
+        r"(?:一|二|两|三|四|五|六|七|八|九|十|几)(?:款|件|种|个)"
+        r"(?:产品|商品|礼物|黄金礼品|首饰|饰品|吊坠|挂坠|手镯|项链|戒指|耳环|耳钉))"
+    ),
+    "未经提供的人员或经营场景": re.compile(r"(?:工作人员|店员|销售员|选品师|主理人|老板|柜台|陈列柜|门店现场|仓库|工作台)"),
+    "未经授权的平台交易能力": re.compile(
+        r"(?:商品橱窗|购物车|小黄车|商品入口|商品链接|购买链接|"
+        r"平台内下单|官方售后|官方店铺|官方账号|后台界面|订单页|交易链路|"
+        r"(?:抖音)?账号.{0,8}(?:已登录|活跃)|已登录.{0,8}账号|"
+        r"活跃.{0,8}账号|到店服务路径)"
+    ),
+    "未经验证的对标账号特征": re.compile(r"(?:生活化(?:内容|表达|风格)|对标账号的(?:内容架构|运营逻辑|叙事风格|视频风格))"),
+    "保证性或夸大表达": re.compile(
+        r"(?:绝对|闭眼选|闭眼入|准没错|都夸|快速起量|一定会|保证|"
+        r"看完就能|直接照搬|有效提升|有效降低|远低于|不低于|"
+        r"精准触达|最终带动|会因|会直接|可直接匹配|"
+        r"(?:会|将)(?:优先|主动|转化)|降低.*成本|提升.*(?:成交|转化)|"
+        r"建立.*信任|最终.*(?:选到|完成)|避免踩坑)"
+    ),
+}
+_NUMERIC_LITERAL = re.compile(r"\d+(?:\.\d+)?")
+_STRATEGY_EPISTEMIC_MARKERS = (
+    "无",
+    "没有",
+    "未提供",
+    "未知",
+    "待核验",
+    "需核验",
+    "未核验",
+    "待验证",
+    "可能",
+    "假设",
+    "如果",
+    "若",
+    "补充",
+    "不得",
+    "禁止",
+    "不添加",
+    "不假设",
+    "不复制",
+    "不使用",
+    "不依赖",
+    "待确认",
+    "待用户确认",
+)
+_STRATEGY_HYPOTHESIS_MARKERS = (
+    "待验证",
+    "待核验",
+    "需验证",
+    "需核验",
+    "假设",
+    "可能",
+    "如果",
+    "若",
+    "未知",
+    "待确认",
+    "待用户确认",
+)
+_STRATEGY_CLAUSE_BOUNDARIES = '，,。；;！？!?\n"[]{}'
+
+
+def _strategy_claim_is_qualified(text: str, start: int, end: int) -> bool:
+    left = max(text.rfind(char, 0, start) for char in _STRATEGY_CLAUSE_BOUNDARIES)
+    right_candidates = [position for char in _STRATEGY_CLAUSE_BOUNDARIES if (position := text.find(char, end)) >= 0]
+    right = min(right_candidates) if right_candidates else len(text)
+    clause = text[left + 1 : right]
+    return any(marker in clause for marker in _STRATEGY_EPISTEMIC_MARKERS)
+
+
+def _visible_user_evidence_text(request: ModelRequest) -> str:
+    values = []
+    for message in request.messages:
+        if getattr(message, "type", None) != "human":
+            continue
+        additional_kwargs = getattr(message, "additional_kwargs", {}) or {}
+        if isinstance(additional_kwargs, dict) and additional_kwargs.get("hide_from_ui") is True:
+            continue
+        text = _message_text(message).strip()
+        if text:
+            values.append(text)
+    return "\n".join(values)
+
+
+def _strategy_claim_violations(
+    args: dict[str, Any] | None,
+    request: ModelRequest,
+) -> list[str]:
+    if args is None:
+        return ["结构化决策缺失"]
+    serialized = json.dumps(args, ensure_ascii=False)
+    user_evidence = _visible_user_evidence_text(request)
+    user_numbers = set(_NUMERIC_LITERAL.findall(user_evidence))
+    unsupported_numbers = sorted(number for number in set(_NUMERIC_LITERAL.findall(serialized)) if number not in user_numbers)
+    violations = []
+    if unsupported_numbers:
+        violations.append("出现用户未提供的数字：" + "、".join(unsupported_numbers[:12]))
+    for label, pattern in _UNSUPPORTED_STRATEGY_CLAIMS.items():
+        for match in pattern.finditer(serialized):
+            if _strategy_claim_is_qualified(
+                serialized,
+                match.start(),
+                match.end(),
+            ):
+                continue
+            if match.group(0) not in user_evidence:
+                violations.append(label)
+                break
+    return violations
+
+
+def _strategy_hypothesis_is_traceable(
+    text: str,
+    request: ModelRequest,
+) -> bool:
+    user_evidence = _visible_user_evidence_text(request)
+    return bool(text) and (text in user_evidence or any(marker in text for marker in _STRATEGY_HYPOTHESIS_MARKERS))
+
+
+def _strategy_candidate_violations(
+    args: dict[str, Any] | None,
+    request: ModelRequest,
+) -> list[str]:
+    violations = _strategy_claim_violations(args, request)
+    if args is None:
+        return violations
+    directions = _safe_text_list(args.get("directions"))
+    if len(directions) < 2:
+        violations.append("候选方向少于两个")
+    for index, audience in enumerate(_safe_text_list(args.get("audience_use_cases"))):
+        if not _strategy_hypothesis_is_traceable(audience, request):
+            violations.append(f"候选用户群{index + 1}无法回指用户证据且未标为待验证")
+    for index, truth in enumerate(_safe_text_list(args.get("hypotheses"))):
+        if not _strategy_hypothesis_is_traceable(truth, request):
+            violations.append(f"候选假设{index + 1}无法回指用户证据且未标为待验证")
+    for index, direction in enumerate(directions):
+        if not any(marker in direction for marker in ("假设", "待验证", "需验证", "若能证明", "如果成立")):
+            violations.append(f"候选方向{index + 1}没有把专属真相或转化写成待验证假设")
+        if any(marker in direction for marker in ("第一条脚本", "镜头1", "镜头一", "0-")):
+            violations.append(f"候选方向{index + 1}提前生成了脚本")
+    return violations
+
+
+def _strategy_decision_violations(
+    args: dict[str, Any] | None,
+    request: ModelRequest,
+) -> list[str]:
+    violations = _strategy_claim_violations(args, request)
+    if args is None:
+        return violations
+    required_scalars = (
+        "account_direction",
+        "differentiation",
+        "reason_to_believe",
+        "sacrifice",
+        "dramatic_engine",
+        "pilot_topic",
+        "pilot_hook",
+        "failure_rule",
     )
-    if (
-        text
-        and not unsupported_claim
-        and not _UNSUPPORTED_CREATIVE_SPECIFICITY.search(text)
+    for key in required_scalars:
+        if not _safe_text(args.get(key)):
+            violations.append(f"关键方案字段缺失：{key}")
+    required_lists = {
+        "audience_hypotheses": 2,
+        "content_series": 2,
+        "conversion_path": 3,
+        "script_beats": 4,
+        "observation_signals": 2,
+    }
+    for key, minimum in required_lists.items():
+        if len(_safe_text_list(args.get(key))) < minimum:
+            violations.append(f"关键方案字段不完整：{key}")
+    for index, audience in enumerate(_safe_text_list(args.get("audience_hypotheses"))):
+        if not _strategy_hypothesis_is_traceable(audience, request):
+            violations.append(f"目标用户群{index + 1}无法回指用户证据且未标为待验证")
+    for key, label in (
+        ("economic_hypothesis", "经济假设"),
+        ("reason_to_believe", "可信依据"),
     ):
-        return text
-    return "用户以为自己只是在选产品，其实他先在判断：这是不是为我的处境准备的？"
+        text = _safe_text(args.get(key))
+        if text and not _strategy_hypothesis_is_traceable(text, request):
+            violations.append(f"{label}无法回指用户证据且未标为待验证")
+    for key, label in (
+        ("proprietary_truths_to_verify", "专属事实"),
+        ("proof_shots", "证据镜头"),
+    ):
+        for index, text in enumerate(_safe_text_list(args.get(key))):
+            if not _strategy_hypothesis_is_traceable(text, request):
+                violations.append(f"{label}{index + 1}无法回指用户证据且未标为待验证")
+    unsupported_comparative_threshold = re.compile(r"(?:平台|行业|同品类|同赛道).{0,12}(?:平均水平|平均值|基准线|正常水平)")
+    for signal in _safe_text_list(args.get("observation_signals")):
+        if unsupported_comparative_threshold.search(signal):
+            violations.append("观察信号使用了没有本轮证据的比较阈值")
+            break
+
+    account_direction = _safe_text(args.get("account_direction"))
+    if any(
+        marker in account_direction
+        for marker in (
+            "日常",
+            "顾问",
+            "指南",
+            "避坑",
+            "科普",
+            "当前最有证据",
+            "产品决策方向",
+            "帮助用户解决具体选择",
+            "内容资产",
+        )
+    ):
+        violations.append("账号方向仍是可替换产品名的通用内容标签")
+
+    dramatic_engine = _safe_text(args.get("dramatic_engine"))
+    if not (
+        any(marker in dramatic_engine for marker in ("想", "欲望", "目标"))
+        and any(marker in dramatic_engine for marker in ("但", "却", "冲突", "不能兼得", "阻力"))
+        and any(marker in dramatic_engine for marker in ("选择", "代价", "改变策略"))
+    ):
+        violations.append("戏剧发动机缺少目标、反作用和有代价的选择")
+    return violations
 
 
-def _render_preliminary_plan(args: dict[str, Any]) -> str:
-    audience_lines = []
-    for item in args.get("audience_hypotheses") or []:
-        if isinstance(item, str):
-            if text := _safe_provisional_text(item):
-                audience_lines.append(f"- {text}")
-            continue
-        if not isinstance(item, dict):
-            continue
-        segment = _safe_provisional_text(item.get("segment"))
-        occasion = _safe_text(item.get("occasion"))
-        reason = _safe_text(item.get("reason"))
-        if segment:
-            audience_lines.append(f"- **{segment}**：{occasion}；{reason}")
+def _sanitize_unverified_strategy_decision(
+    args: dict[str, Any],
+    request: ModelRequest,
+) -> dict[str, Any]:
+    sanitized = dict(args)
+    user_evidence = _visible_user_evidence_text(request)
+    user_numbers = set(_NUMERIC_LITERAL.findall(user_evidence))
 
-    series_lines = []
-    for item in args.get("content_series") or []:
-        if isinstance(item, str):
-            if text := _safe_series_idea(item):
-                series_lines.append(f"- {text}")
-            continue
-        if not isinstance(item, dict):
-            continue
-        name = _safe_text(item.get("name"))
-        promise = _safe_text(item.get("promise"))
-        format_text = _safe_content_format(item.get("format"))
-        if name:
-            series_lines.append(f"- **{name}**：{promise}。形式：{format_text}")
+    def is_supported(text: str) -> bool:
+        if any(number not in user_numbers for number in _NUMERIC_LITERAL.findall(text)):
+            return False
+        for pattern in _UNSUPPORTED_STRATEGY_CLAIMS.values():
+            for match in pattern.finditer(text):
+                if _strategy_claim_is_qualified(
+                    text,
+                    match.start(),
+                    match.end(),
+                ):
+                    continue
+                if match.group(0) not in user_evidence:
+                    return False
+        return True
 
-    pilot = args.get("pilot")
-    pilot = pilot if isinstance(pilot, dict) else {}
-    pilot_concept = _safe_text(
-        args.get("pilot_concept") or pilot.get("concept")
-    )
-    pilot_hook = _safe_pilot_hook(
-        args.get("pilot_hook") or pilot.get("hook")
-    )
-    pilot_signals = [
-        "注意与理解：看完率、关键段流失和有效复述是否显示用户理解了核心决策矛盾",
-        "信任：有效评论是否开始追问选择标准、产品事实、交付方式或经营证明",
-        "意向：主页访问、资料请求和按场景咨询是否出现",
-        "商业：到店预约、报价请求或真实成交是否出现",
-    ]
-    pilot_failure_rule = (
-        "若内容只引发表面话题讨论，却没有具体场景咨询、主页行动或商业信号，"
-        "就推翻当前“场景决策内容能推动真实行动”的假设，重做选题与承接；"
-        "首轮不预设通用百分比阈值。"
-    )
-    assumptions = [
-        item
-        for item in _safe_text_list(args.get("assumptions"))
-        if not _UNSUPPORTED_TRAFFIC_ASSUMPTION.search(item)
-        and not any(char.isdigit() for char in item)
-    ]
-    conversion_path = [
-        "内容先帮助用户识别自己的对象、场合、风险与选择标准",
-        "主页按对象、场合和决策问题组织内容，让用户能继续判断",
-        "只使用目标平台和当地规则允许的咨询、预约或到店承接方式",
-        "成交前核验拍摄当日价格、规格、计价、交付与售后事实",
-        "成交后只在获得明确授权时把真实问题或案例沉淀为后续内容证据",
-    ]
+    list_fallbacks = {
+        "rejected_or_deferred": ["其他方向缺少当前证据，暂缓采用"],
+        "audience_hypotheses": ["有明确选择任务但缺少判断依据的人", "需要可核验证据才会行动的人"],
+        "proprietary_truths_to_verify": ["用户确认可公开的真实选择为何发生", "用户确认可展示的证据能否支撑独特取舍"],
+        "content_series": ["真实选择现场", "经营证据与结果复盘"],
+        "conversion_path": ["内容建立判断", "具体处境形成行动", "真实经营结果回收复盘"],
+        "script_beats": ["呈现具体目标", "展示可见阻力", "从用户确认可拍的产品或流程中采取行动", "根据反馈做出有代价的选择", "邀请观众描述具体处境"],
+        "proof_shots": ["只拍摄用户确认可公开且能够直接核验的产品、流程或选择证据"],
+        "observation_signals": ["是否出现对核心判断的有效复述", "是否出现带具体处境的真实行动"],
+    }
+    list_minimums = {
+        "rejected_or_deferred": 1,
+        "audience_hypotheses": 2,
+        "proprietary_truths_to_verify": 1,
+        "content_series": 2,
+        "conversion_path": 3,
+        "script_beats": 4,
+        "proof_shots": 1,
+        "observation_signals": 2,
+    }
+    scalar_fallbacks = {
+        "evidence_boundary": "当前只使用用户明确提供的经营主体、产品和目标；其他事实均待核验。",
+        "decision": "先选择与当前产品事实最贴近、又能通过首条样片验证的方向，其他方向暂缓。",
+        "account_direction": "把产品从陈列对象变成帮助用户解决具体选择问题的内容资产。",
+        "intended_influence": "让目标人群形成一个能够被真实行为验证的新判断。",
+        "desired_behavior": "带着具体处境和问题采取下一步行动。",
+        "economic_hypothesis": "有效行动可能形成商业结果，但当前没有数据支持量化结论。",
+        "differentiation": "只解决由该经营主体真实产品与取舍才能回答的问题。",
+        "reason_to_believe": "使用用户确认可公开并能够核验的产品、流程和选择证据。",
+        "sacrifice": "不做无法证明、无法持续或只复制对标表面形式的内容。",
+        "dramatic_engine": "一个具体目标遇到可见阻力，人物采取行动并因反馈改变策略或选择。",
+        "human_mode": "由用户确认实际出镜者和公开边界后试拍，不添加未经证实的履历或人设。",
+        "faceless_mode": "只用用户确认可公开展示的素材和旁白完成同一判断链。",
+        "pilot_topic": "同一类产品为什么在不同处境下不是同一个选择",
+        "pilot_hook": "你以为自己只是在选产品，真正决定结果的是它要解决谁的什么处境。",
+        "cta": "邀请观众说出自己的具体处境和最怕选错的地方。",
+        "failure_rule": "如果只有泛互动而没有理解、信任或行动信号，就推翻当前方向并重做。",
+        "next_evidence": "补充真实选择记录、代表作原始材料和首轮试拍反馈。",
+    }
+    for key, fallback in list_fallbacks.items():
+        value = sanitized.get(key)
+        filtered = [item for item in _safe_text_list(value) if is_supported(item)]
+        sanitized[key] = filtered if len(filtered) >= list_minimums[key] else fallback
+    for key, fallback in scalar_fallbacks.items():
+        text = _safe_text(sanitized.get(key))
+        sanitized[key] = text if text and is_supported(text) else fallback
+    return sanitized
+
+
+def _render_agentic_preliminary_plan(args: dict[str, Any]) -> str:
+    audience = _safe_strategy_list(args.get("audience_hypotheses"))
+    truths = _safe_strategy_list(args.get("proprietary_truths_to_verify"))
+    rejected = _safe_strategy_list(args.get("rejected_or_deferred"))
+    series = _safe_strategy_list(args.get("content_series"))
+    conversion = _safe_strategy_list(args.get("conversion_path"))
+    beats = _safe_strategy_list(args.get("script_beats"))
+    proof_shots = _safe_strategy_list(args.get("proof_shots"))
+    signals = _safe_strategy_list(args.get("observation_signals"))
     sections = [
         "## 初步完整方案",
-        "### 证据边界\n"
-        "当前只确认用户在本轮明确提供的经营主体、产品、目标平台和对标名称，"
-        "以及工具实际返回的结果。未成功返回的公开搜索、代表作页面、后台数据和"
-        "成交信息一律视为未核验；以下是待验证的初步策略，不是完成的对标拆解。",
-        "### 当前战略判断\n"
-        + _safe_provisional_text(args.get("strategic_thesis")),
-        "### 我先替你建立的用户与场景假设\n" + ("\n".join(audience_lines) or "- 暂无足够结构化假设"),
-        "### 借什么，不抄什么\n"
-        + "\n".join(f"- 可借：{item}" for item in _safe_text_list(args.get("benchmark_transfer")))
-        + "\n"
-        + "\n".join(f"- 暂不确认或不复制：{item}" for item in _safe_text_list(args.get("unverified_or_do_not_copy"))),
-        "### 可持续内容系统\n" + ("\n".join(series_lines) or "- 待补充"),
-        "### 从内容到成交\n"
-        + "\n".join(
-            f"{index + 1}. {item}"
-            for index, item in enumerate(conversion_path)
-        ),
-        "### 表现与制作方案\n"
-        + "\n".join(
-            f"- {_safe_production_mode(item)}"
-            for item in _safe_text_list(args.get("production_modes"))
-        ),
-        "### 首轮试验\n"
-        + f"- **选题**：{pilot_concept}\n"
-        + f"- **开头**：{pilot_hook}\n"
-        + f"- **结构**：{_safe_pilot_outline(pilot.get('outline'))}\n"
-        + "- **拍法**：同一脚本先做真人出镜版与无脸实拍旁白版，"
-        "只改变表现方式以比较可信度和完成度\n"
-        + "\n".join(f"- **观察信号**：{item}" for item in pilot_signals)
-        + f"\n- **失败规则**：{pilot_failure_rule}",
-        "### 当前假设\n"
-        + "\n".join(f"- {item}" for item in assumptions),
-        "### 接下来补强什么\n"
-        "先补充对标账号的代表作证据；同时把首轮真人/无脸双版本上传给智能体，"
-        "或真实发布后回收数据，观察注意与理解、信任、意向和商业信号，再修正方向。",
+        "### 证据边界\n" + _safe_strategy_text(args.get("evidence_boundary")),
+        "### 判断与取舍\n" + _safe_strategy_text(args.get("decision")) + ("\n\n暂不选：\n" + "\n".join(f"- {item}" for item in rejected) if rejected else ""),
+        "### 账号方向\n" + _safe_strategy_text(args.get("account_direction")),
+        "### 这条路要产生什么结果\n"
+        + f"- **影响力**：{_safe_strategy_text(args.get('intended_influence'))}\n"
+        + f"- **行为**：{_safe_strategy_text(args.get('desired_behavior'))}\n"
+        + f"- **经济假设**：{_safe_strategy_text(args.get('economic_hypothesis'))}",
+        "### 谁会在什么处境下需要它\n" + ("\n".join(f"- {item}" for item in audience) or "- 尚待验证"),
+        "### 为什么选择你，而不是同类\n"
+        + f"- **差异**：{_safe_strategy_text(args.get('differentiation'))}\n"
+        + f"- **可信依据**：{_safe_strategy_text(args.get('reason_to_believe'))}\n"
+        + f"- **主动放弃**：{_safe_strategy_text(args.get('sacrifice'))}\n"
+        + "- **下一步核验的专属事实**：\n"
+        + ("\n".join(f"  - {item}" for item in truths) or "  - 尚待补充"),
+        "### 能持续生出内容的发动机\n" + _safe_strategy_text(args.get("dramatic_engine")) + "\n\n" + ("\n".join(f"- {item}" for item in series) or "- 尚待补充"),
+        "### 从内容到真实行动\n" + ("\n".join(f"{index + 1}. {item}" for index, item in enumerate(conversion)) or "1. 尚待验证"),
+        "### 表现与制作\n" + f"- **真人版**：{_safe_strategy_text(args.get('human_mode'))}\n" + f"- **无脸版**：{_safe_strategy_text(args.get('faceless_mode'))}",
+        "### 首条试验视频",
+        f"**选题**：{_safe_strategy_text(args.get('pilot_topic'))}\n\n"
+        f"**开头**：{_safe_strategy_text(args.get('pilot_hook'))}\n\n"
+        "**剧本节拍**：\n"
+        + ("\n".join(f"{index + 1}. {item}" for index, item in enumerate(beats)) or "1. 尚待补充")
+        + "\n\n**证据镜头**：\n"
+        + ("\n".join(f"- {item}" for item in proof_shots) or "- 尚待补充")
+        + f"\n\n**行动邀请**：{_safe_strategy_text(args.get('cta'))}",
+        "### 怎么判断方向是不是自娱自乐\n" + ("\n".join(f"- {item}" for item in signals) or "- 尚待验证") + f"\n- **失败规则**：{_safe_strategy_text(args.get('failure_rule'))}",
+        "### 下一轮补证\n" + _safe_strategy_text(args.get("next_evidence")),
     ]
     return "\n\n".join(section for section in sections if section.strip())
 
 
-def _fallback_preliminary_plan_args(request: ModelRequest) -> dict[str, Any]:
-    visible_user_text = "\n".join(
-        _message_text(message)
-        for message in request.messages
-        if getattr(message, "type", None) == "human"
+def _fallback_agentic_decision(
+    request: ModelRequest,
+    candidates: dict[str, Any],
+) -> dict[str, Any]:
+    evidence_boundary = _safe_strategy_text(candidates.get("evidence_boundary"))
+    user_evidence = _visible_user_evidence_text(request)
+    product = "当前产品"
+    product_patterns = (
+        r"(?:主要产品|核心产品)\s*(?:是|为)?\s*([^，。；;,\n]{2,18})",
+        r"(?:主营|卖的是|售卖|卖)\s*([^，。；;,\n]{2,18})",
     )
-    product_match = re.search(
-        r"(?:主要产品(?:是|为)|卖)\s*([^，,。；;\n]{1,24})",
-        visible_user_text,
-    )
-    operated_entity = (
-        _safe_provisional_text(product_match.group(1))
-        if product_match is not None
-        else "用户已经明确提供的产品或经营主体"
-    )
+    for pattern in product_patterns:
+        match = re.search(pattern, user_evidence)
+        if match is None:
+            continue
+        candidate = re.sub(
+            r"[^\u4e00-\u9fffA-Za-z0-9·+\-]",
+            "",
+            match.group(1),
+        )[:16]
+        if len(candidate) >= 2:
+            product = candidate
+            break
+    grounded_direction = f"公开替{product}做“不适合谁”的取舍：每次用待核验处境说明何时不该推荐，而不是只陈列卖点。"
     return {
-        "strategic_thesis": (
-            f"先把{operated_entity}从单纯展示，改造成帮助用户解决具体对象、"
-            "关系和使用场景中决策问题的可信内容资产，再用真实经营结果验证。"
-        ),
+        "evidence_boundary": evidence_boundary or "当前只使用用户明确提供的事实，其他信息均待核验。",
+        "decision": (f"现有证据只够支持一个可推翻的首轮方向：先验证“{product}不适合谁”，不把它当作已验证定位。"),
+        "rejected_or_deferred": ["泛知识、流水陈列和照搬对标表面形式的方向暂缓"],
+        "account_direction": grounded_direction,
+        "intended_influence": (f"让相关人群先判断自己的处境是否适合{product}，再讨论具体选择。"),
+        "desired_behavior": "带着具体使用处境和最怕选错的地方提出问题。",
+        "economic_hypothesis": ("待验证：更明确的适合与不适合判断可能带来更高质量的真实商业行动，当前没有结果数据。"),
         "audience_hypotheses": [
-            "有明确购买或选择任务、但缺少判断标准的人；先帮助他降低选错风险。",
-            "已经在比较替代方案、需要可信证据才能行动的人；先展示可核验差异。",
+            f"待验证：有明确使用任务却不知道{product}是否匹配的人",
+            "待验证：需要看到可核验取舍依据才会行动的人",
         ],
-        "benchmark_transfer": [
-            "只迁移场景入口、信息节奏和信任建立机制，不迁移表层表达。",
-            "把对标机制改写为经营主体自己的事实、人物关系和交付证据。",
+        "proprietary_truths_to_verify": [
+            f"待用户确认：哪些真实处境会让经营者主动不推荐{product}",
+            "待用户确认：哪些可公开证据足以支撑这种取舍",
         ],
-        "unverified_or_do_not_copy": [
-            "代表作未核验前，不声称已经掌握对标账号的钩子、视觉或转化机制。",
-            "不复制名称、人设、台词、顾客故事或视觉识别。",
-        ],
+        "differentiation": grounded_direction,
+        "reason_to_believe": ("可信依据只来自待用户确认可公开的产品、流程和选择记录。"),
+        "sacrifice": ("主动放弃只讲优点的安全表达，也不发布无法证明或只复制对标表面的内容。"),
+        "dramatic_engine": ("经营者想促成选择，但用户处境与产品卖点发生冲突；经营者必须在顺势推荐与明确说不适合之间做出有代价的选择。"),
         "content_series": [
-            "决策现场：围绕一个真实对象、场合或选择冲突，给出可执行判断标准。",
-            "证据拆解：用经营现场能够核验的产品、流程、交付或售后事实建立信任。",
-            "真实验证：只在获得授权后复盘真实问题与结果，不编造顾客故事。",
+            f"{product}什么时候不该推荐",
+            "一次真实取舍如何改变最初建议",
         ],
-        "production_modes": [
-            "真人版用于测试经营者或店员的可信度与表达完成度。",
-            "无脸版用产品、手部、空间和旁白完成同一信息，测试更低表演负担的方案。",
+        "conversion_path": ["内容建立判断", "具体问题形成行动", "真实结果回收复盘"],
+        "human_mode": ("待用户确认实际出镜者与公开边界后，用同一取舍脚本试拍真人版本。"),
+        "faceless_mode": ("只用待用户确认可公开的素材和旁白完成同一取舍链。"),
+        "pilot_topic": f"{product}在什么处境下反而不该推荐",
+        "pilot_hook": (f"今天先不劝你选{product}；先看你的真实处境是不是一开始就不匹配。"),
+        "script_beats": [
+            "声明本条只使用待用户确认可拍的素材",
+            "提出一个待验证的具体使用目标",
+            "展示这个目标与常规卖点之间的冲突",
+            "在顺势推荐与明确说不适合之间做出选择",
+            "说明仍缺少的事实并邀请观众补充自己的处境",
         ],
-        "pilot_concept": "同一个产品，为什么换了对象或使用场景，就不再是同一个选择？",
-        "pilot_hook": "用户以为自己只是在选产品，其实他先在判断：这是不是为我的处境准备的？",
-        "assumptions": [
-            "当前方向是冷启动假设，尚无账号表现与商业结果证据。",
-            "经营现场存在可拍摄且可核验的产品、流程或交付事实。",
-        ],
-        "next_evidence": "补充对标账号的代表作证据，并用首轮真人/无脸双版本的真实观察修正方向。",
+        "proof_shots": ["只拍摄待用户确认可公开且能够直接核验的产品、流程或选择证据"],
+        "cta": "请说出你的具体使用处境，以及最怕选错的地方。",
+        "observation_signals": ["是否出现对核心判断的有效复述", "是否出现带具体处境的真实行动"],
+        "failure_rule": ("如果只有泛互动而没有人复述“不适合”的判断或带来具体处境，就推翻当前方向并重做。"),
+        "next_evidence": (f"补充待用户确认可公开的{product}选择记录、对标代表作原始材料和首轮试拍反馈。"),
     }
-
-
-def _should_synthesize_preliminary_plan(request: ModelRequest) -> bool:
-    if _runtime_agent_name(request) != _CUSTOMER_AGENT_NAME:
-        return False
-    messages = list(request.messages)
-    if not _is_benchmark_adaptation_request(messages):
-        return False
-    research_attempts = (
-        _tool_call_count(messages, "web_search")
-        + _tool_call_count(messages, "browser_navigate")
-        + _compacted_search_evidence(request)
-    )
-    return (
-        _has_verified_representative_work(messages)
-        or _has_usable_benchmark_lead(messages)
-        or research_attempts >= 1
-        or _preferred_benchmark_research_tool(request) is None
-    )
 
 
 def _fallback_narrative_turn(text: str, entity_type: str, *, is_chinese: bool) -> tuple[str, str]:
@@ -1372,21 +1827,12 @@ class PersonalIPContextMiddleware(AgentMiddleware):
     def _first_contact_response(request: ModelRequest) -> AIMessage | None:
         portfolio = _runtime_portfolio(request)
         runtime_context = getattr(getattr(request, "runtime", None), "context", None)
-        if (
-            portfolio is None
-            or not isinstance(runtime_context, dict)
-            or runtime_context.get("disable_clarification")
-            or _runtime_agent_name(request) != _CUSTOMER_AGENT_NAME
-        ):
+        if portfolio is None or not isinstance(runtime_context, dict) or runtime_context.get("disable_clarification") or _runtime_agent_name(request) != _CUSTOMER_AGENT_NAME:
             return None
         real_user_messages = [
             message
             for message in request.messages
-            if getattr(message, "type", None) == "human"
-            and not (
-                isinstance(getattr(message, "additional_kwargs", None), dict)
-                and getattr(message, "additional_kwargs", {}).get("hide_from_ui") is True
-            )
+            if getattr(message, "type", None) == "human" and not (isinstance(getattr(message, "additional_kwargs", None), dict) and getattr(message, "additional_kwargs", {}).get("hide_from_ui") is True)
         ]
         if len(real_user_messages) != 1:
             return None
@@ -1395,9 +1841,7 @@ class PersonalIPContextMiddleware(AgentMiddleware):
             return None
         is_chinese = any("\u4e00" <= char <= "\u9fff" for char in text)
         content = (
-            "你好。你可以直接把产品、品牌、账号、对标链接、视频或正在卡住的事情丢给我。"
-            "我会先自己查证并形成初步判断；只有缺少的信息确实会改变方案时，我才问一个关键问题。"
-            "你现在最想解决什么？"
+            "你好。你可以直接把产品、品牌、账号、对标链接、视频或正在卡住的事情丢给我。我会先自己查证并形成初步判断；只有缺少的信息确实会改变方案时，我才问一个关键问题。你现在最想解决什么？"
             if is_chinese
             else "Hello. Send me the product, brand, account, benchmark link, video, or concrete problem directly. "
             "I will investigate and form a first judgment myself, and ask one question only when the missing fact "
@@ -1555,19 +1999,104 @@ class PersonalIPContextMiddleware(AgentMiddleware):
         return injected.override(messages=messages)
 
     @staticmethod
-    def _compact_preliminary_plan_request(request: ModelRequest) -> ModelRequest:
+    def _compact_strategy_candidates_request(
+        request: ModelRequest,
+        violations: list[str] | None = None,
+    ) -> ModelRequest:
+        correction = ""
+        if violations:
+            correction = "\nThe previous candidate payload failed the server evidence gate. Rewrite it from scratch and remove every listed violation:\n- " + "\n- ".join(violations)
         return request.override(
-            system_message=SystemMessage(content=_PRELIMINARY_PLAN_SYSTEM),
+            system_message=SystemMessage(content=_STRATEGY_CANDIDATES_SYSTEM + correction),
             messages=[
                 HumanMessage(
-                    content=_compact_preliminary_plan_evidence(request),
+                    content=(_strategy_candidates_evidence(request) + ("\n<server_rejection>\n" + "\n".join(f"- {item}" for item in violations) + "\n</server_rejection>" if violations else "")),
                     additional_kwargs={"hide_from_ui": True},
                 )
             ],
-            tools=[_PRELIMINARY_PLAN_TOOL],
-            tool_choice=_PRELIMINARY_PLAN_TOOL_NAME,
+            tools=[_STRATEGY_CANDIDATES_TOOL],
+            tool_choice=_STRATEGY_CANDIDATES_TOOL_NAME,
             response_format=None,
         )
+
+    @staticmethod
+    def _compact_strategy_review_request(
+        request: ModelRequest,
+        candidates: dict[str, Any],
+        violations: list[str] | None = None,
+    ) -> ModelRequest:
+        correction = ""
+        if violations:
+            correction = "\nThe previous decision failed the server evidence gate. Rewrite the entire decision and remove every listed violation:\n- " + "\n- ".join(violations)
+        return request.override(
+            system_message=SystemMessage(content=_STRATEGY_REVIEW_SYSTEM + correction),
+            messages=[
+                HumanMessage(
+                    content=(_strategy_review_evidence(request, candidates) + ("\n<server_rejection>\n" + "\n".join(f"- {item}" for item in violations) + "\n</server_rejection>" if violations else "")),
+                    additional_kwargs={"hide_from_ui": True},
+                )
+            ],
+            tools=[_STRATEGY_DECISION_TOOL],
+            tool_choice=_STRATEGY_DECISION_TOOL_NAME,
+            response_format=None,
+        )
+
+    @staticmethod
+    def _render_agentic_plan_result(
+        result: ModelCallResult,
+        request: ModelRequest,
+        candidates: dict[str, Any],
+    ) -> ModelCallResult:
+        message = _ai_message_from_result(result)
+        args = _structured_tool_args(message, _STRATEGY_DECISION_TOOL_NAME)
+        if args is None:
+            args = _fallback_agentic_decision(request, candidates)
+        gate_violations = _strategy_decision_violations(args, request)
+        server_rewrite_applied = bool(gate_violations)
+        if gate_violations:
+            needs_grounded_rebuild = any(violation.startswith("关键方案字段") or "账号方向" in violation or "戏剧发动机" in violation for violation in gate_violations)
+            rewrite_source = _fallback_agentic_decision(request, candidates) if needs_grounded_rebuild else args
+            args = _sanitize_unverified_strategy_decision(
+                rewrite_source,
+                request,
+            )
+        final_gate_violations = _strategy_decision_violations(args, request)
+        if final_gate_violations:
+            args = _sanitize_unverified_strategy_decision(
+                _fallback_agentic_decision(request, candidates),
+                request,
+            )
+            final_gate_violations = _strategy_decision_violations(args, request)
+        if final_gate_violations:
+            logger.error(
+                "Personal-IP strategy rewrite could not satisfy the server quality gate: %s",
+                final_gate_violations,
+            )
+            content = "这次独立审查连续两次没有通过事实与完整性门禁，我不能把仍含未经核验断言的方案直接展示给你。请重试当前请求；系统会沿用已确认事实重新生成，不会继续扩大搜索或把缺口编成案例。"
+        else:
+            content = _render_agentic_preliminary_plan(args)
+        base_message = message or AIMessage(content="")
+        updated = clone_ai_message_with_tool_calls(base_message, [], content=content)
+        additional_kwargs = dict(updated.additional_kwargs or {})
+        additional_kwargs[_PRELIMINARY_PLAN_KEY] = {
+            "version": _AGENTIC_PLAN_VERSION,
+            "status": "provisional",
+            "candidate_count": len(_safe_text_list(candidates.get("directions"))),
+            "method_count": len(_loaded_adaptation_methods(request)),
+            "independent_review": message is not None,
+            "evidence_gate_passed": not final_gate_violations,
+            "evidence_gate_rejections": len(gate_violations),
+            "server_rewrite_applied": server_rewrite_applied,
+        }
+        updated = updated.model_copy(
+            update={
+                "additional_kwargs": additional_kwargs,
+                "invalid_tool_calls": [],
+            }
+        )
+        if message is None:
+            return updated
+        return _replace_ai_message(result, message, updated)
 
     @staticmethod
     def _compact_adaptation_research_request(
@@ -1576,21 +2105,14 @@ class PersonalIPContextMiddleware(AgentMiddleware):
         tool_name = _preferred_benchmark_research_tool(request)
         if tool_name is None:
             return request
-        selected_tool = next(
-            tool for tool in request.tools if _tool_name(tool) == tool_name
-        )
+        selected_tool = next(tool for tool in request.tools if _tool_name(tool) == tool_name)
         return request.override(
-            system_message=SystemMessage(
-                content=_BENCHMARK_ADAPTATION_RESEARCH_SYSTEM
-            ),
+            system_message=SystemMessage(content=_BENCHMARK_ADAPTATION_RESEARCH_SYSTEM),
             messages=[
                 HumanMessage(
                     content=_compact_benchmark_evidence(
                         request,
-                        final_instruction=(
-                            "Use the forced tool for one narrow benchmark evidence "
-                            "action now; do not produce the plan in this call."
-                        ),
+                        final_instruction=("Use the forced tool for one narrow benchmark evidence action now; do not produce the plan in this call."),
                     ),
                     additional_kwargs={"hide_from_ui": True},
                 )
@@ -1601,51 +2123,17 @@ class PersonalIPContextMiddleware(AgentMiddleware):
         )
 
     @staticmethod
-    def _render_preliminary_plan_result(
-        result: ModelCallResult,
-        request: ModelRequest,
-    ) -> ModelCallResult:
-        message = _ai_message_from_result(result)
-        if message is None:
-            return result
-        args = _preliminary_plan_tool_args(message)
-        if args is None:
-            args = _fallback_preliminary_plan_args(request)
-        content = _render_preliminary_plan(args)
-        updated = clone_ai_message_with_tool_calls(message, [], content=content)
-        additional_kwargs = dict(updated.additional_kwargs or {})
-        additional_kwargs[_PRELIMINARY_PLAN_KEY] = {
-            "version": _PRELIMINARY_PLAN_VERSION,
-            "status": "provisional",
-        }
-        updated = updated.model_copy(
-            update={
-                "additional_kwargs": additional_kwargs,
-                "invalid_tool_calls": [],
-            }
-        )
-        return _replace_ai_message(result, message, updated)
-
-    @staticmethod
     def _guard_benchmark_result(
         request: ModelRequest,
         result: ModelCallResult,
     ) -> ModelCallResult:
         messages = list(request.messages)
-        if (
-            _runtime_agent_name(request) != _CUSTOMER_AGENT_NAME
-            or not _prefers_conversational_evidence_followup(messages)
-        ):
+        if _runtime_agent_name(request) != _CUSTOMER_AGENT_NAME or not _prefers_conversational_evidence_followup(messages):
             return result
         message = _ai_message_from_result(result)
         if message is None or message.tool_calls or _has_verified_representative_work(messages):
             return result
-        research_attempts = (
-            _tool_call_count(messages, "web_search")
-            + _tool_call_count(messages, "image_search")
-            + _tool_call_count(messages, "browser_navigate")
-            + _compacted_search_evidence(request)
-        )
+        research_attempts = _tool_call_count(messages, "web_search") + _tool_call_count(messages, "image_search") + _tool_call_count(messages, "browser_navigate") + _compacted_search_evidence(request)
         if research_attempts == 0:
             return result
         latest_user = _latest_real_user_message(messages)
@@ -1686,15 +2174,8 @@ class PersonalIPContextMiddleware(AgentMiddleware):
             return request
         request_messages = list(request.messages)
         benchmark_adaptation = _is_benchmark_adaptation_request(request_messages)
-        conversational_evidence = _runtime_agent_name(request) == _CUSTOMER_AGENT_NAME and (
-            _prefers_conversational_evidence_followup(request_messages)
-            or benchmark_adaptation
-        )
-        failed_browser_verifications = (
-            _failed_browser_verification_count(request_messages)
-            if conversational_evidence
-            else 0
-        )
+        conversational_evidence = _runtime_agent_name(request) == _CUSTOMER_AGENT_NAME and (_prefers_conversational_evidence_followup(request_messages) or benchmark_adaptation)
+        failed_browser_verifications = _failed_browser_verification_count(request_messages) if conversational_evidence else 0
         contracts = [SystemMessage(content=_AUTHORITY_CONTRACT)]
         if _runtime_agent_name(request) == _CUSTOMER_AGENT_NAME:
             contracts.append(SystemMessage(content=_STRATEGIC_GROUNDING_CONTRACT))
@@ -1715,26 +2196,14 @@ class PersonalIPContextMiddleware(AgentMiddleware):
         )
         tools = request.tools
         if conversational_evidence:
-            tools = [
-                tool
-                for tool in request.tools
-                if _tool_name(tool) in _BENCHMARK_RESEARCH_TOOL_NAMES
-            ]
-            discovery_searches = (
-                _tool_call_count(request_messages, "web_search")
-                + _compacted_search_evidence(request)
-            )
+            tools = [tool for tool in request.tools if _tool_name(tool) in _BENCHMARK_RESEARCH_TOOL_NAMES]
+            discovery_searches = _tool_call_count(request_messages, "web_search") + _compacted_search_evidence(request)
             if discovery_searches >= 2:
                 tools = [tool for tool in tools if _tool_name(tool) != "web_search"]
             if _tool_call_count(request_messages, "browser_navigate") >= 2:
                 tools = [tool for tool in tools if _tool_name(tool) != "browser_navigate"]
             if failed_browser_verifications >= 2:
-                tools = [
-                    tool
-                    for tool in tools
-                    if not _tool_name(tool).startswith("browser_")
-                    and _tool_name(tool) not in {"web_search", "write_todos"}
-                ]
+                tools = [tool for tool in tools if not _tool_name(tool).startswith("browser_") and _tool_name(tool) not in {"web_search", "write_todos"}]
         return request.override(messages=messages, tools=tools)
 
     @override
@@ -1745,16 +2214,96 @@ class PersonalIPContextMiddleware(AgentMiddleware):
     ) -> ModelCallResult:
         if response := self._first_contact_response(request):
             return response
-        if _should_synthesize_preliminary_plan(request):
-            bounded_request = self._compact_preliminary_plan_request(request)
-            result = handler(bounded_request)
-            message = _ai_message_from_result(result)
-            if (
-                message is None
-                or _preliminary_plan_tool_args(message) is None
-            ):
-                result = handler(bounded_request)
-            return self._render_preliminary_plan_result(result, request)
+        if _adaptation_research_ready(request):
+            available = {_tool_name(tool) for tool in request.tools}
+            messages = list(request.messages)
+            method_paths = _adaptation_method_paths(request)
+            loaded_methods = _loaded_adaptation_methods(request)
+            if {"describe_skill", "read_file"}.issubset(available) and _tool_call_count(messages, "describe_skill") == 0:
+                return _adaptation_method_discovery_message(request)
+            missing_paths = [path for name, path in method_paths.items() if name not in loaded_methods]
+            if "read_file" in available and missing_paths:
+                attempts = _adaptation_method_read_attempts(request, method_paths)
+                if all(attempts.get(name, 0) >= 2 for name in method_paths if name not in loaded_methods):
+                    return _adaptation_method_load_failure_message(len(loaded_methods))
+                return _adaptation_method_load_message(
+                    request,
+                    method_paths,
+                    loaded_methods,
+                )
+
+            candidates_request = self._compact_strategy_candidates_request(request)
+            candidate_result = handler(candidates_request)
+            candidate_message = _ai_message_from_result(candidate_result)
+            candidates = _structured_tool_args(
+                candidate_message,
+                _STRATEGY_CANDIDATES_TOOL_NAME,
+            )
+            candidate_violations = _strategy_candidate_violations(
+                candidates,
+                request,
+            )
+            if candidate_violations:
+                candidates_request = self._compact_strategy_candidates_request(
+                    request,
+                    candidate_violations,
+                )
+                candidate_result = handler(candidates_request)
+                candidate_message = _ai_message_from_result(candidate_result)
+                candidates = _structured_tool_args(
+                    candidate_message,
+                    _STRATEGY_CANDIDATES_TOOL_NAME,
+                )
+                candidate_violations = _strategy_candidate_violations(
+                    candidates,
+                    request,
+                )
+            if candidates is None:
+                candidates = {
+                    "evidence_boundary": "候选方案未通过证据门，交由独立审查阶段只从现有证据重新建立。",
+                    "facts": [],
+                    "hypotheses": [],
+                    "unknowns": [],
+                    "benchmark_transfer": [],
+                    "prohibited_copy": [],
+                    "audience_use_cases": [],
+                    "directions": [],
+                    "review_questions": [],
+                }
+            elif candidate_violations:
+                logger.warning(
+                    "Personal-IP candidate payload still failed the server quality gate after rewrite: %s",
+                    candidate_violations,
+                )
+                candidates = {
+                    **candidates,
+                    "_server_candidate_rejections": candidate_violations,
+                    "_server_instruction": ("这些候选仅保留为待修订战略骨架；独立审查不得继承被拒绝的事实断言。"),
+                }
+
+            review_request = self._compact_strategy_review_request(request, candidates)
+            review_result = handler(review_request)
+            review_message = _ai_message_from_result(review_result)
+            decision_args = _structured_tool_args(
+                review_message,
+                _STRATEGY_DECISION_TOOL_NAME,
+            )
+            decision_violations = _strategy_decision_violations(
+                decision_args,
+                request,
+            )
+            if decision_violations:
+                review_request = self._compact_strategy_review_request(
+                    request,
+                    candidates,
+                    decision_violations,
+                )
+                review_result = handler(review_request)
+            return self._render_agentic_plan_result(
+                review_result,
+                request,
+                candidates,
+            )
         if response := self._first_use_response(request):
             return response
         if marker := self._active_narrative_marker(request):
@@ -1779,16 +2328,96 @@ class PersonalIPContextMiddleware(AgentMiddleware):
     ) -> ModelCallResult:
         if response := self._first_contact_response(request):
             return response
-        if _should_synthesize_preliminary_plan(request):
-            bounded_request = self._compact_preliminary_plan_request(request)
-            result = await handler(bounded_request)
-            message = _ai_message_from_result(result)
-            if (
-                message is None
-                or _preliminary_plan_tool_args(message) is None
-            ):
-                result = await handler(bounded_request)
-            return self._render_preliminary_plan_result(result, request)
+        if _adaptation_research_ready(request):
+            available = {_tool_name(tool) for tool in request.tools}
+            messages = list(request.messages)
+            method_paths = _adaptation_method_paths(request)
+            loaded_methods = _loaded_adaptation_methods(request)
+            if {"describe_skill", "read_file"}.issubset(available) and _tool_call_count(messages, "describe_skill") == 0:
+                return _adaptation_method_discovery_message(request)
+            missing_paths = [path for name, path in method_paths.items() if name not in loaded_methods]
+            if "read_file" in available and missing_paths:
+                attempts = _adaptation_method_read_attempts(request, method_paths)
+                if all(attempts.get(name, 0) >= 2 for name in method_paths if name not in loaded_methods):
+                    return _adaptation_method_load_failure_message(len(loaded_methods))
+                return _adaptation_method_load_message(
+                    request,
+                    method_paths,
+                    loaded_methods,
+                )
+
+            candidates_request = self._compact_strategy_candidates_request(request)
+            candidate_result = await handler(candidates_request)
+            candidate_message = _ai_message_from_result(candidate_result)
+            candidates = _structured_tool_args(
+                candidate_message,
+                _STRATEGY_CANDIDATES_TOOL_NAME,
+            )
+            candidate_violations = _strategy_candidate_violations(
+                candidates,
+                request,
+            )
+            if candidate_violations:
+                candidates_request = self._compact_strategy_candidates_request(
+                    request,
+                    candidate_violations,
+                )
+                candidate_result = await handler(candidates_request)
+                candidate_message = _ai_message_from_result(candidate_result)
+                candidates = _structured_tool_args(
+                    candidate_message,
+                    _STRATEGY_CANDIDATES_TOOL_NAME,
+                )
+                candidate_violations = _strategy_candidate_violations(
+                    candidates,
+                    request,
+                )
+            if candidates is None:
+                candidates = {
+                    "evidence_boundary": "候选方案未通过证据门，交由独立审查阶段只从现有证据重新建立。",
+                    "facts": [],
+                    "hypotheses": [],
+                    "unknowns": [],
+                    "benchmark_transfer": [],
+                    "prohibited_copy": [],
+                    "audience_use_cases": [],
+                    "directions": [],
+                    "review_questions": [],
+                }
+            elif candidate_violations:
+                logger.warning(
+                    "Personal-IP candidate payload still failed the server quality gate after rewrite: %s",
+                    candidate_violations,
+                )
+                candidates = {
+                    **candidates,
+                    "_server_candidate_rejections": candidate_violations,
+                    "_server_instruction": ("这些候选仅保留为待修订战略骨架；独立审查不得继承被拒绝的事实断言。"),
+                }
+
+            review_request = self._compact_strategy_review_request(request, candidates)
+            review_result = await handler(review_request)
+            review_message = _ai_message_from_result(review_result)
+            decision_args = _structured_tool_args(
+                review_message,
+                _STRATEGY_DECISION_TOOL_NAME,
+            )
+            decision_violations = _strategy_decision_violations(
+                decision_args,
+                request,
+            )
+            if decision_violations:
+                review_request = self._compact_strategy_review_request(
+                    request,
+                    candidates,
+                    decision_violations,
+                )
+                review_result = await handler(review_request)
+            return self._render_agentic_plan_result(
+                review_result,
+                request,
+                candidates,
+            )
         if response := self._first_use_response(request):
             return response
         if marker := self._active_narrative_marker(request):
