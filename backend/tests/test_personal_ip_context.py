@@ -170,6 +170,58 @@ def test_new_owner_orientation_opens_as_normal_conversation_without_calling_mode
     handler.assert_not_called()
 
 
+def test_new_owner_plain_greeting_is_zero_model_cost_and_does_not_start_an_interview():
+    request = ModelRequest(
+        model=object(),
+        messages=[HumanMessage(content="你好")],
+        tools=[
+            SimpleNamespace(name="web_search"),
+            SimpleNamespace(name="read_file"),
+            SimpleNamespace(name="personal_ip_operating_cockpit"),
+        ],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    handler = Mock()
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert isinstance(result, AIMessage)
+    assert "直接把" in result.content
+    assert "我会先自己查证" in result.content
+    assert result.content.count("？") == 1
+    assert "personal_ip_narrative_interview" not in result.additional_kwargs
+    handler.assert_not_called()
+
+
+def test_returning_owner_plain_greeting_is_also_zero_model_cost():
+    request = ModelRequest(
+        model=object(),
+        messages=[HumanMessage(content="你好")],
+        tools=[SimpleNamespace(name="personal_ip_operating_cockpit")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": _portfolio(),
+            }
+        ),
+    )
+    handler = Mock()
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert isinstance(result, AIMessage)
+    assert "直接把" in result.content
+    assert result.content.count("？") == 1
+    handler.assert_not_called()
+
+
 @pytest.mark.parametrize(
     ("user_text", "entity_type"),
     [
@@ -240,6 +292,102 @@ def test_ip_agent_injects_decision_grounding_before_benchmark_research():
         "web_search",
         "browser_navigate",
     ]
+
+
+def test_named_benchmark_research_uses_a_real_tool_allowlist():
+    request = ModelRequest(
+        model=object(),
+        messages=[HumanMessage(content="你看看贵厨笔记这个对标账号")],
+        tools=[
+            SimpleNamespace(name="web_search"),
+            SimpleNamespace(name="browser_navigate"),
+            SimpleNamespace(name="browser_get_text"),
+            SimpleNamespace(name="browser_click"),
+            SimpleNamespace(name="personal_ip_select_browser_account"),
+            SimpleNamespace(name="ask_clarification"),
+            SimpleNamespace(name="read_file"),
+            SimpleNamespace(name="personal_ip_operating_cockpit"),
+            SimpleNamespace(name="personal_ip_begin_video_production"),
+            SimpleNamespace(name="personal_ip_prepare_browser_publish"),
+            SimpleNamespace(name="task"),
+            SimpleNamespace(name="write_todos"),
+        ],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+
+    injected = PersonalIPContextMiddleware()._inject(request)
+
+    assert [tool.name for tool in injected.tools] == [
+        "web_search",
+        "browser_navigate",
+        "browser_get_text",
+        "browser_click",
+        "personal_ip_select_browser_account",
+    ]
+
+
+def test_product_benchmark_starts_with_one_compact_forced_discovery_call():
+    request = ModelRequest(
+        model=object(),
+        system_message=SystemMessage(
+            content="full operating prompt with every Skill and every tool"
+        ),
+        messages=[
+            HumanMessage(
+                content=(
+                    "我有一家金店，主要产品是黄金礼品。我想参考抖音账号‘贵厨笔记’"
+                    "做一个类似但不照抄的账号。你自己查、自己判断，直接给我一套初步完整方案。"
+                )
+            )
+        ],
+        tools=[
+            SimpleNamespace(name="web_search"),
+            SimpleNamespace(name="browser_navigate"),
+            SimpleNamespace(name="browser_get_text"),
+            SimpleNamespace(name="read_file"),
+            SimpleNamespace(name="personal_ip_operating_cockpit"),
+            SimpleNamespace(name="personal_ip_begin_video_production"),
+        ],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    expected = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "web_search",
+                "args": {"query": "贵厨笔记 抖音"},
+                "id": "search-1",
+                "type": "tool_call",
+            }
+        ],
+    )
+    handler = Mock(return_value=expected)
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert result is expected
+    bounded_request = handler.call_args.args[0]
+    assert bounded_request.system_message.content != request.system_message.content
+    assert "one bounded evidence-acquisition action" in (
+        bounded_request.system_message.content
+    )
+    assert len(bounded_request.messages) == 1
+    assert "黄金礼品" in bounded_request.messages[0].content
+    assert [tool.name for tool in bounded_request.tools] == ["web_search"]
+    assert bounded_request.tool_choice == "web_search"
+    handler.assert_called_once()
 
 
 def test_own_account_inspection_is_not_treated_as_external_benchmark_research():
@@ -421,7 +569,7 @@ def test_named_benchmark_two_failed_page_verifications_force_artifact_request():
 
     injected = PersonalIPContextMiddleware()._inject(request)
 
-    assert [tool.name for tool in injected.tools] == ["read_file"]
+    assert injected.tools == []
     contracts = "\n".join(
         message.content
         for message in injected.messages
@@ -514,6 +662,222 @@ def test_named_benchmark_final_answer_survives_verified_representative_work():
     result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
 
     assert result is expected
+
+
+def test_product_plus_benchmark_routes_to_one_bounded_complete_preliminary_plan():
+    request = ModelRequest(
+        model=object(),
+        system_message=SystemMessage(content="full operating prompt with every Skill and every tool"),
+        messages=[
+            HumanMessage(content="你知道贵厨笔记这个账号吗"),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "web_search",
+                        "args": {"query": "贵厨笔记 抖音"},
+                        "id": "search-1",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            ToolMessage(
+                content='{"query":"贵厨笔记 抖音","total_results":0,"results":[]}',
+                tool_call_id="search-1",
+            ),
+            HumanMessage(content="我有一家金店，主要产品为黄金礼品，我也想做这样的账号，你帮我策划一下"),
+        ],
+        tools=[
+            SimpleNamespace(name="web_search"),
+            SimpleNamespace(name="browser_navigate"),
+            SimpleNamespace(name="read_file"),
+            SimpleNamespace(name="personal_ip_operating_cockpit"),
+            SimpleNamespace(name="personal_ip_begin_video_production"),
+            SimpleNamespace(name="personal_ip_prepare_browser_publish"),
+        ],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    structured = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "personal_ip_preliminary_plan",
+                "args": {
+                    "evidence_boundary": "已确认用户经营黄金礼品、对标为贵厨笔记及其主页定位；代表作与转化链路尚未核验。",
+                    "strategic_thesis": "把黄金礼品从款式陈列转成人情表达，再引流到私域，但先按假设测试。",
+                        "audience_hypotheses": [
+                            {
+                                "segment": "22-35岁需要送礼但不会选的人",
+                                "occasion": "婚庆、纪念日和重要关系表达",
+                                "reason": "需要降低选礼决策成本并避免送错。",
+                        },
+                        {
+                            "segment": "重视长期价值的家庭购买者",
+                            "occasion": "新生儿、长辈寿礼和家庭纪念",
+                            "reason": "希望礼物同时承载关系与可留存价值。",
+                        },
+                    ],
+                    "benchmark_transfer": [
+                        "借鉴场景身份带来的可信叙事入口",
+                        "借鉴弱广告、强情境的内容组织方式",
+                    ],
+                    "unverified_or_do_not_copy": [
+                        "尚不能确认贵厨笔记代表作的钩子和转化机制",
+                        "不复制服务员人设和泛人生金句",
+                    ],
+                    "content_series": [
+                            {
+                                "name": "这份金礼为什么这样选",
+                                "promise": "把送礼对象、场合和预算翻译成选择逻辑",
+                                "format": "礼物特写加店员旁白，每条60-90秒",
+                        },
+                        {
+                            "name": "一件礼物的一生",
+                            "promise": "讲清黄金礼品被赠送、保存和再次想起的关系价值",
+                            "format": "真实订单证据授权后再拍，禁止编造顾客故事",
+                        },
+                    ],
+                        "conversion_path": [
+                            "内容解决送什么",
+                            "主页引导添加企业微信并进粉丝群",
+                            "成交后赠送小克重黄金换用户晒单",
+                    ],
+                        "production_modes": [
+                            "先测试本人或店员出镜的可信度，每条75秒",
+                            "同时准备手部实拍加旁白的无脸版本作对照",
+                    ],
+                    "pilot": {
+                        "concept": "同一预算，送妈妈和送伴侣为什么不能选同一件金礼",
+                        "hook": "花差不多的钱送黄金，体面保值，大家都夸。",
+                        "outline": "先给冲突，然后告诉用户3000元预算直接推荐20克手镯。",
+                        "format": "真人半身版与手部旁白版各拍一条",
+                        "signals": [
+                            "完播率≥30%就算方向成立",
+                            "评论咨询率达到10%就算有意向",
+                            "连续3条未达标就换方向",
+                        ],
+                        "failure_rule": "连续发布3条，任意2个指标未达到阈值就判定失败。",
+                    },
+                        "assumptions": [
+                            "暂按门店具备基础定制或选款能力处理",
+                            "暂不假设全国成交能力和具体客单价",
+                            "发够10条以后一定会获得稳定流量",
+                    ],
+                    "next_evidence": "下一轮优先自主核验三条代表作，并用首轮两种拍法的数据修正人设与内容结构。",
+                },
+                "id": "preliminary-plan",
+                "type": "tool_call",
+            }
+        ],
+    )
+    handler = Mock(return_value=structured)
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert isinstance(result, AIMessage)
+    assert result.tool_calls == []
+    assert "初步完整方案" in result.content
+    assert "证据边界" in result.content
+    assert "黄金礼品" in result.content
+    assert "谁为什么来买" not in result.content
+    assert "完整复刻" not in result.content
+    assert "10倍" not in result.content
+    assert "3000元" not in result.content
+    assert "20克" not in result.content
+    assert "≥30%" not in result.content
+    assert "达到10%" not in result.content
+    assert "任意2个指标" not in result.content
+    assert "22-35岁" not in result.content
+    assert "60-90秒" not in result.content
+    assert "75秒" not in result.content
+    assert "企业微信" not in result.content
+    assert "私域" not in result.content
+    assert "赠送小克重黄金" not in result.content
+    assert "体面保值" not in result.content
+    assert "大家都夸" not in result.content
+    assert "10条以后" not in result.content
+    assert "价格、规格、交付与售后信息以拍摄当日经营事实为准" in result.content
+    assert "送礼矛盾" not in result.content
+    assert "金价或克重" not in result.content
+    assert "注意与理解" in result.content
+    assert "首轮试验" in result.content
+    bounded_request = handler.call_args.args[0]
+    assert bounded_request.system_message.content != request.system_message.content
+    assert "complete provisional plan now" in bounded_request.system_message.content
+    assert [tool["function"]["name"] for tool in bounded_request.tools] == [
+        "personal_ip_preliminary_plan"
+    ]
+    plan_schema = bounded_request.tools[0]["function"]["parameters"]
+    assert plan_schema["properties"]["audience_hypotheses"]["items"]["type"] == "string"
+    assert "conversion_path" not in plan_schema["properties"]
+    assert "pilot" not in plan_schema["properties"]
+    assert "personal_ip_begin_video_production" not in str(bounded_request.tools)
+    assert "贵厨笔记" in bounded_request.messages[-1].content
+    assert "黄金礼品" in bounded_request.messages[-1].content
+    handler.assert_called_once()
+
+
+def test_malformed_preliminary_plan_retries_once_then_returns_a_complete_fallback():
+    request = ModelRequest(
+        model=object(),
+        messages=[
+            HumanMessage(content="你看看贵厨笔记这个账号"),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "web_search",
+                        "args": {"query": "贵厨笔记 抖音"},
+                        "id": "search-1",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            ToolMessage(
+                content='{"query":"贵厨笔记 抖音","total_results":0,"results":[]}',
+                tool_call_id="search-1",
+            ),
+            HumanMessage(
+                content="我有一家金店，卖黄金礼品，也想做类似但不照抄的账号，直接给我完整方案"
+            ),
+        ],
+        tools=[SimpleNamespace(name="web_search")],
+        state={"messages": []},
+        runtime=SimpleNamespace(
+            context={
+                "agent_name": "ip-agent",
+                "personal_ip_portfolio": {"subjects": [], "accounts": []},
+            }
+        ),
+    )
+    malformed = AIMessage(
+        content="",
+        invalid_tool_calls=[
+            {
+                "name": "personal_ip_preliminary_plan",
+                "args": '{"evidence_boundary":"truncated"',
+                "id": "bad-plan",
+                "error": "invalid JSON",
+                "type": "invalid_tool_call",
+            }
+        ],
+    )
+    handler = Mock(side_effect=[malformed, malformed])
+
+    result = PersonalIPContextMiddleware().wrap_model_call(request, handler)
+
+    assert "初步完整方案" in result.content
+    assert "这次没有生成出完整" not in result.content
+    assert "黄金礼品" in result.content
+    assert "供应商" not in result.content
+    assert handler.call_count == 2
+    assert handler.call_args_list[0].args[0] == handler.call_args_list[1].args[0]
 
 
 def test_new_owner_first_answer_uses_a_bounded_reflective_model_call():

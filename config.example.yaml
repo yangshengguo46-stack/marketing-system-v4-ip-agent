@@ -1546,12 +1546,12 @@ skills:
   # Default: /mnt/skills
   container_path: /mnt/skills
 
-  # Deferred skill discovery (default: false)
+  # Deferred skill discovery (default: true)
   # When enabled, only skill names appear in the system prompt (<skill_index>).
   # The LLM discovers skill details on demand via the describe_skill tool.
   # This keeps the system prompt compact and prefix-cache friendly when many
   # skills are installed.
-  # deferred_discovery: true
+  deferred_discovery: true
 
 # ============================================================================
 # SkillScan Configuration

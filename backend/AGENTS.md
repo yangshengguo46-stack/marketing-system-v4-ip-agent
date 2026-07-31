@@ -549,8 +549,8 @@ Additional providers also live here (`boxlite`, `brave`, `browserless`, `crawl4a
 - **Loading**: `load_skills()` recursively scans namespace directories under `skills/{public,custom}`, but stops descending once it finds a `SKILL.md`; that directory is a package boundary, so no nested `SKILL.md` is registered as a runtime skill. SkillScan has a deliberately narrower packaging rule: known eval fixtures are permitted as support data, while other nested `SKILL.md` files are reported as package defects. It parses runtime metadata and reads enabled state from extensions_config.json.
 - **External reload**: `POST /api/skills/reload` is an admin-only, process-local invalidation hook for trusted MinIO/NFS/CSI writes. `SkillStorage` instances do not cache a catalog — `load_skills()` scans on every call — so the route clears all `(app_config, user_id)` entries and the rendered prompt-section LRU, then waits up to the shared refresh timeout for the existing off-loop single-flight refresh. Each invalidation receives a generation-bound result handle; a successful scan atomically replaces the global enabled-skills cache, while a loader-level failure propagates to the HTTP waiter and preserves the last-known-good global cache. Per-user/config scans capture the refresh version and cannot repopulate shared caches if invalidation occurs while they are loading. A timed-out HTTP wait fails generically while the daemon refresh worker continues. Subsequent runs rescan after a successful reload; active runs keep their existing snapshot. Each Uvicorn worker/Kubernetes Pod must be targeted separately. Direct mount writes bypass install/edit validation, SkillScan, and history, so mounted roots are an operator-controlled trust boundary.
 - **Tool policy**: Lead-agent `allowed-tools` declarations apply dynamically only to slash-activated skills and skills captured in `ThreadState.skill_context` through configured `read_file` loads; passive enabled skills and custom-agent skill allowlists remain discoverable without clamping the global toolset. Slash policy is dominant for its run, preventing subsequently read skills from widening explicit authority; autonomous captured skills use the existing union only when no slash source exists. `tool_search` and `describe_skill` stay available as framework discovery infrastructure, while every discovered or promoted business tool still requires active-policy permission for schema visibility and execution; `task` likewise requires an explicit declaration. Each active model call intentionally reloads the full live registry so enable/disable changes, frontmatter edits, and custom/public name-shadow winners take effect without a stale TTL or unsafe direct-path cache; all tool calls produced by that model step reuse the resulting source-and-path-signed decision. Registry failures and all-invalid active sets fail closed, while stale individual paths are skipped when another valid skill remains. This is best-effort behavioral scoping, not a hard security boundary: alternate loading paths are not captured and bounded autonomous context may evict entries. Subagents still filter statically because their configured skills are all loaded into the session at startup.
-- **Injection (legacy / default)**: Enabled skills are listed in the agent system prompt with full metadata and container paths (`<available_skills>` block). Controlled by `skills.deferred_discovery: false` (default).
-- **Deferred discovery** (`skills.deferred_discovery: true`): Skills are listed by name only in a compact `<skill_index>` block, keeping the system prompt prefix-cache friendly. The agent calls the `describe_skill` tool at runtime to fetch full metadata for skills it wants to use, then loads the SKILL.md via `read_file`. Two new modules support this path:
+- **Injection (legacy opt-in)**: Enabled skills are listed in the agent system prompt with full metadata and container paths (`<available_skills>` block). Controlled by `skills.deferred_discovery: false`; use it only when a deployment intentionally accepts the larger prompt.
+- **Deferred discovery (default)** (`skills.deferred_discovery: true`): Skills are listed by name only in a compact `<skill_index>` block, keeping the system prompt prefix-cache friendly. The agent calls the `describe_skill` tool at runtime to fetch full metadata for skills it wants to use, then loads the SKILL.md via `read_file`. Two new modules support this path:
   - `skills/catalog.py` — `SkillCatalog` (immutable, searchable; query forms: `select:a,b`, `+prefix`, free-text regex); `select:` returns all requested skills without a result cap; other modes cap at `MAX_RESULTS=5`.
   - `skills/describe.py` — `build_describe_skill_tool(catalog)` builds the `describe_skill` tool as a closure; `build_skill_search_setup(skills, enabled, ...)` produces a `SkillSearchSetup(describe_skill_tool, skill_names)` that is wired into both the LangGraph agent factory (`agent.py`) and the embedded client (`client.py`).
 - **Slash activation**: `/skill-name task` loads that enabled skill's `SKILL.md` for the current model call only. The resolver rejects leading whitespace, missing separators, reserved channel commands (`/new`, `/help`, `/bootstrap`, `/status`, `/models`, `/memory`, `/goal`), disabled skills, and skills outside a custom agent's whitelist.
@@ -838,7 +838,7 @@ Config is env-driven like the others — `MonocleTracingConfig`, built in `get_t
 - `tool_groups[]` - Logical groupings for tools
 - `sandbox.use` - Sandbox provider class path
 - `skills.path` / `skills.container_path` - Host and container paths to skills directory
-- `skills.deferred_discovery` - When `true`, replaces the full-metadata `<available_skills>` prompt block with a compact `<skill_index>` (names only) and registers the `describe_skill` tool so the agent fetches metadata on demand. Defaults to `false` (legacy full-metadata injection)
+- `skills.deferred_discovery` - When `true`, replaces the full-metadata `<available_skills>` prompt block with a compact `<skill_index>` (names only) and registers the `describe_skill` tool so the agent fetches metadata on demand. Defaults to `true`; `false` is the legacy full-metadata opt-in
 - `title` - Auto-title generation (enabled, max_words, max_chars, model_name; null model_name uses fast local fallback, explicit model_name uses the prompt_template LLM path)
 - `summarization` - Context summarization (enabled, trigger conditions, keep policy)
 - `subagents.enabled` - Master switch for subagent delegation
@@ -1052,13 +1052,40 @@ recent visible dialogue, no operating tools and a compact interviewing prompt.
 The middleware converts that private tool call into ordinary assistant text,
 persists only a version/status/turn/entity marker, and either asks one
 answer-grounded follow-up, stops, or hands sufficient evidence to the full
-agent in the same turn. Concrete script/asset/link/direction operations bypass
-or interrupt the gate. For a named benchmark, the same middleware injects the
-strategy-grounding contract, removes clarification-card and image-search tools,
-caps discovery at two searches across compaction, stops after two blocked
-rendered verifications and guards final model text unless a representative
-post/video page was actually verified. Secondary articles and search snippets
-may identify the account but cannot complete content-mechanism analysis.
+agent in the same turn. A plain first-turn greeting from either a new or
+returning owner receives a deterministic zero-model invitation rather than
+starting the narrative interview or loading the full operating context. Concrete
+script/asset/link/direction operations bypass or interrupt the gate.
+
+Named-benchmark discovery uses a positive allowlist containing only public
+search, rendered browser verification and browser-account selection; it must
+not inherit the full native-tool registry merely by excluding a few known-bad
+tools. Discovery is capped at two searches across compaction. A pure benchmark
+judgment stops after two blocked rendered verifications and guards final model
+text unless a representative post/video page was actually verified. Secondary
+articles and search snippets may identify the account but cannot complete
+content-mechanism analysis.
+
+When the visible dialogue already supplies a product, brand or other operating
+entity plus a benchmark lead and asks for an adapted account plan, missing
+representative works must neither license a fabricated benchmark analysis nor
+block the first useful answer. The middleware makes one compact forced-tool
+discovery call, then one flat forced-schema synthesis call using only recent
+user facts, compact credential-free research observations and the server
+portfolio projection. One equally bounded synthesis retry is allowed for
+malformed provider JSON; a deterministic complete provisional fallback must
+still answer the user if both attempts fail. The full system prompt, Skill
+catalog and ordinary tool schemas are absent from these calls. The
+natural-language result is a complete provisional
+package: evidence boundary, strategic thesis, audience/use-occasion
+hypotheses, transferable and non-transferable mechanisms, content system,
+conversion path, human/faceless production choices and one falsifiable pilot.
+Unsupported customer stories, exact performance claims, arbitrary thresholds,
+viral guarantees, multipliers, age bands, fixed schedules/durations,
+price-to-spec mappings, assumed private channels and incentive giveaways are
+forbidden. Evidence boundary, conversion path, pilot structure, signal classes
+and failure rule are server-rendered; stronger representative works remain a
+non-blocking next-evidence request.
 Account ids are operation targets and receipt fields only. Keep the middleware
 before `SkillActivationMiddleware`, and preserve tests for owner isolation,
 cross-account portfolio access, the zero-model ordinary first reply,

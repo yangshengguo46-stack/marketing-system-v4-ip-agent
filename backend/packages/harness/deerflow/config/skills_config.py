@@ -30,7 +30,7 @@ class SkillsConfig(BaseModel):
         description="Path where skills are mounted in the sandbox container",
     )
     deferred_discovery: bool = Field(
-        default=False,
+        default=True,
         description=("When enabled, skill metadata is not injected into the system prompt. Instead, only skill names appear in <skill_index> and the LLM discovers details on demand via the describe_skill tool."),
     )
 

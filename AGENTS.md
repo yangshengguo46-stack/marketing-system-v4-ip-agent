@@ -452,17 +452,36 @@ IP Agent distribution note:
   direct-strategy operations bypass or interrupt this boundary.
 - Public-web research is only an evidence-acquisition layer for Personal-IP;
   never let a search summary or generic industry playbook become the strategy.
-  A named benchmark gets at most two discovery searches. Search snippets,
-  profile pages and secondary articles may establish identity leads but are
-  not representative-work evidence. After two failed rendered verifications,
-  stop search/browser/image-search planning and ask in ordinary conversation
+  A named benchmark gets at most two discovery searches and only the positive
+  allowlist of search/browser/account-selection schemas; do not expose the
+  ordinary full tool registry during that stage. Search snippets, profile pages
+  and secondary articles may establish identity leads but are not
+  representative-work evidence. After two failed rendered verifications, a
+  pure benchmark-analysis request must stop and ask in ordinary conversation
   for the exact account page plus three representative videos, screenshots or
   a recording. `PersonalIPContextMiddleware` must guard a final benchmark claim
   when no representative work was verified, including after message
-  compaction. Keep the generic `deep-research` Skill out of the default
-  `ip-agent` config; product strategy and creative synthesis own the judgment.
-  The Volcengine provider's public fallback uses strict safe search and filters
-  unsafe or query-irrelevant results before returning evidence.
+  compaction.
+
+  A product/entity plus benchmark plus adapted-account request has a different
+  useful-answer boundary: after bounded autonomous discovery, return one
+  complete provisional strategy instead of making broad buyer/intake questions
+  prerequisites. Use one compact forced discovery action followed by a flat
+  forced response schema over recent user facts and sanitized research
+  observations only, with no full system/Skill/tool prompt. Retry malformed
+  provider JSON at most once, then render a deterministic complete fallback
+  instead of asking the user to retry. Separate verified facts from
+  hypotheses, transfer mechanisms rather than appearances, include content,
+  conversion, production alternatives and a falsifiable pilot, and make
+  stronger representative works a non-blocking next-evidence request. Never
+  invent customer stories, exact performance, arbitrary thresholds, viral
+  guarantees, multipliers, demographic bands, publishing schedules, paid
+  traffic, price-to-spec mappings, private-channel availability or incentive
+  giveaways. Keep the generic
+  `deep-research` Skill out of the default `ip-agent` config; product strategy
+  and creative synthesis own the judgment. The Volcengine provider's public
+  fallback uses strict safe search and filters unsafe or query-irrelevant
+  results before returning evidence.
 - `deerflow.personal_ip.video_method_distillation` adapts the MIT-licensed
   Cangjie RIA-TV++ workflow for long-form video, recorded courses, interviews
   and podcasts. It may consume only a sealed `personal-ip-video-pattern-v1`

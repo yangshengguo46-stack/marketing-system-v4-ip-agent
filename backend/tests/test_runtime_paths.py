@@ -45,6 +45,10 @@ def test_default_runtime_paths_resolve_from_current_project(tmp_path: Path, monk
     assert get_or_new_skill_storage(skills_path=SkillsConfig().get_skills_path()).get_skills_root_path() == tmp_path / "skills"
 
 
+def test_skill_discovery_defaults_to_compact_name_only_prompting():
+    assert SkillsConfig().deferred_discovery is True
+
+
 def test_deer_flow_project_root_overrides_current_directory(tmp_path: Path, monkeypatch):
     _clear_path_env(monkeypatch)
     project_root = tmp_path / "project"
