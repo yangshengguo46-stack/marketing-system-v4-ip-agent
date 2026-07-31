@@ -149,15 +149,19 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > without a model call. If the user
 > has already supplied a product or brand, a benchmark account and a request
 > for an adapted direction, the Agent does not turn “who buys and why” into an
-> entry exam. It researches within a strict search/browser budget and then uses
-> a bounded multi-stage strategy room: it reads the relevant first-party
-> strategy and cinematic methods, creates competing directions, and submits
-> them to an independent skeptical review before returning a complete
-> provisional plan. Missing representative works remain a clearly labelled
-> evidence gap and a non-blocking next step. A server quality gate then rejects
-> any untraceable number, work history, case, audience group, channel, product
-> detail or guaranteed outcome. It asks the review stage to rewrite once and
-> never displays a result that still fails the evidence check.
+> entry exam. It keeps DeerFlow's ordinary model–tool–model loop, but benchmark
+> work is dependency-ordered: discovery must first identify the exact account;
+> otherwise the Agent asks for its link and does not load downstream creative
+> capabilities. An identified account still needs supplied or verified
+> representative works before video-pattern extraction, IP transfer, cinematic
+> story work or production can start. There is no fixed six-method route,
+> private strategy-room detour, deterministic prose renderer or generic
+> category plan masquerading as benchmark adaptation.
+> Verified operating facts, brand/product truth, social/emotional insight and
+> fictional story truth are separate lanes. Server contracts still own
+> identity, authority, credentials, irreversible actions, receipts and factual
+> business claims; clearly fictional characters and conflicts are valid
+> creative material and are not rewritten into generic “经营证据” copy.
 > Open-web search is evidence acquisition, not the IP Agent's deliverable.
 > When a user names a benchmark account, the Agent may make at most two
 > discovery searches, then verifies representative works. Search snippets,
@@ -169,9 +173,9 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > benchmark analysis. The public fallback uses strict safe search and removes
 > unsafe or query-irrelevant results before they enter model context.
 > Skill discovery is name-only by default and expands a method only when it is
-> actually selected. Benchmark discovery receives only search/browser schemas,
-> so dozens of unrelated tool and Skill descriptions do not consume the prompt
-> on every reasoning step.
+> actually selected. The authorized native tools stay available; loading one
+> relevant capability applies its declared tool policy without turning a
+> semantic task such as benchmark research into a hard-coded allowlist.
 > IP is treated as an influence asset for a person, brand, product or
 > organization: attributable public expectations that can change attention,
 > trust, choice or action. Reach is distribution, not the asset. The private
@@ -684,6 +688,11 @@ DeerFlow supports configurable MCP servers and skills to extend its capabilities
 For HTTP/SSE MCP servers, OAuth token flows are supported (`client_credentials`, `refresh_token`).
 For stdio MCP servers, per-tool call timeouts can be configured with `tool_call_timeout`.
 MCP routing hints can also prefer a specific MCP tool for matching requests without forbidding other tools. When `tool_search` defers MCP schemas, matching routing metadata can auto-promote up to `tool_search.auto_promote_top_k` deferred schemas before the model call.
+The same schema-on-demand path also supports explicitly tagged first-party
+tools. In this distribution, specialized Personal-IP strategy, video,
+publishing and metrics tools are deferred while startup and operating-cockpit
+entry tools stay visible. The model sees names first and promotes full schemas
+only when the current task needs them.
 See the [MCP Server Guide](backend/docs/MCP_SERVER.md) for detailed instructions.
 
 #### IM Channels

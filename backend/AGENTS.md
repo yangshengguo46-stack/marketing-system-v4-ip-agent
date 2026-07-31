@@ -291,7 +291,7 @@ Before changing a later authorization phase, read the [authorization RFC](../doc
 22. **MemoryMiddleware** - Queues conversations for async memory update (filters to user + final AI responses)
 23. **ViewImageMiddleware** - *(optional, if the model supports vision)* Injects base64 image data before the LLM call
 24. **McpRoutingMiddleware** - *(optional, if `tool_search.enabled` and PR1 MCP routing metadata produce a routing index)* Auto-promotes matching deferred MCP tool schemas before the model call by writing a minimal `promoted` state update. It matches only the latest real `HumanMessage`, uses the global `tool_search.auto_promote_top_k` limit (default 3, clamped to 1..5), never executes tools, and must be installed before `DeferredToolFilterMiddleware`
-25. **DeferredToolFilterMiddleware** - *(optional, if `tool_search.enabled`)* Hides deferred (MCP) tool schemas from the bound model until `tool_search` or `McpRoutingMiddleware` promotes them (reads per-thread promotions from `ThreadState.promoted`, hash-scoped)
+25. **DeferredToolFilterMiddleware** - *(optional, if `tool_search.enabled`)* Hides deferred tool schemas from the bound model until `tool_search` or, for routed MCP tools, `McpRoutingMiddleware` promotes them (reads per-thread promotions from `ThreadState.promoted`, hash-scoped). MCP tools opt in automatically; the large Personal-IP first-party catalog also opts in except for startup and operating-cockpit entry tools.
 26. **SystemMessageCoalescingMiddleware** - Merges every SystemMessage into a single leading SystemMessage per request; provider-agnostic fix for strict backends (vLLM/SGLang/Qwen/Anthropic) that reject non-leading system messages. Touches the per-request payload only (checkpoint state unchanged); on midnight crossings only the latest `dynamic_context_reminder` SystemMessage survives
 27. **SubagentLimitMiddleware** - *(optional, if `subagent_enabled`)* Truncates excess `task` tool calls to enforce both the per-response concurrency limit (`max_concurrent_subagents`, clamped to 2-4) and the per-run total delegation cap (`max_total_subagents` runtime override or `subagents.max_total_per_run`, default 6, clamped to 1-50). The total cap counts current-run entries in the durable delegation ledger (entries are tagged with `run_id` when captured), so repeated planning checkpoints in one run cannot keep launching legal-sized batches indefinitely, while later user turns in the same thread get a fresh run budget. If the cap is exhausted, the middleware strips remaining `task` calls, forces `finish_reason="stop"`, and appends a visible limit note so the run can synthesize existing results instead of ending with an empty tool-call response.
 28. **LoopDetectionMiddleware** - *(optional, if `loop_detection.enabled`)* Detects repeated tool-call loops; hard-stop clears both structured `tool_calls` and raw provider tool-call metadata before forcing a final text answer; stamps `loop_capped` via `consume_stop_reason` (#3875 Phase 2), symmetric to `TokenBudgetMiddleware`
@@ -461,7 +461,7 @@ Proxied through nginx: `/api/langgraph/*` → Gateway LangGraph-compatible runti
 **Guardrail caps & `stop_reason` (#3875 Phase 2)**: three independent axes can end a subagent run early, and all now surface *why* through one additive field rather than a new status enum. **Turn axis**: `recursion_limit` on the subagent `run_config` equals `max_turns`, so exhausting the turn budget raises `GraphRecursionError` from `agent.astream`; `executor.py::_aexecute` catches it specifically (before the generic `except Exception`). **Token axis**: `TokenBudgetMiddleware` is attached per-agent via `build_subagent_runtime_middlewares` from `subagents.token_budget` (default `max_tokens` **coupled to `summarization.enabled`** — 1,000,000 when subagent summarization is on, 2,000,000 when off, warn at 0.7, hard-stop at 1.0; a user-set budget always wins regardless of the switch — #3875 Phase 3; a backstop against a subagent that burns tokens on trivial work). It does *not* raise: at the hard-stop threshold it strips the in-flight turn's tool calls, forces `finish_reason="stop"`, and lets the run complete naturally with a final answer. **Loop axis**: `LoopDetectionMiddleware` (attached at the same point) catches repeated identical tool-call sets — or one tool *type* called many times with varying args — and its hard-stop likewise strips `tool_calls` and forces a final answer without raising, recording `loop_capped`. Each guard exposes its cap on a per-`run_id` `consume_stop_reason(run_id)` accessor; `_aexecute` collects **every** middleware with that method (duck-typed via `hasattr`, so the executor has no import coupling to the guard classes) and surfaces the first non-`None` reason — adding a future guard needs no executor change. **Surfacing**: whichever axis fired, `_aexecute` stamps a normal status plus an additive reason — `completed` + `stop_reason=token_capped|turn_capped|loop_capped` when a usable final answer (or partial recovered from the last streamed chunk via `_extract_final_result` → `utils/messages.py::message_content_to_text`, returning a `"No response Generated"` sentinel when no text survived) was produced; `failed` + `stop_reason=turn_capped` when nothing usable survived. `SubagentResult.stop_reason` flows through `task_tool.py::_task_result_command` → `format_subagent_result_message` (renders `Task Succeeded (capped: ...)` / `Task failed (capped: ...)`) and `make_subagent_additional_kwargs`, which stamps the additive `subagent_stop_reason` key alongside the normal `subagent_status`. **Why additive, not an enum**: a new status value would break v1 consumers; an optional field is ignored by older frontends and ledger readers, so the cross-language contract (`contracts/subagent_status_contract.json` v2 + `subagents/status_contract.py` + `frontend/.../subtask-result.ts`, pinned by `test_status_values_match_contract` / `test_stop_reason_values_match_contract`) stays backward-compatible. The durable delegation ledger captures `stop_reason` onto the entry and renders model-facing guidance ("hit a guardrail cap with a partial result; reuse it, retry tighter, or raise the per-agent budget (`max_turns` / `token_budget`)") so the lead reuses a capped completion knowingly instead of mistaking it for a clean one. (Phase 1 shipped this surfacing as a `MAX_TURNS_REACHED` status enum in #3949; Phase 2 replaced that enum with the additive `stop_reason` field per the agreed design — the `max_turns_reached` status value and `SubagentStatus.MAX_TURNS_REACHED` are gone.)
 **Context compaction (#3875 Phase 3, #4039)**: subagents inherit `DeerFlowSummarizationMiddleware` via `build_subagent_runtime_middlewares`, gated on the **same** `summarization.enabled` switch the lead reads (one config covers both chains; trigger/keep/model/prompt come from the shared `summarization` config so they cannot drift). The subagent builder attaches `DurableContextMiddleware` immediately before summarization, using the same skills path/read-tool settings as the lead chain. Compaction stores the generated summary in `ThreadState.summary_text` rather than as a `messages` item; the durable-context wrapper therefore projects it into the next model request as guarded hidden human data. This is required when a message-count keep policy preserves only an assistant tool-call plus its tool results: without the injected summary the next request begins with assistant/tool history and strict OpenAI-compatible providers can reject it. Because `DurableContextMiddleware` inserts a second `SystemMessage(authority_contract)` after the subagent's leading system prompt, the builder also appends `SystemMessageCoalescingMiddleware` innermost (mirroring the lead chain, appended after the optional summarization middleware so it is unconditionally last) to merge every `SystemMessage` into one leading `system_message` — otherwise the durable fix would trade #4039's assistant-first HTTP 400 for a duplicate-system 400 on the same strict backends (#4040). The factory is called with `skip_memory_flush=True` on the subagent path: the lead's `memory_flush_hook` (attached when `memory.enabled`) flushes pre-compaction messages into durable memory keyed by `thread_id`, and subagents share the parent's `thread_id`, so without skipping the hook a subagent's internal turns would pollute the **parent** thread's durable memory. Placement differs from the lead chain (lead appends summarization *before* the guard trio; subagent appends it *after*) — benign because the middleware implements only `before_model` (compaction) with no `after_model`/`consume_stop_reason`, so it cannot disturb the Phase 2 guard-cap stop-reason channel. Compaction rewrites the messages channel via `RemoveMessage(id=REMOVE_ALL_MESSAGES)`, which shrinks `len(messages)` below the step-capture cursor mid-run; `capture_new_step_messages` (see Step capture below) resets the cursor to the new tail on contraction so steps appended after the compaction point are not silently dropped.
 **Step capture & persistence (#3779)**: `executor.py` captures both assistant turns (`AIMessage`) **and** tool outputs (`ToolMessage`) via `subagents/step_events.py::capture_new_step_messages`, which walks the *newly-appended tail* of each `stream_mode="values"` chunk (not just `messages[-1]`) so a multi-tool-call turn — where LangGraph's `ToolNode` appends several `ToolMessage`s in one super-step — keeps every tool output instead of dropping all but the last. `runtime/runs/worker.py::_SubagentEventBuffer` additionally persists these `task_*` custom events to the `RunEventStore` as `subagent.start`/`subagent.step`/`subagent.end` (`category="subagent"`, `task_id` in `metadata`). It **batches** writes via `put_batch` (flushing on a terminal `subagent.end`, at `FLUSH_THRESHOLD` events, and in the worker's `finally`) rather than one `put()` per step, since `put()` is a documented low-frequency path (per-thread advisory lock per call) and a deep subagent (`max_turns=150`) emits hundreds of steps on the hot stream loop. `build_subagent_step` caps both the per-step `text` and each tool call's serialized `args` at `SUBAGENT_STEP_MAX_CHARS` (flagged `truncated` / `args_truncated`) so a large `write_file`/`bash` payload can't produce an unbounded row. The dedicated category keeps them out of `list_messages` (the thread feed) while `list_events` returns them for the frontend's fetch-on-expand backfill. `list_events` accepts `task_id` (filters on `metadata["task_id"]` — SQL-side in `DbRunEventStore` via `event_metadata["task_id"].as_string()`, in-memory in the JSONL/memory stores) plus an `after_seq` forward cursor, so the card pages through one subagent's steps without the run-wide `limit` truncating the tail (no schema migration: the filter rides the existing run-scoped index). `step_events.py` is a pure, unit-tested layer (`build_subagent_step` / `subagent_run_event`). **History contraction (#3875 Phase 3)**: `capture_new_step_messages` assumes append-only growth, but `DeerFlowSummarizationMiddleware` rewrites the messages channel via `RemoveMessage(id=REMOVE_ALL_MESSAGES)`, shrinking `len(messages)` below the cursor mid-run. On contraction (`total < processed_count`) the cursor resets to the new tail; `capture_step_message`'s id/content dedup prevents re-emitting pre-compaction steps, so steps appended after the compaction point are still captured instead of being dropped until `total` overtakes the stale cursor.
-**Deferred MCP tools** (if `tool_search.enabled`): `SubagentExecutor._build_initial_state` assembles deferral after policy filtering via the shared `assemble_deferred_tools` (fail-closed), appends the `tool_search` tool, injects the `<available-deferred-tools>` section into the subagent's `SystemMessage`, and threads the setup to `_create_agent`, which attaches `McpRoutingMiddleware` (when PR1 routing metadata matches deferred tools) before `DeferredToolFilterMiddleware` through `build_subagent_runtime_middlewares(...)`. Subagents thus withhold full MCP schemas until promotion, same as the lead agent; each task run gets a fresh `ThreadState` so promotion is isolated per run
+**Deferred tools** (if `tool_search.enabled`): `SubagentExecutor._build_initial_state` assembles deferral after policy filtering via the shared `assemble_deferred_tools` (fail-closed), appends the `tool_search` tool, injects the `<available-deferred-tools>` section into the subagent's `SystemMessage`, and threads the setup to `_create_agent`, which attaches `McpRoutingMiddleware` (when MCP routing metadata matches deferred tools) before `DeferredToolFilterMiddleware` through `build_subagent_runtime_middlewares(...)`. Subagents thus withhold full schemas until promotion, same as the lead agent; each task run gets a fresh `ThreadState` so promotion is isolated per run.
 **Checkpointer isolation**: Subagent graphs are compiled with `checkpointer=False` to avoid inheriting the parent run's checkpointer, since subagents are one-shot and never resume.
 **Checkpoint lineage / stream isolation**: `_aexecute` deliberately omits checkpoint-coordinate keys (`thread_id`, `checkpoint_ns`, `checkpoint_id`, `checkpoint_map`) from the child `RunnableConfig`. LangGraph must inherit those coordinates from the copied parent ContextVar so the delegated graph retains a non-root subgraph namespace; explicitly re-supplying even the same parent `thread_id` starts a new root lineage on LangGraph 1.2.6+ and can route child AI/tool frames into the parent `messages` stream. DeerFlow business components still receive the parent `thread_id` through `runtime.context`, which is the preferred lookup path for sandbox, middleware, and attribution code. Regression coverage in `tests/test_subagent_executor.py::TestSubagentCheckpointLineage` keeps the invocation-contract assertion active on every supported version and version-gates the production-shaped parent-stream test to LangGraph 1.2.6+, where the leak exists.
 
@@ -1057,50 +1057,52 @@ returning owner receives a deterministic zero-model invitation rather than
 starting the narrative interview or loading the full operating context. Concrete
 script/asset/link/direction operations bypass or interrupt the gate.
 
-Named-benchmark discovery uses a positive allowlist containing only public
-search, rendered browser verification and browser-account selection; it must
-not inherit the full native-tool registry merely by excluding a few known-bad
-tools. Discovery is capped at two searches across compaction. A pure benchmark
-judgment stops after two blocked rendered verifications and guards final model
-text unless a representative post/video page was actually verified. Secondary
+Named-benchmark work keeps the native DeerFlow model–tool–model loop and full
+authorized tool registry. Search is one evidence capability, not a special
+planner: discovery remains capped at two searches by the product contract, and
+the model may then verify an exact source, inspect supplied media, discover a
+relevant Skill or synthesize the bounded result. A pure benchmark judgment
+stops after two blocked rendered verifications and guards final model text
+unless a representative post/video page was actually verified. Secondary
 articles and search snippets may identify the account but cannot complete
-content-mechanism analysis.
+content-mechanism analysis. Do not reintroduce a middleware tool allowlist for
+this semantic task; authorization and active-Skill tool policy remain the
+actual capability boundaries.
 
-When the visible dialogue already supplies a product, brand or other operating
-entity plus a benchmark lead and asks for an adapted account plan, missing
-representative works must neither license a fabricated benchmark analysis nor
-block the first useful answer. The middleware makes one compact forced-tool
-discovery call, discovers and reads the bounded first-party strategy/cinematic
-method set through real `describe_skill` and `read_file` tool results, generates
-two or three competing directions, and sends them to a separate skeptical
-decision/continuity review. A failed method read is never counted as loaded;
-the server retries it once and then fails closed instead of synthesizing a
-method-free plan. Candidate and review stages each receive only recent visible
-user facts, compact credential-free research evidence and bounded method
-excerpts; each may be rewritten once after a server rejection. The full system
-prompt, private catalog and unrelated tool schemas are absent from those model
-calls.
+When the visible dialogue supplies a product, brand or other operating entity
+plus a named benchmark, benchmark work is dependency-ordered. Discovery must
+first identify the exact account. An explicit empty discovery result is a
+runtime stop for that branch: `PersonalIPContextMiddleware` returns one ordinary
+request for the exact account link without making another model call, so video,
+strategy, cinematic, script, spread and production capabilities cannot fill the
+gap with a generic plan. An identified account still requires supplied or
+verified representative works before objective description and video-pattern
+extraction; only the extracted pattern unlocks strategy and creative transfer.
+After those prerequisites, the lead model uses `describe_skill` and `read_file`
+to load the smallest task-specific chain and replans inside the ordinary
+LangGraph loop. There is no required count of methods and no deterministic
+prose renderer.
 
-Before any plan is customer-visible, a server-owned evidence gate validates the
-complete structured payload against current visible user evidence. Unsupported
-numbers, work history or credentials, customer cases or operating events,
-audience groups, conversion/distribution channels, inventory/product details,
-people/locations, commerce surfaces and guaranteed or causal outcome claims are
-rejected. Audience hypotheses must either be traceable verbatim or explicitly
-marked as a correctable hypothesis; a qualifier in another clause cannot wash
-an unsupported assertion. The rejected review is rewritten once. If it still
-fails, deterministic sanitization may retain only a product-grounded,
-explicitly provisional skeleton; the result is validated again and fails
-closed rather than exposing a dirty answer. Metadata records real loaded-method
-count, candidate count, independent review, rejection count and whether a
-server rewrite was applied. Stronger representative works remain a non-blocking
-next-evidence request.
+Keep four truth lanes distinct: verified operating facts, supplied or verified
+brand/product truth, social/emotional insight, and explicitly fictional or
+dramatized story truth. Authority, credentials, receipts, irreversible actions
+and factual business claims remain server-validated. Fictional characters,
+locations, props and conflicts are valid creative material when labeled by
+context and must not be rejected merely because they are absent from the
+business ledger; they must never be presented as real customers, employees,
+testimonials, history or measured outcomes. Do not restore the deleted broad
+keyword gate or deterministic strategy sanitizer: it collapsed creative truth
+into operating evidence and converted model judgment into generic copy.
+Do not describe missing benchmark identity or representative works as a
+non-blocking evidence gap: proceeding would silently replace the user's chosen
+object with the model's generic prior.
 Account ids are operation targets and receipt fields only. Keep the middleware
 before `SkillActivationMiddleware`, and preserve tests for owner isolation,
 cross-account portfolio access, the zero-model ordinary first reply,
-entity-sensitive openings, compact tool isolation, reflective result
+entity-sensitive openings, dynamic tool-loop preservation, reflective result
 conversion, sufficient-evidence transition, stop/direct-operation bypass,
-prompt-injection boundaries, and sync/async model calls.
+fiction-vs-fact separation, prompt-injection boundaries, and sync/async model
+calls.
 
 ByteDance HLLM-Creator is the audience intelligence foundation, not another
 agent runtime. Its complete source lives under `third_party/bytedance/HLLM` and

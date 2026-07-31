@@ -403,7 +403,7 @@ def test_make_lead_agent_filters_clarification_tool_for_non_interactive_runs(mon
         }
     )
 
-    assert [tool.name for tool in result["tools"]] == ["bash"]
+    assert [tool.name for tool in result["tools"]] == ["bash", "describe_skill"]
 
 
 def test_make_lead_agent_rejects_invalid_bootstrap_agent_name(monkeypatch):

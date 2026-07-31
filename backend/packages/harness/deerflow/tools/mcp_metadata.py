@@ -20,17 +20,41 @@ from langchain.tools import BaseTool
 
 MCP_TOOL_METADATA_KEY = "deerflow_mcp"
 MCP_TOOL_ROUTING_METADATA_KEY = "deerflow_mcp_routing"
+DEFERRED_TOOL_METADATA_KEY = "deerflow_deferred_tool"
 
 
 def tag_mcp_tool(tool: BaseTool) -> BaseTool:
     """Mark ``tool`` as MCP-sourced. Mutates in place and returns it for chaining."""
-    tool.metadata = {**(tool.metadata or {}), MCP_TOOL_METADATA_KEY: True}
+    tool.metadata = {
+        **(tool.metadata or {}),
+        MCP_TOOL_METADATA_KEY: True,
+        DEFERRED_TOOL_METADATA_KEY: True,
+    }
     return tool
 
 
 def is_mcp_tool(tool: BaseTool) -> bool:
     """True when ``tool`` carries the MCP-source tag written by :func:`tag_mcp_tool`."""
     return (getattr(tool, "metadata", None) or {}).get(MCP_TOOL_METADATA_KEY) is True
+
+
+def tag_deferred_tool(tool: BaseTool) -> BaseTool:
+    """Opt a first-party tool into schema-on-demand discovery.
+
+    Deferred discovery is a context-budget decision, not a source or authority
+    label. MCP tools receive both tags; large first-party capability catalogs
+    may receive only this one.
+    """
+    tool.metadata = {
+        **(tool.metadata or {}),
+        DEFERRED_TOOL_METADATA_KEY: True,
+    }
+    return tool
+
+
+def is_deferred_tool(tool: BaseTool) -> bool:
+    """True when the tool should expose only its name until promoted."""
+    return (getattr(tool, "metadata", None) or {}).get(DEFERRED_TOOL_METADATA_KEY) is True
 
 
 def tag_mcp_routing(tool: BaseTool, routing: Mapping[str, Any]) -> BaseTool:

@@ -73,7 +73,7 @@ from deerflow.tools.builtins import (
     ui_tars_desktop_step_tool,
     view_image_tool,
 )
-from deerflow.tools.mcp_metadata import tag_mcp_tool
+from deerflow.tools.mcp_metadata import tag_deferred_tool, tag_mcp_tool
 from deerflow.tools.sync import make_sync_tool_wrapper
 
 logger = logging.getLogger(__name__)
@@ -148,6 +148,26 @@ SUBAGENT_TOOLS = [
     # task_status_tool is no longer exposed to LLM (backend handles polling internally)
 ]
 
+_ALWAYS_VISIBLE_PERSONAL_IP_TOOLS = frozenset(
+    {
+        "personal_ip_startup_context",
+        "personal_ip_operating_cockpit",
+    }
+)
+
+
+def _mark_deferred_first_party_tools(tools: list[BaseTool]) -> None:
+    """Keep the large Personal-IP action catalog schema-on-demand.
+
+    Startup and resume context stay visible because they are entry routing
+    surfaces. Every other Personal-IP tool remains installed in ToolNode but
+    exposes only its name until ``tool_search`` promotes its full schema.
+    Deferral is inert when ``tool_search.enabled`` is false.
+    """
+    for candidate in tools:
+        if candidate.name.startswith("personal_ip_") and candidate.name not in _ALWAYS_VISIBLE_PERSONAL_IP_TOOLS:
+            tag_deferred_tool(candidate)
+
 
 def _is_host_bash_tool(tool: object) -> bool:
     """Return True if the tool config represents a host-bash execution surface."""
@@ -215,6 +235,7 @@ def get_available_tools(
 
     # Conditionally add tools based on config
     builtin_tools = BUILTIN_TOOLS.copy()
+    _mark_deferred_first_party_tools(builtin_tools)
     skill_evolution_config = getattr(config, "skill_evolution", None)
     if getattr(skill_evolution_config, "enabled", False):
         from deerflow.tools.skill_manage_tool import skill_manage_tool

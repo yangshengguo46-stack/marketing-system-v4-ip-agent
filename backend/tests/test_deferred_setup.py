@@ -1,8 +1,17 @@
+from pathlib import Path
+
 from langchain_core.tools import tool as as_tool
 from langgraph.types import Command
 
+from deerflow.config.app_config import AppConfig
 from deerflow.tools.builtins.tool_search import DeferredToolCatalog, build_deferred_tool_setup, build_tool_search_tool
-from deerflow.tools.mcp_metadata import is_mcp_tool, tag_mcp_tool
+from deerflow.tools.mcp_metadata import (
+    is_deferred_tool,
+    is_mcp_tool,
+    tag_deferred_tool,
+    tag_mcp_tool,
+)
+from deerflow.tools.tools import get_available_tools
 
 
 @as_tool
@@ -17,9 +26,48 @@ def local_echo(text: str) -> str:
     return text
 
 
+@as_tool
+def native_business_action(text: str) -> str:
+    "A first-party business action loaded only when the task needs it."
+    return text
+
+
 def test_is_mcp_tool_reads_metadata():
     assert is_mcp_tool(tag_mcp_tool(mcp_calc)) is True
     assert is_mcp_tool(local_echo) is False
+
+
+def test_explicit_first_party_tool_can_use_the_same_deferred_discovery_path():
+    tagged = tag_deferred_tool(native_business_action)
+
+    assert is_deferred_tool(tagged) is True
+    assert is_mcp_tool(tagged) is False
+
+    setup = build_deferred_tool_setup([tagged, local_echo], enabled=True)
+    assert setup.deferred_names == frozenset({"native_business_action"})
+    assert setup.tool_search_tool is not None
+
+
+def test_mcp_tag_also_marks_the_tool_as_deferred():
+    assert is_deferred_tool(tag_mcp_tool(mcp_calc)) is True
+
+
+def test_personal_ip_business_tools_are_deferred_but_startup_context_stays_visible():
+    app_config = AppConfig.from_file(
+        str(Path(__file__).resolve().parents[2] / "config.example.yaml")
+    )
+    tools = {
+        item.name: item
+        for item in get_available_tools(
+            include_mcp=False,
+            app_config=app_config,
+        )
+    }
+
+    assert is_deferred_tool(tools["personal_ip_compile_video_pattern"]) is True
+    assert is_deferred_tool(tools["personal_ip_record_strategy"]) is True
+    assert is_deferred_tool(tools["personal_ip_startup_context"]) is False
+    assert is_deferred_tool(tools["personal_ip_operating_cockpit"]) is False
 
 
 def test_setup_disabled_returns_empty():

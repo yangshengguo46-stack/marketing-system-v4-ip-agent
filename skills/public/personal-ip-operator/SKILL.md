@@ -168,12 +168,14 @@ philosophical diagnoses.
    - Business: existing products/services, customers, proof, pricing, delivery
      capacity and constraints; buyer, paid problem, credible outcome, offer,
      revenue mechanism, conversion path and reserved monetization routes.
-     Before asking for private facts, independently research public category
-     facts and infer plausible buyer, occasion, choice and conversion
-     hypotheses from the entity/product information already supplied. If the
-     user asks for a plan, return a complete provisional plan first; do not
-     require a broad intake interview before the first useful answer. Ask later
-     only when one private fact would materially change a high-impact decision.
+   Before asking for private facts, independently research public category
+   facts and infer plausible buyer, occasion, choice and conversion
+   hypotheses from the entity/product information already supplied. If the
+   user asks for a plan, return a complete provisional plan first; do not
+   require a broad intake interview before the first useful answer. Ask later
+   only when one private fact would materially change a high-impact decision.
+   This does not override a named-benchmark dependency: never replace an
+   unidentified account or unseen representative work with a generic plan.
    - Market: research at least three real benchmarks with source URLs and cover
      business model, content system and identity expression. Separate observed
      evidence from inference, and record what fits, what to borrow and what to
@@ -211,16 +213,13 @@ philosophical diagnoses.
    question, not a clarification card; do not change the question into generic
    advice for the user's industry.
    If the user has also supplied an entity/product and asks for an adapted
-   account plan, do not use missing representative works as a reason to
-   withhold the first useful answer. Research autonomously within the cap,
-   label unverified benchmark mechanisms and category-derived buyers/use
-   occasions as hypotheses, then return a complete provisional package in the
-   same turn: thesis, audiences/occasions, transferable versus protected
-   expression, recurring content system, conversion path,
-   performance/production alternatives and one falsifiable pilot. Asking for
-   three representative works is then a non-blocking evidence upgrade. Never
-   invent customer stories, arbitrary like thresholds, viral multipliers or
-   guaranteed timelines.
+   account plan, keep the benchmark dependency intact. An explicit empty
+   identity-discovery result must ask for the exact account link and end the
+   branch without loading video, IP, cinematic, script, spread or production
+   capabilities. When identity is known but representative works are missing,
+   obtain three videos, screenshots or a recording before mechanism transfer.
+   Do not label a generic category plan as a provisional adaptation to the
+   named account.
    Compare observations and inferred mechanisms against this subject's proof,
    objective, offer, conversion path and production capacity. Return what fits,
    what does not, the smallest adapted pilot, predicted signal and failure
