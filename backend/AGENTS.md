@@ -187,6 +187,14 @@ Agentic browser sessions are process-local. The Gateway startup safety gate reje
 uvicorn worker dispatch does not provide thread affinity for browser tools, REST
 navigation, and the Live WebSocket.
 
+Public-web discovery should use `web_search` before Browser Control. The
+`deerflow.community.volcengine_web_search` provider adapts Ark's `/responses`
+Web Search without changing the lead agent's `/chat/completions` conversation
+runtime. It disables provider-side response storage, bounds source/result/token
+settings, sanitizes returned citation URLs and may fall back to DuckDuckGo when
+Ark reports that Web Search is not activated. Browser Control remains for
+rendered verification, authentication and interaction.
+
 ## Architecture
 
 ### Harness / App Split

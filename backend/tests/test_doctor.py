@@ -283,6 +283,23 @@ class TestCheckWebSearch:
         assert result.fix is not None
         assert "make setup" in result.fix
 
+    def test_volcengine_web_search_reuses_volcengine_key(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("VOLCENGINE_API_KEY", "ark-test")
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.volcengine_web_search.tools:web_search_tool\n    api_key: $VOLCENGINE_API_KEY\n")
+        result = doctor.check_web_search(cfg)
+        assert result.status == "ok"
+        assert "VOLCENGINE_API_KEY set from config" in result.detail
+        assert "activation checked on first use" in result.detail
+
+    def test_volcengine_web_search_without_key_warns(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("VOLCENGINE_API_KEY", raising=False)
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.volcengine_web_search.tools:web_search_tool\n")
+        result = doctor.check_web_search(cfg)
+        assert result.status == "warn"
+        assert "VOLCENGINE_API_KEY" in (result.fix or "")
+
     def test_brave_with_key_ok(self, tmp_path, monkeypatch):
         monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "bsa-test")
         cfg = tmp_path / "config.yaml"

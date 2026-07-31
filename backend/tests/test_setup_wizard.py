@@ -99,6 +99,13 @@ class TestProviders:
         assert any(provider.name == "firecrawl" for provider in SEARCH_PROVIDERS)
         assert any(provider.name == "firecrawl" for provider in WEB_FETCH_PROVIDERS)
 
+    def test_search_providers_include_volcengine_web_search(self):
+        provider = next(provider for provider in SEARCH_PROVIDERS if provider.name == "volcengine")
+        assert provider.env_var == "VOLCENGINE_API_KEY"
+        assert provider.use == "deerflow.community.volcengine_web_search.tools:web_search_tool"
+        assert provider.extra_config["sources"] == ["search_engine"]
+        assert provider.extra_config["fallback_to_ddg"] is True
+
     def test_web_fetch_providers_have_required_fields(self):
         for provider in WEB_FETCH_PROVIDERS:
             assert provider.name
@@ -714,7 +721,9 @@ class TestSearchStep:
         monkeypatch.setattr(search_step, "print_success", lambda *_args, **_kwargs: None)
         monkeypatch.setattr(search_step, "print_info", lambda *_args, **_kwargs: None)
 
-        choices = iter([3, 1])
+        search_exa_index = next(index for index, provider in enumerate(SEARCH_PROVIDERS) if provider.name == "exa")
+        fetch_exa_index = next(index for index, provider in enumerate(WEB_FETCH_PROVIDERS) if provider.name == "exa")
+        choices = iter([search_exa_index, fetch_exa_index])
         prompts: list[str] = []
 
         def fake_choice(_prompt, _options, default=0):

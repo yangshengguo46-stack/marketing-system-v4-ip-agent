@@ -660,6 +660,7 @@ def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckRes
                 "fastcrw": "CRW_API_KEY",
                 "brave": "BRAVE_SEARCH_API_KEY",
                 "serper": "SERPER_API_KEY",
+                "volcengine_web_search": "VOLCENGINE_API_KEY",
             },
             "web_fetch": {
                 "infoquest": "INFOQUEST_API_KEY",
@@ -724,6 +725,8 @@ def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckRes
                                 f"{provider} ({detail})",
                                 fix=f"Move the {key_field} to .env as {var}=<your-key> and reference it as ${var}",
                             )
+                        if provider == "volcengine_web_search":
+                            detail = f"{detail}; service activation checked on first use"
                         return CheckResult(label, "ok", f"{provider} ({detail})")
                     if tool_name == "web_capture" and provider == "browserless" and _browserless_self_hosted(tool):
                         return CheckResult(label, "ok", "browserless (self-hosted, token optional)")

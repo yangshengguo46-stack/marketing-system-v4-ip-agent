@@ -318,6 +318,14 @@ IP Agent distribution note:
   answers for public creator hosts under the same narrow SSRF policy as Browser
   Control. Always return `observed_at`; never silently relabel an older
   observation as the current result.
+- Public-web research is search-first, not browser-first. The Volcengine Ark
+  provider exposes Responses API Web Search through the ordinary `web_search`
+  contract, reuses `VOLCENGINE_API_KEY`, keeps provider storage disabled and
+  returns citation-bearing evidence. When the account reports `ToolNotOpen`,
+  the configured DuckDuckGo fallback avoids opening an interactive browser and
+  caches that unavailable capability for the Gateway process. Browser Control
+  remains the path for rendered-source verification, user-supplied pages,
+  authenticated creator surfaces and interaction.
 - Personal-IP video production lives in
   `deerflow.persistence.personal_ip_video_productions` and migration
   `0015_personal_ip_video_productions`; migration

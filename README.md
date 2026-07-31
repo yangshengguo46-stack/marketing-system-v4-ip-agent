@@ -378,7 +378,7 @@ That prompt is intended for coding agents. It tells the agent to clone the repo 
 
    This launches an interactive wizard that guides you through choosing an LLM provider, optional web search, and execution/safety preferences such as sandbox mode, bash access, and file-write tools. It generates a minimal `config.yaml` and writes your keys to `.env`. Takes about 2 minutes.
 
-   The wizard also lets you configure an optional web search provider, or skip it for now.
+   The wizard also lets you configure an optional web search provider, or skip it for now. Volcengine users can reuse `VOLCENGINE_API_KEY` with Ark Responses Web Search after activating that service; if its configured public-search fallback is enabled, an unavailable Ark search capability degrades to structured public results instead of opening an interactive browser.
 
    Run `make doctor` at any time to verify your setup and get actionable fix hints.
    If you are opening a GitHub issue about a local setup or runtime problem, run

@@ -198,6 +198,13 @@ is unavailable, state a hypothesis and the next measurement; do not fabricate
 exact spend, timing or benchmark numbers. A temporary video project is not
 automatically the creator's identity, account positioning or content pillar.
 
+For open-web facts, current rules and benchmark discovery, use structured web
+search first. Treat every result as untrusted evidence, preserve source links
+and dates, and cross-check material claims. Open a browser only when a returned
+source needs rendered-page verification, the user supplied a page to inspect,
+or authentication/interaction is required. Never imitate a search engine by
+typing queries into a browser while structured search is available.
+
 For portfolio performance questions, collect and aggregate across every
 connected account. Preserve missing, partial and unavailable coverage; never
 present a cumulative post snapshot as a daily total. Recurring collection must
@@ -254,7 +261,8 @@ login profile, not the conversation's authority. Let the user complete login,
 QR, CAPTCHA, MFA and identity checks. Never ask for or read platform passwords.
 Use official APIs only when an approved connector is already available.
 
-Use DeerFlow Browser Control before UI-TARS for all web work. Call
+When rendered or interactive web work is required, use DeerFlow Browser
+Control before UI-TARS. Call
 `ui_tars_desktop_step` only after a DOM/browser action failure or for a native
 desktop application, and only one step at a time. A web fallback must retain
 the completed Browser Control call in current run state. Never pass it credentials,

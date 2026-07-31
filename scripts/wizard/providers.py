@@ -545,6 +545,21 @@ SEARCH_PROVIDERS: list[SearchProvider] = [
         extra_config={"max_results": 5},
     ),
     SearchProvider(
+        name="volcengine",
+        display_name="Volcengine Ark Web Search",
+        description="Reuses the Doubao key; Ark Web Search activation required",
+        use="deerflow.community.volcengine_web_search.tools:web_search_tool",
+        env_var="VOLCENGINE_API_KEY",
+        extra_config={
+            "api_base": "https://ark.cn-beijing.volces.com/api/v3",
+            "model": "doubao-seed-2-0-pro-260215",
+            "sources": ["search_engine"],
+            "max_results": 5,
+            "max_keyword": 3,
+            "fallback_to_ddg": True,
+        },
+    ),
+    SearchProvider(
         name="tavily",
         display_name="Tavily",
         description="Recommended, free tier available",

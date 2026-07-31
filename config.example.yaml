@@ -718,6 +718,21 @@ tools:
     # region: wt-wt          # wt-wt is normalized for Wikipedia when backend includes auto/all/wikipedia.
     # safesearch: moderate   # on, moderate, off
 
+  # Volcengine Ark Responses Web Search. This reuses VOLCENGINE_API_KEY but the
+  # account must separately activate Ark's Web Search service. Keep the public
+  # fallback enabled when search availability is more important than using one
+  # provider; the first ToolNotOpen result is cached for the Gateway process.
+  # - name: web_search
+  #   group: web
+  #   use: deerflow.community.volcengine_web_search.tools:web_search_tool
+  #   api_key: $VOLCENGINE_API_KEY
+  #   api_base: https://ark.cn-beijing.volces.com/api/v3
+  #   model: doubao-seed-2-0-pro-260215
+  #   sources: [search_engine]
+  #   max_results: 5
+  #   max_keyword: 3
+  #   fallback_to_ddg: true
+
   # Web search tool (uses SearXNG, self-hosted, no API key required)
   # SearXNG is a free internet metasearch engine which aggregates results from
   # various search services. Deploy your own instance: https://github.com/searxng/searxng
