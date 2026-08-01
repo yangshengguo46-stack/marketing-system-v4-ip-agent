@@ -68,8 +68,8 @@ evidence.
 | AUD-CAL-001 | P0 | Content evidence | Pilot/preflight guidance separated hypotheses from evidence in prose, but formal contracts could still contain neural shorthand or unsupported viral certainty and did not freeze distribution assumptions. | Strategy v4 and audience-preflight v2 tests require evidence level, observable mechanism, predicted signal, failure condition, distribution assumptions and uncertainty; neural shortcuts and viral guarantees are rejected; a first pilot with no account history stays an explicit unmeasured cold-start hypothesis. | done |
 | AUD-DIAG-001 | P0 | Account diagnosis | Connected accounts had collection and metrics surfaces but no unified evidence-bound decision for continuing, adjusting or starting over; platform folklore could outrank content and low reach could be mistaken for a dead account. | Native context/compiler tests cover owner scope, seven content layers, the full commercial funnel, three distinct measured posts, complete commercial-outcome coverage from observations no older than 30 days, server-bound intent/conversion states, non-hostile language, repairable restrictions, latest-within-24-hours/same-reason/seven-day/exhausted-remediation structural evidence and rejection of low-reach-only replacement; all eight platform Skills validate against dated first-party sources. | done |
 | AUD-IP-001 | P0 | IP scope | The operating model still treated IP mainly as a creator strategy; products were not first-class subjects and no immutable contract connected influence, differentiation, creative encoding and observed adoption/economic effects. | Migration 0020, repository and native-tool tests prove owner isolation, idempotency, product subjects, candidate/pilot gates, three-supportive-observation downstream validation, strategy/preflight/cockpit/account-diagnosis linkage; strategy v4 separates influence, behavioral and economic goals; the differentiation Skill validates and frontend type/check plus the real-backend product-subject scenario pass. | done |
-| AUD-BENCH-001 | P0 | Benchmark judgment | A named benchmark triggered generic deep research; after CAPTCHA/search failure the Agent changed the question into broad restaurant advice and presented secondary snippets as a completed professional analysis. | Empty-owner IP/business distress enters narrative intake without tools; named-benchmark research removes the generic research Skill, uses at most two discovery searches across compaction, rejects clarification cards and image-search drift, stops after two blocked page verifications and replaces any final claim that lacks a verified representative work with one ordinary artifact request. Real UI + Gateway replay of “请看看贵厨笔记这个对标账号” ends with the account-page/three-video request and no restaurant playbook. | done |
-| AUD-BENCH-002 | P0 | Adapted-plan synthesis, orchestration and token control | A six-turn product/benchmark conversation originally made 23 model calls and consumed 618,963 tokens. The first remediation reduced the replay to 4,583 tokens, but it overcorrected twice: first into a flat form, then into a fixed six-method/private-review path whose broad evidence regex rejected fictional people, places and conflict and whose deterministic sanitizer rewrote the work into generic “经营证据” copy. A later draft made the opposite mistake: when a named benchmark could not be found, it proposed loading IP, desire, scene and spread methods to create a provisional plan, silently replacing the user's chosen object with model priors. | A plain greeting uses 0 model calls. Named-benchmark work preserves the native loop but follows explicit artifact dependencies: exact identity discovery first; an empty result returns one ordinary link request with no downstream model/Skill/tool call; verified identity then requires three representative works; only supplied or verified works unlock video extraction, and only an extracted pattern unlocks dynamic strategy/cinematic/spread transfer. After that boundary, capabilities are discovered dynamically with no required method count, fictional gold-gift scenes remain valid creative truth, and factual customers, history, metrics, credentials, channels and guarantees remain unasserted. Live replay must separately prove the failed-identity lock and the representative-video-to-script path, including tool calls and token totals. | verifying |
+| AUD-ARCH-001 | P0 | Agent architecture | Personal-IP context middleware accumulated benchmark search planning, Skill routing, downstream locks and final-answer rewriting, while most native Personal-IP tool schemas were hidden behind deferred discovery. Together they created a second runtime and made installed capabilities hard to call. | Middleware owns only owner-scoped portfolio injection and bounded first-use narrative intake. Native first-party tools remain visible; deferred discovery applies only to MCP tools. Static architecture regressions pin both boundaries. | done |
+| AUD-BENCH-001 | P0 | Benchmark capability | A named benchmark previously triggered generic search, then multiple middleware-specific gates attempted to control the failure and broke creative execution. | Rebuild benchmark handling only after capability contracts and the native orchestration path are explicit. Until then it is not accepted as a complete product path. | pending |
 | AUD-SRCH-001 | P0 | Search safety | The public fallback could return query-irrelevant adult spam when Ark Web Search was not activated. | Fallback calls DuckDuckGo with strict safe search, accepts public URLs only, removes unsafe and query-irrelevant entries, reports filtered coverage and returns no evidence when the exact live query has no safe relevant result. | done |
 
 ## Execution order
@@ -144,69 +144,11 @@ evidence.
   openings, correction/skip/private/stop control, sensitive-memory
   non-defaults, direct-task bypass and same-turn transition to the full Agent
   when enough evidence exists.
-- Benchmark-judgment acceptance replayed the reported “贵厨笔记” failure through
-  the live Next.js UI and Gateway. “普通人打造个人IP难度会不会很大呀？” entered the
-  zero-tool narrative opening. The named benchmark made exactly two discovery
-  searches, did not search generic restaurant operations, did not render a
-  clarification card and ended with a normal account-page/three-video request
-  because no representative work was verified. Focused middleware and product
-  stack/search regression passed 106 tests and three changed internal method
-  packages passed deterministic review. The public fallback regression passed
-  15 provider tests; the exact previously polluted query returned zero safe
-  results and no adult entry. The complete backend passed 9,046 tests with 71
-  explicit external-dependency skips, and the root suite passed 111 tests. A
-  final own-account/benchmark scope refinement then passed its 58 focused
-  regressions and Ruff.
-- Adapted-plan/token acceptance replayed
-  “我有一家金店，主要产品是黄金礼品……参考贵厨笔记……直接给我一套初步完整方案”
-  through the isolated real Gateway with the actual `ip-agent`. Plain “你好”
-  completed with 0 model calls and 0 tokens. The adapted-plan run
-  `d085e77c-d170-4e49-a2ac-078067184db6` completed after one 867-input-token
-  discovery action and one bounded malformed-JSON retry: 3 model calls, 4,583
-  total tokens, versus 4 calls and 99,502 tokens for the previously reported
-  gold-gift turn (about 95.4% lower), without crossing the 32,000-token
-  summarization trigger. The customer received an evidence-labelled complete
-  provisional direction, audience/use-occasion hypotheses, transfer/no-copy
-  boundary, distinct content series, server-owned compliant conversion path,
-  human/faceless production choices and a falsifiable pilot. Deterministic
-  rendering tests reject invented customer stories, age bands, fixed
-  schedules/durations, price-to-spec mappings, private-channel assumptions,
-  incentive giveaways, percentage thresholds, guarantees and multipliers.
-  Focused Agent/config/client regression passed 248 tests, the Personal-IP
-  regression passed 351 tests and Ruff passed.
-- Agentic adapted-plan quality-gate acceptance supersedes the flat synthesis
-  above without closing `AUD-BENCH-002` yet. The isolated real Gateway run
-  `c2431498-3f04-4179-b0a4-44d85237ee9c` used one bounded public discovery,
-  loaded six first-party methods through successful `read_file` results,
-  generated two candidate directions and executed a separate skeptical review:
-  5 model calls and 28,075 total tokens. The server rejected nine unsupported
-  claim classes and rebuilt the customer answer before display. Its final text
-  contains no invented login/account state, age or relationship audience,
-  work history, customer case, concrete product detail, private/commerce
-  channel, numeric or comparative threshold, or guaranteed outcome; every
-  remaining audience, proof and economic statement is explicitly provisional.
-  The immediately preceding replay is retained as a failed acceptance sample:
-  it exposed “已登录活跃账号”, “送长辈”, “很多人踩过坑” and a platform-average
-  completion threshold after an earlier rewrite, which led to the additional
-  field-level traceability rules. Focused middleware tests passed 44 and the
-  broader Skill/deferred-tool/Agent/config group passed 177; Ruff and diff
-  checks passed. The ledger item remains `verifying` because the accepted live
-  answer required a server rewrite; stable model-authored quality without that
-  fallback is still outstanding.
-- Benchmark dependency acceptance supersedes both adapted-plan behaviors above.
-  In isolated real-Gateway run `7dcaf4a2-ae58-4269-bff4-1eabaaa6e4fa`, the
-  actual `ip-agent` received the gold-gift plus “贵厨笔记” request, made one
-  `web_search`, received an explicit zero-result receipt and returned the exact
-  account-page/three-work request without another model call. No Skill
-  discovery, video extraction, IP/cinematic/spread method or production tool
-  ran. The run completed successfully with 1 model call and 17,465 total tokens
-  (17,285 input / 180 output). Middleware regression now proves that even a
-  model attempting a downstream method after the empty result is never called,
-  while a later user-supplied URL unlocks exact-source verification. The
-  focused middleware suite passed 38 tests and the broader Agent/Skill/deferred
-  group passed 143; Ruff and diff checks passed. `AUD-BENCH-002` remains
-  `verifying` until a user-supplied representative-work replay proves the
-  extraction-to-creative handoff.
+- Architecture cleanup removed cross-layer benchmark routing, prompt gates,
+  output rewriting and automatic first-party tool deferral. The restored
+  middleware and focused regressions pass; benchmark adaptation is deliberately
+  marked pending until it is rebuilt as an explicit capability path rather than
+  another middleware special case.
 - Full-backend gate: `make test` passed 8,979 tests with 71 explicit
   live/external-dependency skips in 629.51 seconds. The autouse fixture now
   isolates auth and owner-contract tests from a checkout-local

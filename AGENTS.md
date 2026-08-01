@@ -450,33 +450,6 @@ IP Agent distribution note:
   Do not default to earliest memory or sensitive history; skip/stop/correct and
   internal-only boundaries belong to the user. Supplied script, asset, link and
   direct-strategy operations bypass or interrupt this boundary.
-- Public-web research is only an evidence-acquisition layer for Personal-IP;
-  never let a search summary or generic industry playbook become the strategy.
-  A named benchmark gets at most two discovery searches. Search snippets,
-  profile pages and secondary articles may establish identity leads but are
-  not representative-work evidence. Benchmark transfer is dependency-ordered:
-  exact identity first, representative works second, objective video-pattern
-  extraction third, and only then dynamic IP/cinematic/spread transfer. An
-  explicit empty discovery result must return one ordinary request for the
-  exact account link without another model call or any downstream Skill/tool
-  call. If identity is known but representative works remain unavailable after
-  bounded verification, request the account page plus three videos,
-  screenshots or a recording and stop that branch. Never substitute a generic
-  provisional plan for the benchmark object the user selected.
-
-  Keep DeerFlow's native model–tool–model loop and authorized tool registry;
-  do not restore the removed semantic tool allowlist, fixed six-method path,
-  private candidate/review room, flat forced response schema or deterministic
-  prose fallback. Once benchmark prerequisites are satisfied, discover the
-  smallest relevant capability chain dynamically and re-plan after tool
-  results. Never invent customer stories, exact performance, arbitrary
-  thresholds, viral guarantees, multipliers, demographic bands, publishing
-  schedules, paid traffic, price-to-spec mappings, private-channel availability
-  or incentive giveaways. Keep the generic
-  `deep-research` Skill out of the default `ip-agent` config; product strategy
-  and creative synthesis own the judgment. The Volcengine provider's public
-  fallback uses strict safe search and filters unsafe or query-irrelevant
-  results before returning evidence.
 - `deerflow.personal_ip.video_method_distillation` adapts the MIT-licensed
   Cangjie RIA-TV++ workflow for long-form video, recorded courses, interviews
   and podcasts. It may consume only a sealed `personal-ip-video-pattern-v1`

@@ -121,8 +121,6 @@ def test_first_use_orientation_precedes_generic_research() -> None:
         research.lower().split()
     )
     assert "deep-research" not in configured
-    assert "research is evidence acquisition, not the strategy or deliverable" in normalized_soul
-    assert "do not replace it with a generic industry search" in normalized_soul
 
 
 def test_upstream_media_skills_keep_hidden_evaluations() -> None:

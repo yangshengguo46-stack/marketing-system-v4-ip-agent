@@ -1063,15 +1063,14 @@ tools:
 # ============================================================================
 # Tool Search Configuration (Deferred Tool Loading)
 # ============================================================================
-# When enabled, deferred MCP and opted-in first-party tool schemas are not
-# loaded into the agent's context directly. They are listed by name in the
-# system prompt and discoverable via the tool_search tool at runtime.
-# This reduces context usage and improves tool selection accuracy for large
-# capability catalogs. The IP Agent keeps startup/resume context visible and
-# defers its specialized strategy, video, publishing and metrics actions.
+# When enabled, MCP tools are not loaded into the agent's context directly.
+# Instead, they are listed by name in the system prompt and discoverable
+# via the tool_search tool at runtime.
+# This reduces context usage and improves tool selection accuracy when
+# multiple MCP servers expose a large number of tools.
 
 tool_search:
-  enabled: true
+  enabled: false
   # When tool_search is enabled, PR1 MCP routing metadata can auto-promote
   # matching deferred MCP tool schemas before a model call. This is the maximum
   # number of matched schemas promoted per model call. Valid range: 1..5.

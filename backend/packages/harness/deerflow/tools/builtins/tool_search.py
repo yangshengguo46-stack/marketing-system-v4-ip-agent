@@ -13,8 +13,7 @@ The agent sees deferred tool names in <available-deferred-tools> but cannot
 call them until it fetches their full schema via the tool_search tool. The
 deferred set rides on a build-time closure and promotion lives in per-thread
 graph state — there is no ContextVar. Source-agnostic: a tool is "deferred"
-when it carries the ``deerflow_deferred_tool`` metadata tag. MCP tools receive
-that tag automatically; selected first-party catalogs may opt in as well.
+when it carries the ``deerflow_mcp`` metadata tag.
 """
 
 import hashlib
@@ -33,7 +32,7 @@ from langchain_core.tools import InjectedToolCallId, tool
 from langchain_core.utils.function_calling import convert_to_openai_function
 from langgraph.types import Command
 
-from deerflow.tools.mcp_metadata import get_mcp_routing, is_deferred_tool
+from deerflow.tools.mcp_metadata import get_mcp_routing, is_mcp_tool
 
 if TYPE_CHECKING:
     from langchain.agents.middleware import AgentMiddleware
@@ -124,9 +123,9 @@ class DeferredToolSetup:
 
     The three fields move as a unit, so callers branch on ``tool_search_tool``:
 
-    - **Empty** ``(None, frozenset(), None)``: deferral is disabled, or no
-      deferred tool is present in the candidate list. Nothing is deferred —
-      bind tools as-is.
+    - **Empty** ``(None, frozenset(), None)``: deferral is disabled, or no MCP
+      tool is present in the candidate list. Nothing is deferred — bind tools
+      as-is.
     - **Populated**: ``tool_search_tool`` is appended to the agent's tools,
       ``deferred_names`` are withheld from the model until promoted, and
       ``catalog_hash`` scopes those promotions in graph state.
@@ -181,18 +180,18 @@ def build_deferred_tool_setup(candidate_tools: list[BaseTool], *, enabled: bool)
     for the active skill while keeping the discovery tool itself available.
     Subagents may pass a statically policy-filtered list because their configured
     skills are loaded at startup. The downstream deferred-schema middleware still
-    hides unpromoted schemas in either case.
+    hides unpromoted MCP schemas in either case.
 
     Returns an empty setup (see :class:`DeferredToolSetup`) in two distinct
-    cases: deferral is disabled, or it is enabled but no deferred tool survived
+    cases: deferral is disabled, or it is enabled but no MCP tool survived
     the caller's build-time selection.
     """
     if not enabled:
         # Deferral disabled: defer nothing; the model binds every tool as before.
         return DeferredToolSetup(None, frozenset(), None)
-    deferred = [t for t in candidate_tools if is_deferred_tool(t)]
+    deferred = [t for t in candidate_tools if is_mcp_tool(t)]
     if not deferred:
-        # Enabled, but no tool opted into deferral: same empty result, different reason.
+        # Enabled, but no MCP tool to defer: same empty result, different reason.
         return DeferredToolSetup(None, frozenset(), None)
     catalog = DeferredToolCatalog(tuple(deferred))
     return DeferredToolSetup(build_tool_search_tool(catalog), catalog.names, catalog.hash)
@@ -201,9 +200,9 @@ def build_deferred_tool_setup(candidate_tools: list[BaseTool], *, enabled: bool)
 def assemble_deferred_tools(candidate_tools: list[BaseTool], *, enabled: bool) -> tuple[list[BaseTool], DeferredToolSetup]:
     """Build the final tool list and deferred setup from candidate tools.
 
-    Fail closed on deferral assembly itself: if tool_search is enabled and
-    deferred candidates exist but no deferred set was recovered, raise rather
-    than silently binding their full schemas to the model. Lead-agent authorization is enforced
+    Fail closed on deferral assembly itself: if tool_search is enabled and MCP
+    candidates exist but no deferred set was recovered, raise rather than silently
+    binding their full schemas to the model. Lead-agent authorization is enforced
     separately at runtime by ``SkillToolPolicyMiddleware``; subagents may already
     have applied their static skill policy to ``candidate_tools``.
 
@@ -211,11 +210,8 @@ def assemble_deferred_tools(candidate_tools: list[BaseTool], *, enabled: bool) -
     all get the same fail-closed guarantee from one place.
     """
     deferred_setup = build_deferred_tool_setup(candidate_tools, enabled=enabled)
-    if enabled and not deferred_setup.deferred_names and any(is_deferred_tool(t) for t in candidate_tools):
-        raise RuntimeError(
-            "tool_search enabled and deferred candidates exist, but no deferred set was recovered - "
-            "refusing to bind their schemas (fail-closed)."
-        )
+    if enabled and not deferred_setup.deferred_names and any(is_mcp_tool(t) for t in candidate_tools):
+        raise RuntimeError("tool_search enabled and MCP candidates exist, but no deferred set was recovered - refusing to bind MCP schemas (fail-closed).")
     final_tools = list(candidate_tools)
     if deferred_setup.tool_search_tool:
         final_tools.append(deferred_setup.tool_search_tool)
@@ -289,7 +285,7 @@ def get_deferred_tools_prompt_section(*, deferred_names: frozenset[str] = frozen
     Lists only names so the agent knows what exists and can use tool_search to
     load them. Returns empty string when there are no deferred tools. The set is
     computed at agent build time and passed in. Lead-agent sets contain the full
-    configured deferred catalog because active skill policy is applied at runtime;
+    configured MCP catalog because active skill policy is applied at runtime;
     subagent sets may already have been filtered by their startup skill policy.
 
     Lives here, next to the assembly that produces ``deferred_names``, so every

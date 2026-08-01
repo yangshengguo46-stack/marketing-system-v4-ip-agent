@@ -291,7 +291,7 @@ Before changing a later authorization phase, read the [authorization RFC](../doc
 22. **MemoryMiddleware** - Queues conversations for async memory update (filters to user + final AI responses)
 23. **ViewImageMiddleware** - *(optional, if the model supports vision)* Injects base64 image data before the LLM call
 24. **McpRoutingMiddleware** - *(optional, if `tool_search.enabled` and PR1 MCP routing metadata produce a routing index)* Auto-promotes matching deferred MCP tool schemas before the model call by writing a minimal `promoted` state update. It matches only the latest real `HumanMessage`, uses the global `tool_search.auto_promote_top_k` limit (default 3, clamped to 1..5), never executes tools, and must be installed before `DeferredToolFilterMiddleware`
-25. **DeferredToolFilterMiddleware** - *(optional, if `tool_search.enabled`)* Hides deferred tool schemas from the bound model until `tool_search` or, for routed MCP tools, `McpRoutingMiddleware` promotes them (reads per-thread promotions from `ThreadState.promoted`, hash-scoped). MCP tools opt in automatically; the large Personal-IP first-party catalog also opts in except for startup and operating-cockpit entry tools.
+25. **DeferredToolFilterMiddleware** - *(optional, if `tool_search.enabled`)* Hides deferred MCP tool schemas from the bound model until `tool_search` or `McpRoutingMiddleware` promotes them (reads per-thread promotions from `ThreadState.promoted`, hash-scoped). Native first-party tools remain directly available.
 26. **SystemMessageCoalescingMiddleware** - Merges every SystemMessage into a single leading SystemMessage per request; provider-agnostic fix for strict backends (vLLM/SGLang/Qwen/Anthropic) that reject non-leading system messages. Touches the per-request payload only (checkpoint state unchanged); on midnight crossings only the latest `dynamic_context_reminder` SystemMessage survives
 27. **SubagentLimitMiddleware** - *(optional, if `subagent_enabled`)* Truncates excess `task` tool calls to enforce both the per-response concurrency limit (`max_concurrent_subagents`, clamped to 2-4) and the per-run total delegation cap (`max_total_subagents` runtime override or `subagents.max_total_per_run`, default 6, clamped to 1-50). The total cap counts current-run entries in the durable delegation ledger (entries are tagged with `run_id` when captured), so repeated planning checkpoints in one run cannot keep launching legal-sized batches indefinitely, while later user turns in the same thread get a fresh run budget. If the cap is exhausted, the middleware strips remaining `task` calls, forces `finish_reason="stop"`, and appends a visible limit note so the run can synthesize existing results instead of ending with an empty tool-call response.
 28. **LoopDetectionMiddleware** - *(optional, if `loop_detection.enabled`)* Detects repeated tool-call loops; hard-stop clears both structured `tool_calls` and raw provider tool-call metadata before forcing a final text answer; stamps `loop_capped` via `consume_stop_reason` (#3875 Phase 2), symmetric to `TokenBudgetMiddleware`
@@ -1057,52 +1057,13 @@ returning owner receives a deterministic zero-model invitation rather than
 starting the narrative interview or loading the full operating context. Concrete
 script/asset/link/direction operations bypass or interrupt the gate.
 
-Named-benchmark work keeps the native DeerFlow model–tool–model loop and full
-authorized tool registry. Search is one evidence capability, not a special
-planner: discovery remains capped at two searches by the product contract, and
-the model may then verify an exact source, inspect supplied media, discover a
-relevant Skill or synthesize the bounded result. A pure benchmark judgment
-stops after two blocked rendered verifications and guards final model text
-unless a representative post/video page was actually verified. Secondary
-articles and search snippets may identify the account but cannot complete
-content-mechanism analysis. Do not reintroduce a middleware tool allowlist for
-this semantic task; authorization and active-Skill tool policy remain the
-actual capability boundaries.
-
-When the visible dialogue supplies a product, brand or other operating entity
-plus a named benchmark, benchmark work is dependency-ordered. Discovery must
-first identify the exact account. An explicit empty discovery result is a
-runtime stop for that branch: `PersonalIPContextMiddleware` returns one ordinary
-request for the exact account link without making another model call, so video,
-strategy, cinematic, script, spread and production capabilities cannot fill the
-gap with a generic plan. An identified account still requires supplied or
-verified representative works before objective description and video-pattern
-extraction; only the extracted pattern unlocks strategy and creative transfer.
-After those prerequisites, the lead model uses `describe_skill` and `read_file`
-to load the smallest task-specific chain and replans inside the ordinary
-LangGraph loop. There is no required count of methods and no deterministic
-prose renderer.
-
-Keep four truth lanes distinct: verified operating facts, supplied or verified
-brand/product truth, social/emotional insight, and explicitly fictional or
-dramatized story truth. Authority, credentials, receipts, irreversible actions
-and factual business claims remain server-validated. Fictional characters,
-locations, props and conflicts are valid creative material when labeled by
-context and must not be rejected merely because they are absent from the
-business ledger; they must never be presented as real customers, employees,
-testimonials, history or measured outcomes. Do not restore the deleted broad
-keyword gate or deterministic strategy sanitizer: it collapsed creative truth
-into operating evidence and converted model judgment into generic copy.
-Do not describe missing benchmark identity or representative works as a
-non-blocking evidence gap: proceeding would silently replace the user's chosen
-object with the model's generic prior.
 Account ids are operation targets and receipt fields only. Keep the middleware
 before `SkillActivationMiddleware`, and preserve tests for owner isolation,
 cross-account portfolio access, the zero-model ordinary first reply,
-entity-sensitive openings, dynamic tool-loop preservation, reflective result
-conversion, sufficient-evidence transition, stop/direct-operation bypass,
-fiction-vs-fact separation, prompt-injection boundaries, and sync/async model
-calls.
+entity-sensitive openings, reflective result conversion, sufficient-evidence
+transition, stop/direct-operation bypass, prompt-injection boundaries, and
+sync/async model calls. Benchmark discovery, Skill routing, creative review and
+final-answer rewriting do not belong in `PersonalIPContextMiddleware`.
 
 ByteDance HLLM-Creator is the audience intelligence foundation, not another
 agent runtime. Its complete source lives under `third_party/bytedance/HLLM` and
