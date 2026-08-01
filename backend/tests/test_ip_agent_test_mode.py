@@ -142,3 +142,68 @@ def test_environment_marks_frontend_and_backend_as_test_mode(tmp_path: Path):
     assert environment["DEER_FLOW_AUTH_DISABLED"] == "1"
     assert environment["IP_AGENT_TEST_MODE"] == "1"
     assert environment["NEXT_PUBLIC_IP_AGENT_TEST_MODE"] == "1"
+    assert "uv" in environment["DEER_FLOW_MCP_STDIO_COMMAND_ALLOWLIST"]
+
+
+def test_evidence_profile_adds_only_the_two_mcp_tools_to_the_clean_agent(tmp_path: Path):
+    root = _repo_fixture(tmp_path)
+    (root / "extensions_config.example.json").write_text(
+        json.dumps(
+            {
+                "middlewares": ["legacy.middleware"],
+                "mcpInterceptors": ["legacy.interceptor"],
+                "mcpServers": {"legacy": {"enabled": False}},
+                "skills": {"legacy": {"enabled": False}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    default_config = root / "product/defaults/agents/ip-agent/config.yaml"
+    default_config.write_text(
+        yaml.safe_dump(
+            {
+                "name": "ip-agent",
+                "skills": [],
+                "memory_enabled": False,
+                "tool_allowlist": ["web_search", "read_file"],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    paths = test_mode.prepare_test_mode(root, profile=test_mode.TEST_PROFILE_EVIDENCE)
+
+    installed = yaml.safe_load((paths.state_dir / "users/default/agents/ip-agent/config.yaml").read_text(encoding="utf-8"))
+    assert installed["skills"] == []
+    assert installed["memory_enabled"] is False
+    assert installed["tool_allowlist"] == [
+        "web_search",
+        "read_file",
+        "ip_evidence_collect_douyin_benchmark_account",
+        "ip_evidence_inspect_reference_videos",
+    ]
+    extensions = json.loads(paths.extensions_config.read_text(encoding="utf-8"))
+    assert extensions["middlewares"] == []
+    assert extensions["mcpInterceptors"] == []
+    assert list(extensions["mcpServers"]) == [test_mode.EVIDENCE_MCP_SERVER_NAME]
+    assert extensions["skills"] == {}
+    server = extensions["mcpServers"][test_mode.EVIDENCE_MCP_SERVER_NAME]
+    assert server["command"] == "uv"
+    assert server["env"]["IP_AGENT_EVIDENCE_BROWSER_PROFILE_DIR"] == str(paths.evidence_browser_profile_dir)
+    assert server["tools"]["collect_douyin_benchmark_account"]["routing"] == {
+        "mode": "prefer",
+        "priority": 100,
+        "keywords": ["抖音主页", "抖音账号", "对标账号", "profile URL", "benchmark account"],
+    }
+    assert server["tools"]["inspect_reference_videos"]["routing"]["mode"] == "prefer"
+    marker = json.loads(paths.marker.read_text(encoding="utf-8"))
+    assert marker["profile"] == test_mode.TEST_PROFILE_EVIDENCE
+
+
+def test_profile_switch_requires_a_reset(tmp_path: Path):
+    root = _repo_fixture(tmp_path)
+    test_mode.prepare_test_mode(root, profile=test_mode.TEST_PROFILE_CLEAN)
+
+    with pytest.raises(RuntimeError, match="reset before switching"):
+        test_mode.prepare_test_mode(root, profile=test_mode.TEST_PROFILE_EVIDENCE)

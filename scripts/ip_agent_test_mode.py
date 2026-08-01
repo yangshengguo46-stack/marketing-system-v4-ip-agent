@@ -12,7 +12,7 @@ import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
@@ -22,6 +22,10 @@ TEST_SNAPSHOTS_RELATIVE = Path("backend/.deer-flow-ip-test-snapshots")
 TEST_MARKER_NAME = ".ip-agent-test-mode.json"
 TEST_CONFIG_NAME = "config.yaml"
 TEST_EXTENSIONS_CONFIG_NAME = "extensions_config.json"
+TEST_PROFILE_CLEAN = "clean"
+TEST_PROFILE_EVIDENCE = "evidence"
+EVIDENCE_MCP_SERVER_NAME = "ip_evidence"
+TestProfile = Literal["clean", "evidence"]
 
 
 @dataclass(frozen=True)
@@ -33,6 +37,7 @@ class TestModePaths:
     config: Path
     extensions_config: Path
     database_dir: Path
+    evidence_browser_profile_dir: Path
 
 
 def _utc_stamp(now: datetime | None = None) -> str:
@@ -52,6 +57,7 @@ def resolve_test_mode_paths(root: Path) -> TestModePaths:
         config=state_dir / TEST_CONFIG_NAME,
         extensions_config=state_dir / TEST_EXTENSIONS_CONFIG_NAME,
         database_dir=state_dir / "data",
+        evidence_browser_profile_dir=state_dir / "evidence-mcp" / "browser-profile" / "douyin",
     )
 
 
@@ -121,7 +127,7 @@ def _write_isolated_config(paths: TestModePaths, source_config: Path) -> None:
     )
 
 
-def _install_product_defaults(paths: TestModePaths) -> None:
+def _install_product_defaults(paths: TestModePaths, *, profile: TestProfile) -> None:
     defaults = paths.root / "product" / "defaults"
     user_source = defaults / "USER.md"
     agent_source = defaults / "agents" / "ip-agent"
@@ -144,20 +150,105 @@ def _install_product_defaults(paths: TestModePaths) -> None:
         target = agent_target / name
         shutil.copy2(agent_source / name, target)
         target.chmod(0o600)
+    if profile == TEST_PROFILE_EVIDENCE:
+        config_target = agent_target / "config.yaml"
+        config = _load_mapping(config_target)
+        allowlist = config.get("tool_allowlist")
+        if not isinstance(allowlist, list):
+            raise ValueError("IP Agent test config must define a tool_allowlist")
+        for tool_name in (
+            "ip_evidence_collect_douyin_benchmark_account",
+            "ip_evidence_inspect_reference_videos",
+        ):
+            if tool_name not in allowlist:
+                allowlist.append(tool_name)
+        _write_private_text(
+            config_target,
+            yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+        )
 
 
-def _write_marker(paths: TestModePaths, *, now: datetime | None = None) -> None:
+def _write_test_extensions(paths: TestModePaths, *, profile: TestProfile) -> None:
+    if paths.extensions_config.is_file():
+        try:
+            payload = json.loads(paths.extensions_config.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError("test extensions configuration is invalid JSON") from exc
+    else:
+        source = _source_extensions_config(paths.root)
+        payload = json.loads(source.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("test extensions configuration root must be an object")
+    if profile == TEST_PROFILE_EVIDENCE:
+        payload["middlewares"] = []
+        payload["mcpInterceptors"] = []
+        payload["mcpServers"] = {}
+        payload["skills"] = {}
+    servers = payload.get("mcpServers")
+    if not isinstance(servers, dict):
+        servers = {}
+        payload["mcpServers"] = servers
+    servers.pop(EVIDENCE_MCP_SERVER_NAME, None)
+    if profile == TEST_PROFILE_EVIDENCE:
+        servers[EVIDENCE_MCP_SERVER_NAME] = {
+            "enabled": True,
+            "type": "stdio",
+            "command": "uv",
+            "args": [
+                "run",
+                "--project",
+                str(paths.root / "backend"),
+                "python",
+                "-m",
+                "deerflow.ip_agent.evidence_mcp",
+            ],
+            "env": {
+                "DEER_FLOW_HOME": str(paths.state_dir),
+                "DEER_FLOW_CONFIG_PATH": str(paths.config),
+                "DEER_FLOW_PROJECT_ROOT": str(paths.root),
+                "IP_AGENT_TEST_MODE": "1",
+                "IP_AGENT_EVIDENCE_BROWSER_PROFILE_DIR": str(paths.evidence_browser_profile_dir),
+                "IP_AGENT_EVIDENCE_BROWSER_HEADLESS": "1",
+                "MEDIAKIT_API_KEY": "$MEDIAKIT_API_KEY",
+            },
+            "tool_call_timeout": 600,
+            "description": "Test-only grounded Douyin account and reference-video evidence.",
+            "tools": {
+                "collect_douyin_benchmark_account": {
+                    "routing": {
+                        "mode": "prefer",
+                        "priority": 100,
+                        "keywords": ["抖音主页", "抖音账号", "对标账号", "profile URL", "benchmark account"],
+                    }
+                },
+                "inspect_reference_videos": {
+                    "routing": {
+                        "mode": "prefer",
+                        "priority": 90,
+                        "keywords": ["作品链接", "代表作品", "作品拆解", "拆解作品", "参考视频", "视频", "video URL", "reference video"],
+                    }
+                },
+            },
+        }
+    _write_private_text(
+        paths.extensions_config,
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+    )
+
+
+def _write_marker(paths: TestModePaths, *, profile: TestProfile, now: datetime | None = None) -> None:
     marker = {
         "schema_version": TEST_MODE_SCHEMA_VERSION,
         "created_at": (now or datetime.now(UTC)).astimezone(UTC).isoformat(),
         "root": str(paths.root),
         "state_dir": str(paths.state_dir),
         "database_dir": str(paths.database_dir),
+        "profile": profile,
     }
     _write_private_text(paths.marker, json.dumps(marker, ensure_ascii=False, indent=2) + "\n")
 
 
-def _validate_marker(paths: TestModePaths) -> dict[str, Any]:
+def _validate_marker(paths: TestModePaths, *, expected_profile: TestProfile | None = None) -> dict[str, Any]:
     expected_state = (paths.root / TEST_STATE_RELATIVE).resolve()
     if paths.state_dir != expected_state:
         raise RuntimeError("refusing test reset outside the repository's fixed test-state directory")
@@ -176,6 +267,11 @@ def _validate_marker(paths: TestModePaths) -> dict[str, Any]:
     for key, value in expected.items():
         if marker.get(key) != value:
             raise RuntimeError(f"test-mode marker mismatch for {key}")
+    profile = marker.get("profile", TEST_PROFILE_CLEAN)
+    if profile not in {TEST_PROFILE_CLEAN, TEST_PROFILE_EVIDENCE}:
+        raise RuntimeError("test-mode marker contains an unknown profile")
+    if expected_profile is not None and profile != expected_profile:
+        raise RuntimeError(f"test mode is prepared as profile '{profile}', not '{expected_profile}'; reset before switching profiles")
     return marker
 
 
@@ -183,6 +279,7 @@ def prepare_test_mode(
     root: Path,
     *,
     source_config: Path | None = None,
+    profile: TestProfile = TEST_PROFILE_CLEAN,
     now: datetime | None = None,
 ) -> TestModePaths:
     paths = resolve_test_mode_paths(root)
@@ -191,19 +288,15 @@ def prepare_test_mode(
         if has_contents and not paths.marker.is_file():
             raise RuntimeError(f"refusing to prepare an unmarked non-empty directory: {paths.state_dir}")
         if paths.marker.is_file():
-            _validate_marker(paths)
+            _validate_marker(paths, expected_profile=profile)
     paths.state_dir.mkdir(parents=True, exist_ok=True)
     paths.state_dir.chmod(0o700)
     _write_isolated_config(paths, (source_config or (paths.root / "config.yaml")).resolve())
 
-    if not paths.extensions_config.exists():
-        source = _source_extensions_config(paths.root)
-        shutil.copy2(source, paths.extensions_config)
-        paths.extensions_config.chmod(0o600)
-
-    _install_product_defaults(paths)
+    _write_test_extensions(paths, profile=profile)
+    _install_product_defaults(paths, profile=profile)
     if not paths.marker.exists():
-        _write_marker(paths, now=now)
+        _write_marker(paths, profile=profile, now=now)
     return paths
 
 
@@ -219,6 +312,7 @@ def reset_test_mode(
     root: Path,
     *,
     source_config: Path | None = None,
+    profile: TestProfile = TEST_PROFILE_CLEAN,
     now: datetime | None = None,
     stop_running_services: bool = True,
 ) -> tuple[TestModePaths, Path | None]:
@@ -238,7 +332,7 @@ def reset_test_mode(
             suffix += 1
         paths.state_dir.rename(snapshot)
 
-    fresh = prepare_test_mode(paths.root, source_config=source_config, now=now)
+    fresh = prepare_test_mode(paths.root, source_config=source_config, profile=profile, now=now)
     return fresh, snapshot
 
 
@@ -254,6 +348,7 @@ def test_mode_environment(paths: TestModePaths) -> dict[str, str]:
             "DEER_FLOW_AUTH_DISABLED": "1",
             "IP_AGENT_TEST_MODE": "1",
             "NEXT_PUBLIC_IP_AGENT_TEST_MODE": "1",
+            "DEER_FLOW_MCP_STDIO_COMMAND_ALLOWLIST": "npx,uvx,uv",
         }
     )
     return environment
@@ -269,6 +364,9 @@ def _status(paths: TestModePaths) -> dict[str, Any]:
         except RuntimeError:
             marker_valid = False
     snapshots = len(list(paths.snapshots_dir.iterdir())) if paths.snapshots_dir.is_dir() else 0
+    profile = None
+    if prepared and marker_valid:
+        profile = _validate_marker(paths).get("profile", TEST_PROFILE_CLEAN)
     return {
         "schema_version": TEST_MODE_SCHEMA_VERSION,
         "prepared": prepared,
@@ -277,6 +375,7 @@ def _status(paths: TestModePaths) -> dict[str, Any]:
         "database": str(paths.database_dir / "deerflow.db"),
         "database_exists": (paths.database_dir / "deerflow.db").is_file(),
         "snapshots": snapshots,
+        "profile": profile,
     }
 
 
@@ -284,7 +383,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command",
-        choices=("prepare", "reset", "start", "status", "stop"),
+        choices=("prepare", "reset", "start", "status", "stop", "login-douyin"),
     )
     parser.add_argument(
         "--root",
@@ -294,6 +393,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--daemon", action="store_true", help="start services in the background")
     parser.add_argument("--with-nginx", action="store_true", help="use the nginx-backed local profile")
     parser.add_argument("--install", action="store_true", help="sync dependencies before starting")
+    parser.add_argument(
+        "--profile",
+        choices=(TEST_PROFILE_CLEAN, TEST_PROFILE_EVIDENCE),
+        default=TEST_PROFILE_CLEAN,
+        help="clean keeps the permanent Chat baseline; evidence adds only the two test MCP tools",
+    )
     return parser
 
 
@@ -303,11 +408,11 @@ def main() -> None:
     paths = resolve_test_mode_paths(root)
 
     if args.command == "prepare":
-        paths = prepare_test_mode(root)
+        paths = prepare_test_mode(root, profile=args.profile)
         print(json.dumps(_status(paths), ensure_ascii=False, indent=2))
         return
     if args.command == "reset":
-        paths, snapshot = reset_test_mode(root)
+        paths, snapshot = reset_test_mode(root, profile=args.profile)
         payload = _status(paths)
         payload["snapshot"] = str(snapshot) if snapshot else None
         print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -319,7 +424,23 @@ def main() -> None:
         stop_services(root)
         return
 
-    paths = prepare_test_mode(root)
+    if args.command == "login-douyin":
+        _validate_marker(paths, expected_profile=TEST_PROFILE_EVIDENCE)
+        environment = test_mode_environment(paths)
+        environment["IP_AGENT_EVIDENCE_BROWSER_PROFILE_DIR"] = str(paths.evidence_browser_profile_dir)
+        command = [
+            "uv",
+            "run",
+            "--project",
+            str(root / "backend"),
+            "python",
+            "-m",
+            "deerflow.ip_agent.evidence_mcp",
+            "login-douyin",
+        ]
+        os.execvpe(command[0], command, environment)
+
+    paths = prepare_test_mode(root, profile=args.profile)
     command = ["bash", str(root / "scripts" / "serve.sh"), "--dev"]
     if not args.with_nginx:
         command.append("--no-nginx")

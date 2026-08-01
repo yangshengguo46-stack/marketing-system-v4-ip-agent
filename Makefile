@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install ip-test-prepare ip-test-start ip-test-reset ip-test-status ip-test-stop personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install ip-test-prepare ip-test-start ip-test-reset ip-test-status ip-test-stop ip-test-evidence-reset ip-test-evidence-start ip-test-evidence-login personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 PNPM ?= pnpm
@@ -30,6 +30,9 @@ help:
 	@echo "  make ip-test-reset   - Rotate test state to a recoverable snapshot and prepare a clean state"
 	@echo "  make ip-test-status  - Show the isolated test-state paths and readiness"
 	@echo "  make ip-test-stop    - Stop the local test environment"
+	@echo "  make ip-test-evidence-reset - Reset into the isolated two-tool Evidence MCP profile"
+	@echo "  make ip-test-evidence-login - Open the dedicated Douyin login profile"
+	@echo "  make ip-test-evidence-start - Start the two-tool Evidence MCP test profile"
 	@echo "  make personal-ip-publish-acceptance - Run local-only eight-platform publish recovery checks"
 	@echo "  make personal-ip-cost-acceptance - Run video hard-budget reservation/retry/concurrency checks"
 	@echo "  make personal-ip-data-lifecycle-acceptance - Verify credential-safe backup, restore and whole-domain deletion"
@@ -116,6 +119,15 @@ ip-test-status:
 
 ip-test-stop:
 	@$(IP_TEST_RUN) stop
+
+ip-test-evidence-reset:
+	@$(IP_TEST_RUN) reset --profile evidence
+
+ip-test-evidence-login:
+	@$(IP_TEST_RUN) login-douyin --profile evidence
+
+ip-test-evidence-start:
+	@$(IP_TEST_RUN) start --profile evidence
 
 personal-ip-publish-acceptance:
 	@$(MAKE) -C backend personal-ip-publish-acceptance

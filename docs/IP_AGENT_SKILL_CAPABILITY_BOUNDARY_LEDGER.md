@@ -155,6 +155,13 @@ MCP、ACP、子 Agent、Skill 和记忆工具全部组装之后；Plan Mode 注�
 | `memory_delete` | 记忆工具模式开启 | `memory_enabled: false`，不生成 |
 | `write_todos` | Plan Mode 中间件开启 | 未列入白名单，不注入 |
 | MCP 工具 | `extensions_config.json` 中服务器启用并成功连接 | 当前示例服务器均关闭；任意返回工具仍受精确白名单 |
+| `ip_evidence_collect_douyin_benchmark_account` | 测试模式显式选择 `evidence` Profile | 限域读取一个精确抖音主页；最多 12 条作者归属可验证作品；正式默认 Agent 隔离 |
+| `ip_evidence_inspect_reference_videos` | 测试模式显式选择 `evidence` Profile | 检查最多 3 条精确视频/上传文件，返回哈希、时间证据、联系表和覆盖；正式默认 Agent 隔离 |
+
+这两个条件工具来自同一个自研 stdio Capability MCP。MCP 内部使用确定性 Manifest、
+能力探测、精确 Child 绑定、运行上限和输入/输出 Schema 校验；抖音只是首个平台 Child。
+以后新增或恢复的平台、供应商、浏览器、重媒体、发布和有状态执行能力沿用同一骨架，
+不得注册成新的 Agent 原生特例。正式默认配置仍是八工具纯净基线。
 
 仓库还保留 `personal_ip_collect_douyin_browser_page` 这个抖音页面采集兼容包装器，
 但它没有进入 `BUILTIN_TOOLS`，因此不是模型可调用工具；现役统一入口是
