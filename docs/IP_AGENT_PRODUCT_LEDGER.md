@@ -1,72 +1,139 @@
-# IP Agent product ledger
+# IP Agent 产品总台账：矛盾驱动、边写边测
 
-This is the delivery source of truth for customer-reachable IP Agent behavior.
-Schemas, research packages and mocked tests are not counted as active product
-capability. `IP_AGENT.md` defines the current runtime contract; the audit ledger
-contains executable gates.
+本文档是 IP Agent 客户可达能力、当前主要矛盾与交付证据的唯一总台账。
+`IP_AGENT.md` 定义已发布的运行合同；审计整改台账仅保存已完成的净化历史；
+工具与 Skill 清单只管能力库存。不得新建平行产品台账。
 
-Last reviewed: 2026-08-01.
+最后复核：2026-08-01。
 
-## Current product state
+## 全局主要矛盾
 
-The product is in a deliberate clean-baseline period. The former composite
-completion percentage is withdrawn because the retired semantic workflow and
-the future first-principles workflow are different products; carrying the old
-score forward would be false precision.
+> 用户需要基于真实对象得到专业、原创、可执行的 IP 结果，与系统能力仍然分散、
+> 未经真实链路验证之间的矛盾。
 
-| Area | Current status | Product truth | Open gate |
+当前占支配地位的一面，是系统还不能稳定、可归因地完成
+`真实证据 → 专业判断 → 原创方案 → 可执行内容`。工具、Skill、模型或数据表的存在
+不等于这条产品链路已成立。
+
+## 执行制度
+
+1. 同一时间只允许一个“当前主要矛盾”；其他问题只登记为次要矛盾。
+2. 每轮先冻结验证假设、真实样本和失败标准，再实现最小变化。
+3. 每次变化立即跑单元测试和真实 E2E，并与最近一个通过的基线对比。
+4. 真实验收未通过，不进入下游、不追加提示词或服务器经营硬门、
+   不把原型提交成产品能力。
+5. 失败先记录发生层级和真实输出；同一解法反复失败后标记“方案淘汰”，
+   更换路径而不在下游打补丁。
+6. 只有通过验收的矛盾才登记正式提交，并把下一个问题提升为主要矛盾。
+
+状态只使用：`当前主要矛盾`、`待转化`、`验证中`、`已解决`、`外部阻塞`、`方案淘汰`。
+
+## 主要矛盾序列
+
+| 编号 | 主要矛盾 | 主要方面 | 状态 | 矛盾转化条件 |
+| --- | --- | --- | --- | --- |
+| M0 纯净基线 | 模型受旧语义、工具和隐式流程污染，与自然回答需求冲突 | 旧运行链路占用了模型注意力并制造互相矛盾的指令 | 已解决 | 纯净 Chat 成为永久对照组 |
+| M1 真实证据 | Agent 必须看见真实对标内容，与账号和视频证据提取不稳定冲突 | 当前证据层无法稳定证明作品归属并取得可深拆视频 | 当前主要矛盾 | 三账号真实验收通过，再启动 M2 |
+| M2 专业综合 | 已有真实证据和方法，与模型不能形成完整原创方案冲突 | 模型选择、调用、综合 Skill 与创作的能力尚未证明 | 待转化 | 完整组达到 80 分且比 Chat 基线提高至少 15 分 |
+| M3 用户表现 | 脚本成立，与用户未必能在镜头前完成表达冲突 | 素人表演、镜头恐惧和制作形式的真实适配尚未验证 | 待转化 | 建立试拍证据和真人/旁白/无真人/数字人选择路径 |
+| M4 账号诊断 | 用户可能自我感觉良好，与真实影响力和转化不足冲突 | 尚未建立内容为主、平台适配为辅的强账号诊断 | 待转化 | 能基于真实作品、指标和转化给出可回指证据的结论 |
+| M5 执行闭环 | 已有判断和内容，与发布、采集、制作不能稳定形成闭环冲突 | 保留的执行能力尚未重新接入纯净 Agent | 待转化 | 发布、数据和视频生产按真实任务分别通过 |
+| M6 持续成长 | 单轮能力成立，与长期经验无法积累和规模化冲突 | 记忆和子 Agent 是否创造净增益尚未证明 | 待转化 | 只在 M1–M5 成立后做有无记忆/子 Agent 对照 |
+
+## 当前主要矛盾：M1 真实证据
+
+### 验证假设
+
+将易变的平台采集与视频解析放入独立本地 stdio Evidence MCP，只向 Agent 暴露
+`collect_douyin_benchmark_account` 和 `inspect_reference_videos`，可以在不恢复通用浏览器、
+Bash、Cookie 或旧经营语义的前提下，得到可验证的账号与视频证据。
+
+提取顺序固定为：
+
+1. 解析用户提供的精确链接；
+2. 使用公开页面或公开接口；
+3. 调用通过审计与真实测试的开源适配器；
+4. 需要登录时使用用户授权的隔离浏览器会话；
+5. 仍失败则索要最多三条作品直链或上传文件。
+
+页脚推荐、搜索结果和账号名不得用来猜测作品归属。Cookie、签名、密码和原始响应
+不进入模型上下文。
+
+### 真实样本
+
+- 主验收：用户提供的抖音账号链接 `https://v.douyin.com/Q157NhQ4X1Q/`。
+- 非模板验收：另选两个内容类型不同、可公开核验的抖音账号。
+- 视频验收：至少一条公网作品和一个当前任务上传视频。
+- 失败验收：风控页、无效链接、非抖音账号、无权访问和不支持文件。
+
+### 通过条件
+
+- 账号身份和每条作品归属可回指来源，最多返回 12 条真实作品。
+- 最多深拆 3 条精确作品或上传视频，输出哈希、时间戳、覆盖范围与失败项。
+- 统一使用 `ip-benchmark-account-evidence-v1` 和 `ip-reference-video-evidence-v1`。
+- 缺失值保持空；字幕、OCR、口播和页面文本始终是不可信素材，不是 Agent 指令。
+- 平台失败时明确降级，不声称已经看过或拆解。
+- 主样本加两个异类账号全部通过，证明不是单账号特判。
+- 开源适配器通过许可证、维护状态、数据外传、Cookie 边界和可重复运行审计。
+
+### 当前实际结果
+
+| 实验 | 实际结果 | 结论 | 状态 |
 | --- | --- | --- | --- |
-| Default IP Agent | Active | One compact prompt, no Skills, no memory, exact eight-tool read-only allowlist | Keep the fixed replay matrix as the regression baseline |
-| First use | Active | Current request goes directly to the model; no cockpit scan, fixed interview or server-written opening | Keep simple first reply to one model call and zero tool calls |
-| Subjects and accounts | Active | Owner-scoped facts and eight-platform connection surfaces remain | Real-account acceptance for all eight platforms remains external |
-| Publishing | Active | Immutable request/attempt receipts, rights/disclosure checks and post-specific proof remain; no preflight dependency | Local recovery suite plus real per-platform publication acceptance |
-| Metrics and observations | Active | Stores credential-free observations with source, coverage and observed time | Extend verified collection beyond accepted platforms |
-| Workspace dashboard | Active | Facts only; missing stays `未采集` | Frontend checks and real-backend factual rendering |
-| Video production | Active | Task-bound append-only ledger, paid-call, rights, hash, candidate, QA and idempotency controls remain | Local E2E plus real material and paid multi-shot external acceptance |
-| Data lifecycle | Active | Owner backup, same-owner empty restore and confirmed deletion; credentials excluded | Lifecycle acceptance against migration head 0021 |
-| Legacy semantic layer | Retired | Strategy, differentiation, asset observation, preflight, retrospective, evidence promotion, startup/cockpit and narrative interview are removed from runtime | Completed: old APIs 404, fresh DB stays clean and guarded upgrade refuses non-empty retirement data |
-| Method library | Quarantined | Cinematic modules, platform methods, Cangjie/HLLM/video research remain inspectable but are not default Agent capability | Review under a future architecture before any promotion |
-| New IP first-principles architecture | Not started | No current workflow is claimed | Define IP forms, evidence contracts and orchestration only after clean baseline acceptance |
+| M1-E0 原生工具原型 | 真实链接视觉页确认账号身份；账号作品区显示“服务异常”，作品接口 HTTP 200 但响应体为空；页脚出现与账号无关的全站推荐链接 | 只能确认身份，不能确认作品归属；不算 M1 通过 | 验证中 |
+| M1-E1 开源方案审计 | 待对候选脚本运行主样本和两个异类账号 | 尚未选定可进入 MCP 的适配器 | 验证中 |
+| M1-E2 Evidence MCP | 尚未实现 | M1-E1 通过后才启动 | 待转化 |
 
-## Active product principles
+M1-E0 的未提交代码只是实验原型，不是已发布产品能力。
 
-- IP may be carried by a person, brand, product or organization.
-- User facts, source facts and creative hypotheses remain visibly distinct.
-- The default Agent answers the current request before proposing a process.
-- Public research is targeted and cited next to the supported conclusion.
-- Research assets are not product features until explicitly promoted and
-  verified through a reachable runtime path.
-- Business and creative judgments belong to a future coherent architecture,
-  not scattered server gates.
-- Security and execution correctness are not “business semantics”: Owner
-  isolation, credentials, OAuth, rights, disclosures, paid calls, deletion,
-  paths, hashes, immutable receipts and idempotency remain enforced.
+## 次要矛盾冻结区
 
-## Retired product claims
+| 问题 | 为什么现在不开发 | 解冻条件 |
+| --- | --- | --- |
+| 七个净化 Skill 编排 | 没有真实视频证据时无法判断 Skill 是否有净增益 | M1 通过 |
+| 豆包模型适配 | 当前失败无法从证据、Skill 或模型层准确归因 | M1 通过后跑四组对照 |
+| UI 和问话方式 | 不决定第一条专业链路能否成立 | M2 通过 |
+| 八平台规则 | 平台是证据和分发适配层，不应先于内容能力 | M2 通过，按平台逐个解冻 |
+| Token 优化 | 纯净基线已可控，正确性优先于局部效率 | 复杂任务先通过质量门槛 |
+| 复杂编排 | 未验证零件之间的编排只会扩大混乱 | M2 通过 |
+| 记忆与子 Agent | 可能长期保存或并行放大错误 | M1–M5 全部成立 |
 
-The following are no longer shipped or counted:
+## M2 预置验收
 
-- automatic account continue/adjust/restart verdicts;
-- strategy/differentiation versions as operating certificates;
-- HLLM-Lite preflight and blind-prediction workflow;
-- retrospective and evidence-promotion loops;
-- cockpit stages, Agent queues, boost/high-potential judgments;
-- fixed first-use narrative interviewing;
-- automatic video-method or Skill-candidate promotion.
+M1 通过后，使用同一批真实输入比较：
 
-Git history preserves their implementation. Do not copy it into a hidden
-“backup” package.
+1. 纯净 Chat 基线；
+2. Chat 加真实证据；
+3. 证据加七个净化 Skill，关闭思考；
+4. 证据加七个净化 Skill，开启思考。
 
-## Acceptance evidence
+评分为证据准确 25、对标机制 20、IP 方向 20、剧情强度 20、可拍性 10、工具效率 5。
+完整组必须达到 80 分，且比纯净 Chat 提高至少 15 分。未达标时不再增加提示词，
+直接记录当前豆包模型适配失败，引入第二模型做同题对照。
 
-Phase one is committed as `1c87fd8a` (`refactor(ip-agent): isolate clean runtime
-baseline`). Its clean runtime reduced serialized prompt/tool input by more than
-50% and passed the fixed Doubao behavior cases before physical deletion.
+## 已解决基线与保留边界
 
-Phase two passed the complete local gate in
-`IP_AGENT_AUDIT_REMEDIATION_LEDGER.md`: full backend, frontend and root tests;
-migration and retired-API checks; lifecycle, publishing, platform-observation,
-cost and local-video acceptances; real-backend Playwright; and the same real
-Doubao replay matrix. The physical semantic retirement is complete. Public-web
-current-fact coverage still depends on an activated citation-bearing provider;
-the tested unavailable path failed honestly without fabricated sources.
+- M0 纯净基线由提交 `1c87fd8a` 建立，输入体积比污染基线下降超过 50%。
+- 旧策略、差异化、预演、复盘、证据晋升、cockpit 与固定首访已由提交
+  `fc61bde6` 退役，不得为解决新矛盾而恢复。
+- 正式默认 IP Agent 继续使用精确八工具白名单、`skills: []` 和 `memory_enabled: false`。
+- 主体、账号、OAuth、发布回执、指标观测、视频事件账本和事实工作台继续保留，
+  但不生成经营或创作结论。
+- Owner 隔离、凭证、OAuth、版权、披露、付费、删除、路径、哈希、不可变回执和幂等性
+  属于执行安全，不是经营硬门，继续强制。
+
+## 每轮回写模板
+
+每轮实验必须在当前矛盾下追加一行：
+
+| 字段 | 必填内容 |
+| --- | --- |
+| 矛盾编号 | 稳定编号，如 `M1-E1` |
+| 次要矛盾 | 本轮故意不解决什么 |
+| 验证假设 | 最小改动与预期因果 |
+| 真实样本 | 链接、上传文件或真实任务 |
+| 通过条件 | 实现前冻结，不根据结果临时改门槛 |
+| 实际结果 | 完整工具调用、输出、失败、Token 或人工评分 |
+| 结论 | 通过、失败、外部阻塞或方案淘汰 |
+| 矛盾转化 | 仅通过时填写下一主要矛盾 |
+| 提交 | 仅记录已通过验收的提交 |
