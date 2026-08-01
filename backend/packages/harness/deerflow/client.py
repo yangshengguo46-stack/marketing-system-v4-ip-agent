@@ -254,8 +254,8 @@ class DeerFlowClient:
         configured_skills = self._available_skills
         if configured_skills is None and agent_config and agent_config.skills is not None:
             configured_skills = set(agent_config.skills)
-        tool_allowlist = agent_config.tool_allowlist if agent_config else None
-        memory_enabled = agent_config.memory_enabled if agent_config else None
+        tool_allowlist = getattr(agent_config, "tool_allowlist", None)
+        memory_enabled = getattr(agent_config, "memory_enabled", None)
         base_key = (
             cfg.get("model_name"),
             cfg.get("thinking_enabled"),

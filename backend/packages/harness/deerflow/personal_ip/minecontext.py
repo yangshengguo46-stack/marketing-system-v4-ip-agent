@@ -34,16 +34,12 @@ MINECONTEXT_UPSTREAM_COMMIT = "171c7a9ea8091e326ddcf0f10718aa1b58c83c65"
 MINECONTEXT_UPSTREAM_RELATIVE_PATH = Path("third_party/volcengine/MineContext")
 MINECONTEXT_EVIDENCE_SCHEMA_VERSION = "personal-ip-local-context-evidence-v1"
 MINECONTEXT_CONSENT_SCHEMA_VERSION = "personal-ip-local-context-consent-v1"
-MINECONTEXT_MODEL_SCHEMA_VERSION = "personal-ip-hllm-context-evidence-v1"
 MINECONTEXT_DEFAULT_PROFILE_VERSION = "personal-ip-default-on-v1"
 
 MineContextScope = Literal["screen", "files", "people", "projects", "work_activity"]
 MineContextPurpose = Literal[
     "persona_modeling",
     "audience_modeling",
-    "hllm_user_profile",
-    "preflight",
-    "retrospective",
 ]
 DEFAULT_MINECONTEXT_SCOPES: tuple[MineContextScope, ...] = (
     "screen",
@@ -55,9 +51,6 @@ DEFAULT_MINECONTEXT_SCOPES: tuple[MineContextScope, ...] = (
 DEFAULT_MINECONTEXT_PURPOSES: tuple[MineContextPurpose, ...] = (
     "persona_modeling",
     "audience_modeling",
-    "hllm_user_profile",
-    "preflight",
-    "retrospective",
 )
 
 _REQUIRED_UPSTREAM_FILES = (
@@ -307,35 +300,6 @@ def seal_minecontext_results(
             }
         )
     return records
-
-
-def model_evidence_projection(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """Build a provenance-preserving, revisable HLLM/preflight projection."""
-
-    items = []
-    for record in records[:20]:
-        if record.get("schema_version") != MINECONTEXT_EVIDENCE_SCHEMA_VERSION:
-            continue
-        source = record.get("source") if isinstance(record.get("source"), Mapping) else {}
-        summary = record.get("summary") if isinstance(record.get("summary"), Mapping) else {}
-        items.append(
-            {
-                "evidence_id": str(record.get("evidence_id") or "")[:64],
-                "source_kind": str(source.get("source_kind") or "")[:40],
-                "context_type": str(source.get("context_type") or "")[:80],
-                "observed_at": str(source.get("observed_at") or "")[:64],
-                "title": str(summary.get("title") or "")[:_MAX_TITLE],
-                "summary": str(summary.get("text") or "")[:_MAX_SUMMARY],
-                "keywords": [str(item)[:_MAX_KEYWORD] for item in (summary.get("keywords") or [])[:20]],
-                "digest": str(record.get("digest") or "")[:64],
-            }
-        )
-    return {
-        "schema_version": MINECONTEXT_MODEL_SCHEMA_VERSION,
-        "epistemic_status": "observational_partial_revisable",
-        "raw_content_included": False,
-        "items": items,
-    }
 
 
 class MineContextService:

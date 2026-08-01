@@ -5,6 +5,10 @@ description: Direct a working IP strategy for a person, brand, product or organi
 
 # Personal-IP strategy director
 
+> Research quarantine (2026-08-01): this method package is not active in the
+> default IP Agent. Any persistence/tool references below are historical and
+> must not be represented as current product capability. See `IP_AGENT.md`.
+
 Give the user a useful direction now. Evidence, business observations and
 versioned notes improve the judgment; none is a certificate that must be
 completed before the Agent can think, recommend, write or test.

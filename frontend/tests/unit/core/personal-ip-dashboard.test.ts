@@ -35,8 +35,8 @@ const metric = (
   ...overrides,
 });
 
-describe("personal IP dashboard", () => {
-  it("deduplicates replacement windows and builds platform growth", () => {
+describe("personal IP factual dashboard", () => {
+  it("deduplicates replacement windows and excludes cumulative snapshots", () => {
     const view = buildPersonalIPDashboardView(
       [
         metric({
@@ -63,19 +63,13 @@ describe("personal IP dashboard", () => {
         }),
       ],
       [account("acct-douyin", "douyin"), account("acct-xhs", "xiaohongshu")],
-      undefined,
       new Date("2026-07-26T12:00:00Z"),
     );
 
-    expect(view.totals).toMatchObject({
+    expect(view.totals).toEqual({
       views: 200,
       followers: 5,
       engagement: 11,
-    });
-    expect(view.availability).toMatchObject({
-      views: true,
-      followers: true,
-      engagement: true,
     });
     expect(view.platforms.map((item) => [item.id, item.views])).toEqual([
       ["douyin", 140],
@@ -84,8 +78,8 @@ describe("personal IP dashboard", () => {
     expect(view.trend.at(-2)?.views).toBe(200);
   });
 
-  it("requires a same-platform baseline before suggesting paid boost review", () => {
-    const post = (id: string, views: number, likes: number, day: string) =>
+  it("lists post facts by observation time without a recommendation field", () => {
+    const post = (id: string, views: number, day: string) =>
       metric({
         id,
         receipt_id: `receipt-${id}`,
@@ -95,55 +89,35 @@ describe("personal IP dashboard", () => {
         window_started_at: null,
         window_ended_at: null,
         observed_at: `${day}T12:00:00Z`,
-        metrics: { views, likes },
+        metrics: { views, likes: 2 },
         coverage: { content_title: `作品 ${id}` },
       });
     const view = buildPersonalIPDashboardView(
-      [
-        post("one", 100, 5, "2026-07-24"),
-        post("two", 120, 6, "2026-07-25"),
-        post("winner", 600, 60, "2026-07-26"),
-      ],
+      [post("older", 10_000, "2026-07-25"), post("newer", 10, "2026-07-26")],
       [account("acct-douyin", "douyin")],
-      undefined,
       new Date("2026-07-26T20:00:00Z"),
     );
 
-    expect(view.posts[0]).toMatchObject({
-      title: "作品 winner",
-      opportunity: "boost_candidate",
-      views: 600,
-    });
-    expect(view.totals.highPotentialPosts).toBe(1);
-    expect(view.availability.paidTrafficBaseline).toBe(true);
-
-    const insufficient = buildPersonalIPDashboardView(
-      [post("single", 10_000, 1_000, "2026-07-26")],
-      [account("acct-douyin", "douyin")],
-      undefined,
-      new Date("2026-07-26T20:00:00Z"),
-    );
-    expect(insufficient.posts[0]?.opportunity).toBe("insufficient_baseline");
-    expect(insufficient.availability.paidTrafficBaseline).toBe(false);
+    expect(view.posts.map((item) => item.title)).toEqual([
+      "作品 newer",
+      "作品 older",
+    ]);
+    expect(view.posts[0]).not.toHaveProperty("opportunity");
   });
 
-  it("keeps missing growth metrics distinct from an observed zero", () => {
+  it("keeps missing metrics distinct from an observed zero", () => {
     const missing = buildPersonalIPDashboardView(
       [metric({ metrics: {} })],
       [account("acct-douyin", "douyin")],
-      undefined,
       new Date("2026-07-26T20:00:00Z"),
     );
-    expect(missing.totals.views).toBe(0);
-    expect(missing.availability.views).toBe(false);
+    expect(missing.totals.views).toBeNull();
 
     const observedZero = buildPersonalIPDashboardView(
       [metric({ metrics: { views: 0 } })],
       [account("acct-douyin", "douyin")],
-      undefined,
       new Date("2026-07-26T20:00:00Z"),
     );
     expect(observedZero.totals.views).toBe(0);
-    expect(observedZero.availability.views).toBe(true);
   });
 });

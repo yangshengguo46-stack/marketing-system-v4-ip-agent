@@ -32,7 +32,6 @@ async def test_publish_router_begins_operation_and_appends_attempt(monkeypatch) 
                 "operation_key": "publish:draft-1:douyin",
                 "idempotency_key": "idem-draft-1-douyin",
                 "account_id": "acct-1",
-                "preflight_id": "preflight-1",
                 "executor": "platform_api",
                 "request": {"caption": "候选文案"},
             },
@@ -54,6 +53,7 @@ async def test_publish_router_begins_operation_and_appends_attempt(monkeypatch) 
     begin_kwargs = repository.begin.await_args.kwargs
     assert begin_kwargs["owner_user_id"] == "user-1"
     assert begin_kwargs["account_id"] == "acct-1"
+    assert "preflight_id" not in begin_kwargs
     attempt_kwargs = repository.record_attempt.await_args.kwargs
     assert attempt_kwargs["status"] == "published"
     assert attempt_kwargs["occurred_at"].isoformat() == "2026-07-21T08:00:00+00:00"

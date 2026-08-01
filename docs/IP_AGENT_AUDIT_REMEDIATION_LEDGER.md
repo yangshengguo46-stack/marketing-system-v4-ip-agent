@@ -1,223 +1,89 @@
 # IP Agent audit remediation ledger
 
-This ledger turns the 2026-07-29 audit into executable work. It complements
-`IP_AGENT_PRODUCT_LEDGER.md`: the product ledger measures customer completion,
-while this file records concrete defects, evidence, acceptance gates and the
-order in which they will be closed.
+This is the executable audit ledger. It records the current cleanup and its
+acceptance gates; historical implementation detail remains available in Git.
+Do not create a parallel ledger.
 
-## Status vocabulary
+Status vocabulary:
 
-- `done`: implemented and verified by the acceptance evidence in this ledger.
-- `verifying`: implementation exists, but the named gate has not completed yet.
-- `ready`: locally actionable without real customer credentials or paid calls.
-- `external gate`: requires a real account, OS permission, explicit human
-  approval, paid-provider authorization or another external dependency.
+- `done`: implementation and named acceptance completed;
+- `verifying`: implementation exists but the full gate is still running;
+- `pending`: intentionally not implemented;
+- `external gate`: requires credentials, paid calls, OS permission or human
+  approval.
 
-## Audit snapshot
+## Two-phase purification
 
-The audit does **not** show that Personal-IP was written only in the frontend.
-The backend has owner-scoped repositories, migrations, routers, native tools
-and immutable ledgers. The break is between implementation and proof: the two
-mocked Playwright scenarios exercised the UI, while the real-backend Playwright
-suite contained no Personal-IP flow.
+| ID | Finding | Required result | Status |
+| --- | --- | --- | --- |
+| CLEAN-01 | Tool, Skill, memory and self-modification sources polluted the default Agent | Final exact read-only allowlist after all tool assembly; empty Skills; memory disabled | done — commit `1c87fd8a` |
+| CLEAN-02 | The 359-line soul and generic system prompt described unavailable behavior | Soul under 40 lines; capability-sensitive prompt sections; nearby search links | done — commit `1c87fd8a` |
+| CLEAN-03 | First-use middleware scanned ledgers and imposed a scripted interview | Clean IP Agent bypasses Personal-IP context middleware and goes directly to the model | done — commit `1c87fd8a` |
+| CLEAN-04 | Phase-one baseline needed real-provider proof | Four fixed Doubao cases; simple dialogue one model call/zero tools; input size reduced at least 50% | done — commit `1c87fd8a` |
+| RETIRE-01 | Strategy, differentiation and asset-observation semantics remained live | Repositories, models, tools, DI and customer surfaces removed | done |
+| RETIRE-02 | Preflight, HLLM-Lite prediction, retrospective and promotion formed a conflicting judgment loop | Runtime code/routes/tools removed; publishing no longer carries `preflight_id` | done |
+| RETIRE-03 | Startup/cockpit and narrative interview still created hidden orchestration | Fixed opening, forced schema, session marker and operating tools removed | done |
+| RETIRE-04 | Method distillation and Skill promotion were mixed into production runtime | Python adapters moved to research quarantine; production imports are zero | done |
+| RETIRE-05 | Old tables could return through bootstrap or unsafe migration | 0021 refuses non-empty tables, drops empty legacy tables and `preflight_id`; fresh DB remains clean; downgrade restores empty schema only | done |
+| RETIRE-06 | Cockpit UI still published unsupported business judgments | Dashboard reads fact APIs directly and removes potential/boost/continue-adjust-restart conclusions | done |
+| RETIRE-07 | Accumulated documentation described retired code as current | `IP_AGENT.md` is sole contract; root/module guides compressed; both existing ledgers state retirement and quarantine | done |
+| RETIRE-08 | Physical cleanup might change clean-Agent behavior | Run the same four real Doubao replays and compare answers, tool calls and input scale with phase one | done |
+| NEXT-01 | There is no coherent replacement IP architecture yet | Design from first principles only after the clean baseline is accepted | pending |
 
-Anonymous local SQLite evidence at audit time:
+## Phase-two acceptance gate
 
-| Record | Count |
-| --- | ---: |
-| Platform accounts | 5 |
-| Platform observations | 27 |
-| Preflights | 0 |
-| Publish receipts | 0 |
-| Metric observations | 0 |
-| Retrospectives | 0 |
-| Evidence promotions | 0 |
-| Strategy versions | 0 |
-| Video productions / events | 3 / 26 |
+All of the following must pass before `RETIRE-*` becomes `done`:
 
-This means the base and collection surface exist, but the main
-direction-to-publication-to-learning loop has not yet produced persisted local
-evidence. Empty strategy or metric history is not itself an admission failure.
+1. Backend full test suite and Ruff.
+2. Frontend lint/typecheck, unit tests and factual-dashboard coverage.
+3. Root Skill/package architecture tests.
+4. Migration upgrade from 0020, fresh bootstrap, non-empty fail-closed check and
+   empty-schema downgrade.
+5. Retired API paths return 404 and retired tables are absent at head.
+6. `make personal-ip-data-lifecycle-acceptance`.
+7. `make personal-ip-publish-acceptance`.
+8. `make personal-ip-observability-acceptance`.
+9. `make personal-ip-cost-acceptance`.
+10. `make video-e2e-local`.
+11. Identical real Doubao replay matrix with no unexpected answer, tool-call or
+    input-size drift from phase one.
+12. Refresh product defaults, factory-reset the isolated test profile and leave
+    it ready for the next manual E2E.
 
-## Remediation register
+Completed evidence on 2026-08-01:
 
-| ID | Priority | Area | Audit finding | Acceptance gate | Status |
-| --- | --- | --- | --- | --- | --- |
-| AUD-ENG-001 | P0 | Relocation | Local Python console scripts retained shebangs from the deleted source directory, breaking Make targets after the project move. | Local Make, serve and container launchers invoke `python -m pytest` / `python -m uvicorn`; relocation regression passes. | done |
-| AUD-ENG-002 | P0 | Relocation | The current backend and MineContext virtual environments still contain stale generated entrypoints/editable-install metadata. | Rebuild both ignored runtimes in the new directory; `make minecontext-doctor` and entrypoint scan show no old path. | done |
-| AUD-ENG-003 | P0 | Packaging | The package test fixture copied MineContext runtime bytecode and force-added it, so ordinary prior imports broke source-package acceptance. | Package tests exclude runtime bytecode from the synthetic source checkout and all package tests pass. | done |
-| AUD-TST-001 | P0 | Full stack | Personal-IP had two Playwright scenarios, both fully mocking backend APIs; the real-backend suite had none. | Real Next.js + real Gateway + temporary migrated SQLite: create subject through UI, read it through the API, insert an account through the API, reload and render the stored account. | done |
-| AUD-TST-002 | P0 | Frontend startup | Default Playwright allowed 120 seconds, while the audited production build needed about 165 seconds. | Default web-server startup timeout is 300 seconds and the mock suite can reach test execution. | done |
-| AUD-TST-003 | P0 | Test isolation | Mocked web-fetch tests used the machine's live DNS; Clash RFC 2544 fake-IP answers caused 11 false failures. | Browserless, Crawl4AI and fastCRW unit tests inject deterministic public DNS while private/metadata rejection tests remain active. | done |
-| AUD-TST-004 | P0 | Full-stack isolation | The real-backend Playwright build inherited `frontend/.env` and could call a developer gateway on port 8001 instead of its temporary replay gateway. | The config explicitly clears both public backend URLs and forces same-origin rewrites to the ephemeral gateway. | done |
-| AUD-TST-005 | P0 | Manual E2E isolation | Repeated first-use testing reused the normal owner database, conversations, learned memory, MineContext and browser profiles, requiring destructive factory resets between trials. | `make ip-test-start` uses a fixed marked test home with independent SQLite/config/extensions/user state and a visible UI banner; `make ip-test-reset` refuses unmarked/tampered targets, stops services, rotates only that test home to a recoverable snapshot and preserves the normal runtime. Unit tests plus a live create/reset/recovery probe pass. | done |
-| AUD-QA-001 | P0 | Regression | The full backend suite had environment-sensitive failures and the root suite had one package-fixture failure. | Root suite, backend suite, frontend unit suite and `pnpm check` are green from the moved checkout. | done |
-| AUD-QA-002 | P1 | Build performance | Next production build is unusually slow and reports whole-project NFT tracing from a dynamic artifact route. | Scope the traced filesystem path, remove the warning and record a repeatable build time below the Playwright startup budget. | done |
-| AUD-LOOP-001 | P0 | Strategy | No real natural incubation has yet produced a useful direction and first creative action. | Complete one natural subject conversation through whatever evidence is available, a direct IP-form/direction judgment, one script or pilot and explicit assumptions; no internal stage certificate is required. | external gate |
-| AUD-LOOP-002 | P0 | Closed loop | Local preflight, publish, metric and retrospective tables are empty. | Seal one real publication from blind prediction through observed retrospective, then use it to revise the next hypothesis; no evidence-promotion receipt or fixed publication count is required. | external gate |
-| AUD-DIST-001 | P1 | Platforms | Evidence is concentrated in Douyin/WeChat/Xiaohongshu; X, Instagram, YouTube and TikTok have no accepted evidence. | Run the account/login/collection/publish/recovery matrix per platform with explicit coverage states. | external gate |
-| AUD-VID-001 | P1 | Video | Local video E2E simulates paid providers; paid calls executed by that gate are zero. | Accept one full multi-shot generative production and one real faceless-material production with immutable provider/cost/QA receipts. | external gate |
-| AUD-COMP-001 | P1 | Publishing compliance | Publish requests remain generic JSON and do not yet enforce platform-specific disclosure, commercial-partnership or moderation fields. | Add versioned per-platform compliance schemas, validation and receipt evidence before prepare/finish. | done |
-| AUD-COST-001 | P1 | Cost control | Video budgets are recorded but not enforced as admission limits. | Reserve, accumulate and reject over-budget paid operations before provider submission; test retries and concurrent reservations. | done |
-| AUD-DATA-001 | P1 | Data lifecycle | MineContext deletion exists, but whole Personal-IP export/backup/restore/delete is absent. | Owner-scoped export, verified restore and destructive-delete flow cover every Personal-IP repository without leaking credentials. | done |
-| AUD-OBS-001 | P2 | Operations | Product observability is mostly optional and the local doctor reports missing nginx and unconfigured web tools. | Define the supported local/prod profile, make required health checks green and surface loop/provider/cost failures in the operating console. | done |
-| AUD-OS-001 | P2 | Desktop fallback | UI-TARS source and permission checks exist, but the runtime/model are disabled and no live desktop acceptance was executed. | Explicitly enable, approve and run one sanitized macOS fallback receipt without exposing raw screenshots or credentials. | external gate |
-| AUD-ONB-001 | P0 | First use | New owners shared the returning-owner cockpit entry and could scan every empty strategy/publish/metric/retro/video repository before answering the first request. | Startup-context unit/tool tests prove that an empty owner reads only subjects/accounts, returns `new_owner`, and defensively skips the full cockpit; welcome copy does not require an account. | done |
-| AUD-ONB-002 | P0 | First reply | A first-use orientation could still enter the generic research/Skill loop, spend multiple provider calls and stall behind browser search or CAPTCHA before showing any answer. | Real Next.js + real Gateway + isolated empty SQLite returns one provisional route and one entity-sensitive clarification within three seconds on a cold local runtime; its structured answer advances to a target-group/core-problem question without repeating the first. Both runs use 0 model calls, 0 tokens, no follow-up-suggestion request and no web/Skill/ledger operation; concrete script/asset/link tests still reach the normal model path. | done |
-| AUD-ONB-003 | P0 | Narrative interview | The fast first-use path is still a deterministic pair of clarification cards. It collects fields but cannot reflect the user's language, revise a hypothesis, change the next question from the answer, or preserve narrative and disclosure control. | Real Next.js + real Gateway + isolated SQLite proves ordinary conversational onboarding with no intake cards; person, brand, product and organization openings use entity-appropriate grand-tour invitations; three materially different answers produce answer-grounded different follow-ups with one main question per turn; skip/correct/private/stop requests are honored; earliest-memory and sensitive-history prompts are never the default and are not repeated after refusal; direct tasks bypass incubation; confirmed facts, tentative interpretations and evidence gaps remain distinct; bounded interviewer calls do not regress to the full-agent 80k-token path. | done |
-| AUD-CAL-001 | P0 | Content evidence | Pilot/preflight guidance separated hypotheses from evidence in prose, but formal contracts could still contain neural shorthand or unsupported viral certainty and did not freeze distribution assumptions. | Strategy v4 and audience-preflight v2 tests require evidence level, observable mechanism, predicted signal, failure condition, distribution assumptions and uncertainty; neural shortcuts and viral guarantees are rejected; a first pilot with no account history stays an explicit unmeasured cold-start hypothesis. | done |
-| AUD-DIAG-001 | P0 | Account diagnosis | Connected accounts had collection and metrics surfaces but no coherent basis for continuing, adjusting or starting over. The first fix overcorrected with a server verdict compiler, fixed sample count, freshness windows and a business-outcome matrix. | The native surface now exposes only an owner-scoped credential-free evidence reader. Architecture tests prove the compiler, `decision_ready`, fixed post minimum and freshness constants are absent; all eight platform Skills use the reader and make an Agent judgment whose confidence reflects missing evidence without blocking. | done |
-| AUD-IP-001 | P0 | IP scope | The operating model still treated IP mainly as a creator strategy; products were not first-class subjects and no shared context connected influence, differentiation and creative expression. The first fix then turned that context into compulsory stage and promotion gates. | Migration 0020 and repository/native-tool tests prove owner isolation, idempotency and all four subject types while strategy v5 and differentiation v2 remain shape-only versioned working notes. Direct stage movement, empty optional sections and gate-free preflight are covered; frontend type/check plus the real-backend product-subject scenario pass. | done |
-| AUD-ARCH-001 | P0 | Agent architecture | Personal-IP context middleware accumulated benchmark search planning, Skill routing, downstream locks and final-answer rewriting, while most native Personal-IP tool schemas were hidden behind deferred discovery. Together they created a second runtime and made installed capabilities hard to call. | Middleware owns only owner-scoped portfolio injection and bounded first-use narrative intake. Native first-party tools remain visible; deferred discovery applies only to MCP tools. Static architecture regressions pin both boundaries. | done |
-| AUD-ARCH-002 | P0 | Semantic gates | Strategy stages, differentiation promotions, account-diagnosis thresholds and automatic evidence promotion forced creative work through conflicting business certificates. Fixing one gate repeatedly broke an adjacent path. | Strategy/differentiation storage validates only shape and owner scope; account diagnosis is read-only context; preflight accepts absent notes/history; the promotion write API/tool/repository method is removed; a static architecture test pins those absences. Safety, credential, rights, paid-call, publishing, deletion, hash and immutable-receipt boundaries remain enforced. | done |
-| AUD-BENCH-001 | P0 | Benchmark capability | A named benchmark previously triggered generic search, then multiple middleware-specific gates attempted to control the failure and broke creative execution. | Rebuild benchmark handling only after capability contracts and the native orchestration path are explicit. Until then it is not accepted as a complete product path. | pending |
-| AUD-SRCH-001 | P0 | Search safety | The public fallback could return query-irrelevant adult spam when Ark Web Search was not activated. | Fallback calls DuckDuckGo with strict safe search, accepts public URLs only, removes unsafe and query-irrelevant entries, reports filtered coverage and returns no evidence when the exact live query has no safe relevant result. | done |
+- backend: `8940 passed, 71 skipped`; Ruff passed;
+- frontend: 90 unit-test files and 730 tests passed; `pnpm check` passed;
+- root architecture/package tests: 111 passed; focused package/Skill tests: 12 passed;
+- migration 0021 upgrade, fresh bootstrap, non-empty refusal and empty-schema
+  downgrade passed; retired APIs return 404 and retired tables are absent at
+  head;
+- data lifecycle, publishing, observability and cost acceptances passed with
+  8/3, 56, 94/3 and 29 tests respectively;
+- local video E2E completed with 11 ledger events, successful QA, zero paid
+  calls and output SHA-256
+  `f0e6604ace19f32eca3c810ff92320ce0a957dc86b348b000983b8cfec019544`;
+- real-backend Playwright portfolio acceptance passed;
+- real Doubao replay preserved the clean baseline: the simple IP question and
+  the Chinese-grammar question each used one model call and zero tools; the
+  account-name-only case used one `web_search`, then requested the platform or
+  home-page link through `ask_clarification`, without inventing an account or
+  video analysis. First-call inputs remained about 3.2k tokens, consistent
+  with phase one and more than 50% below the pre-cleanup baseline.
 
-## Execution order
+The current-fact replay encountered an external coverage limit: Ark Web Search
+was not activated for the configured account and the DuckDuckGo fallback
+returned no results. The Agent disclosed that it could not verify the fact and
+did not fabricate a citation. Activating a citation-bearing search provider is
+an external configuration gate, not a reason to restore semantic middleware or
+add a new server-side quality gate.
 
-1. Restore reproducible engineering gates after relocation.
-2. Keep at least one Personal-IP path in the real frontend/backend/SQLite E2E
-   suite and expand it whenever a loop stage is implemented.
-3. Prove one Douyin gold loop end to end before expanding all eight platforms.
-4. Accept full multi-shot and faceless-material video paths.
-5. Add compliance, enforced cost limits and whole-product data lifecycle.
-6. Expand the real-account matrix to the remaining platforms and desktop
-   fallback.
+## Intentionally retained external gates
 
-## First-wave acceptance evidence
+- Real login, collection and publication acceptance for all eight platforms.
+- Real UI-TARS and MineContext OS-permission acceptance.
+- Real paid multi-shot and real faceless-material video delivery.
 
-- 2026-08-01 semantic-gate cleanup: 334 Personal-IP/audience backend tests,
-  eight Skill-stack architecture tests, frontend lint/typecheck and five
-  focused cockpit/workflow unit tests passed. The static pure-tool regression
-  pins direct strategy/direction status movement, an evidence-only account
-  reader, gate-free cold-start preflight, absence of promotion write/read Agent
-  tools, and absence of promotion data from current compilers/cockpit.
-
-- `backend`: relocation + web-tool isolation regression group, 73 passed.
-- `backend`: local eight-platform publish/recovery acceptance, 58 passed.
-- `root`: full suite, 108 passed.
-- `frontend`: unit suite, 90 files / 729 tests passed; `pnpm check` passed.
-- Mocked Personal-IP Playwright scenarios: 2 passed against the production
-  server.
-- Real-backend IP portfolio Playwright: 1 passed against real Next.js, real
-  Gateway and temporary SQLite at migration head `0020`; the UI created a
-  product subject, the API read the persisted row, an account was attached and
-  the refreshed UI rendered both.
-- Isolated manual test mode passed 5 backend safety tests, 1 frontend flag
-  test and `pnpm check`. A live Gateway used
-  `backend/.deer-flow-ip-test/data/deerflow.db`; the probe thread
-  `test-mode-reset-probe` was present only in the timestamped reset snapshot,
-  the fresh test state had no database, and the normal runtime remained at
-  zero threads, subjects and accounts. The in-app browser's stale internal
-  connection-error page was security-blocked from further navigation, so the
-  visible banner is covered by the compiled frontend path rather than claimed
-  as a successful browser observation in this acceptance.
-- IP influence-asset regression: the earlier 331-test run covered the original
-  strategy/account/differentiation implementation. It is historical evidence;
-  the current shape-only strategy v5, differentiation v2, evidence reader and
-  gate-free preflight are covered by the semantic-gate cleanup regression.
-- Relocated runtimes: backend and MineContext rebuilt offline; old source-path
-  references are 0 and `make minecontext-doctor` passes.
-- First-use/evidence remediation: Personal-IP/HLLM regression 273 passed;
-  Skill/catalog regression 101 passed; six affected Skill packages validated;
-  frontend 90 files / 729 tests and `pnpm check` passed. Two independent
-  forward tests confirmed the cold-start and anti-viral-guarantee behavior.
-- Deterministic first-reply acceptance: the in-app Next.js UI ran against a
-  real Gateway and isolated empty SQLite at migration head
-  `0020_personal_ip_differentiation`. A fresh cold-runtime run completed in
-  2.063 seconds with 0 model calls, 0 input/output tokens and exactly one
-  `ask_clarification`; the visible response gave the provisional
-  value/audience -> positioning hypotheses -> benchmark/pilot -> observed
-  calibration route and one person-evidence question. Ten seconds after the
-  card appeared, the UI had made no follow-up-suggestion request. The original
-  owner portfolio (1 subject, 5 accounts) was never modified.
-- Deterministic first-answer continuation acceptance: on a second isolated
-  empty-owner thread, the initial evidence question completed in 2.278 seconds
-  and its structured answer advanced in 0.817 seconds to the target-group and
-  actionable/paid-problem question. Both runs recorded 0 model calls and 0
-  tokens; the first question appeared only once. This replaced the observed
-  pre-fix continuation path, which had spent 82,255 input tokens across two
-  provider calls before asking the same second intake question.
-- Adaptive narrative-interview acceptance supersedes the two deterministic
-  clarification cards above. One Playwright scenario passed against real
-  Next.js, real Gateway and isolated SQLite in 3.5 minutes including the
-  production build. The same ordinary conversational opening received three
-  materially different user stories and returned three answer-grounded
-  reflections and three different follow-up questions. The composer stayed
-  enabled, no `human-input-card` rendered and no follow-up-suggestion request
-  occurred while the interview marker was active. The first opening used zero
-  model calls; later turns sent only the latest bounded visible exchange and
-  one private structured interviewer schema, then rendered the result as
-  ordinary assistant text. Focused middleware tests also cover all four entity
-  openings, correction/skip/private/stop control, sensitive-memory
-  non-defaults, direct-task bypass and same-turn transition to the full Agent
-  when enough evidence exists.
-- Architecture cleanup removed cross-layer benchmark routing, prompt gates,
-  output rewriting and automatic first-party tool deferral. The restored
-  middleware and focused regressions pass; benchmark adaptation is deliberately
-  marked pending until it is rebuilt as an explicit capability path rather than
-  another middleware special case.
-- Full-backend gate: `make test` passed 8,979 tests with 71 explicit
-  live/external-dependency skips in 629.51 seconds. The autouse fixture now
-  isolates auth and owner-contract tests from a checkout-local
-  `DEER_FLOW_AUTH_DISABLED=1`; real-model client and agent-factory tests require
-  dedicated opt-in environment flags, so ordinary regression runs do not spend
-  provider credentials merely because local `.env` or `config.yaml` files
-  exist.
-- Frontend NFT/build gate: the mock artifact route now anchors every dynamic
-  lookup under `public/demo/threads`, rejects path and symlink escapes and no
-  longer leaks the absolute checkout path in its download header. Four route
-  regressions passed; the complete frontend suite passed 89 files / 723 tests;
-  `pnpm check` passed. Two consecutive warning-free production builds completed
-  in 127.70 and 125.64 seconds, below the 300-second Playwright startup budget.
-- Publishing-compliance gate: all eight supported platforms now use the
-  immutable `personal-ip-publish-compliance-v1` declaration plus a distinct
-  dated policy version and source-linked server receipt. Prepare rejects
-  missing rights, moderation or an inexact commercial/AI disclosure plan;
-  sensitive topics require documented human review. A published finish
-  requires `personal-ip-publish-compliance-evidence-v1` bound to that receipt
-  and non-empty disclosure evidence refs. The focused contract/repository
-  regression passed 43 tests, the local eight-platform publish/recovery
-  acceptance passed 59, the complete Personal-IP backend regression passed
-  308, Ruff passed and the seven IP Agent routing/stack constraints passed.
-- Video-cost gate: `personal_ip_reserve_video_budget`,
-  `personal_ip_settle_video_budget` and
-  `personal_ip_release_video_budget` now write server-owned append-only events
-  in the existing production ledger. The state fold admits a paid attempt only
-  when settled spend plus every active maximum remains within the immutable
-  hard limit. SQLite uses `BEGIN IMMEDIATE` and other databases use a row lock,
-  so concurrent reservations cannot overbook. Failed attempts remain charged,
-  retries require new reservations, unknown billing remains reserved and an
-  admitted provider request cannot be released. Meaningful paid approvals must
-  come from the authenticated workbench path and match the exact reservation;
-  generic agent events cannot forge them. `make personal-ip-cost-acceptance`
-  passed 34 tests, the complete Personal-IP backend regression passed 315,
-  Ruff/format passed and all seven IP Agent routing/stack constraints passed.
-- Whole-data lifecycle gate: every registered `personal_ip_*` table is now
-  structurally classified as an exported dataset or a secret/deletion-only
-  table. The versioned backup is owner-bound and canonical-digest verified;
-  encrypted platform tokens and one-use OAuth state never enter it. Restore is
-  empty-scope only, verifies the post-insert digest in the same transaction and
-  restores connection shells as revoked so login is mandatory. Permanent
-  deletion rechecks a fresh state digest under a write lock, requires the exact
-  phrase plus backup acknowledgement, and removes business rows, encrypted
-  credentials, OAuth state and MineContext local data. Settings exposes the
-  download, file restore and strong-confirmation flow. `make
-  personal-ip-data-lifecycle-acceptance` passed 8 backend and 3 frontend tests;
-  the complete Personal-IP backend regression passed 320, the complete
-  frontend suite passed 90 files / 726 tests, `pnpm check`, Ruff/format,
-  persistence bootstrap and Gateway route registration all passed.
-- Runtime-observability gate: `docs/RUNTIME_PROFILES.md` now defines
-  auto-detected `local-direct`, explicit nginx-backed `local-proxy` and
-  production ingress profiles. `make doctor` selected this checkout's direct
-  `3000 -> 8001` route and completed Ready with zero errors and warnings;
-  absent web organs were explicit skips, while malformed providers and literal
-  secrets remain unhealthy. `serve.sh --prod --no-nginx` failed closed before
-  service startup. Operating cockpit v6 projects unresolved publication,
-  collection, video-provider and budget failures from authoritative receipts
-  and active video ledgers into sanitized loop/provider/cost alerts. Hard-limit
-  rejection now seals `personal-ip-video-budget-rejection-v1` before returning
-  the error, without request refs or raw provider payloads. `make
-  personal-ip-observability-acceptance` passed 88 backend tests, 4 frontend
-  tests and `pnpm check`; `make personal-ip-cost-acceptance` passed 34 tests;
-  Ruff and shell syntax checks passed.
+These do not turn research or unavailable integrations into active capability.
+They also do not block local verification of the clean runtime and retained
+execution safety boundaries.

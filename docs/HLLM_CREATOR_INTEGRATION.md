@@ -1,5 +1,9 @@
 # HLLM-Creator integration
 
+> Historical research note. HLLM/HLLM-Lite prediction is retired from the
+> production IP Agent as of 2026-08-01. This document does not describe an
+> active route, tool or product workflow; see `IP_AGENT.md`.
+
 ## Product decision
 
 ByteDance HLLM-Creator is the audience intelligence foundation for the IP

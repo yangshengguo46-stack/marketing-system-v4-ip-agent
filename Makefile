@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install ip-test-prepare ip-test-start ip-test-reset ip-test-status ip-test-stop personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor hllm-lite ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install ip-test-prepare ip-test-start ip-test-reset ip-test-status ip-test-stop personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 PNPM ?= pnpm
@@ -41,8 +41,7 @@ help:
 	@echo "  make ip-clean-install - Validate the source archive in a credential-free clean room"
 	@echo "  make volcengine-install - Build the pinned AI MediaKit CLI from source"
 	@echo "  make volcengine-doctor  - Check the source-built AI MediaKit CLI"
-	@echo "  make hllm-doctor        - Verify the pinned full HLLM-Creator source"
-	@echo "  make hllm-lite          - Run the local Doubao-backed audience provider"
+	@echo "  make hllm-doctor        - Verify the quarantined HLLM research source"
 	@echo "  make ui-tars-install    - Verify/register the pinned source-only UI-TARS organ"
 	@echo "  make ui-tars-start      - Start or connect the optional local UI-TARS operator"
 	@echo "  make ui-tars-stop       - Stop the managed local UI-TARS operator"
@@ -130,7 +129,7 @@ personal-ip-data-lifecycle-acceptance:
 
 personal-ip-observability-acceptance:
 	@$(MAKE) -C backend personal-ip-observability-acceptance
-	@cd frontend && $(PNPM) exec rstest run tests/unit/core/personal-ip-cockpit.test.ts
+	@cd frontend && $(PNPM) exec rstest run tests/unit/core/personal-ip-dashboard.test.ts
 	@cd frontend && $(PNPM) check
 
 video-e2e-local:
@@ -156,9 +155,6 @@ volcengine-doctor:
 
 hllm-doctor:
 	@$(PYTHON) ./scripts/hllm_creator_source.py
-
-hllm-lite:
-	@cd backend && uv run python -m uvicorn app.audience_lite.app:app --host 127.0.0.1 --port 9128
 
 ui-tars-install:
 	@$(BACKEND_UV_RUN) python ../scripts/ui_tars_operator.py install

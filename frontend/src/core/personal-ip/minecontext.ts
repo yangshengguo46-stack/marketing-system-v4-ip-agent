@@ -13,10 +13,7 @@ export type MineContextScope =
   | "work_activity";
 export type MineContextPurpose =
   | "persona_modeling"
-  | "audience_modeling"
-  | "hllm_user_profile"
-  | "preflight"
-  | "retrospective";
+  | "audience_modeling";
 
 export type MineContextStatus = {
   operator_enabled: boolean;

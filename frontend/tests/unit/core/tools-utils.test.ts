@@ -28,18 +28,4 @@ describe("explainToolCall", () => {
     expect(label).toBe("正在同步各平台的最新数据…");
     expect(label).not.toContain("personal_ip");
   });
-
-  it("shows private strategy work as a natural customer-safe activity", () => {
-    const label = explainToolCall(
-      {
-        name: "personal_ip_record_strategy",
-        args: { stage: "business_model_draft" },
-      },
-      zhCN,
-    );
-
-    expect(label).toBe("正在了解你的整体经营情况…");
-    expect(label).not.toContain("strategy");
-    expect(label).not.toContain("建模完成");
-  });
 });

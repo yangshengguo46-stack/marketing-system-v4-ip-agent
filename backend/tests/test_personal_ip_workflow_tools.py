@@ -2,101 +2,37 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from deerflow.config.paths import Paths
-from deerflow.personal_ip.audience_provider import AudiencePreflightResult
 from deerflow.personal_ip.browser_profiles import clear_browser_account_target
 from deerflow.personal_ip.runtime import PersonalIPRuntimeServices, configure_personal_ip_runtime
 from deerflow.tools.builtins import (
     personal_ip_begin_publish_receipt_tool,
     personal_ip_finish_browser_publish_tool,
     personal_ip_prepare_browser_publish_tool,
-    personal_ip_read_preflight_tool,
     personal_ip_read_publish_receipt_tool,
-    personal_ip_read_retrospective_tool,
     personal_ip_record_publish_attempt_tool,
-    personal_ip_run_preflight_tool,
-    personal_ip_seal_retrospective_tool,
 )
 from deerflow.tools.builtins.personal_ip_workflow_tools import (
     _personal_ip_begin_publish_receipt,
     _personal_ip_finish_browser_publish,
     _personal_ip_prepare_browser_publish,
-    _personal_ip_read_preflight,
     _personal_ip_read_publish_receipt,
-    _personal_ip_read_retrospective,
     _personal_ip_record_publish_attempt,
-    _personal_ip_run_preflight,
-    _personal_ip_seal_retrospective,
 )
 from deerflow.tools.tools import BUILTIN_TOOLS
 
 
-def _variant(variant_id: str, text: str) -> dict:
-    return {
-        "variant_id": variant_id,
-        "text": text,
-        "evidence_level": "account_history_conditioned",
-        "mechanism_hypotheses": [
-            {
-                "layer": "attention_prediction",
-                "claim": "目标人群识别到相关问题后更可能继续观看",
-                "predicted_signal": "首段继续观看比例提高",
-                "failure_condition": "目标人群无法复述内容承诺",
-            }
-        ],
-        "distribution_assumptions": ["平台分发给相关兴趣人群"],
-        "uncertainty": "历史表现不能保证本次结果",
-    }
-
-
-def _pilot_differentiation():
-    return SimpleNamespace(
-        get_version=AsyncMock(
-            return_value={
-                "id": "difference-1",
-                "method_version": "ip-differentiation-thesis-v1",
-                "status": "pilot",
-                "primary_entity": {"entity_type": "product", "name": "IP Agent"},
-                "decision_context": {"target_publics": ["经营者"]},
-                "strategic_difference": {"reason_to_choose": "经营证据闭环"},
-                "dramatic_engine": {"recurring_choice": "公开真实结果还是包装成功"},
-                "distinctive_encoding": {"invariants": ["真实证据优先"]},
-            }
-        )
-    )
-
-
-def _active_subjects():
-    return SimpleNamespace(
-        get=AsyncMock(
-            return_value={"id": "subject-1", "status": "active"},
-        )
-    )
-
-
-def _active_accounts():
-    return SimpleNamespace(
-        get=AsyncMock(
-            return_value={"id": "acct-1", "status": "active"},
-        )
-    )
-
-
-def test_personal_ip_workflow_tools_keep_observation_tools() -> None:
+def test_personal_ip_workflow_tools_keep_publish_tools() -> None:
     tools = [
-        personal_ip_run_preflight_tool,
-        personal_ip_read_preflight_tool,
         personal_ip_begin_publish_receipt_tool,
         personal_ip_prepare_browser_publish_tool,
         personal_ip_finish_browser_publish_tool,
         personal_ip_record_publish_attempt_tool,
         personal_ip_read_publish_receipt_tool,
-        personal_ip_seal_retrospective_tool,
-        personal_ip_read_retrospective_tool,
     ]
     assert all(item in BUILTIN_TOOLS for item in tools)
     names = {item.name for item in tools}
@@ -104,12 +40,8 @@ def test_personal_ip_workflow_tools_keep_observation_tools() -> None:
         "personal_ip_begin_publish_receipt",
         "personal_ip_finish_browser_publish",
         "personal_ip_prepare_browser_publish",
-        "personal_ip_read_preflight",
         "personal_ip_read_publish_receipt",
-        "personal_ip_read_retrospective",
         "personal_ip_record_publish_attempt",
-        "personal_ip_run_preflight",
-        "personal_ip_seal_retrospective",
     }
     assert not any("decide_evidence" in tool.name for tool in BUILTIN_TOOLS)
 
@@ -193,7 +125,6 @@ async def test_browser_publish_tools_bind_selected_profile_and_live_proof(tmp_pa
                 idempotency_key="publish:video-1:youtube",
                 pending_attempt_key="browser-handoff-1",
                 account_id="acct-1",
-                preflight_id="",
                 request={"caption": "视频文案", "media_refs": ["artifact://video-1"]},
             )
         )
@@ -225,265 +156,7 @@ async def test_browser_publish_tools_bind_selected_profile_and_live_proof(tmp_pa
 
 
 @pytest.mark.asyncio
-async def test_run_preflight_uses_strategy_without_local_ids(monkeypatch) -> None:
-    preflights = SimpleNamespace(
-        seal=AsyncMock(
-            return_value={
-                "id": "preflight-1",
-                "status": "sealed",
-                "provider": "hllm-lite",
-            }
-        )
-    )
-    brand = SimpleNamespace(
-        get_latest_strategy=AsyncMock(
-            return_value={
-                "stage": "launch_package_ready",
-                "differentiation_version_id": "difference-1",
-                "mode": "monetization_first",
-                "person_model": {"values_boundaries": ["不夸大"]},
-                "business_model": {
-                    "primary_goal": "获取付费客户",
-                    "objective_system": {
-                        "asset_mechanism": "influence",
-                        "influence_goals": [{"goal": "正确归因"}],
-                        "behavioral_goals": [{"behavior": "申请体验"}],
-                        "economic_goals": [{"outcome": "付费订阅"}],
-                        "priority_order": [
-                            "influence",
-                            "behavioral",
-                            "economic",
-                        ],
-                    },
-                },
-                "positioning_candidates": [{"candidate_id": "a", "promise": "经营结果"}],
-                "launch_package": {"selected_candidate_id": "a", "bio_options": ["真实经营"]},
-            }
-        ),
-    )
-    configure_personal_ip_runtime(
-        PersonalIPRuntimeServices(
-            connections=SimpleNamespace(),
-            metrics=SimpleNamespace(),
-            publish_receipts=SimpleNamespace(),
-            preflights=preflights,
-            subjects=_active_subjects(),
-            accounts=_active_accounts(),
-            brand=brand,
-            differentiation=_pilot_differentiation(),
-        )
-    )
-
-    async def preflight(request):
-        payload = request.to_payload()
-        assert "acct-1" not in json.dumps(payload)
-        assert "subject-1" not in json.dumps(payload)
-        return AudiencePreflightResult(
-            provider="hllm-lite",
-            model_version="doubao-test",
-            algorithm_version="lite-v0",
-            request_digest=request.request_digest,
-            audience_basis="aggregate_account_cohort",
-            variants=[_variant("variant-1", "候选文案")],
-        )
-
-    monkeypatch.setattr(
-        "deerflow.tools.builtins.personal_ip_workflow_tools._audience_preflight_provider",
-        lambda: SimpleNamespace(preflight=preflight),
-    )
-    runtime = SimpleNamespace(context={"user_id": "user-1"})
-
-    result = json.loads(
-        await _personal_ip_run_preflight(
-            runtime,
-            operation_key="preflight:draft-1",
-            subject_ids=["subject-1"],
-            target_account_ids=["acct-1"],
-            history=[
-                {
-                    "content_id": "published-1",
-                    "published_at": "2026-07-20T08:00:00Z",
-                    "platform": "douyin",
-                    "title": "历史内容",
-                    "content_type": "short_video",
-                    "metrics": {"views": 1000, "likes": 90},
-                }
-            ],
-            target={
-                "content_id": "draft-1",
-                "title": "待发布",
-                "description": "发布前预演",
-            },
-            variant_count=3,
-        )
-    )
-
-    assert result["id"] == "preflight-1"
-    kwargs = preflights.seal.await_args.kwargs
-    assert kwargs["owner_user_id"] == "user-1"
-    assert kwargs["subject_ids"] == ["subject-1"]
-    assert kwargs["target_account_ids"] == ["acct-1"]
-    assert kwargs["result"].variants[0].variant_id == "variant-1"
-    request_payload = kwargs["request"].to_payload()
-    creator_prompt = request_payload["example"]["prompt2"]
-    assert '"mode":' not in creator_prompt
-    assert '"objective_system":' in creator_prompt
-    assert '"asset_mechanism":"influence"' in creator_prompt
-
-
-@pytest.mark.asyncio
-async def test_run_preflight_supports_a_first_pilot_without_account_history(monkeypatch) -> None:
-    preflights = SimpleNamespace(seal=AsyncMock(return_value={"id": "preflight-cold", "status": "sealed"}))
-    brand = SimpleNamespace(
-        get_latest_strategy=AsyncMock(
-            return_value={
-                "stage": "launch_package_ready",
-                "differentiation_version_id": "difference-1",
-                "mode": "monetization_first",
-                "person_model": {"values_boundaries": ["不夸大"]},
-                "business_model": {"primary_goal": "验证真实需求"},
-                "positioning_candidates": [{"candidate_id": "a", "promise": "记录真实开店"}],
-                "launch_package": {"selected_candidate_id": "a", "bio_options": ["从零开店"]},
-            }
-        )
-    )
-    configure_personal_ip_runtime(
-        PersonalIPRuntimeServices(
-            connections=SimpleNamespace(),
-            metrics=SimpleNamespace(),
-            publish_receipts=SimpleNamespace(),
-            preflights=preflights,
-            subjects=_active_subjects(),
-            brand=brand,
-            differentiation=_pilot_differentiation(),
-        )
-    )
-
-    async def preflight(request):
-        payload = request.to_payload()
-        assert payload["audience_basis"] == "cold_start_hypothesis"
-        assert payload["example"]["title_list"] == []
-        return AudiencePreflightResult(
-            provider="hllm-lite",
-            model_version="doubao-test",
-            algorithm_version="behavioral-hypothesis-v1",
-            request_digest=request.request_digest,
-            audience_basis="cold_start_hypothesis",
-            variants=[
-                {
-                    **_variant("variant-1", "记录第一次选址判断"),
-                    "evidence_level": "unmeasured_hypothesis",
-                }
-            ],
-        )
-
-    monkeypatch.setattr(
-        "deerflow.tools.builtins.personal_ip_workflow_tools._audience_preflight_provider",
-        lambda: SimpleNamespace(preflight=preflight),
-    )
-
-    result = json.loads(
-        await _personal_ip_run_preflight(
-            SimpleNamespace(context={"user_id": "user-1"}),
-            operation_key="preflight:first-pilot",
-            subject_ids=["subject-1"],
-            target_account_ids=[],
-            history=[],
-            target={
-                "content_id": "pilot-1",
-                "title": "第一次选址",
-                "description": "验证真实开店过程是否值得持续看",
-            },
-        )
-    )
-
-    assert result["id"] == "preflight-cold"
-    sealed = preflights.seal.await_args.kwargs
-    assert sealed["target_account_ids"] == []
-    assert sealed["request"].audience_basis == "cold_start_hypothesis"
-    assert sealed["result"].variants[0].evidence_level == "unmeasured_hypothesis"
-
-
-@pytest.mark.asyncio
-async def test_run_preflight_requires_both_local_evidence_purposes(monkeypatch) -> None:
-    preflights = SimpleNamespace(seal=AsyncMock(return_value={"id": "preflight-local", "status": "sealed"}))
-    evidence = {
-        "schema_version": "personal-ip-local-context-evidence-v1",
-        "evidence_id": "mctx_1",
-        "source": {"source_kind": "projects", "context_type": "activity", "observed_at": "2026-07-22T05:00:00+00:00"},
-        "summary": {"title": "路线图", "text": "下周交付", "keywords": ["交付"]},
-        "digest": "a" * 64,
-    }
-    minecontext = SimpleNamespace(read_evidence=MagicMock(return_value=[evidence]))
-    brand = SimpleNamespace(
-        get_latest_strategy=AsyncMock(
-            return_value={
-                "stage": "launch_package_ready",
-                "differentiation_version_id": "difference-1",
-                "mode": "monetization_first",
-                "person_model": {"values_boundaries": ["不夸大"]},
-                "business_model": {"primary_goal": "获取付费客户"},
-                "positioning_candidates": [{"candidate_id": "a", "promise": "经营结果"}],
-                "launch_package": {"selected_candidate_id": "a", "bio_options": ["真实经营"]},
-            }
-        ),
-    )
-    configure_personal_ip_runtime(
-        PersonalIPRuntimeServices(
-            connections=SimpleNamespace(),
-            metrics=SimpleNamespace(),
-            publish_receipts=SimpleNamespace(),
-            preflights=preflights,
-            subjects=_active_subjects(),
-            brand=brand,
-            differentiation=_pilot_differentiation(),
-            minecontext=minecontext,
-        )
-    )
-
-    async def preflight(request):
-        profile = json.loads(request.to_payload()["example"]["user_profile"])
-        assert profile["local_context_evidence"]["items"][0]["evidence_id"] == "mctx_1"
-        return AudiencePreflightResult(
-            provider="hllm-lite",
-            model_version="doubao-test",
-            algorithm_version="lite-v0",
-            request_digest=request.request_digest,
-            audience_basis="aggregate_account_cohort",
-            variants=[_variant("variant-1", "候选文案")],
-        )
-
-    monkeypatch.setattr(
-        "deerflow.tools.builtins.personal_ip_workflow_tools._audience_preflight_provider",
-        lambda: SimpleNamespace(preflight=preflight),
-    )
-    result = json.loads(
-        await _personal_ip_run_preflight(
-            SimpleNamespace(context={"user_id": "user-1"}),
-            operation_key="preflight:local",
-            subject_ids=["subject-1"],
-            target_account_ids=[],
-            history=[
-                {
-                    "content_id": "published-1",
-                    "published_at": "2026-07-20T08:00:00Z",
-                    "platform": "douyin",
-                    "title": "历史内容",
-                    "content_type": "short_video",
-                    "metrics": {"views": 1000},
-                }
-            ],
-            target={"content_id": "draft-1", "title": "待发布", "description": "预演"},
-            local_context_evidence_ids=["mctx_1"],
-        )
-    )
-
-    assert result["id"] == "preflight-local"
-    assert [call.kwargs["purpose"] for call in minecontext.read_evidence.call_args_list] == ["preflight", "hllm_user_profile"]
-
-
-@pytest.mark.asyncio
-async def test_native_workflow_tools_preserve_owner_scope_and_append_only_sequence() -> None:
+async def test_native_publish_tools_preserve_owner_scope_and_append_only_sequence() -> None:
     publish_receipts = SimpleNamespace(
         begin=AsyncMock(return_value={"id": "publish-1", "status": "planned"}),
         record_attempt=AsyncMock(
@@ -495,18 +168,11 @@ async def test_native_workflow_tools_preserve_owner_scope_and_append_only_sequen
         ),
         get=AsyncMock(return_value={"id": "publish-1", "attempts": []}),
     )
-    preflights = SimpleNamespace(get=AsyncMock(return_value={"id": "preflight-1"}))
-    retrospectives = SimpleNamespace(
-        seal=AsyncMock(return_value={"id": "retro-1", "status": "measured"}),
-        get=AsyncMock(return_value={"id": "retro-1", "prediction": {}, "outcome": {}}),
-    )
     configure_personal_ip_runtime(
         PersonalIPRuntimeServices(
             connections=SimpleNamespace(),
             metrics=SimpleNamespace(),
             publish_receipts=publish_receipts,
-            preflights=preflights,
-            retrospectives=retrospectives,
         )
     )
     runtime = SimpleNamespace(context={"user_id": "user-1"})
@@ -517,9 +183,8 @@ async def test_native_workflow_tools_preserve_owner_scope_and_append_only_sequen
             operation_key="publish:draft-1",
             idempotency_key="idem:draft-1",
             account_id="acct-1",
-            preflight_id="preflight-1",
             executor="platform_api",
-            request={"variant_id": "variant-1", "caption": "候选文案"},
+            request={"caption": "候选文案"},
         )
     )
     attempted = json.loads(
@@ -534,34 +199,14 @@ async def test_native_workflow_tools_preserve_owner_scope_and_append_only_sequen
             external_url="https://example.com/post-1",
         )
     )
-    publish_detail = json.loads(await _personal_ip_read_publish_receipt(runtime, "publish-1"))
-    preflight_detail = json.loads(await _personal_ip_read_preflight(runtime, "preflight-1"))
-    retrospective = json.loads(
-        await _personal_ip_seal_retrospective(
-            runtime,
-            review_key="retro:post-1:t3d",
-            publish_receipt_id="publish-1",
-            horizon="T+3d",
-            metric_observation_ids=["metric-1"],
-        )
-    )
-    retrospective_detail = json.loads(await _personal_ip_read_retrospective(runtime, "retro-1"))
+    detail = json.loads(await _personal_ip_read_publish_receipt(runtime, "publish-1"))
 
     assert created["id"] == "publish-1"
     assert attempted["status"] == "published"
-    assert publish_detail["id"] == "publish-1"
-    assert preflight_detail["id"] == "preflight-1"
-    assert retrospective["id"] == "retro-1"
-    assert retrospective_detail["id"] == "retro-1"
+    assert detail["id"] == "publish-1"
     assert publish_receipts.begin.await_args.kwargs["owner_user_id"] == "user-1"
+    assert "semantic_dependency" not in publish_receipts.begin.await_args.kwargs
     assert publish_receipts.record_attempt.await_args.kwargs["occurred_at"].isoformat() == "2026-07-22T05:00:00+00:00"
-    retrospectives.seal.assert_awaited_once_with(
-        owner_user_id="user-1",
-        review_key="retro:post-1:t3d",
-        publish_receipt_id="publish-1",
-        horizon="T+3d",
-        metric_observation_ids=["metric-1"],
-    )
 
 
 @pytest.mark.asyncio
@@ -586,7 +231,6 @@ async def test_generic_publish_tools_reject_browser_receipt_bypass() -> None:
             operation_key="publish:draft-1",
             idempotency_key="idem:draft-1",
             account_id="acct-1",
-            preflight_id="",
             executor="browser",
             request={"caption": "候选文案"},
         )

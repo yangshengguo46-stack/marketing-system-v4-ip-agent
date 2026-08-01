@@ -6,12 +6,19 @@ import { fetch } from "@/core/api/fetcher";
 import { getBackendBaseURL } from "@/core/config";
 
 import { type PersonalIPAccount } from "./accounts";
-import { type PersonalIPOperatingCockpit } from "./cockpit";
 import { PERSONAL_IP_BROWSER_PLATFORMS } from "./platforms";
 
 export const PERSONAL_IP_METRICS_QUERY_KEY = [
   "personal-ip",
   "metrics",
+] as const;
+export const PERSONAL_IP_PLATFORM_OBSERVATIONS_QUERY_KEY = [
+  "personal-ip",
+  "platform-observations",
+] as const;
+export const PERSONAL_IP_PUBLISH_RECEIPTS_QUERY_KEY = [
+  "personal-ip",
+  "publish-receipts",
 ] as const;
 
 export type PersonalIPMetricObservation = {
@@ -31,38 +38,60 @@ export type PersonalIPMetricObservation = {
   coverage: Record<string, unknown>;
 };
 
+export type PersonalIPPlatformObservation = {
+  id: string;
+  account_id: string;
+  subject_id: string | null;
+  platform: string;
+  dataset: string;
+  source: string;
+  status: "observed" | "partial" | "unavailable";
+  observed_at: string;
+  summary: Record<string, unknown>;
+  coverage: Record<string, unknown>;
+};
+
+export type PersonalIPPublishReceipt = {
+  id: string;
+  account_id: string;
+  subject_id: string | null;
+  platform: string;
+  executor: string;
+  status:
+    | "planned"
+    | "pending"
+    | "published"
+    | "failed"
+    | "unknown"
+    | "deleted";
+  external_url: string | null;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type PersonalIPDashboardView = {
-  period: {
-    startedAt: string;
-    endedAt: string;
-    days: number;
-  };
+  period: { startedAt: string; endedAt: string; days: number };
   totals: {
-    views: number;
-    followers: number;
-    engagement: number;
-    highPotentialPosts: number;
-  };
-  availability: {
-    views: boolean;
-    followers: boolean;
-    engagement: boolean;
-    paidTrafficBaseline: boolean;
+    views: number | null;
+    followers: number | null;
+    engagement: number | null;
   };
   trend: Array<{
     date: string;
     label: string;
-    views: number;
-    followers: number;
-    engagement: number;
+    views: number | null;
+    followers: number | null;
+    engagement: number | null;
   }>;
   platforms: Array<{
     id: string;
     label: string;
-    views: number;
-    followers: number;
-    engagement: number;
-    accountCount: number;
+    views: number | null;
+    followers: number | null;
+    engagement: number | null;
+    observedAccountCount: number;
+    latestObservedAt: string;
   }>;
   posts: Array<{
     id: string;
@@ -71,10 +100,8 @@ export type PersonalIPDashboardView = {
     platformLabel: string;
     accountName: string;
     observedAt: string;
-    views: number;
-    engagement: number;
-    engagementRate: number | null;
-    opportunity: "boost_candidate" | "watch" | "insufficient_baseline";
+    views: number | null;
+    engagement: number | null;
   }>;
   coverage: {
     activeAccountCount: number;
@@ -92,21 +119,22 @@ const PLATFORM_LABELS = new Map(
 );
 const ENGAGEMENT_METRICS = ["likes", "comments", "saves", "shares"] as const;
 
-function hasMetric(observation: PersonalIPMetricObservation, metric: string) {
+function numericMetric(
+  observation: PersonalIPMetricObservation,
+  metric: string,
+) {
   const value = observation.metrics?.[metric];
-  return typeof value === "number" && Number.isFinite(value);
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function metricValue(observation: PersonalIPMetricObservation, metric: string) {
-  const value = observation.metrics?.[metric];
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function engagementValue(observation: PersonalIPMetricObservation) {
-  return ENGAGEMENT_METRICS.reduce(
-    (total, metric) => total + metricValue(observation, metric),
-    0,
+function engagementMetric(observation: PersonalIPMetricObservation) {
+  const values = ENGAGEMENT_METRICS.map((metric) =>
+    numericMetric(observation, metric),
   );
+  const measured = values.filter((value): value is number => value !== null);
+  return measured.length
+    ? measured.reduce((sum, value) => sum + value, 0)
+    : null;
 }
 
 function dateValue(value: string | null | undefined) {
@@ -121,271 +149,176 @@ function startOfUTCDay(value: Date) {
 }
 
 function addUTCDays(value: Date, days: number) {
-  return new Date(value.getTime() + days * 24 * 60 * 60 * 1000);
+  return new Date(value.getTime() + days * 86_400_000);
 }
 
 function dateKey(value: Date) {
   return value.toISOString().slice(0, 10);
 }
 
-function observationRank(observation: PersonalIPMetricObservation) {
-  return [
-    dateValue(observation.window_ended_at),
-    dateValue(observation.observed_at),
-    observation.id,
-  ] as const;
-}
-
 function rankAfter(
   candidate: PersonalIPMetricObservation,
   current: PersonalIPMetricObservation,
 ) {
-  const left = observationRank(candidate);
-  const right = observationRank(current);
-  if (left[0] !== right[0]) return left[0] > right[0];
-  if (left[1] !== right[1]) return left[1] > right[1];
-  return left[2] > right[2];
+  return (
+    dateValue(candidate.window_ended_at ?? candidate.observed_at) >
+      dateValue(current.window_ended_at ?? current.observed_at) ||
+    (dateValue(candidate.window_ended_at ?? candidate.observed_at) ===
+      dateValue(current.window_ended_at ?? current.observed_at) &&
+      candidate.id > current.id)
+  );
 }
 
-function deduplicateGrowthObservations(
-  observations: PersonalIPMetricObservation[],
-) {
+function deduplicateGrowth(observations: PersonalIPMetricObservation[]) {
   const latest = new Map<string, PersonalIPMetricObservation>();
   for (const observation of observations) {
     if (!["window_total", "delta"].includes(observation.metric_mode)) continue;
     if (observation.status === "unavailable") continue;
     if (!observation.window_started_at || !observation.window_ended_at)
       continue;
-    const base = [
+    const key = [
       observation.account_id,
       observation.scope,
       observation.series_key,
       observation.metric_mode,
       observation.window_started_at,
-    ];
-    if (observation.metric_mode === "delta") {
-      base.push(observation.window_ended_at);
-    }
-    const key = base.join("|");
+      observation.metric_mode === "delta" ? observation.window_ended_at : "",
+    ].join("|");
     const current = latest.get(key);
-    if (!current || rankAfter(observation, current)) {
+    if (!current || rankAfter(observation, current))
       latest.set(key, observation);
-    }
   }
   return [...latest.values()];
 }
 
-function latestPostObservations(observations: PersonalIPMetricObservation[]) {
+function latestPosts(observations: PersonalIPMetricObservation[]) {
   const latest = new Map<string, PersonalIPMetricObservation>();
   for (const observation of observations) {
-    if (observation.scope !== "post" || observation.status === "unavailable") {
+    if (observation.scope !== "post" || observation.status === "unavailable")
       continue;
-    }
     const key =
       observation.receipt_id ??
       `${observation.account_id}:${observation.series_key}`;
     const current = latest.get(key);
-    if (!current || rankAfter(observation, current)) {
+    if (!current || rankAfter(observation, current))
       latest.set(key, observation);
-    }
   }
   return [...latest.values()];
 }
 
-function median(values: number[]) {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[middle - 1]! + sorted[middle]!) / 2
-    : sorted[middle]!;
-}
-
-function safeCoverageTitle(observation: PersonalIPMetricObservation) {
+function coverageTitle(observation: PersonalIPMetricObservation) {
   for (const key of ["content_title", "title", "caption"]) {
     const value = observation.coverage?.[key];
-    if (typeof value === "string" && value.trim()) {
+    if (typeof value === "string" && value.trim())
       return value.trim().slice(0, 120);
-    }
   }
   return null;
+}
+
+function addMeasured(current: number | null, value: number | null) {
+  if (value === null) return current;
+  return (current ?? 0) + value;
 }
 
 export function buildPersonalIPDashboardView(
   observations: PersonalIPMetricObservation[],
   accounts: PersonalIPAccount[],
-  cockpit: PersonalIPOperatingCockpit | undefined,
   now = new Date(),
 ): PersonalIPDashboardView {
   const periodEnd = now;
   const periodStart = addUTCDays(startOfUTCDay(now), -6);
-  const growth = deduplicateGrowthObservations(observations).filter(
+  const growth = deduplicateGrowth(observations).filter(
     (observation) =>
       dateValue(observation.window_started_at) >= periodStart.getTime() &&
       dateValue(observation.window_ended_at) <= periodEnd.getTime(),
   );
-  const recentPosts = latestPostObservations(observations).filter(
-    (observation) =>
-      dateValue(observation.observed_at) >= periodStart.getTime() &&
-      dateValue(observation.observed_at) <= periodEnd.getTime(),
-  );
+  const posts = latestPosts(observations)
+    .filter(
+      (observation) =>
+        dateValue(observation.observed_at) >= periodStart.getTime() &&
+        dateValue(observation.observed_at) <= periodEnd.getTime(),
+    )
+    .sort(
+      (left, right) =>
+        dateValue(right.observed_at) - dateValue(left.observed_at),
+    );
+
   const accountsById = new Map(
     accounts.map((account) => [account.id, account]),
   );
-
-  const trendMap = new Map<
-    string,
-    {
-      date: string;
-      label: string;
-      views: number;
-      followers: number;
-      engagement: number;
-    }
-  >();
-  for (let offset = 0; offset < 7; offset += 1) {
-    const day = addUTCDays(periodStart, offset);
-    const key = dateKey(day);
-    trendMap.set(key, {
-      date: key,
-      label: `${String(day.getUTCMonth() + 1).padStart(2, "0")}/${String(
-        day.getUTCDate(),
-      ).padStart(2, "0")}`,
-      views: 0,
-      followers: 0,
-      engagement: 0,
-    });
-  }
-
+  const trend: PersonalIPDashboardView["trend"] = Array.from(
+    { length: 7 },
+    (_, offset) => {
+      const day = addUTCDays(periodStart, offset);
+      return {
+        date: dateKey(day),
+        label: `${String(day.getUTCMonth() + 1).padStart(2, "0")}/${String(
+          day.getUTCDate(),
+        ).padStart(2, "0")}`,
+        views: null,
+        followers: null,
+        engagement: null,
+      };
+    },
+  );
+  const trendByDate = new Map(trend.map((item) => [item.date, item]));
   const platformMap = new Map<
     string,
-    {
-      id: string;
-      label: string;
-      views: number;
-      followers: number;
-      engagement: number;
-      accountCount: number;
-    }
+    PersonalIPDashboardView["platforms"][number] & { accountIds: Set<string> }
   >();
-  const accountCounts = new Map<string, Set<string>>();
+
+  let totalViews: number | null = null;
+  let totalFollowers: number | null = null;
+  let totalEngagement: number | null = null;
 
   for (const observation of growth) {
-    const key = (
-      observation.window_started_at ?? observation.observed_at
-    ).slice(0, 10);
-    const trend = trendMap.get(key);
-    const views = metricValue(observation, "views");
-    const followers = metricValue(observation, "followers_delta");
-    const engagement = engagementValue(observation);
-    if (trend) {
-      trend.views += views;
-      trend.followers += followers;
-      trend.engagement += engagement;
+    const views = numericMetric(observation, "views");
+    const followers = numericMetric(observation, "followers_delta");
+    const engagement = engagementMetric(observation);
+    totalViews = addMeasured(totalViews, views);
+    totalFollowers = addMeasured(totalFollowers, followers);
+    totalEngagement = addMeasured(totalEngagement, engagement);
+
+    const day = trendByDate.get(observation.window_started_at!.slice(0, 10));
+    if (day) {
+      day.views = addMeasured(day.views, views);
+      day.followers = addMeasured(day.followers, followers);
+      day.engagement = addMeasured(day.engagement, engagement);
     }
 
-    const hasRelevantMetric =
-      hasMetric(observation, "views") ||
-      hasMetric(observation, "followers_delta") ||
-      ENGAGEMENT_METRICS.some((metric) => hasMetric(observation, metric));
-    if (!hasRelevantMetric) continue;
-
-    const platform = observation.platform;
-    const platformSummary = platformMap.get(platform) ?? {
-      id: platform,
-      label: PLATFORM_LABELS.get(platform) ?? platform,
-      views: 0,
-      followers: 0,
-      engagement: 0,
-      accountCount: 0,
+    if (views === null && followers === null && engagement === null) continue;
+    const current = platformMap.get(observation.platform) ?? {
+      id: observation.platform,
+      label: PLATFORM_LABELS.get(observation.platform) ?? observation.platform,
+      views: null,
+      followers: null,
+      engagement: null,
+      observedAccountCount: 0,
+      latestObservedAt: observation.observed_at,
+      accountIds: new Set<string>(),
     };
-    platformSummary.views += views;
-    platformSummary.followers += followers;
-    platformSummary.engagement += engagement;
-    platformMap.set(platform, platformSummary);
-    const ids = accountCounts.get(platform) ?? new Set<string>();
-    ids.add(observation.account_id);
-    accountCounts.set(platform, ids);
-  }
-  for (const summary of platformMap.values()) {
-    summary.accountCount = accountCounts.get(summary.id)?.size ?? 0;
-  }
-
-  const platformBaselines = new Map<
-    string,
-    Array<{ views: number; engagementRate: number }>
-  >();
-  for (const observation of recentPosts) {
-    const views = metricValue(observation, "views");
-    const engagementRate = views > 0 ? engagementValue(observation) / views : 0;
-    const baseline = platformBaselines.get(observation.platform) ?? [];
-    baseline.push({ views, engagementRate });
-    platformBaselines.set(observation.platform, baseline);
+    current.views = addMeasured(current.views, views);
+    current.followers = addMeasured(current.followers, followers);
+    current.engagement = addMeasured(current.engagement, engagement);
+    current.accountIds.add(observation.account_id);
+    if (
+      dateValue(observation.observed_at) > dateValue(current.latestObservedAt)
+    ) {
+      current.latestObservedAt = observation.observed_at;
+    }
+    platformMap.set(observation.platform, current);
   }
 
-  const posts = recentPosts
-    .map((observation) => {
-      const views = metricValue(observation, "views");
-      const engagement = engagementValue(observation);
-      const engagementRate = views > 0 ? engagement / views : null;
-      const baseline = platformBaselines.get(observation.platform) ?? [];
-      const viewsMedian = median(baseline.map((item) => item.views));
-      const engagementMedian = median(
-        baseline.map((item) => item.engagementRate),
-      );
-      const opportunity =
-        baseline.length < 3
-          ? "insufficient_baseline"
-          : views >= Math.max(1, viewsMedian * 1.5) &&
-              (engagementRate ?? 0) >= engagementMedian
-            ? "boost_candidate"
-            : "watch";
-      const account = accountsById.get(observation.account_id);
-      return {
-        id:
-          observation.receipt_id ??
-          `${observation.account_id}:${observation.series_key}`,
-        title:
-          safeCoverageTitle(observation) ??
-          `${PLATFORM_LABELS.get(observation.platform) ?? observation.platform}近期作品`,
-        platform: observation.platform,
-        platformLabel:
-          PLATFORM_LABELS.get(observation.platform) ?? observation.platform,
-        accountName: account?.display_name ?? "未命名账号",
-        observedAt: observation.observed_at,
-        views,
-        engagement,
-        engagementRate,
-        opportunity,
-      } satisfies PersonalIPDashboardView["posts"][number];
-    })
+  const platforms = [...platformMap.values()]
+    .map(({ accountIds, ...item }) => ({
+      ...item,
+      observedAccountCount: accountIds.size,
+    }))
     .sort(
       (left, right) =>
-        right.views - left.views || right.engagement - left.engagement,
-    )
-    .slice(0, 5);
+        dateValue(right.latestObservedAt) - dateValue(left.latestObservedAt),
+    );
 
-  const availability = {
-    views: growth.some((observation) => hasMetric(observation, "views")),
-    followers: growth.some((observation) =>
-      hasMetric(observation, "followers_delta"),
-    ),
-    engagement: growth.some((observation) =>
-      ENGAGEMENT_METRICS.some((metric) => hasMetric(observation, metric)),
-    ),
-    paidTrafficBaseline: [...platformBaselines.values()].some(
-      (baseline) => baseline.length >= 3,
-    ),
-  };
-  const totals = growth.reduce(
-    (result, observation) => {
-      result.views += metricValue(observation, "views");
-      result.followers += metricValue(observation, "followers_delta");
-      result.engagement += engagementValue(observation);
-      return result;
-    },
-    { views: 0, followers: 0, engagement: 0 },
-  );
   const observedAccountIds = new Set(
     observations
       .filter((observation) => observation.status !== "unavailable")
@@ -405,20 +338,32 @@ export function buildPersonalIPDashboardView(
       days: 7,
     },
     totals: {
-      ...totals,
-      highPotentialPosts: posts.filter(
-        (post) => post.opportunity === "boost_candidate",
-      ).length,
+      views: totalViews,
+      followers: totalFollowers,
+      engagement: totalEngagement,
     },
-    availability,
-    trend: [...trendMap.values()],
-    platforms: [...platformMap.values()].sort(
-      (left, right) =>
-        right.views - left.views || right.followers - left.followers,
-    ),
-    posts,
+    trend,
+    platforms,
+    posts: posts.slice(0, 8).map((observation) => ({
+      id:
+        observation.receipt_id ??
+        `${observation.account_id}:${observation.series_key}`,
+      title:
+        coverageTitle(observation) ??
+        `${PLATFORM_LABELS.get(observation.platform) ?? observation.platform}作品`,
+      platform: observation.platform,
+      platformLabel:
+        PLATFORM_LABELS.get(observation.platform) ?? observation.platform,
+      accountName:
+        accountsById.get(observation.account_id)?.display_name ?? "未命名账号",
+      observedAt: observation.observed_at,
+      views: numericMetric(observation, "views"),
+      engagement: engagementMetric(observation),
+    })),
     coverage: {
-      activeAccountCount: cockpit?.portfolio.account_count ?? accounts.length,
+      activeAccountCount: accounts.filter(
+        (account) => account.status === "active",
+      ).length,
       observedAccountCount: observedAccountIds.size,
       observationCount: observations.length,
       latestObservedAt,
@@ -426,24 +371,43 @@ export function buildPersonalIPDashboardView(
   };
 }
 
-async function requestMetrics(
-  limit: number,
-): Promise<PersonalIPMetricObservation[]> {
-  const response = await fetch(
-    `${getBackendBaseURL()}/api/personal-ip/metrics?limit=${limit}`,
-  );
+async function requestJSON<T>(path: string): Promise<T> {
+  const response = await fetch(`${getBackendBaseURL()}${path}`);
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as {
       detail?: string;
     } | null;
     throw new Error(payload?.detail ?? `Request failed (${response.status})`);
   }
-  return (await response.json()) as PersonalIPMetricObservation[];
+  return (await response.json()) as T;
 }
 
 export function usePersonalIPMetrics(limit = 500) {
   return useQuery({
     queryKey: [...PERSONAL_IP_METRICS_QUERY_KEY, limit],
-    queryFn: () => requestMetrics(limit),
+    queryFn: () =>
+      requestJSON<PersonalIPMetricObservation[]>(
+        `/api/personal-ip/metrics?limit=${limit}`,
+      ),
+  });
+}
+
+export function usePersonalIPPlatformObservations(limit = 100) {
+  return useQuery({
+    queryKey: [...PERSONAL_IP_PLATFORM_OBSERVATIONS_QUERY_KEY, limit],
+    queryFn: () =>
+      requestJSON<PersonalIPPlatformObservation[]>(
+        `/api/personal-ip/platform-observations?limit=${limit}`,
+      ),
+  });
+}
+
+export function usePersonalIPPublishReceipts(limit = 100) {
+  return useQuery({
+    queryKey: [...PERSONAL_IP_PUBLISH_RECEIPTS_QUERY_KEY, limit],
+    queryFn: () =>
+      requestJSON<PersonalIPPublishReceipt[]>(
+        `/api/personal-ip/publish-receipts?limit=${limit}`,
+      ),
   });
 }

@@ -37,37 +37,20 @@ test.describe("Sidebar navigation", () => {
     await page.route("**/api/personal-ip/accounts", (route) =>
       route.fulfill({ status: 200, json: [] }),
     );
+    await page.route("**/api/personal-ip/subjects", (route) =>
+      route.fulfill({ status: 200, json: [] }),
+    );
     await page.route("**/api/personal-ip/metrics?*", (route) =>
       route.fulfill({ status: 200, json: [] }),
     );
-    await page.route("**/api/personal-ip/cockpit", (route) =>
-      route.fulfill({
-        status: 200,
-        json: {
-          portfolio: {
-            subject_count: 0,
-            account_count: 0,
-            platform_count: 0,
-            platforms: [],
-          },
-          stages: {},
-          queues: {
-            preflights_awaiting_publish: [],
-            published_receipts_awaiting_metrics: [],
-            published_receipts_awaiting_retrospective: [],
-          },
-          recent: {},
-          video: {
-            production_count: 0,
-            active_count: 0,
-            completed_count: 0,
-            blocked_production_ids: [],
-            awaiting_review_production_ids: [],
-            stages: {},
-            recent: [],
-          },
-        },
-      }),
+    await page.route("**/api/personal-ip/platform-observations?*", (route) =>
+      route.fulfill({ status: 200, json: [] }),
+    );
+    await page.route("**/api/personal-ip/publish-receipts?*", (route) =>
+      route.fulfill({ status: 200, json: [] }),
+    );
+    await page.route("**/api/personal-ip/video-productions?*", (route) =>
+      route.fulfill({ status: 200, json: [] }),
     );
     await page.goto("/workspace/chats/new");
     const sidebar = page.locator("[data-sidebar='sidebar']");
@@ -80,9 +63,9 @@ test.describe("Sidebar navigation", () => {
     await links.nth(0).click();
     await page.waitForURL("**/workspace/dashboard");
     await expect(
-      page.getByRole("heading", { name: "今天的增长，哪里值得继续追" }),
+      page.getByRole("heading", { name: "账号、发布、数据和视频任务" }),
     ).toBeVisible();
-    await expect(page.getByText("—", { exact: true })).toHaveCount(4);
+    await expect(page.getByText("未采集", { exact: true }).first()).toBeVisible();
   });
 
   test("local context lives in Settings instead of the portfolio", async ({

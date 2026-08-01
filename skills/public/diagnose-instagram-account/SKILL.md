@@ -5,9 +5,12 @@ description: Diagnose a connected Instagram account and recommend continuing, ad
 
 # Diagnose Instagram account
 
+> Research quarantine (2026-08-01): this platform method is not active in the
+> default IP Agent. The former diagnostic-context tool is retired.
+
 Use this for a concrete Instagram account. Read `references/platform-evidence.md` first.
 
-1. Read `personal_ip_account_diagnostic_context`.
+1. Begin only from explicitly supplied or independently observed account facts.
 2. Use available observations as evidence, not as an admission checklist.
    Missing metrics lower confidence but do not stop analysis.
 3. Diagnose IP type, audience promise, desire/conflict, story and expression

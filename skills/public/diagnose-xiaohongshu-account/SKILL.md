@@ -5,10 +5,13 @@ description: Diagnose a connected Xiaohongshu account and recommend continuing, 
 
 # Diagnose Xiaohongshu account
 
+> Research quarantine (2026-08-01): this platform method is not active in the
+> default IP Agent. The former diagnostic-context tool is retired.
+
 Use this for a concrete Xiaohongshu account. Read
 `references/platform-evidence.md` first.
 
-1. Read `personal_ip_account_diagnostic_context`.
+1. Begin only from explicitly supplied or independently observed account facts.
 2. Treat data coverage as context, never as permission to diagnose.
 3. Diagnose IP type, audience promise, desire/conflict, story and expression
    form before title/cover consistency, consumption, save/share/search value,

@@ -1,9 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  type PersonalIPAccount,
-  type PersonalIPOperatingCockpit,
-} from "@/core/personal-ip";
+import { type PersonalIPAccount } from "@/core/personal-ip";
 
 import { mockLangGraphAPI } from "./utils/mock-api";
 
@@ -24,64 +21,6 @@ const EMPTY_ACCOUNT: PersonalIPAccount = {
   updated_at: "2026-07-21T00:00:00Z",
 };
 
-const EMPTY_COCKPIT: PersonalIPOperatingCockpit = {
-  contract_version: "personal-ip-operating-cockpit-v7",
-  generated_at: "2026-07-22T00:00:00Z",
-  portfolio: {
-    subject_count: 0,
-    account_count: 0,
-    platform_count: 0,
-    platforms: [],
-  },
-  stages: Object.fromEntries(
-    ["modeling", "preflight", "publishing", "performance", "retrospective"].map(
-      (id) => [id, { state: "empty", total: 0, pending: 0 }],
-    ),
-  ) as PersonalIPOperatingCockpit["stages"],
-  queues: {
-    preflights_awaiting_publish: [],
-    published_receipts_awaiting_metrics: [],
-    published_receipts_awaiting_retrospective: [],
-  },
-  recent: {},
-  alerts: {
-    summary: {
-      total: 0,
-      blocking: 0,
-      warning: 0,
-      by_category: { loop: 0, provider: 0, cost: 0 },
-    },
-    items: [],
-  },
-  video: {
-    contract_version: "personal-ip-video-production-v1",
-    production_count: 0,
-    active_count: 0,
-    completed_count: 0,
-    blocked_production_ids: [],
-    awaiting_review_production_ids: [],
-    stages: Object.fromEntries(
-      [
-        "intake",
-        "blueprint",
-        "assets",
-        "storyboard",
-        "generation",
-        "consistency",
-        "selection",
-        "finishing",
-        "delivery",
-      ].map((id) => [id, 0]),
-    ) as PersonalIPOperatingCockpit["video"]["stages"],
-    recent: [],
-  },
-  coverage: {
-    history_limit: 20,
-    video_alert_detail_limit: 50,
-    possibly_truncated: [],
-  },
-};
-
 test("portfolio shows all eight platforms and opens manual login", async ({
   page,
 }) => {
@@ -91,9 +30,6 @@ test("portfolio shows all eight platforms and opens manual login", async ({
   let accounts: PersonalIPAccount[] = [];
   await page.route("**/api/personal-ip/subjects", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
-  );
-  await page.route("**/api/personal-ip/cockpit", (route) =>
-    route.fulfill({ status: 200, json: EMPTY_COCKPIT }),
   );
   await page.route("**/api/personal-ip/accounts", async (route) => {
     if (route.request().method() === "POST") {

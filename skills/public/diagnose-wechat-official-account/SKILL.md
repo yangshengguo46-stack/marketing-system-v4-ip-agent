@@ -5,10 +5,13 @@ description: Diagnose a connected WeChat Official Account and recommend continui
 
 # Diagnose WeChat Official Account
 
+> Research quarantine (2026-08-01): this platform method is not active in the
+> default IP Agent. The former diagnostic-context tool is retired.
+
 Use this for a concrete `wechat_official` account. Read
 `references/platform-evidence.md` first.
 
-1. Read `personal_ip_account_diagnostic_context`.
+1. Begin only from explicitly supplied or independently observed account facts.
 2. Treat returned observations as evidence, not a completeness checklist.
 3. Diagnose IP type, audience promise, desire/conflict, story and expression
    form before title/cover, reading consumption, sharing, trust, intent and conversion.

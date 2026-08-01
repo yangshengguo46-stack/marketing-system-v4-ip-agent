@@ -13,7 +13,6 @@ from deerflow.skills.parser import parse_skill_file
 from deerflow.skills.tool_policy import allowed_tool_names_for_skills
 from deerflow.skills.types import SkillCategory
 from deerflow.tools.builtins import (
-    personal_ip_account_diagnostic_context_tool,
     personal_ip_begin_video_production_tool,
     personal_ip_collect_browser_page_tool,
     personal_ip_collect_browser_portfolio_today_tool,
@@ -30,14 +29,11 @@ from deerflow.tools.builtins import (
     personal_ip_ingest_media_execution_tool,
     personal_ip_inspect_local_video_material_tool,
     personal_ip_metrics_aggregate_tool,
-    personal_ip_operating_cockpit_tool,
     personal_ip_performance_inventory_tool,
     personal_ip_platform_observation_inventory_tool,
     personal_ip_read_platform_observation_tool,
-    personal_ip_read_strategy_context_tool,
     personal_ip_read_video_production_tool,
     personal_ip_record_browser_observation_tool,
-    personal_ip_record_strategy_tool,
     personal_ip_record_video_production_event_tool,
     personal_ip_release_video_budget_tool,
     personal_ip_render_local_remotion_scene_tool,
@@ -46,33 +42,23 @@ from deerflow.tools.builtins import (
     personal_ip_run_local_generated_shot_qa_tool,
     personal_ip_select_browser_account_tool,
     personal_ip_settle_video_budget_tool,
-    personal_ip_startup_context_tool,
     personal_ip_sync_douyin_portfolio_tool,
     personal_ip_sync_douyin_post_tool,
 )
-from deerflow.tools.builtins.personal_ip_brand_tools import (
-    _personal_ip_read_strategy_context,
-)
 from deerflow.tools.builtins.personal_ip_tools import (
-    _personal_ip_account_diagnostic_context,
-    _personal_ip_begin_video_production,
     _personal_ip_collect_browser_page,
     _personal_ip_collect_browser_portfolio_today,
     _personal_ip_collect_douyin_browser_page,
     _personal_ip_ingest_media_execution,
     _personal_ip_metrics_aggregate,
-    _personal_ip_operating_cockpit,
     _personal_ip_performance_inventory,
     _personal_ip_platform_observation_inventory,
     _personal_ip_read_platform_observation,
-    _personal_ip_read_video_production,
     _personal_ip_record_browser_observation,
-    _personal_ip_record_video_production_event,
     _personal_ip_release_video_budget,
     _personal_ip_reserve_video_budget,
     _personal_ip_select_browser_account,
     _personal_ip_settle_video_budget,
-    _personal_ip_startup_context,
     _personal_ip_sync_douyin_portfolio,
     _personal_ip_sync_douyin_post,
 )
@@ -161,12 +147,9 @@ async def test_douyin_sync_tool_uses_connection_reference_without_returning_toke
 
 def test_personal_ip_native_tools_are_available_without_thread_account_binding() -> None:
     names = {tool.name for tool in BUILTIN_TOOLS}
-    assert personal_ip_account_diagnostic_context_tool.name == "personal_ip_account_diagnostic_context"
     assert personal_ip_metrics_aggregate_tool.name == "personal_ip_metrics_aggregate"
     assert personal_ip_ingest_media_execution_tool.name == "personal_ip_ingest_media_execution"
     assert personal_ip_inspect_local_video_material_tool.name == "personal_ip_inspect_local_video_material"
-    assert personal_ip_operating_cockpit_tool.name == "personal_ip_operating_cockpit"
-    assert personal_ip_startup_context_tool.name == "personal_ip_startup_context"
     assert personal_ip_collect_browser_page_tool.name == "personal_ip_collect_browser_page"
     assert personal_ip_collect_browser_portfolio_today_tool.name == "personal_ip_collect_browser_portfolio_today"
     assert personal_ip_collect_douyin_browser_page_tool.name == "personal_ip_collect_douyin_browser_page"
@@ -186,8 +169,6 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     assert personal_ip_platform_observation_inventory_tool.name == "personal_ip_platform_observation_inventory"
     assert personal_ip_read_platform_observation_tool.name == "personal_ip_read_platform_observation"
     assert personal_ip_read_video_production_tool.name == "personal_ip_read_video_production"
-    assert personal_ip_record_strategy_tool.name == "personal_ip_record_strategy"
-    assert personal_ip_read_strategy_context_tool.name == "personal_ip_read_strategy_context"
     assert personal_ip_begin_video_production_tool.name == "personal_ip_begin_video_production"
     assert personal_ip_record_video_production_event_tool.name == "personal_ip_record_video_production_event"
     assert personal_ip_reserve_video_budget_tool.name == "personal_ip_reserve_video_budget"
@@ -199,12 +180,9 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     assert personal_ip_sync_douyin_post_tool.name == "personal_ip_sync_douyin_post"
     assert personal_ip_collect_browser_page_tool in BUILTIN_TOOLS
     assert {
-        "personal_ip_account_diagnostic_context",
         "personal_ip_metrics_aggregate",
         "personal_ip_ingest_media_execution",
         "personal_ip_inspect_local_video_material",
-        "personal_ip_operating_cockpit",
-        "personal_ip_startup_context",
         "personal_ip_collect_browser_page",
         "personal_ip_collect_browser_portfolio_today",
         "personal_ip_compile_video_plan",
@@ -223,8 +201,6 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
         "personal_ip_platform_observation_inventory",
         "personal_ip_read_platform_observation",
         "personal_ip_read_video_production",
-        "personal_ip_record_strategy",
-        "personal_ip_read_strategy_context",
         "personal_ip_begin_video_production",
         "personal_ip_record_video_production_event",
         "personal_ip_reserve_video_budget",
@@ -239,43 +215,6 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     assert "account_id" not in schema.get("properties", {})
     browser_portfolio_schema = personal_ip_collect_browser_portfolio_today_tool.tool_call_schema.model_json_schema()
     assert "account_id" not in browser_portfolio_schema.get("properties", {})
-    strategy_schema = personal_ip_record_strategy_tool.tool_call_schema.model_json_schema()
-    assert "mode" not in strategy_schema.get("properties", {})
-    assert "stage" not in strategy_schema.get("required", [])
-
-
-@pytest.mark.asyncio
-async def test_strategy_context_returns_only_the_latest_strategy() -> None:
-    brand = SimpleNamespace(
-        get_latest_strategy=AsyncMock(
-            return_value={
-                "id": "strategy-1",
-                "subject_id": "subject-1",
-                "stage": "launch_package_ready",
-                "mode": "monetization_first",
-            }
-        ),
-    )
-    configure_personal_ip_runtime(
-        PersonalIPRuntimeServices(
-            brand=brand,
-            connections=SimpleNamespace(),
-            metrics=SimpleNamespace(),
-            publish_receipts=SimpleNamespace(),
-        )
-    )
-
-    payload = json.loads(
-        await _personal_ip_read_strategy_context(
-            SimpleNamespace(context={"user_id": "user-1"}),
-            subject_id="subject-1",
-        )
-    )
-
-    assert payload["strategy"]["id"] == "strategy-1"
-    assert "mode" not in payload["strategy"]
-    assert set(payload) == {"operation_status", "strategy", "subject_id"}
-    brand.get_latest_strategy.assert_awaited_once_with("subject-1", owner_user_id="user-1")
 
 
 def test_video_tool_descriptions_expose_nested_contract_requirements() -> None:
@@ -442,215 +381,6 @@ async def test_browser_today_tool_collects_and_aggregates_owner_whole_portfolio(
     kwargs = collect.await_args.kwargs
     assert kwargs["owner_user_id"] == "user-1"
     assert "account_id" not in kwargs
-
-
-@pytest.mark.asyncio
-async def test_native_cockpit_and_video_tools_use_owner_scoped_product_services(monkeypatch) -> None:
-    video_productions = SimpleNamespace(
-        begin=AsyncMock(
-            return_value={
-                "id": "video-production-1",
-                "status": "draft",
-                "current_stage": "intake",
-                "events": [],
-            }
-        ),
-        append_event=AsyncMock(
-            return_value={
-                "id": "video-production-1",
-                "status": "running",
-                "current_stage": "storyboard",
-                "events": [{"event_type": "storyboard_sealed"}],
-            }
-        ),
-        get=AsyncMock(
-            return_value={
-                "id": "video-production-1",
-                "status": "running",
-                "events": [{"event_type": "storyboard_sealed"}],
-            }
-        ),
-    )
-    services = PersonalIPRuntimeServices(
-        connections=SimpleNamespace(),
-        metrics=SimpleNamespace(),
-        publish_receipts=SimpleNamespace(),
-        subjects=SimpleNamespace(),
-        accounts=SimpleNamespace(),
-        video_productions=video_productions,
-    )
-    configure_personal_ip_runtime(services)
-    startup_build = AsyncMock(return_value={"should_read_operating_cockpit": True})
-    monkeypatch.setattr(
-        "deerflow.tools.builtins.personal_ip_tools._startup_context_service",
-        lambda _services: SimpleNamespace(build=startup_build),
-    )
-    build = AsyncMock(return_value={"contract_version": "personal-ip-operating-cockpit-v4", "stages": {}})
-    monkeypatch.setattr(
-        "deerflow.tools.builtins.personal_ip_tools._operating_cockpit_service",
-        lambda _services: SimpleNamespace(build=build),
-    )
-    runtime = SimpleNamespace(context={"user_id": "user-1", "thread_id": "thread-video-1"})
-
-    cockpit = json.loads(await _personal_ip_operating_cockpit(runtime))
-    created = json.loads(
-        await _personal_ip_begin_video_production(
-            runtime,
-            operation_key="video:1",
-            title="一句话微电影",
-            subject_id="",
-            target_account_ids=[],
-            source_kind="idea",
-            source={"idea": "智能体理解创作者"},
-            delivery_spec={"aspect_ratio": "16:9"},
-            provider_policy={"video": ["seedance"]},
-            budget={"currency": "CNY", "hard_limit": 100},
-            production_mode="generative_cinematic",
-        )
-    )
-    event = json.loads(
-        await _personal_ip_record_video_production_event(
-            runtime,
-            production_id="video-production-1",
-            event_key="storyboard:v1",
-            event_type="storyboard_sealed",
-            status="succeeded",
-            entity_type="production",
-            entity_id="video-production-1",
-            payload={"shots": 12},
-            input_refs=[],
-            output_refs=["artifact://storyboard-v1.json"],
-            provider="doubao",
-            model="doubao-seed-1-8",
-            provider_task_id="",
-            cost={"currency": "CNY", "amount": 0.1},
-            occurred_at="2026-07-22T05:00:00Z",
-        )
-    )
-    detail = json.loads(await _personal_ip_read_video_production(runtime, "video-production-1"))
-
-    assert cockpit["contract_version"] == "personal-ip-operating-cockpit-v4"
-    assert created["id"] == "video-production-1"
-    assert event["event_count"] == 1
-    assert detail["events"][0]["event_type"] == "storyboard_sealed"
-    build.assert_awaited_once_with(owner_user_id="user-1")
-    startup_build.assert_awaited_once_with(owner_user_id="user-1")
-    assert video_productions.begin.await_args.kwargs["subject_id"] is None
-    assert video_productions.begin.await_args.kwargs["production_mode"] == "generative_cinematic"
-    assert video_productions.begin.await_args.kwargs["thread_id"] == "thread-video-1"
-    assert video_productions.append_event.await_args.kwargs["occurred_at"].isoformat() == "2026-07-22T05:00:00+00:00"
-    video_productions.get.assert_awaited_once_with("video-production-1", owner_user_id="user-1")
-
-
-@pytest.mark.asyncio
-async def test_native_startup_context_uses_only_minimal_owner_scoped_services(monkeypatch) -> None:
-    build = AsyncMock(
-        return_value={
-            "contract_version": "personal-ip-startup-context-v1",
-            "experience": "new_owner",
-            "portfolio": {"subject_count": 0, "account_count": 0},
-            "should_read_operating_cockpit": False,
-            "next_step": "respond_to_current_request",
-        }
-    )
-    configure_personal_ip_runtime(
-        PersonalIPRuntimeServices(
-            connections=SimpleNamespace(),
-            metrics=SimpleNamespace(),
-            publish_receipts=SimpleNamespace(),
-            subjects=SimpleNamespace(),
-            accounts=SimpleNamespace(),
-        )
-    )
-    monkeypatch.setattr(
-        "deerflow.tools.builtins.personal_ip_tools._startup_context_service",
-        lambda _services: SimpleNamespace(build=build),
-    )
-
-    payload = json.loads(
-        await _personal_ip_startup_context(
-            SimpleNamespace(context={"user_id": "user-new"}),
-        )
-    )
-
-    assert payload["experience"] == "new_owner"
-    assert payload["should_read_operating_cockpit"] is False
-    build.assert_awaited_once_with(owner_user_id="user-new")
-
-
-@pytest.mark.asyncio
-async def test_native_account_diagnostic_context_uses_authenticated_owner(
-    monkeypatch,
-) -> None:
-    build = AsyncMock(
-        return_value={
-            "contract_version": "personal-ip-account-evidence-context-v3",
-            "account": {"id": "account-1", "platform": "youtube"},
-            "inventory": {"metric_observation_count": 0},
-        }
-    )
-    configure_personal_ip_runtime(
-        PersonalIPRuntimeServices(
-            connections=SimpleNamespace(),
-            metrics=SimpleNamespace(),
-            publish_receipts=SimpleNamespace(),
-            accounts=SimpleNamespace(),
-            platform_observations=SimpleNamespace(),
-            retrospectives=SimpleNamespace(),
-        )
-    )
-    monkeypatch.setattr(
-        "deerflow.tools.builtins.personal_ip_tools._account_diagnostic_service",
-        lambda _services: SimpleNamespace(build=build),
-    )
-
-    payload = json.loads(
-        await _personal_ip_account_diagnostic_context(
-            SimpleNamespace(context={"user_id": "owner-1"}),
-            account_id="account-1",
-        )
-    )
-
-    assert payload["account"]["platform"] == "youtube"
-    build.assert_awaited_once_with(
-        owner_user_id="owner-1",
-        account_id="account-1",
-    )
-
-
-@pytest.mark.asyncio
-async def test_native_cockpit_defensively_skips_all_workflow_ledgers_for_a_new_owner(
-    monkeypatch,
-) -> None:
-    subjects = SimpleNamespace(list=AsyncMock(return_value=[]))
-    accounts = SimpleNamespace(list=AsyncMock(return_value=[]))
-    configure_personal_ip_runtime(
-        PersonalIPRuntimeServices(
-            connections=SimpleNamespace(),
-            metrics=SimpleNamespace(),
-            publish_receipts=SimpleNamespace(),
-            subjects=subjects,
-            accounts=accounts,
-        )
-    )
-    cockpit_build = AsyncMock()
-    monkeypatch.setattr(
-        "deerflow.tools.builtins.personal_ip_tools._operating_cockpit_service",
-        lambda _services: SimpleNamespace(build=cockpit_build),
-    )
-
-    payload = json.loads(
-        await _personal_ip_operating_cockpit(
-            SimpleNamespace(context={"user_id": "user-new"}),
-        )
-    )
-
-    assert payload["contract_version"] == "personal-ip-startup-context-v1"
-    assert payload["experience"] == "new_owner"
-    assert payload["cockpit_skipped"] is True
-    cockpit_build.assert_not_awaited()
-    subjects.list.assert_awaited_once_with("user-new", include_archived=False)
-    accounts.list.assert_awaited_once_with("user-new", include_archived=False)
 
 
 @pytest.mark.asyncio

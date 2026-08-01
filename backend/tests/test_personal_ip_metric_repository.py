@@ -129,7 +129,6 @@ async def test_metric_observation_is_idempotent_and_validates_publish_receipt_ac
         operation_key="publish:metrics",
         idempotency_key="idem-metrics",
         account_id=account["id"],
-        preflight_id=None,
         executor="platform_api",
         request_payload=compliant_publish_request(
             "douyin",

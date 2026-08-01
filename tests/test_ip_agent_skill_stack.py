@@ -194,25 +194,20 @@ def test_cinematic_ip_matrix_and_assets_are_complete() -> None:
             )
 
 
-def test_cinematic_ip_stack_uses_native_product_state() -> None:
+def test_cinematic_ip_stack_is_research_only() -> None:
     ingest = ROOT / "skills" / "public" / "ingest-ip-evidence"
     calibrate = ROOT / "skills" / "public" / "calibrate-cinematic-ip"
     curriculum = ROOT / "skills" / "public" / "run-cinematic-curriculum"
 
     assert not (ingest / "scripts" / "ip_os.py").exists()
     assert not (calibrate / "scripts" / "ip_os.py").exists()
-    assert "personal_ip_record_strategy" in (ingest / "SKILL.md").read_text(
+    assert (ingest / "SKILL.md").is_file()
+    assert (calibrate / "SKILL.md").is_file()
+    quarantine = (ROOT / "product" / "research" / "ip-agent" / "README.md").read_text(
         encoding="utf-8"
     )
-
-    calibrate_text = (calibrate / "SKILL.md").read_text(encoding="utf-8")
-    for tool_name in (
-        "personal_ip_run_preflight",
-        "personal_ip_prepare_browser_publish",
-        "personal_ip_seal_retrospective",
-    ):
-        assert tool_name in calibrate_text
-    assert "personal_ip_promote_evidence" not in calibrate_text
+    assert "not registered as production tools" in quarantine
+    assert "described as active product capability" in quarantine
 
     curriculum_cli = (curriculum / "scripts" / "curriculum_cli.py").read_text(
         encoding="utf-8"
@@ -226,12 +221,10 @@ def test_cinematic_ip_stack_uses_native_product_state() -> None:
     assert "客户输出不得出现 Skill 名" in orchestration
 
 
-def test_differentiation_thesis_is_bound_to_strategy_and_cinematic_work() -> None:
+def test_differentiation_research_assets_remain_available_for_review() -> None:
     differentiation = ROOT / "skills" / "public" / "design-ip-differentiation"
     text = (differentiation / "SKILL.md").read_text(encoding="utf-8")
     assert "for a person, brand, product, organization or portfolio" in text
-    assert "personal_ip_record_differentiation" in text
-    assert "personal_ip_record_asset_observation" in text
     assert (differentiation / "references" / "thesis-contract.md").is_file()
     assert (differentiation / "references" / "decision-judgment.md").is_file()
 
@@ -245,6 +238,5 @@ def test_differentiation_thesis_is_bound_to_strategy_and_cinematic_work() -> Non
         ROOT / "skills" / "public" / "direct-ip-visual-language" / "SKILL.md"
     ).read_text(encoding="utf-8")
     assert "differentiation note tool" in strategy
-    assert "status labels and document completeness never authorize downstream work" in strategy
     assert "差异化版本" in series
     assert "差异化识别系统" in direction

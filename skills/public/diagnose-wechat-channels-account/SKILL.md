@@ -5,10 +5,13 @@ description: Diagnose a connected WeChat Channels account and recommend continui
 
 # Diagnose WeChat Channels account
 
+> Research quarantine (2026-08-01): this platform method is not active in the
+> default IP Agent. The former diagnostic-context tool is retired.
+
 Use this for a concrete `wechat_channels` account. Read
 `references/platform-evidence.md` first.
 
-1. Read `personal_ip_account_diagnostic_context`.
+1. Begin only from explicitly supplied or independently observed account facts.
 2. Use available account, content and business observations without converting
    coverage into a permission gate. Name uncertainty when evidence is absent.
 3. Diagnose IP type, audience promise, desire/conflict, story and expression

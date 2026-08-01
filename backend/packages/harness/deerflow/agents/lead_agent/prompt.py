@@ -678,7 +678,7 @@ combined with a FastAPI gateway for REST API access [citation:FastAPI](https://f
 """
 
 
-SYSTEM_PROMPT_TEMPLATE = """
+_CAPABILITY_AWARE_SYSTEM_PROMPT_TEMPLATE = """
 <role>You are {agent_name}, an open-source agent.</role>
 
 User input is wrapped in `--- BEGIN USER INPUT ---` / `--- END USER INPUT ---`.
@@ -725,6 +725,11 @@ consequential action. After calling `ask_clarification`, stop and wait.
 - Always provide a visible answer.
 </critical_reminders>
 """
+
+# Public compatibility constant. Agents without operator capability overrides
+# keep DeerFlow's original prompt; allowlisted/overridden agents use the
+# capability-aware template below in ``apply_prompt_template``.
+SYSTEM_PROMPT_TEMPLATE = _LEGACY_SYSTEM_PROMPT_TEMPLATE
 
 
 def _get_memory_context(agent_name: str | None = None, *, app_config: AppConfig | None = None) -> str:
@@ -1125,11 +1130,12 @@ def apply_prompt_template(
         available_tool_names=available_tool_names,
         memory_enabled=memory_enabled,
     )
+    memory_config = getattr(app_config, "memory", None) if app_config is not None else None
     resolved_memory_enabled = memory_enabled is not False and (
         app_config is None
         or (
-            getattr(app_config.memory, "enabled", False)
-            and getattr(app_config.memory, "injection_enabled", False)
+            getattr(memory_config, "enabled", False)
+            and getattr(memory_config, "injection_enabled", False)
         )
     )
 
@@ -1137,7 +1143,20 @@ def apply_prompt_template(
     # Memory and current date are injected per-turn via DynamicContextMiddleware
     # as a <system-reminder> in the first HumanMessage, keeping this prompt
     # identical across users and sessions for maximum prefix-cache reuse.
-    return SYSTEM_PROMPT_TEMPLATE.format(
+    prompt_template = (
+        _CAPABILITY_AWARE_SYSTEM_PROMPT_TEMPLATE
+        if available_tool_names is not None or memory_enabled is not None
+        else SYSTEM_PROMPT_TEMPLATE
+    )
+    legacy_workspace_supplements = "\n".join(
+        section
+        for section in (
+            _build_acp_section(app_config=app_config),
+            _build_custom_mounts_section(app_config=app_config),
+        )
+        if section
+    )
+    return prompt_template.format(
         agent_name=agent_name or "DeerFlow 2.0",
         soul=get_agent_soul(agent_name),
         self_update_section=_build_self_update_section(agent_name) if _has_tool(available_tool_names, "update_agent") else "",
@@ -1154,6 +1173,7 @@ def apply_prompt_template(
         subagent_reminder=subagent_reminder,
         skill_first_reminder=skill_first_reminder,
         subagent_thinking=subagent_thinking,
+        acp_section=legacy_workspace_supplements,
         working_directory_section=_build_working_directory_section(
             available_tool_names=available_tool_names,
             app_config=app_config,

@@ -5,10 +5,13 @@ description: Diagnose a connected Douyin creator account and recommend continuin
 
 # Diagnose Douyin account
 
+> Research quarantine (2026-08-01): this platform method is not active in the
+> default IP Agent. The former diagnostic-context tool is retired.
+
 Use this for a concrete Douyin account. Read `references/platform-evidence.md`
 before interpreting platform mechanics.
 
-1. Read the account with `personal_ip_account_diagnostic_context`.
+1. Begin only from explicitly supplied or independently observed account facts.
 2. Treat every returned metric, observation and strategy note as input, not as
    permission to think. Missing data is an uncertainty to name, never a reason
    to withhold a useful provisional conclusion.

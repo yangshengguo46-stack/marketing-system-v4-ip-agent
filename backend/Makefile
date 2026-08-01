@@ -23,7 +23,7 @@ personal-ip-data-lifecycle-acceptance:
 	PYTHONPATH=. PYTHONIOENCODING=utf-8 PYTHONUTF8=1 uv run python -m pytest tests/test_personal_ip_data_lifecycle.py tests/test_personal_ip_data_lifecycle_router.py tests/test_personal_ip_platform_connection_repository.py -q --tb=short
 
 personal-ip-observability-acceptance:
-	PYTHONPATH=. PYTHONIOENCODING=utf-8 PYTHONUTF8=1 uv run python -m pytest tests/test_doctor.py tests/test_personal_ip_operating_cockpit.py tests/test_personal_ip_video_budget.py -q --tb=short
+	PYTHONPATH=. PYTHONIOENCODING=utf-8 PYTHONUTF8=1 uv run python -m pytest tests/test_doctor.py tests/test_personal_ip_video_budget.py tests/test_personal_ip_metric_repository.py tests/test_personal_ip_platform_observation_repository.py -q --tb=short
 
 lint:
 	uvx ruff check .

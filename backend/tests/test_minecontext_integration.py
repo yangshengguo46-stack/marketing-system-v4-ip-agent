@@ -63,7 +63,7 @@ def _service(tmp_path: Path, *, enabled: bool, launched: list[dict]) -> MineCont
 def _manual_consent(**updates) -> MineContextConsent:
     values = {
         "scopes": ["projects", "work_activity"],
-        "purposes": ["persona_modeling", "hllm_user_profile", "preflight"],
+        "purposes": ["persona_modeling", "audience_modeling"],
         "retention_days": 30,
         "collection_mode": "manual",
     }
@@ -144,9 +144,6 @@ def test_new_owner_is_authorized_and_started_with_default_screen_context(
     assert status["purposes"] == [
         "persona_modeling",
         "audience_modeling",
-        "hllm_user_profile",
-        "preflight",
-        "retrospective",
     ]
     generated = yaml.safe_load(Path(launched[0]["command"][5]).read_text(encoding="utf-8"))
     assert generated["capture"]["screenshot"]["enabled"] is True
@@ -287,11 +284,11 @@ def test_evidence_is_owner_isolated_revocable_and_deletable(tmp_path: Path) -> N
     )[0]
     service.store_evidence("owner-a", [evidence])
 
-    assert len(service.read_evidence("owner-a", purpose="preflight")) == 1
-    assert service.read_evidence("owner-b", purpose="preflight") == []
+    assert len(service.read_evidence("owner-a", purpose="audience_modeling")) == 1
+    assert service.read_evidence("owner-b", purpose="audience_modeling") == []
     service.revoke("owner-a")
     with pytest.raises(PermissionError, match="authorization is not active"):
-        service.read_evidence("owner-a", purpose="preflight")
+        service.read_evidence("owner-a", purpose="audience_modeling")
 
     deleted = service.clear("owner-a", scope="evidence")
     assert deleted["deleted_evidence_records"] == 1
@@ -308,7 +305,7 @@ def test_retention_prunes_expired_records(tmp_path: Path) -> None:
     )[0]
     service.store_evidence("owner-a", [evidence])
 
-    assert service.read_evidence("owner-a", purpose="preflight") == []
+    assert service.read_evidence("owner-a", purpose="audience_modeling") == []
 
 
 def test_vendored_source_manifest_is_pinned_and_complete() -> None:

@@ -6,11 +6,9 @@ import { fetch } from "@/core/api/fetcher";
 import { getBackendBaseURL } from "@/core/config";
 
 export type PersonalIPWorkflowResource =
-  | "preflights"
   | "publish-receipts"
   | "metrics"
-  | "platform-observations"
-  | "retrospectives";
+  | "platform-observations";
 
 async function readError(response: Response): Promise<string> {
   const payload = (await response.json().catch(() => null)) as {

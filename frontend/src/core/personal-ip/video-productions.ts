@@ -5,8 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetch } from "@/core/api/fetcher";
 import { getBackendBaseURL } from "@/core/config";
 
-import { PERSONAL_IP_COCKPIT_QUERY_KEY } from "./cockpit";
-
 export type VideoProductionStatus =
   | "draft"
   | "running"
@@ -536,9 +534,6 @@ export function useRecordVideoConfirmation(productionId: string | null) {
         queryClient.invalidateQueries({
           queryKey: PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
         }),
-        queryClient.invalidateQueries({
-          queryKey: PERSONAL_IP_COCKPIT_QUERY_KEY,
-        }),
       ]);
     },
   });
@@ -582,9 +577,6 @@ export function useSaveVideoTimelineRevision(productionId: string | null) {
         queryClient.invalidateQueries({
           queryKey: PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
         }),
-        queryClient.invalidateQueries({
-          queryKey: PERSONAL_IP_COCKPIT_QUERY_KEY,
-        }),
       ]);
     },
   });
@@ -616,9 +608,6 @@ export function useLockVideoFinalEdit(productionId: string | null) {
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
-        }),
-        queryClient.invalidateQueries({
-          queryKey: PERSONAL_IP_COCKPIT_QUERY_KEY,
         }),
       ]);
     },

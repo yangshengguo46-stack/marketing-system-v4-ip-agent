@@ -1,6 +1,6 @@
 ---
 name: personal-ip-operator
-description: "Operate a person, brand, product or organization IP end to end: entity scope, differentiation, research, positioning, content, production, publishing, observed influence and retrospective learning."
+description: "Research-only snapshot of the retired Personal-IP operator; not active in the default IP Agent."
 license: MIT
 allowed-tools:
   - ask_clarification
@@ -17,7 +17,6 @@ allowed-tools:
   - grep
   - image_search
   - ls
-  - personal_ip_account_diagnostic_context
   - personal_ip_begin_publish_receipt
   - personal_ip_begin_video_production
   - personal_ip_collect_browser_page
@@ -27,13 +26,9 @@ allowed-tools:
   - personal_ip_compile_video_asset_manifest
   - personal_ip_compile_video_continuity
   - personal_ip_compile_video_material_selection
-  - personal_ip_compile_video_method_distillation
-  - personal_ip_compile_video_method_skill_candidate
   - personal_ip_compile_video_narration
   - personal_ip_compile_video_narration_timing
   - personal_ip_compile_video_plan
-  - personal_ip_compile_video_pattern
-  - personal_ip_compile_video_skill_candidate
   - personal_ip_compile_video_storyboard
   - personal_ip_compile_video_timeline_revision
   - personal_ip_finish_browser_publish
@@ -44,19 +39,11 @@ allowed-tools:
   - personal_ip_metrics_aggregate
   - personal_ip_minecontext_evidence
   - personal_ip_minecontext_sync
-  - personal_ip_operating_cockpit
   - personal_ip_performance_inventory
   - personal_ip_platform_observation_inventory
   - personal_ip_prepare_browser_publish
-  - personal_ip_read_strategy_context
-  - personal_ip_read_differentiation
-  - personal_ip_record_asset_observation
-  - personal_ip_record_differentiation
-  - personal_ip_record_strategy
   - personal_ip_read_platform_observation
-  - personal_ip_read_preflight
   - personal_ip_read_publish_receipt
-  - personal_ip_read_retrospective
   - personal_ip_read_video_production
   - personal_ip_record_browser_observation
   - personal_ip_record_publish_attempt
@@ -66,11 +53,8 @@ allowed-tools:
   - personal_ip_render_locked_video_delivery
   - personal_ip_reserve_video_budget
   - personal_ip_run_local_generated_shot_qa
-  - personal_ip_run_preflight
-  - personal_ip_seal_retrospective
   - personal_ip_select_browser_account
   - personal_ip_settle_video_budget
-  - personal_ip_startup_context
   - personal_ip_sync_douyin_portfolio
   - personal_ip_sync_douyin_post
   - present_files
@@ -84,6 +68,10 @@ allowed-tools:
 ---
 
 # Personal IP operator
+
+> Research quarantine (2026-08-01): this former operator is not active in the
+> default IP Agent. Its semantic workflow and retired tool references are
+> historical design material, not current production APIs. See `IP_AGENT.md`.
 
 Treat this as an agent operating an influence asset, not a content-generation app.
 DeerFlow owns planning and execution. The operated subject owns person,

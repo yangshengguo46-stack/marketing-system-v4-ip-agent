@@ -1,5 +1,4 @@
 export * from "./accounts";
-export * from "./cockpit";
 export * from "./connections";
 export * from "./dashboard";
 export * from "./data-lifecycle";

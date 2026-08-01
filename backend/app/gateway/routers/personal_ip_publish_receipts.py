@@ -19,7 +19,6 @@ class PersonalIPPublishBeginRequest(BaseModel):
     operation_key: str = Field(min_length=1, max_length=256)
     idempotency_key: str = Field(min_length=1, max_length=256)
     account_id: str = Field(min_length=1, max_length=64)
-    preflight_id: str | None = Field(default=None, max_length=64)
     executor: Literal["platform_api", "ui_tars", "browser", "manual"]
     request_payload: dict[str, Any] = Field(alias="request")
 
@@ -72,7 +71,6 @@ async def begin_personal_ip_publish(
             operation_key=body.operation_key,
             idempotency_key=body.idempotency_key,
             account_id=body.account_id,
-            preflight_id=body.preflight_id,
             executor=body.executor,
             request_payload=body.request_payload,
         )

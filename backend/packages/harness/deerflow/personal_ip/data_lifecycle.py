@@ -21,16 +21,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.base import Base
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
-from deerflow.persistence.personal_ip_brand.model import (
-    PersonalIPStrategyVersionRow,
-    _ArchivedPersonalIPIdentityVersionRow,
-    _ArchivedPersonalIPReputationSnapshotRow,
-)
-from deerflow.persistence.personal_ip_differentiation.model import (
-    PersonalIPAssetObservationRow,
-    PersonalIPDifferentiationVersionRow,
-)
-from deerflow.persistence.personal_ip_evidence_promotions.model import PersonalIPEvidencePromotionRow
 from deerflow.persistence.personal_ip_metrics.model import PersonalIPMetricObservationRow
 from deerflow.persistence.personal_ip_platform_connections.model import (
     PersonalIPPlatformConnectionRow,
@@ -38,9 +28,7 @@ from deerflow.persistence.personal_ip_platform_connections.model import (
     PersonalIPPlatformOAuthStateRow,
 )
 from deerflow.persistence.personal_ip_platform_observations.model import PersonalIPPlatformObservationRow
-from deerflow.persistence.personal_ip_preflights.model import PersonalIPPreflightRow
 from deerflow.persistence.personal_ip_publish_receipts.model import PersonalIPPublishReceiptRow
-from deerflow.persistence.personal_ip_retrospectives.model import PersonalIPRetrospectiveRow
 from deerflow.persistence.personal_ip_subjects.model import PersonalIPSubjectRow
 from deerflow.persistence.personal_ip_video_productions.model import (
     PersonalIPVideoProductionEventRow,
@@ -78,16 +66,8 @@ class _Dataset:
 _DATASETS: tuple[_Dataset, ...] = (
     _Dataset("subjects", PersonalIPSubjectRow),
     _Dataset("accounts", PersonalIPAccountRow),
-    _Dataset("differentiation_versions", PersonalIPDifferentiationVersionRow),
-    _Dataset("asset_observations", PersonalIPAssetObservationRow),
-    _Dataset("strategy_versions", PersonalIPStrategyVersionRow),
-    _Dataset("legacy_identity_versions", _ArchivedPersonalIPIdentityVersionRow),
-    _Dataset("legacy_reputation_snapshots", _ArchivedPersonalIPReputationSnapshotRow),
-    _Dataset("preflights", PersonalIPPreflightRow),
     _Dataset("publish_receipts", PersonalIPPublishReceiptRow),
     _Dataset("metric_observations", PersonalIPMetricObservationRow),
-    _Dataset("retrospectives", PersonalIPRetrospectiveRow),
-    _Dataset("evidence_promotions", PersonalIPEvidencePromotionRow),
     _Dataset("platform_observations", PersonalIPPlatformObservationRow),
     _Dataset("platform_connections", PersonalIPPlatformConnectionRow),
     _Dataset("video_productions", PersonalIPVideoProductionRow),

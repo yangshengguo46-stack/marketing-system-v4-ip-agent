@@ -1,5 +1,10 @@
 # IP Agent Skill 能力与边界台账
 
+> 历史研究快照：2026-08-01 起不再是产品台账，也不描述现役能力。默认 IP
+> Agent 的 `skills: []`，本文所列方法仅处于隔离待审状态。当前合同与状态只看
+> `IP_AGENT.md`、`IP_AGENT_PRODUCT_LEDGER.md` 和
+> `IP_AGENT_AUDIT_REMEDIATION_LEDGER.md`。
+
 审计日期：2026-07-30
 
 主报告：

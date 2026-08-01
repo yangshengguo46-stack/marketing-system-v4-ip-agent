@@ -5,9 +5,12 @@ description: Diagnose a connected YouTube channel and recommend continuing, adju
 
 # Diagnose YouTube account
 
+> Research quarantine (2026-08-01): this platform method is not active in the
+> default IP Agent. The former diagnostic-context tool is retired.
+
 Use this for a concrete YouTube account. Read `references/platform-evidence.md` first.
 
-1. Read `personal_ip_account_diagnostic_context`.
+1. Begin only from explicitly supplied or independently observed account facts.
 2. Use available observations directly; missing coverage lowers confidence but
    does not block a provisional conclusion.
 3. Diagnose IP type, audience promise, desire/conflict, story and expression

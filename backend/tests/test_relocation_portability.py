@@ -23,7 +23,7 @@ def test_local_python_entrypoints_do_not_depend_on_console_script_shebangs():
     assert "uv run pytest" not in backend_makefile
     assert "uv run python -m uvicorn" in backend_makefile
     assert "uv run uvicorn" not in backend_makefile
-    assert "uv run python -m uvicorn app.audience_lite.app:app" in root_makefile
+    assert "app.audience_lite.app:app" not in root_makefile
     assert "uv run python -m uvicorn app.gateway.app:app" in serve_script
     for content in (docker_compose, docker_entrypoint, dockerfile):
         assert "uv run python -m uvicorn app.gateway.app:app" in content

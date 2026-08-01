@@ -525,9 +525,8 @@ def _make_minimal_app_config():
     )
 
 
-def test_apply_prompt_template_legacy_path_does_not_mention_describe_skill(monkeypatch):
-    """When skill_names is None (legacy path), critical_reminders must not
-    reference describe_skill (the tool is not registered in legacy mode)."""
+def test_apply_prompt_template_with_no_skills_has_no_skill_first_reminder(monkeypatch):
+    """An empty legacy Skill catalog must not produce a Skill-first command."""
     config = _make_minimal_app_config()
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
     monkeypatch.setattr(prompt_module, "get_or_new_skill_storage", lambda app_config=None: SimpleNamespace(load_skills=lambda enabled_only=True: []))
@@ -535,9 +534,8 @@ def test_apply_prompt_template_legacy_path_does_not_mention_describe_skill(monke
 
     prompt = prompt_module.apply_prompt_template(app_config=config)
 
-    # Legacy wording — tool-agnostic
-    assert "Always load the relevant skill" in prompt
-    # Must NOT reference the deferred tool
+    assert "Always load the relevant skill" not in prompt
+    assert "Load the relevant skill" not in prompt
     assert "describe_skill(name)" not in prompt
 
 

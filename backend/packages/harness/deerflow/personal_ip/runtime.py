@@ -6,15 +6,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
-from deerflow.persistence.personal_ip_brand import PersonalIPBrandRepository
-from deerflow.persistence.personal_ip_differentiation import PersonalIPDifferentiationRepository
-from deerflow.persistence.personal_ip_evidence_promotions import PersonalIPEvidencePromotionRepository
 from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
 from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
 from deerflow.persistence.personal_ip_platform_observations import PersonalIPPlatformObservationRepository
-from deerflow.persistence.personal_ip_preflights import PersonalIPPreflightRepository
 from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
-from deerflow.persistence.personal_ip_retrospectives import PersonalIPRetrospectiveRepository
 from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
 from deerflow.persistence.personal_ip_video_productions import PersonalIPVideoProductionRepository
 
@@ -28,13 +23,8 @@ class PersonalIPRuntimeServices:
     metrics: PersonalIPMetricRepository
     publish_receipts: PersonalIPPublishReceiptRepository
     accounts: PersonalIPAccountRepository | None = None
-    brand: PersonalIPBrandRepository | None = None
-    differentiation: PersonalIPDifferentiationRepository | None = None
     platform_observations: PersonalIPPlatformObservationRepository | None = None
     subjects: PersonalIPSubjectRepository | None = None
-    preflights: PersonalIPPreflightRepository | None = None
-    retrospectives: PersonalIPRetrospectiveRepository | None = None
-    evidence_promotions: PersonalIPEvidencePromotionRepository | None = None
     video_productions: PersonalIPVideoProductionRepository | None = None
     minecontext: MineContextService | None = None
 

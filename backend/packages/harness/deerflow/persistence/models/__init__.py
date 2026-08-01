@@ -23,12 +23,6 @@ from deerflow.persistence.channel_connections.model import (
 from deerflow.persistence.feedback.model import FeedbackRow
 from deerflow.persistence.models.run_event import RunEventRow
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
-from deerflow.persistence.personal_ip_brand.model import PersonalIPStrategyVersionRow
-from deerflow.persistence.personal_ip_differentiation.model import (
-    PersonalIPAssetObservationRow,
-    PersonalIPDifferentiationVersionRow,
-)
-from deerflow.persistence.personal_ip_evidence_promotions.model import PersonalIPEvidencePromotionRow
 from deerflow.persistence.personal_ip_metrics.model import PersonalIPMetricObservationRow
 from deerflow.persistence.personal_ip_platform_connections.model import (
     PersonalIPPlatformConnectionRow,
@@ -36,9 +30,7 @@ from deerflow.persistence.personal_ip_platform_connections.model import (
     PersonalIPPlatformOAuthStateRow,
 )
 from deerflow.persistence.personal_ip_platform_observations.model import PersonalIPPlatformObservationRow
-from deerflow.persistence.personal_ip_preflights.model import PersonalIPPreflightRow
 from deerflow.persistence.personal_ip_publish_receipts.model import PersonalIPPublishReceiptRow
-from deerflow.persistence.personal_ip_retrospectives.model import PersonalIPRetrospectiveRow
 from deerflow.persistence.personal_ip_subjects.model import PersonalIPSubjectRow
 from deerflow.persistence.personal_ip_video_productions.model import (
     PersonalIPVideoProductionEventRow,
@@ -57,18 +49,12 @@ __all__ = [
     "ChannelOAuthStateRow",
     "FeedbackRow",
     "PersonalIPAccountRow",
-    "PersonalIPAssetObservationRow",
-    "PersonalIPDifferentiationVersionRow",
-    "PersonalIPEvidencePromotionRow",
     "PersonalIPMetricObservationRow",
     "PersonalIPPlatformConnectionRow",
     "PersonalIPPlatformCredentialRow",
     "PersonalIPPlatformOAuthStateRow",
     "PersonalIPPlatformObservationRow",
-    "PersonalIPPreflightRow",
     "PersonalIPPublishReceiptRow",
-    "PersonalIPRetrospectiveRow",
-    "PersonalIPStrategyVersionRow",
     "PersonalIPSubjectRow",
     "PersonalIPVideoProductionEventRow",
     "PersonalIPVideoProductionRow",

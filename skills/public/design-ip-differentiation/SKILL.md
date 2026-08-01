@@ -5,6 +5,10 @@ description: Build an evidence-bound differentiation thesis for a person, brand,
 
 # IP differentiation design
 
+> Research quarantine (2026-08-01): this method package is not active in the
+> default IP Agent. Differentiation storage and tools are retired; references
+> below are historical research only. See `IP_AGENT.md`.
+
 Treat IP as a public influence asset: a set of expectations and associations
 that a relevant public can attribute to a person, brand, product or
 organization, and that can change attention, interpretation, trust, choice or

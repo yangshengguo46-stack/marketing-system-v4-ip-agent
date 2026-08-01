@@ -518,8 +518,8 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
 
     agent_config = load_agent_config(agent_name) if not is_bootstrap else None
     available_skills = _available_skill_names(agent_config, is_bootstrap)
-    tool_allowlist = agent_config.tool_allowlist if agent_config else None
-    memory_enabled = agent_config.memory_enabled if agent_config else None
+    tool_allowlist = getattr(agent_config, "tool_allowlist", None)
+    memory_enabled = getattr(agent_config, "memory_enabled", None)
     # Custom agent model from agent config (if any), or None to let _resolve_model_name pick the default
     agent_model_name = agent_config.model if agent_config and agent_config.model else None
 

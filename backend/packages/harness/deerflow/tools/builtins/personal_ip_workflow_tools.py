@@ -2,21 +2,15 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
-import os
 from datetime import UTC, datetime
 
-import httpx
 from langchain.tools import tool
 
 from deerflow.config.paths import get_paths
-from deerflow.personal_ip.audience_provider import AudiencePreflightRequest, HLLMCreatorHTTPProvider
 from deerflow.personal_ip.browser_profiles import get_browser_account_target, select_browser_account_target
 from deerflow.personal_ip.browser_publishing import normalize_publication_url, verify_browser_publication_evidence
-from deerflow.personal_ip.hllm_creator import HLLMCreatorAdapter
 from deerflow.personal_ip.runtime import get_personal_ip_runtime
-from deerflow.personal_ip.strategy_methodology import PERSONAL_IP_STRATEGY_METHOD_VERSION
 from deerflow.runtime.user_context import resolve_runtime_user_id
 from deerflow.tools.types import Runtime
 
@@ -92,214 +86,11 @@ def _browser_result_replay_matches(
     return True
 
 
-def _audience_preflight_provider() -> HLLMCreatorHTTPProvider:
-    return HLLMCreatorHTTPProvider(
-        base_url=os.environ.get("PERSONAL_IP_AUDIENCE_BASE_URL", "http://127.0.0.1:9128"),
-        token=os.environ.get("PERSONAL_IP_AUDIENCE_TOKEN"),
-    )
-
-
-async def _personal_ip_run_preflight(
-    runtime: Runtime,
-    operation_key: str,
-    subject_ids: list[str],
-    target_account_ids: list[str],
-    history: list[dict],
-    target: dict,
-    variant_count: int = 3,
-    local_context_evidence_ids: list[str] | None = None,
-) -> str:
-    """Run HLLM-Lite/full HLLM preflight and seal its immutable receipt.
-
-    Use aggregate published-content history when it exists. For a first pilot,
-    history may be empty and the sealed basis remains an unmeasured cold-start
-    hypothesis. The adapter rejects individual viewer identities, and local
-    subject/account ids stay in DeerFlow rather than being sent to the model
-    provider.
-
-    Args:
-        operation_key: Stable idempotency key for this exact preflight.
-        subject_ids: Owner-scoped subjects represented by the preflight.
-        target_account_ids: Accounts this prediction may later publish to.
-        history: Chronological published content with aggregate metrics, or an empty list for a first pilot.
-        target: Draft content id, title, description and content type to evaluate.
-        variant_count: Number of creative variants, from 1 to 8.
-        local_context_evidence_ids: Optional sealed MineContext evidence ids; both preflight and HLLM-profile purposes must already be authorized.
-
-    Returns:
-        JSON sealed preflight with provider/model versions and prediction variants.
-    """
-    try:
-        services = get_personal_ip_runtime()
-        if services.preflights is None:
-            raise RuntimeError("Personal-IP preflight persistence is not available")
-        owner_user_id = resolve_runtime_user_id(runtime)
-        normalized_subject_ids = list(dict.fromkeys(subject_ids))
-        if not normalized_subject_ids:
-            raise ValueError("preflight requires at least one Personal-IP subject")
-        if services.subjects is None:
-            raise RuntimeError("Personal-IP subject persistence is not available")
-        for subject_id in normalized_subject_ids:
-            subject = await services.subjects.get(
-                subject_id,
-                owner_user_id=owner_user_id,
-            )
-            if subject is None or subject.get("status") != "active":
-                raise ValueError("Personal-IP subject not found")
-        if services.accounts is not None:
-            for account_id in list(dict.fromkeys(target_account_ids)):
-                account = await services.accounts.get(
-                    account_id,
-                    owner_user_id=owner_user_id,
-                )
-                if account is None or account.get("status") != "active":
-                    raise ValueError("Personal-IP account not found")
-        strategy_contexts: list[dict] = []
-        for subject_id in normalized_subject_ids:
-            strategy = (
-                await services.brand.get_latest_strategy(
-                    subject_id,
-                    owner_user_id=owner_user_id,
-                )
-                if services.brand is not None
-                else None
-            )
-            direction = None
-            if services.differentiation is not None:
-                direction_id = str(strategy.get("differentiation_version_id") or "").strip() if strategy else ""
-                if direction_id:
-                    direction = await services.differentiation.get_version(
-                        direction_id,
-                        owner_user_id=owner_user_id,
-                    )
-                if direction is None:
-                    direction = await services.differentiation.get_latest(
-                        subject_id,
-                        owner_user_id=owner_user_id,
-                    )
-            strategy_contexts.append(
-                {
-                    "subject_id_present": True,
-                    "strategy": (
-                        {
-                            "person_model": strategy.get("person_model", {}),
-                            "business_model": strategy.get("business_model", {}),
-                            "benchmark_research": strategy.get("benchmark_research", {}),
-                            "positioning_candidates": strategy.get("positioning_candidates", []),
-                            "launch_package": strategy.get("launch_package", {}),
-                        }
-                        if strategy
-                        else {}
-                    ),
-                    "direction": (
-                        {
-                            "primary_entity": direction.get("primary_entity", {}),
-                            "decision_context": direction.get("decision_context", {}),
-                            "strategic_difference": direction.get("strategic_difference", {}),
-                            "dramatic_engine": direction.get("dramatic_engine", {}),
-                            "distinctive_encoding": direction.get("distinctive_encoding", {}),
-                        }
-                        if direction
-                        else {}
-                    ),
-                }
-            )
-        creator_profile = {
-            "method_version": PERSONAL_IP_STRATEGY_METHOD_VERSION,
-            "operating_strategies": strategy_contexts,
-        }
-        audience_profile = {
-            "epistemic_status": ("aggregate_history_only_revisable" if history else "cold_start_unmeasured_revisable"),
-            "published_sample_count": len(history),
-        }
-        local_context_evidence: list[dict] = []
-        requested_evidence_ids = list(dict.fromkeys(local_context_evidence_ids or []))
-        if requested_evidence_ids:
-            if services.minecontext is None:
-                raise RuntimeError("MineContext local evidence is not available")
-            local_context_evidence = await asyncio.to_thread(
-                services.minecontext.read_evidence,
-                owner_user_id,
-                purpose="preflight",
-                evidence_ids=requested_evidence_ids,
-                limit=len(requested_evidence_ids),
-            )
-            # Require the independent HLLM-profile purpose as well. The second
-            # read is intentional: the service enforces the persisted consent.
-            await asyncio.to_thread(
-                services.minecontext.read_evidence,
-                owner_user_id,
-                purpose="hllm_user_profile",
-                evidence_ids=requested_evidence_ids,
-                limit=len(requested_evidence_ids),
-            )
-            found_ids = {item.get("evidence_id") for item in local_context_evidence}
-            if found_ids != set(requested_evidence_ids):
-                raise ValueError("requested MineContext evidence is missing or expired")
-        example = HLLMCreatorAdapter().build_example(
-            history=history,
-            audience_profile=audience_profile,
-            creator_profile=creator_profile,
-            target=target,
-            local_context_evidence=local_context_evidence,
-        )
-        request = AudiencePreflightRequest(example=example, variant_count=int(variant_count))
-        result = await _audience_preflight_provider().preflight(request)
-        sealed = await services.preflights.seal(
-            owner_user_id=owner_user_id,
-            operation_key=operation_key,
-            subject_ids=normalized_subject_ids,
-            target_account_ids=target_account_ids,
-            request=request,
-            result=result,
-        )
-        return _json({"operation_status": "ok", **sealed})
-    except httpx.HTTPError:
-        return _json(
-            {
-                "status": "error",
-                "category": "provider_unavailable",
-                "message": "Audience preflight provider is unavailable",
-            }
-        )
-    except (RuntimeError, TypeError, ValueError) as exc:
-        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
-    except Exception:
-        return _json({"status": "error", "category": "internal", "message": "Audience preflight could not be sealed"})
-
-
-async def _personal_ip_read_preflight(runtime: Runtime, preflight_id: str) -> str:
-    """Read one full owner-scoped immutable audience preflight.
-
-    Args:
-        preflight_id: Server-issued preflight id from the operating cockpit.
-
-    Returns:
-        JSON model request and exact provider receipt used before publication.
-    """
-    try:
-        services = get_personal_ip_runtime()
-        if services.preflights is None:
-            raise RuntimeError("Personal-IP preflight persistence is not available")
-        result = await services.preflights.get(
-            str(preflight_id or "").strip(),
-            owner_user_id=resolve_runtime_user_id(runtime),
-        )
-        if result is None:
-            return _json({"status": "error", "category": "not_found", "message": "Personal-IP preflight not found"})
-        return _json({"operation_status": "ok", **result})
-    except (RuntimeError, TypeError, ValueError) as exc:
-        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
-    except Exception:
-        return _json({"status": "error", "category": "internal", "message": "Personal-IP preflight is unavailable"})
-
-
 async def _personal_ip_begin_publish_receipt(
     runtime: Runtime,
     operation_key: str,
     idempotency_key: str,
     account_id: str,
-    preflight_id: str,
     executor: str,
     request: dict,
 ) -> str:
@@ -307,16 +98,13 @@ async def _personal_ip_begin_publish_receipt(
 
     This tool records intent but does not publish. The request must include a
     personal-ip-publish-compliance-v1 declaration; the server validates the
-    target platform's disclosure plan and seals its own policy receipt. When
-    preflight_id is present, request must also contain a variant_id sealed by
-    that preflight. Call it only after the user has approved the consequential
-    publish operation.
+    target platform's disclosure plan and seals its own policy receipt. Call it
+    only after the user has approved the consequential publish operation.
 
     Args:
         operation_key: Stable business operation key.
         idempotency_key: Stable executor idempotency key.
         account_id: Exact owner-scoped platform account to publish through.
-        preflight_id: Optional preflight id; pass an empty string when absent.
         executor: platform_api, ui_tars or manual. Browser must use prepare.
         request: Exact caption/media/options, selected variant and compliance declaration.
 
@@ -332,7 +120,6 @@ async def _personal_ip_begin_publish_receipt(
             operation_key=operation_key,
             idempotency_key=idempotency_key,
             account_id=account_id,
-            preflight_id=str(preflight_id or "").strip() or None,
             executor=executor,
             request_payload=request,
         )
@@ -349,7 +136,6 @@ async def _personal_ip_prepare_browser_publish(
     idempotency_key: str,
     pending_attempt_key: str,
     account_id: str,
-    preflight_id: str,
     request: dict,
 ) -> str:
     """Bind a selected account browser to an immutable publication receipt.
@@ -365,7 +151,6 @@ async def _personal_ip_prepare_browser_publish(
         idempotency_key: Stable key for this exact publish request.
         pending_attempt_key: Stable key for the browser handoff attempt.
         account_id: Exact owner-scoped platform account to publish through.
-        preflight_id: Optional preflight id; pass an empty string when absent.
         request: Exact caption, media, options, selected variant and compliance declaration.
 
     Returns:
@@ -387,7 +172,6 @@ async def _personal_ip_prepare_browser_publish(
             operation_key=operation_key,
             idempotency_key=idempotency_key,
             account_id=account["id"],
-            preflight_id=str(preflight_id or "").strip() or None,
             executor="browser",
             request_payload=request,
         )
@@ -621,74 +405,8 @@ async def _personal_ip_read_publish_receipt(runtime: Runtime, receipt_id: str) -
         return _json({"status": "error", "category": "internal", "message": "Publish receipt is unavailable"})
 
 
-async def _personal_ip_seal_retrospective(
-    runtime: Runtime,
-    review_key: str,
-    publish_receipt_id: str,
-    horizon: str,
-    metric_observation_ids: list[str],
-) -> str:
-    """Seal prediction-versus-outcome evidence for one published post.
-
-    Args:
-        review_key: Stable idempotency key for this post and horizon.
-        publish_receipt_id: Confirmed publication receipt tied to a preflight.
-        horizon: Observation horizon such as T+3d, T+7d or T+30d.
-        metric_observation_ids: Post-level metric observation ids for the receipt.
-
-    Returns:
-        JSON immutable prediction/outcome comparison and policy eligibility.
-    """
-    try:
-        services = get_personal_ip_runtime()
-        if services.retrospectives is None:
-            raise RuntimeError("Personal-IP retrospective persistence is not available")
-        result = await services.retrospectives.seal(
-            owner_user_id=resolve_runtime_user_id(runtime),
-            review_key=review_key,
-            publish_receipt_id=publish_receipt_id,
-            horizon=horizon,
-            metric_observation_ids=metric_observation_ids,
-        )
-        return _json({"operation_status": "ok", **result})
-    except (RuntimeError, TypeError, ValueError) as exc:
-        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
-    except Exception:
-        return _json({"status": "error", "category": "internal", "message": "Retrospective could not be sealed"})
-
-
-async def _personal_ip_read_retrospective(runtime: Runtime, retrospective_id: str) -> str:
-    """Read one full prediction-versus-outcome retrospective.
-
-    Args:
-        retrospective_id: Server-issued retrospective id from the cockpit.
-
-    Returns:
-        JSON prediction, observed outcome, coverage and training eligibility.
-    """
-    try:
-        services = get_personal_ip_runtime()
-        if services.retrospectives is None:
-            raise RuntimeError("Personal-IP retrospective persistence is not available")
-        result = await services.retrospectives.get(
-            str(retrospective_id or "").strip(),
-            owner_user_id=resolve_runtime_user_id(runtime),
-        )
-        if result is None:
-            return _json({"status": "error", "category": "not_found", "message": "Personal-IP retrospective not found"})
-        return _json({"operation_status": "ok", **result})
-    except (RuntimeError, TypeError, ValueError) as exc:
-        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
-    except Exception:
-        return _json({"status": "error", "category": "internal", "message": "Personal-IP retrospective is unavailable"})
-
-
-personal_ip_run_preflight_tool = tool("personal_ip_run_preflight", parse_docstring=True)(_personal_ip_run_preflight)
-personal_ip_read_preflight_tool = tool("personal_ip_read_preflight", parse_docstring=True)(_personal_ip_read_preflight)
 personal_ip_begin_publish_receipt_tool = tool("personal_ip_begin_publish_receipt", parse_docstring=True)(_personal_ip_begin_publish_receipt)
 personal_ip_prepare_browser_publish_tool = tool("personal_ip_prepare_browser_publish", parse_docstring=True)(_personal_ip_prepare_browser_publish)
 personal_ip_finish_browser_publish_tool = tool("personal_ip_finish_browser_publish", parse_docstring=True)(_personal_ip_finish_browser_publish)
 personal_ip_record_publish_attempt_tool = tool("personal_ip_record_publish_attempt", parse_docstring=True)(_personal_ip_record_publish_attempt)
 personal_ip_read_publish_receipt_tool = tool("personal_ip_read_publish_receipt", parse_docstring=True)(_personal_ip_read_publish_receipt)
-personal_ip_seal_retrospective_tool = tool("personal_ip_seal_retrospective", parse_docstring=True)(_personal_ip_seal_retrospective)
-personal_ip_read_retrospective_tool = tool("personal_ip_read_retrospective", parse_docstring=True)(_personal_ip_read_retrospective)

@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
 from deerflow.persistence.personal_ip_platform_observations.sql import validate_credential_free_payload
-from deerflow.persistence.personal_ip_preflights.model import PersonalIPPreflightRow
 from deerflow.persistence.personal_ip_publish_receipts.model import PersonalIPPublishReceiptRow
 from deerflow.personal_ip.browser_publishing import normalize_publication_url, platform_publication_url_allowed
 from deerflow.personal_ip.publish_compliance import (
@@ -99,11 +98,10 @@ class PersonalIPPublishReceiptRepository:
         operation_key: str,
         idempotency_key: str,
         account_id: str,
-        preflight_id: str | None,
         executor: str,
         request_payload: dict[str, Any],
     ) -> bool:
-        return row.operation_key == operation_key and row.idempotency_key == idempotency_key and row.account_id == account_id and row.preflight_id == preflight_id and row.executor == executor and row.request_json == request_payload
+        return row.operation_key == operation_key and row.idempotency_key == idempotency_key and row.account_id == account_id and row.executor == executor and row.request_json == request_payload
 
     async def begin(
         self,
@@ -112,7 +110,6 @@ class PersonalIPPublishReceiptRepository:
         operation_key: str,
         idempotency_key: str,
         account_id: str,
-        preflight_id: str | None,
         executor: str,
         request_payload: dict[str, Any],
     ) -> dict[str, Any]:
@@ -120,7 +117,6 @@ class PersonalIPPublishReceiptRepository:
         operation = _clean_required(operation_key, field="operation_key", limit=256)
         idempotency = _clean_required(idempotency_key, field="idempotency_key", limit=256)
         account_key = _clean_required(account_id, field="account_id", limit=64)
-        preflight_key = str(preflight_id or "").strip() or None
         executor_key = str(executor or "").strip()
         if executor_key not in _EXECUTORS:
             raise ValueError("unsupported publish executor")
@@ -157,27 +153,11 @@ class PersonalIPPublishReceiptRepository:
                     operation_key=operation,
                     idempotency_key=idempotency,
                     account_id=account_key,
-                    preflight_id=preflight_key,
                     executor=executor_key,
                     request_payload=request_snapshot,
                 ):
                     return self._to_dict(existing)
                 raise ValueError("operation or idempotency key already records a different publish request")
-
-            preflight = None
-            if preflight_key is not None:
-                preflight = await session.get(PersonalIPPreflightRow, preflight_key)
-                if preflight is None or preflight.owner_user_id != owner or preflight.status == "invalidated":
-                    raise ValueError("Personal-IP preflight not found")
-                targets = list(preflight.target_account_ids_json or [])
-                if targets and account_key not in targets:
-                    raise ValueError("publish account is outside the sealed preflight targets")
-                selected_variant_id = str(request_snapshot.get("variant_id") or "").strip()
-                if not selected_variant_id:
-                    raise ValueError("publish request must identify the selected preflight variant")
-                variants = list((preflight.provider_receipt_json or {}).get("variants") or [])
-                if not any(str(variant.get("variant_id") or "") == selected_variant_id for variant in variants):
-                    raise ValueError("publish request selects a variant outside the sealed preflight receipt")
 
             now = datetime.now(UTC)
             row = PersonalIPPublishReceiptRow(
@@ -185,7 +165,6 @@ class PersonalIPPublishReceiptRepository:
                 owner_user_id=owner,
                 operation_key=operation,
                 idempotency_key=idempotency,
-                preflight_id=preflight_key,
                 subject_id=account.subject_id,
                 account_id=account.id,
                 platform=account.platform,
@@ -273,10 +252,6 @@ class PersonalIPPublishReceiptRepository:
                 row.external_url = url
             if status_key == "published" and row.published_at is None:
                 row.published_at = event_time
-                if row.preflight_id:
-                    preflight = await session.get(PersonalIPPreflightRow, row.preflight_id)
-                    if preflight is not None and preflight.owner_user_id == owner_user_id and preflight.status == "sealed":
-                        preflight.status = "published"
             await session.commit()
             await session.refresh(row)
             return self._to_dict(row)

@@ -5,15 +5,7 @@ from pathlib import Path
 from deerflow.config.app_config import AppConfig
 from deerflow.tools.tools import get_available_tools
 
-MIDDLEWARE_SOURCE = (
-    Path(__file__).parents[1]
-    / "packages"
-    / "harness"
-    / "deerflow"
-    / "agents"
-    / "middlewares"
-    / "personal_ip_context_middleware.py"
-)
+MIDDLEWARE_SOURCE = Path(__file__).parents[1] / "packages" / "harness" / "deerflow" / "agents" / "middlewares" / "personal_ip_context_middleware.py"
 
 
 def test_personal_ip_context_does_not_own_benchmark_or_skill_orchestration() -> None:
@@ -32,20 +24,17 @@ def test_personal_ip_context_does_not_own_benchmark_or_skill_orchestration() -> 
     assert not [token for token in forbidden if token in source]
 
 
-def test_personal_ip_native_tools_are_not_hidden_behind_deferred_discovery() -> None:
-    app_config = AppConfig.from_file(
-        str(Path(__file__).resolve().parents[2] / "config.example.yaml")
-    )
-    tools = {
-        tool.name: tool
-        for tool in get_available_tools(include_mcp=False, app_config=app_config)
-    }
+def test_retired_semantic_tools_are_absent_from_the_runtime_registry() -> None:
+    app_config = AppConfig.from_file(str(Path(__file__).resolve().parents[2] / "config.example.yaml"))
+    tools = {tool.name: tool for tool in get_available_tools(include_mcp=False, app_config=app_config)}
 
     for name in (
         "personal_ip_record_strategy",
         "personal_ip_compile_video_pattern",
-        "personal_ip_compile_video_plan",
         "personal_ip_account_diagnostic_context",
+        "personal_ip_run_preflight",
+        "personal_ip_seal_retrospective",
+        "personal_ip_operating_cockpit",
     ):
-        metadata = tools[name].metadata or {}
-        assert metadata.get("deerflow_deferred_tool") is not True, name
+        assert name not in tools
+    assert "personal_ip_compile_video_plan" in tools

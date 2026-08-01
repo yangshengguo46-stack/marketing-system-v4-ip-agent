@@ -127,7 +127,6 @@ async def test_collection_service_writes_official_snapshot_to_existing_receipt(t
         operation_key="publish:collector",
         idempotency_key="idem:collector",
         account_id=account["id"],
-        preflight_id=None,
         executor="platform_api",
         request_payload=compliant_publish_request(
             "douyin",
@@ -204,7 +203,6 @@ async def test_authorized_collection_refreshes_expired_token_server_side_and_ret
         operation_key="publish:authorized-collector",
         idempotency_key="idem:authorized-collector",
         account_id=account["id"],
-        preflight_id=None,
         executor="platform_api",
         request_payload=compliant_publish_request(
             "douyin",
@@ -334,7 +332,6 @@ async def test_consecutive_official_snapshots_derive_a_partial_exact_interval_de
         operation_key="publish:snapshot-delta",
         idempotency_key="idem:snapshot-delta",
         account_id=account["id"],
-        preflight_id=None,
         executor="platform_api",
         request_payload=compliant_publish_request(
             "douyin",

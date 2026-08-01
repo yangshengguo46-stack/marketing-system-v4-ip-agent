@@ -23,7 +23,6 @@ class PersonalIPPublishReceiptRow(Base):
     owner_user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     operation_key: Mapped[str] = mapped_column(String(256), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(256), nullable=False)
-    preflight_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     subject_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     account_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     platform: Mapped[str] = mapped_column(String(32), nullable=False)

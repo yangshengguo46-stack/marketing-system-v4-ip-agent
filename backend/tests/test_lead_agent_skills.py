@@ -317,7 +317,7 @@ def test_custom_agent_operator_allowlist_creates_clean_runtime(monkeypatch):
         "view_image",
         "ask_clarification",
     }
-    all_tools = [NamedTool(name) for name in sorted(allowed | {"bash", "task", "skill_manage", "personal_ip_startup_context"})]
+    all_tools = [NamedTool(name) for name in sorted(allowed | {"bash", "task", "skill_manage", "personal_ip_metrics_aggregate"})]
     captured_middlewares: dict[str, object] = {}
 
     monkeypatch.setattr(lead_agent_module, "_resolve_model_name", lambda x=None, **kwargs: "default-model")
@@ -356,9 +356,7 @@ def test_custom_agent_operator_allowlist_creates_clean_runtime(monkeypatch):
     app_config.subagents.max_total_per_run = 20
     monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: app_config)
 
-    result = lead_agent_module.make_lead_agent(
-        {"configurable": {"agent_name": "ip-agent", "subagent_enabled": True}}
-    )
+    result = lead_agent_module.make_lead_agent({"configurable": {"agent_name": "ip-agent", "subagent_enabled": True}})
 
     assert {tool.name for tool in result["tools"]} == allowed
     assert captured_middlewares["available_tool_names"] == allowed

@@ -29,17 +29,11 @@ capabilities:
       - tiktok
   audience_intelligence:
     product: ByteDance HLLM-Creator
-    integration: separate-model-provider
+    integration: research-quarantine
     source: third_party/bytedance/HLLM
     source_commit: 864f17221c04a2d3082d9a072df00616bc7e6dab
-    adapter: deerflow.personal_ip.hllm_creator
-    input_scope: cold-start-hypothesis-or-aggregate-account-cohort
-    individual_viewer_identity: forbidden
-    contract: personal-ip-audience-preflight-v2
-    endpoint_env: PERSONAL_IP_AUDIENCE_BASE_URL
-    token_env: PERSONAL_IP_AUDIENCE_TOKEN
-    current_mode: hllm-lite
-    future_mode: hllm-creator-cloud
+    research_adapter: product/research/ip-agent/python/hllm_creator.py
+    current_mode: disabled
     default_enabled: false
   reasoning_and_vision:
     product: Volcengine Ark

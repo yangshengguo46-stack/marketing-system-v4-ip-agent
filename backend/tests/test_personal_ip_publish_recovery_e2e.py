@@ -84,7 +84,6 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 idempotency_key=idempotency_key,
                 pending_attempt_key="handoff-1",
                 account_id=account["id"],
-                preflight_id="",
                 request=compliant_publish_request(
                     platform,
                     caption="已批准发布",
@@ -103,7 +102,6 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 idempotency_key=idempotency_key,
                 pending_attempt_key="handoff-wrong-account",
                 account_id=wrong_account["id"],
-                preflight_id="",
                 request=compliant_publish_request(
                     platform,
                     caption="已批准发布",
@@ -167,7 +165,6 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 idempotency_key=idempotency_key,
                 pending_attempt_key="handoff-1",
                 account_id=account["id"],
-                preflight_id="",
                 request=compliant_publish_request(
                     platform,
                     caption="已批准发布",
@@ -207,7 +204,6 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 idempotency_key=idempotency_key,
                 pending_attempt_key="handoff-1",
                 account_id=account["id"],
-                preflight_id="",
                 request=compliant_publish_request(
                     platform,
                     caption="已批准发布",
@@ -257,7 +253,6 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 idempotency_key=idempotency_key,
                 pending_attempt_key="handoff-2",
                 account_id=account["id"],
-                preflight_id="",
                 request=compliant_publish_request(
                     platform,
                     caption="已批准发布",
@@ -326,7 +321,6 @@ async def test_eight_platform_browser_publish_recovery_matrix(
                 idempotency_key=idempotency_key,
                 pending_attempt_key="handoff-1",
                 account_id=account["id"],
-                preflight_id="",
                 request=compliant_publish_request(
                     platform,
                     caption="已批准发布",

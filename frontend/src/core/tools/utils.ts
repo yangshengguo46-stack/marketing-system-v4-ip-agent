@@ -25,12 +25,6 @@ export function explainToolCall(
   ) {
     return t.common.thinking;
   } else if (
-    toolCall.name === "personal_ip_operating_cockpit" ||
-    toolCall.name === "personal_ip_record_strategy" ||
-    toolCall.name === "personal_ip_read_strategy_context"
-  ) {
-    return t.toolCalls.personalIpOrienting;
-  } else if (
     toolCall.name === "personal_ip_collect_browser_page" ||
     toolCall.name === "personal_ip_collect_douyin_browser_page"
   ) {
