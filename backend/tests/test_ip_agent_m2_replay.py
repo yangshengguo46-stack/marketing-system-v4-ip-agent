@@ -260,6 +260,7 @@ def test_runner_atomically_switches_one_agent_and_restores_the_evidence_config(t
     assert config_path.read_bytes() == original
     payload = json.loads(result_path.read_text(encoding="utf-8"))
     assert payload["frozen_prompt"] == m2.FROZEN_PROMPT
+    assert payload["recursion_limit"] == m2.M2_RECURSION_LIMIT == 100
     assert len(payload["groups"]) == 4
 
 

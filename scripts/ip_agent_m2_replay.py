@@ -21,6 +21,7 @@ import httpx
 import yaml
 
 M2_REPLAY_SCHEMA_VERSION = "ip-agent-m2-replay-v2"
+M2_RECURSION_LIMIT = 100
 TEST_MODE_SCHEMA_VERSION = "ip-agent-test-mode-v1"
 TEST_STATE_RELATIVE = Path("backend/.deer-flow-ip-test")
 TEST_MARKER_NAME = ".ip-agent-test-mode.json"
@@ -813,7 +814,7 @@ def run_group(
     body = {
         "assistant_id": "lead_agent",
         "input": {"messages": [{"role": "user", "content": FROZEN_PROMPT}]},
-        "config": {"recursion_limit": 50},
+        "config": {"recursion_limit": M2_RECURSION_LIMIT},
         "context": context,
         "stream_mode": ["values"],
         "on_disconnect": "cancel",
@@ -868,6 +869,7 @@ def run_group(
         "started_at": started_at.isoformat(),
         "completed_at": completed_at.isoformat(),
         "wall_seconds": round((completed_at - started_at).total_seconds(), 3),
+        "recursion_limit": M2_RECURSION_LIMIT,
         "event_counts": dict(event_counts),
         "run_event_count": len(run_events),
         "runtime_metadata": runtime_metadata,
@@ -965,6 +967,7 @@ def _run_replay_locked(
             "created_at": _utc_now().isoformat(),
             "base_url": base_url,
             "requested_model": model_name,
+            "recursion_limit": M2_RECURSION_LIMIT,
             "frozen_prompt": FROZEN_PROMPT,
             "frozen_user_facts": [
                 "产品是黄金礼品",
