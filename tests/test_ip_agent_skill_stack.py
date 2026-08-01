@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import sqlite3
 from pathlib import Path
 
@@ -102,6 +103,39 @@ def test_clean_first_use_contract_has_no_fixed_orientation_or_skill_flow() -> No
     assert "用户事实" in soul
     assert "来源事实" in soul
     assert "创作假设" in soul
+
+
+def test_capability_inventory_covers_exact_runtime_allowlist_and_every_public_skill() -> None:
+    from deerflow.tools.tools import BUILTIN_TOOLS
+
+    ledger = (
+        ROOT / "docs" / "IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md"
+    ).read_text(encoding="utf-8")
+
+    active_tools = ledger.split("<!-- BEGIN ACTIVE IP AGENT TOOLS -->", 1)[1].split(
+        "<!-- END ACTIVE IP AGENT TOOLS -->", 1
+    )[0]
+    listed_tools = set(re.findall(r"^\| `([^`]+)` \|", active_tools, re.MULTILINE))
+    assert listed_tools == set(_agent_config()["tool_allowlist"])
+
+    isolated_builtins = ledger.split(
+        "<!-- BEGIN ISOLATED NATIVE BUILTIN TOOLS -->", 1
+    )[1].split("<!-- END ISOLATED NATIVE BUILTIN TOOLS -->", 1)[0]
+    listed_builtins = set(
+        re.findall(r"^\| `([^`]+)` \|", isolated_builtins, re.MULTILINE)
+    )
+    runtime_builtins = {tool.name for tool in BUILTIN_TOOLS}
+    assert listed_builtins | {"ask_clarification"} == runtime_builtins
+
+    public_inventory = ledger.split("<!-- BEGIN PUBLIC SKILL INVENTORY -->", 1)[1].split(
+        "<!-- END PUBLIC SKILL INVENTORY -->", 1
+    )[0]
+    listed_skills = set(re.findall(r"^\| `([^`]+)` \|", public_inventory, re.MULTILINE))
+    public_skills = {
+        path.parent.name for path in (ROOT / "skills" / "public").glob("*/SKILL.md")
+    }
+    assert len(public_skills) == 96
+    assert listed_skills == public_skills
 
 
 def test_upstream_media_skills_keep_hidden_evaluations() -> None:

@@ -469,6 +469,31 @@ def test_build_middlewares_uses_resolved_model_name_for_vision(monkeypatch):
     assert isinstance(middlewares[-1], ClarificationMiddleware)
 
 
+def test_operator_tool_allowlist_blocks_plan_mode_injected_write_todos(monkeypatch):
+    app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
+    todo_factory_calls: list[bool] = []
+
+    monkeypatch.setattr(lead_agent_module, "build_lead_runtime_middlewares", lambda *, app_config, lazy_init=True: [])
+    monkeypatch.setattr(lead_agent_module, "_create_summarization_middleware", lambda **kwargs: None)
+    monkeypatch.setattr(
+        lead_agent_module,
+        "_create_todo_list_middleware",
+        lambda is_plan_mode: todo_factory_calls.append(is_plan_mode),
+    )
+
+    middlewares = lead_agent_module.build_middlewares(
+        {"configurable": {"is_plan_mode": True, "subagent_enabled": False}},
+        model_name="safe-model",
+        app_config=app_config,
+        available_skills=set(),
+        available_tool_names={"web_search", "ask_clarification"},
+        memory_enabled=False,
+    )
+
+    assert todo_factory_calls == []
+    assert not any(isinstance(middleware, lead_agent_module.TodoMiddleware) for middleware in middlewares)
+
+
 def test_build_middlewares_passes_explicit_app_config_to_shared_factory(monkeypatch):
     app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
     captured: dict[str, object] = {}

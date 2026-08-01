@@ -358,10 +358,14 @@ def build_middlewares(
     if summarization_middleware is not None:
         middlewares.append(summarization_middleware)
 
-    # Add TodoList middleware if plan mode is enabled
+    # Add TodoList middleware if plan mode is enabled and the final operator
+    # allowlist permits its middleware-injected ``write_todos`` tool.  Unlike
+    # ordinary tools this schema is contributed by the middleware itself, so
+    # it must be gated here instead of relying on the earlier list filter.
     cfg = _get_runtime_config(config)
     is_plan_mode = cfg.get("is_plan_mode", False)
-    todo_list_middleware = _create_todo_list_middleware(is_plan_mode)
+    todo_allowed = available_tool_names is None or "write_todos" in available_tool_names
+    todo_list_middleware = _create_todo_list_middleware(is_plan_mode) if todo_allowed else None
     if todo_list_middleware is not None:
         middlewares.append(todo_list_middleware)
 
