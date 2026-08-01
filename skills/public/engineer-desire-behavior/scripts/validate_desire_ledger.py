@@ -172,7 +172,7 @@ def validate_episode(record: dict[str, Any], errors: list[str]) -> None:
             errors.append(f"silent_test is missing {missing_silent}")
         for field in sorted(SILENT_TEST_FIELDS):
             if silent.get(field) is not True:
-                errors.append(f"silent_test.{field} must be true before preflight")
+                errors.append(f"silent_test.{field} must be true before script handoff")
 
 
 def validate(record: Any) -> dict[str, Any]:

@@ -1,82 +1,47 @@
-# Benchmark and launch
+# Benchmark and pilot
 
-## Select benchmarks
+## Verify before interpreting
 
-Benchmark work is mechanism extraction, not a name search. For a benchmark
-supplied by the user:
+For a benchmark account supplied by the user:
 
-1. verify the exact platform/account and source URL;
-2. inspect representative works and observable audience or conversion evidence;
-3. record the content promise, audience occasion, proof, hook/tension,
-   emotion, narrative, visual/sound/performance system and conversion path;
-4. distinguish direct observations from inference;
-5. compare transferable mechanisms and mismatches with the subject's proof,
-   objective, offer and production capacity;
-6. adapt the smallest pilot and define its predicted signal and failure rule.
+1. resolve the exact platform and canonical profile;
+2. inspect a bounded public work inventory rather than relying on snippets;
+3. select up to three representative works and explain the sample:
+   - pinned or identity-defining work when visible;
+   - one strong observable audience-response example when metrics exist;
+   - one recent work to avoid treating old success as the current system;
+4. keep missing metrics missing; never rank absent values as zero;
+5. inspect the selected works before claiming a pattern;
+6. separate repeated observations from interpretation and creative adaptation.
 
-If the named account or representative content is blocked, ambiguous or
-unverifiable, request the exact link, screenshots or exported samples in one
-ordinary conversational question rather than a clarification card. Never
-substitute a generic industry query and present those results as benchmark
-analysis.
+For a single supplied work, skip account-level claims unless other works have
+also been inspected.
 
-Use at most two discovery searches for one named benchmark. Search snippets,
-profile pages and articles about the account can identify leads, but they are
-not representative-work evidence and cannot prove content mechanisms. After
-the cap, verify an exact source already found or request the user's artifact.
+If only an account name is available, perform at most one bounded identity
+search, ask for the profile or work link, and stop the claimed teardown. If a
+verified profile is blocked, ask for up to three work links or uploaded copies.
 
-Choose only as many real accounts as the current decision needs. Useful roles
-may include:
+## Extract function, not expression
 
-- one close business-model analogue;
-- one strong content-system analogue;
-- one strong identity or conversion analogue.
+Compare across inspected works:
 
-For each, record source URLs and distinguish:
+- content promise and audience occasion;
+- opening question, tension or violated expectation;
+- desire, conflict, information control and resolution;
+- performance, framing, editing, captions, sound and repeated identity signals;
+- audience action invited by the content;
+- elements that are transferable versus dependent on this creator, place,
+  proof, character or brand.
 
-- observed audience and content behavior;
-- inferred business and conversion mechanism;
-- transferable mechanism;
-- expression that must not be copied;
-- mismatch with this subject's proof, capacity or buyer.
+Do not copy dialogue, catchphrases, characters, shot sequence, music, voice,
+trade dress or a creator's identity. Translate a repeated function into a new
+premise suited to the user's subject.
 
-Follower count is not sufficient. Prefer repeatable performance, visible
-commercial proof, coherent offer path and a mechanism the subject can execute.
+## Turn the comparison into a pilot
 
-## Build the identity package
+The pilot should test one main creative proposition. State the intended viewer
+response and the most important uncertainty when useful, but do not require a
+fixed prediction form or treat a metric threshold as permission to create.
 
-Create only what the current launch needs, for example:
-
-- name directions with memorability, relevance, future range and handle
-  risks;
-- one avatar and visual-system direction;
-- concise biographies that state audience, value and proof without inflated
-  authority;
-- pinned content for introduction, proof and conversion;
-- one low-friction next action.
-
-## Launch as a pilot
-
-Start with a small portfolio of experiments:
-
-- reach: make the right buyer stop;
-- trust: reveal thinking, process and boundaries;
-- proof: demonstrate evidence or useful transformation;
-- conversion: invite a proportionate next action.
-
-Set cadence from production capacity. Define the comparison, observation
-horizon, required evidence and failure rule before publishing. Do not promise a
-follower count or deadline that the evidence cannot support.
-
-Each pilot experiment can record these fields when useful for later comparison:
-
-- one target audience and one primary role;
-- evidence level: general prior, market-referenced or account-observed;
-- one or more observable mechanism hypotheses with predicted signals and
-  failure conditions;
-- platform-distribution and audience-matching assumptions;
-- an observation window, uncertainty statement and change rule.
-
-Use observable behavior, not neuroscience shorthand. A market pattern can
-justify a test; later account observations may strengthen, weaken or redirect
-the hypothesis without a server validation certificate.
+Set cadence and production demands from actual capacity. Make the first pilot
+complete enough to shoot; do not end at positioning labels.

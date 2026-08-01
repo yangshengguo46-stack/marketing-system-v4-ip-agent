@@ -17,5 +17,5 @@ Their published repository is noncommercial and does not provide a
 production-ready open Vidi-Edit implementation. Do not vendor their code or
 weights.
 
-Every optional model must sit behind a provider adapter. MediaKit remains the
-fallback so the Skill compiler works without downloading large weights.
+Every optional model must sit behind a provider adapter. The evidence tool, not
+this Skill, owns parser execution and reports unavailable coverage explicitly.

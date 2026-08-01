@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 CORE_SKILLS = {
     "design-ip-differentiation",
+    "engineer-audience-response",
     "ip-strategy-director",
     "ip-content-calibration",
     "video-pattern-learning",
@@ -134,7 +135,7 @@ def test_capability_inventory_covers_exact_runtime_allowlist_and_every_public_sk
     public_skills = {
         path.parent.name for path in (ROOT / "skills" / "public").glob("*/SKILL.md")
     }
-    assert len(public_skills) == 96
+    assert len(public_skills) == 97
     assert listed_skills == public_skills
 
 
@@ -271,6 +272,44 @@ def test_differentiation_research_assets_remain_available_for_review() -> None:
     direction = (
         ROOT / "skills" / "public" / "direct-ip-visual-language" / "SKILL.md"
     ).read_text(encoding="utf-8")
-    assert "differentiation note tool" in strategy
+    assert "creative_hypothesis" in strategy
+    assert "personal_ip_record_strategy" not in strategy
     assert "差异化版本" in series
     assert "差异化识别系统" in direction
+
+
+def test_benchmark_to_script_skills_have_one_clean_semantic_contract() -> None:
+    selected = {
+        "ip-strategy-director",
+        "video-pattern-learning",
+        "engineer-audience-response",
+        "engineer-desire-behavior",
+        "write-ip-episode",
+        "write-scenes-dialogue",
+        "coach-ip-screen-performance",
+    }
+    retired_runtime_terms = {
+        "personal_ip_startup_context",
+        "personal_ip_operating_cockpit",
+        "personal_ip_record_strategy",
+        "personal_ip_compile_video_pattern",
+        "personal_ip_compile_video_skill_candidate",
+        "skill_manage",
+        "preflight",
+        "retrospective",
+    }
+    for name in selected:
+        package = ROOT / "skills" / "public" / name
+        texts = [
+            path.read_text(encoding="utf-8")
+            for path in package.rglob("*")
+            if path.is_file() and path.suffix in {".md", ".yaml", ".py"}
+        ]
+        joined = "\n".join(texts)
+        for term in retired_runtime_terms:
+            assert term not in joined, f"{name} retains retired term: {term}"
+
+    episode = (ROOT / "skills" / "public" / "write-ip-episode" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert "不机械拼接多份方法报告" in episode

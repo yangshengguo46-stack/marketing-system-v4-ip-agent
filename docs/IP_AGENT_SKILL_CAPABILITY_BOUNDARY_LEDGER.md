@@ -29,7 +29,7 @@
 - 默认 IP Agent：8 个精确白名单工具，0 个 Skill；
 - 当前全局配置：16 个配置工具，其中 6 个进入白名单，10 个被隔离；
 - DeerFlow 原生固定工具：43 个，其中 `ask_clarification` 进入白名单，其余 42 个隔离；
-- 公共 Skill 包：96 个，全部研究隔离；
+- 公共 Skill 包：97 个，全部研究隔离；
 - MCP、ACP、记忆、自修改、子 Agent、Skill 管理和 Plan Mode 工具：均不进入默认 IP Agent。
 
 ## 一、默认 IP Agent 的 8 个现役工具
@@ -172,14 +172,14 @@ MCP、ACP、子 Agent、Skill 和记忆工具全部组装之后；Plan Mode 注�
 | `web_capture` | Browserless 页面捕获 |
 | `bash` | 沙箱命令执行；本项目当前配置没有注册，LocalSandbox 也默认禁止宿主 Bash |
 
-## 六、96 个公共 Skill：全部研究隔离
+## 六、97 个公共 Skill：全部研究隔离
 
-以下 96 个目录均真实存在于 `skills/public/*/SKILL.md`，但默认 IP Agent 的
+以下 97 个目录均真实存在于 `skills/public/*/SKILL.md`，但默认 IP Agent 的
 `skills: []` 使它们不可发现、不可加载、不可执行。这里的“功能”只说明研究意图，
 不代表已经通过新 IP 第一性原理架构评审，也不代表其旧工具依赖仍可运行。
 
 <!-- BEGIN PUBLIC SKILL INVENTORY -->
-### 6.1 IP 战略、内容校准与八平台诊断（12）
+### 6.1 IP 战略、内容校准与八平台诊断（13）
 
 | Skill | 能力与功能 |
 | --- | --- |
@@ -187,6 +187,7 @@ MCP、ACP、子 Agent、Skill 和记忆工具全部组装之后；Plan Mode 注�
 | `ip-strategy-director` | 为人、品牌、产品或组织研究 IP 形态、定位、对标、身份、产品与转化方向 |
 | `design-ip-differentiation` | 从独有事实构造可验证的差异化论题、识别系统与选择理由 |
 | `ip-content-calibration` | 研究选题、脚本、预测、发布后复盘和受众学习的校准循环 |
+| `engineer-audience-response` | 把注意、情绪互动、分享和关注/收藏/行动转成可观察的内容设计假设 |
 | `diagnose-douyin-account` | 研究抖音内容、账号、业务事实与平台资格诊断 |
 | `diagnose-wechat-channels-account` | 研究视频号内容、社交分发、账号与业务诊断 |
 | `diagnose-wechat-official-account` | 研究公众号文章、订阅、分享、搜索与转化诊断 |
@@ -333,19 +334,19 @@ MCP、ACP、子 Agent、Skill 和记忆工具全部组装之后；Plan Mode 注�
 
 ## 七、当前最重要的能力边界
 
-- 默认 IP Agent 的专业度目前来自模型、精简 SOUL 和只读证据工具，不来自上述 96 个 Skill。
+- 默认 IP Agent 的专业度目前来自模型、精简 SOUL 和只读证据工具，不来自上述 97 个 Skill。
 - 35 个电影模块、Cangjie、平台诊断、HLLM 和视频学习仍是研究库存；未经统一语义审计前不得接回默认运行链。
 - 账号、发布、指标、观察和视频工具是事实采集或确定性执行器，不负责定义 IP 战略和创意判断。
 - 版权、披露、付费、删除、Owner 隔离、路径、哈希、候选一致性与幂等是安全/执行边界，不属于已退役的经营语义门禁。
 - REST API 和专用工作台可以继续调用保留服务；这不等于聊天 Agent 获得了相应模型工具。
-- 新的 IP 第一性原理、IP 形态分类和总编排尚未开始。未来启用 Skill 时，应从本清单选择最小能力链，而不是把 96 个包一次性重新挂回去。
+- 新的 IP 第一性原理、IP 形态分类和总编排尚未开始。未来启用 Skill 时，应从本清单选择最小能力链，而不是把 97 个包一次性重新挂回去。
 
 ## 八、维护规则
 
 新增、删除或重命名工具/Skill 时，必须在同一提交更新本清单。根测试会核对：
 
 - “现役工具”表与默认 `tool_allowlist` 完全一致；
-- 公共 Skill 表与 `skills/public/*/SKILL.md` 完全一致且当前为 96 个；
+- 公共 Skill 表与 `skills/public/*/SKILL.md` 完全一致且当前为 97 个；
 - Plan Mode 不得绕过 operator 白名单注入 `write_todos`。
 
 历史分类、旧 77-Skill 激活表和旧运行编排由 Git 保存，不在本文继续累积。

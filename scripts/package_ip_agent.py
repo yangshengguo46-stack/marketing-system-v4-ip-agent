@@ -113,6 +113,8 @@ REQUIRED_PACKAGE_PATHS = (
     "skills/public/ip-strategy-director/SKILL.md",
     "skills/public/ip-strategy-director/references/strategy-judgment.md",
     "skills/public/ip-strategy-director/references/benchmark-and-launch.md",
+    "skills/public/engineer-audience-response/SKILL.md",
+    "skills/public/engineer-audience-response/agents/openai.yaml",
     "skills/public/ip-content-calibration/SKILL.md",
     "skills/public/ip-content-calibration/references/editorial-rubric.md",
     "skills/public/ip-content-calibration/references/learning-policy.md",

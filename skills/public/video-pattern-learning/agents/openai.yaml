@@ -1,4 +1,4 @@
 interface:
   display_name: "视频模板学习"
-  short_description: "把对标或爆款视频编译为可验证、可复用的视频 Skill"
-  default_prompt: "Use $video-pattern-learning to reverse-engineer this video into an evidence-backed reusable production Skill."
+  short_description: "从真实时间戳证据提炼可迁移、不可照搬的视频机制"
+  default_prompt: "使用 $video-pattern-learning 从这些已检查视频中提炼可迁移机制与非复制边界。"

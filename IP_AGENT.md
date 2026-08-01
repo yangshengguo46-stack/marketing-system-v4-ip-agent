@@ -110,5 +110,5 @@ ledgers: `docs/IP_AGENT_PRODUCT_LEDGER.md` and
 `docs/IP_AGENT_AUDIT_REMEDIATION_LEDGER.md`.
 
 The exhaustive, code-checked catalog of active, isolated and conditional tools
-plus all 96 quarantined public Skills lives in
+plus all 97 quarantined public Skills lives in
 `docs/IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md`.

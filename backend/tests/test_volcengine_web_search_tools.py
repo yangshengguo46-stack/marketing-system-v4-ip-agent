@@ -200,12 +200,12 @@ def test_ddg_fallback_is_strict_and_drops_unsafe_or_irrelevant_results():
             "body": "今天的比赛结果。",
         },
         {
-            "title": "贵厨笔记账号介绍",
+            "title": "山野食录账号介绍",
             "href": "https://example.com/guichu",
-            "body": "贵厨笔记是餐饮内容账号。",
+            "body": "山野食录是餐饮内容账号。",
         },
         {
-            "title": "贵厨笔记成人视频",
+            "title": "山野食录成人视频",
             "href": "https://bad.example/guichu",
             "body": "色情内容。",
         },
@@ -215,23 +215,23 @@ def test_ddg_fallback_is_strict_and_drops_unsafe_or_irrelevant_results():
         "deerflow.community.ddg_search.tools._search_text",
         return_value=raw_results,
     ) as search:
-        result = _run_ddg_fallback("贵厨笔记 内容结构 餐饮门店", 5)
+        result = _run_ddg_fallback("山野食录 内容结构 餐饮门店", 5)
 
     search.assert_called_once_with(
-        query="贵厨笔记 内容结构 餐饮门店",
+        query="山野食录 内容结构 餐饮门店",
         max_results=10,
         region="wt-wt",
         safesearch="on",
         backend="duckduckgo",
     )
     assert result == {
-        "query": "贵厨笔记 内容结构 餐饮门店",
+        "query": "山野食录 内容结构 餐饮门店",
         "total_results": 1,
         "results": [
             {
-                "title": "贵厨笔记账号介绍",
+                "title": "山野食录账号介绍",
                 "url": "https://example.com/guichu",
-                "content": "贵厨笔记是餐饮内容账号。",
+                "content": "山野食录是餐饮内容账号。",
             }
         ],
         "filtered_results": 3,

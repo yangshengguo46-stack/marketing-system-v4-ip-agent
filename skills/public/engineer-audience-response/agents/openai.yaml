@@ -1,0 +1,4 @@
+interface:
+  display_name: "观众反应工程"
+  short_description: "把注意、情绪、传播与行动转成可观察的短视频设计假设"
+  default_prompt: "使用 $engineer-audience-response 把这个选题转成可观察、可检验的观众反应设计。"
