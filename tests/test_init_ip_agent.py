@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.init_ip_agent import default_state_dir, install  # noqa: E402
 
@@ -28,7 +30,19 @@ def test_install_writes_a_complete_default_agent(tmp_path: Path) -> None:
     assert (state_dir / "USER.md").is_file()
     assert (agent_dir / "config.yaml").is_file()
     assert (agent_dir / "SOUL.md").is_file()
-    assert "personal-ip-operator" in (agent_dir / "config.yaml").read_text()
+    config = yaml.safe_load((agent_dir / "config.yaml").read_text())
+    assert config["skills"] == []
+    assert config["memory_enabled"] is False
+    assert set(config["tool_allowlist"]) == {
+        "web_search",
+        "image_search",
+        "ls",
+        "read_file",
+        "glob",
+        "grep",
+        "view_image",
+        "ask_clarification",
+    }
 
 
 def test_install_keeps_existing_user_profile_without_force(tmp_path: Path) -> None:

@@ -81,6 +81,8 @@ class TestAgentConfig:
         assert cfg.description == ""
         assert cfg.model is None
         assert cfg.tool_groups is None
+        assert cfg.tool_allowlist is None
+        assert cfg.memory_enabled is None
 
     def test_full_config(self):
         from deerflow.config.agents_config import AgentConfig
@@ -90,10 +92,29 @@ class TestAgentConfig:
             description="Specialized for code review",
             model="deepseek-v3",
             tool_groups=["file:read", "bash"],
+            tool_allowlist=["read_file", "web_search"],
+            memory_enabled=False,
         )
         assert cfg.name == "code-reviewer"
         assert cfg.model == "deepseek-v3"
         assert cfg.tool_groups == ["file:read", "bash"]
+        assert cfg.tool_allowlist == ["read_file", "web_search"]
+        assert cfg.memory_enabled is False
+
+    def test_operator_runtime_fields_are_not_agent_managed(self):
+        from deerflow.config.agents_config import AgentConfig, preserve_non_managed_fields
+
+        cfg = AgentConfig(
+            name="bounded",
+            description="customer editable",
+            tool_allowlist=["read_file"],
+            memory_enabled=False,
+        )
+
+        assert preserve_non_managed_fields(cfg) == {
+            "tool_allowlist": ["read_file"],
+            "memory_enabled": False,
+        }
 
     def test_config_from_dict(self):
         from deerflow.config.agents_config import AgentConfig
@@ -666,6 +687,8 @@ class TestAgentsAPI:
                 }
             ],
         }
+        config_data["tool_allowlist"] = ["read_file", "web_search"]
+        config_data["memory_enabled"] = False
         config_file.write_text(yaml.safe_dump(config_data, sort_keys=False), encoding="utf-8")
 
         # PATCH only the description.
@@ -685,6 +708,8 @@ class TestAgentsAPI:
                 }
             ],
         }
+        assert reloaded["tool_allowlist"] == ["read_file", "web_search"]
+        assert reloaded["memory_enabled"] is False
 
     def test_update_memory_only_user_dir_with_legacy_agent_returns_409(self, agent_client, tmp_path):
         """Regression for #3390's PUT /api/agents/{name} guard.

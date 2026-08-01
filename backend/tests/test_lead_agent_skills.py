@@ -300,6 +300,84 @@ def test_make_lead_agent_empty_skills_passed_correctly(monkeypatch):
     assert captured_skills[-1] == {"skill1"}
 
 
+def test_custom_agent_operator_allowlist_creates_clean_runtime(monkeypatch):
+    """The operator boundary wins over every assembled tool source."""
+    from unittest.mock import MagicMock
+
+    from deerflow.agents.lead_agent import agent as lead_agent_module
+    from deerflow.agents.lead_agent import prompt as prompt_module
+
+    allowed = {
+        "web_search",
+        "image_search",
+        "ls",
+        "read_file",
+        "glob",
+        "grep",
+        "view_image",
+        "ask_clarification",
+    }
+    all_tools = [NamedTool(name) for name in sorted(allowed | {"bash", "task", "skill_manage", "personal_ip_startup_context"})]
+    captured_middlewares: dict[str, object] = {}
+
+    monkeypatch.setattr(lead_agent_module, "_resolve_model_name", lambda x=None, **kwargs: "default-model")
+    monkeypatch.setattr(lead_agent_module, "create_chat_model", lambda **kwargs: "model")
+    monkeypatch.setattr(lead_agent_module, "create_agent", lambda **kwargs: kwargs)
+    monkeypatch.setattr(
+        lead_agent_module,
+        "load_agent_config",
+        lambda name: AgentConfig(
+            name=name,
+            skills=[],
+            tool_allowlist=sorted(allowed),
+            memory_enabled=False,
+        ),
+    )
+    monkeypatch.setattr(lead_agent_module, "_load_enabled_available_skills", lambda *args, **kwargs: [])
+    monkeypatch.setattr("deerflow.tools.get_available_tools", lambda **kwargs: all_tools)
+    monkeypatch.setattr(lead_agent_module, "build_tracing_callbacks", lambda: [])
+    monkeypatch.setattr(prompt_module, "get_agent_soul", lambda agent_name: "<soul>Clean and direct.</soul>")
+
+    def capture_build_middlewares(*args, **kwargs):
+        captured_middlewares.update(kwargs)
+        return []
+
+    monkeypatch.setattr(lead_agent_module, "build_middlewares", capture_build_middlewares)
+
+    app_config = MagicMock()
+    app_config.get_model_config.return_value = SimpleNamespace(supports_thinking=False, supports_vision=False)
+    app_config.tool_search.enabled = False
+    app_config.skills.deferred_discovery = True
+    app_config.skills.container_path = "/mnt/skills"
+    app_config.skill_evolution.enabled = True
+    app_config.memory.enabled = True
+    app_config.memory.mode = "tool"
+    app_config.sandbox.mounts = []
+    app_config.subagents.max_total_per_run = 20
+    monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: app_config)
+
+    result = lead_agent_module.make_lead_agent(
+        {"configurable": {"agent_name": "ip-agent", "subagent_enabled": True}}
+    )
+
+    assert {tool.name for tool in result["tools"]} == allowed
+    assert captured_middlewares["available_tool_names"] == allowed
+    assert captured_middlewares["available_skills"] == set()
+    assert captured_middlewares["memory_enabled"] is False
+    prompt = result["system_prompt"]
+    for forbidden in (
+        "Skill First",
+        "Progressive Loading",
+        "update_agent",
+        "Skill Self-Evolution",
+        "Output files",
+        "task orchestrator",
+        "memory_search",
+    ):
+        assert forbidden not in prompt
+    assert "Use the available read tools" in prompt
+
+
 def test_make_lead_agent_custom_skill_allowlist_does_not_activate_tool_policy(monkeypatch):
     from unittest.mock import MagicMock
 

@@ -559,6 +559,38 @@ def test_build_middlewares_injects_personal_ip_context_before_skill_activation(m
     assert account_idx < activation_idx
 
 
+def test_build_middlewares_omits_disabled_semantic_skill_and_memory_layers(monkeypatch):
+    from deerflow.agents.middlewares.durable_context_middleware import DurableContextMiddleware
+    from deerflow.agents.middlewares.memory_middleware import MemoryMiddleware
+    from deerflow.agents.middlewares.personal_ip_context_middleware import PersonalIPContextMiddleware
+    from deerflow.agents.middlewares.skill_activation_middleware import SkillActivationMiddleware
+    from deerflow.agents.middlewares.skill_tool_policy_middleware import SkillToolPolicyMiddleware
+
+    app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
+    monkeypatch.setattr(lead_agent_module, "build_lead_runtime_middlewares", lambda *, app_config, lazy_init=True: [])
+    monkeypatch.setattr(lead_agent_module, "_create_summarization_middleware", lambda *, app_config=None: None)
+    monkeypatch.setattr(lead_agent_module, "_create_todo_list_middleware", lambda is_plan_mode: None)
+
+    middlewares = lead_agent_module.build_middlewares(
+        {"configurable": {"is_plan_mode": False, "subagent_enabled": True}},
+        model_name="safe-model",
+        app_config=app_config,
+        available_skills=set(),
+        available_tool_names={"web_search", "read_file", "ask_clarification"},
+        memory_enabled=False,
+    )
+
+    disabled_types = (
+        PersonalIPContextMiddleware,
+        SkillActivationMiddleware,
+        SkillToolPolicyMiddleware,
+        DurableContextMiddleware,
+        MemoryMiddleware,
+        SubagentLimitMiddleware,
+    )
+    assert not any(isinstance(middleware, disabled_types) for middleware in middlewares)
+
+
 @pytest.mark.parametrize("use_stale_path", [False, True], ids=["restrictive-skill", "stale-active-path"])
 def test_compiled_skill_policy_chain_filters_schema_and_blocks_execution(monkeypatch, use_stale_path):
     from deerflow.agents.middlewares.durable_context_middleware import DurableContextMiddleware

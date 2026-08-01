@@ -169,6 +169,15 @@ class AgentConfig(BaseModel):
     # - [] (explicit empty list): disable all skills
     # - ["skill1", "skill2"]: load only the specified skills
     skills: list[str] | None = None
+    # Operator-owned runtime boundaries. These fields are intentionally not
+    # exposed by the agent self-update or customer-facing Agent APIs.
+    # ``None`` preserves DeerFlow's historical behavior; an explicit list is
+    # applied after every configured/built-in/extension tool has been assembled.
+    tool_allowlist: list[str] | None = None
+    # ``None`` inherits the global memory configuration. ``False`` keeps any
+    # stored memory intact while disabling both injection and updates for this
+    # agent.
+    memory_enabled: bool | None = None
     # Optional binding to GitHub repositories so this agent can respond to
     # webhook events from the gateway dispatcher. None means "no GitHub
     # integration", which is the case for every existing agent.

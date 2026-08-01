@@ -293,6 +293,27 @@ async def inject_personal_ip_portfolio_context(
     }
 
 
+def personal_ip_context_enabled(config: dict[str, Any]) -> bool:
+    """Return whether the selected agent can consume Personal-IP context."""
+    runtime_context = config.get("context")
+    if not isinstance(runtime_context, dict):
+        return True
+    agent_name = runtime_context.get("agent_name")
+    if not isinstance(agent_name, str) or not agent_name:
+        return True
+    try:
+        from deerflow.config.agents_config import load_agent_config
+
+        agent_config = load_agent_config(
+            agent_name,
+            user_id=str(runtime_context.get("user_id") or "") or None,
+        )
+    except (FileNotFoundError, TypeError, ValueError):
+        return True
+    allowlist = agent_config.tool_allowlist if agent_config is not None else None
+    return allowlist is None or any(name.startswith("personal_ip_") for name in allowlist)
+
+
 def merge_run_context_overrides(config: dict[str, Any], context: Mapping[str, Any] | None, *, internal: bool = False) -> None:
     """Merge whitelisted keys from ``body.context`` into both ``config['configurable']``
     and ``config['context']`` so they are visible to legacy configurable readers and
@@ -783,7 +804,11 @@ async def start_run(
         )
         account_repo = getattr(request.app.state, "personal_ip_account_repo", None)
         subject_repo = getattr(request.app.state, "personal_ip_subject_repo", None)
-        if account_repo is not None and subject_repo is not None:
+        if (
+            account_repo is not None
+            and subject_repo is not None
+            and personal_ip_context_enabled(config)
+        ):
             await inject_personal_ip_portfolio_context(
                 config,
                 account_repo=account_repo,

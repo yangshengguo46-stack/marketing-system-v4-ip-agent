@@ -80,11 +80,9 @@ def _agent_config() -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def test_private_operating_intelligence_is_enabled() -> None:
+def test_private_operating_intelligence_is_retained_but_runtime_isolated() -> None:
     configured = set(_agent_config()["skills"])
-    assert CORE_SKILLS <= configured
-    assert MEDIA_SKILLS <= configured
-    assert CINEMATIC_IP_SKILLS <= configured
+    assert configured == set()
 
     for name in CORE_SKILLS | MEDIA_SKILLS | CINEMATIC_IP_SKILLS:
         skill = ROOT / "skills" / "public" / name / "SKILL.md"
@@ -92,35 +90,18 @@ def test_private_operating_intelligence_is_enabled() -> None:
         assert "TODO" not in skill.read_text(encoding="utf-8")
 
 
-def test_first_use_orientation_precedes_generic_research() -> None:
-    configured = set(_agent_config()["skills"])
+def test_clean_first_use_contract_has_no_fixed_orientation_or_skill_flow() -> None:
+    config = _agent_config()
     soul = (
         ROOT / "product" / "defaults" / "agents" / "ip-agent" / "SOUL.md"
     ).read_text(encoding="utf-8")
-    operator = (
-        ROOT / "skills" / "public" / "personal-ip-operator" / "SKILL.md"
-    ).read_text(encoding="utf-8")
-    strategy = (
-        ROOT / "skills" / "public" / "ip-strategy-director" / "SKILL.md"
-    ).read_text(encoding="utf-8")
-    research = (
-        ROOT / "skills" / "public" / "deep-research" / "SKILL.md"
-    ).read_text(encoding="utf-8")
-
-    normalized_soul = " ".join(soul.lower().split())
-    assert "normal narrative-strategy conversation without a model or tool call" in normalized_soul
-    assert "one entity-appropriate grand-tour invitation" in normalized_soul
-    assert "preserve the same strict boundary" in normalized_soul
-    assert "do not load a skill file, browse/search" in normalized_soul
-    assert "ask no more than one material question at a time" in normalized_soul
-    assert "do not apply this delay to a concrete supplied script, asset or link" in " ".join(
-        operator.lower().split()
-    )
-    assert "do not load another skill" in " ".join(strategy.lower().split())
-    assert "product-specific onboarding gates take precedence" in " ".join(
-        research.lower().split()
-    )
-    assert "deep-research" not in configured
+    assert config["skills"] == []
+    assert config["memory_enabled"] is False
+    assert len(soul.splitlines()) <= 40
+    assert "不要擅自启动固定访谈" in soul
+    assert "用户事实" in soul
+    assert "来源事实" in soul
+    assert "创作假设" in soul
 
 
 def test_upstream_media_skills_keep_hidden_evaluations() -> None:

@@ -34,12 +34,18 @@ from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 
-from deerflow.agents.lead_agent.agent import build_middlewares
+from deerflow.agents.lead_agent.agent import (
+    _append_memory_tools_without_name_conflicts,
+    _filter_tools_by_allowlist,
+    _memory_is_enabled,
+    build_middlewares,
+)
 from deerflow.agents.lead_agent.prompt import apply_prompt_template, get_enabled_skills_for_config
 from deerflow.agents.thread_state import ThreadState
-from deerflow.config.agents_config import AGENT_NAME_PATTERN
+from deerflow.config.agents_config import AGENT_NAME_PATTERN, load_agent_config
 from deerflow.config.app_config import get_app_config, is_trace_correlation_enabled, reload_app_config
 from deerflow.config.extensions_config import ExtensionsConfig, SkillStateConfig, get_extensions_config, reload_extensions_config
+from deerflow.config.memory_config import should_use_memory_tools
 from deerflow.config.paths import get_paths
 from deerflow.models import create_chat_model
 from deerflow.runtime.goal import DEFAULT_MAX_GOAL_CONTINUATIONS, build_goal_state, goal_thread_lock, read_thread_goal, write_thread_goal
@@ -238,7 +244,19 @@ class DeerFlowClient:
     def _ensure_agent(self, config: RunnableConfig):
         """Create (or recreate) the agent when config-dependent params change."""
         cfg = config.get("configurable", {})
-        key = (
+        try:
+            agent_config = load_agent_config(self._agent_name) if self._agent_name else None
+        except FileNotFoundError:
+            # Embedded clients historically accepted an arbitrary display-only
+            # agent name. Operator boundaries apply when a persisted config is
+            # present, without breaking that legacy construction path.
+            agent_config = None
+        configured_skills = self._available_skills
+        if configured_skills is None and agent_config and agent_config.skills is not None:
+            configured_skills = set(agent_config.skills)
+        tool_allowlist = agent_config.tool_allowlist if agent_config else None
+        memory_enabled = agent_config.memory_enabled if agent_config else None
+        base_key = (
             cfg.get("model_name"),
             cfg.get("thinking_enabled"),
             cfg.get("is_plan_mode"),
@@ -246,7 +264,12 @@ class DeerFlowClient:
             cfg.get("max_concurrent_subagents"),
             cfg.get("max_total_subagents"),
             self._agent_name,
-            frozenset(self._available_skills) if self._available_skills is not None else None,
+            frozenset(configured_skills) if configured_skills is not None else None,
+        )
+        key = (
+            (*base_key, tuple(tool_allowlist) if tool_allowlist is not None else None, memory_enabled)
+            if tool_allowlist is not None or memory_enabled is not None
+            else base_key
         )
 
         if self._agent is not None and self._agent_config_key == key:
@@ -258,7 +281,12 @@ class DeerFlowClient:
         max_concurrent_subagents = cfg.get("max_concurrent_subagents", 3)
         max_total_subagents = cfg.get("max_total_subagents", self._app_config.subagents.max_total_per_run)
 
-        tools = self._get_tools(model_name=model_name, subagent_enabled=subagent_enabled)
+        tools = self._get_tools(
+            model_name=model_name,
+            subagent_enabled=subagent_enabled,
+            groups=agent_config.tool_groups if agent_config else None,
+        )
+        tools = _filter_tools_by_allowlist(tools, tool_allowlist)
         final_tools, deferred_setup = assemble_deferred_tools(tools, enabled=self._app_config.tool_search.enabled)
         mcp_routing_middleware = build_mcp_routing_middleware(
             final_tools,
@@ -269,15 +297,20 @@ class DeerFlowClient:
 
         # Wire deferred skill discovery — mirrors agent.py so config flag works on both paths.
         skills_list = get_enabled_skills_for_config(self._app_config)
-        if self._available_skills is not None:
-            skills_list = [s for s in skills_list if s.name in self._available_skills]
+        if configured_skills is not None:
+            skills_list = [s for s in skills_list if s.name in configured_skills]
         skill_setup = build_skill_search_setup(
             skills_list,
             enabled=self._app_config.skills.deferred_discovery,
             container_base_path=self._app_config.skills.container_path,
         )
-        if skill_setup.describe_skill_tool:
+        if skill_setup.describe_skill_tool and (tool_allowlist is None or skill_setup.describe_skill_tool.name in tool_allowlist):
             final_tools.append(skill_setup.describe_skill_tool)
+        if _memory_is_enabled(memory_enabled, self._app_config) and should_use_memory_tools(self._app_config.memory):
+            _append_memory_tools_without_name_conflicts(final_tools)
+        final_tools = _filter_tools_by_allowlist(final_tools, tool_allowlist)
+        available_tool_names = {tool.name for tool in final_tools}
+        effective_subagent_enabled = subagent_enabled and "task" in available_tool_names
 
         kwargs: dict[str, Any] = {
             # attach_tracing=False because ``stream()`` injects tracing
@@ -290,24 +323,32 @@ class DeerFlowClient:
                 config,
                 model_name=model_name,
                 agent_name=self._agent_name,
-                available_skills=self._available_skills,
+                available_skills=configured_skills,
                 custom_middlewares=self._middlewares,
                 app_config=self._app_config,
                 deferred_setup=deferred_setup,
                 mcp_routing_middleware=mcp_routing_middleware,
                 user_id=get_effective_user_id(),
+                available_tool_names=available_tool_names if tool_allowlist is not None else None,
+                memory_enabled=memory_enabled,
             ),
             "system_prompt": apply_prompt_template(
-                subagent_enabled=subagent_enabled,
+                subagent_enabled=effective_subagent_enabled,
                 max_concurrent_subagents=max_concurrent_subagents,
                 max_total_subagents=max_total_subagents,
                 agent_name=self._agent_name,
-                available_skills=self._available_skills,
+                available_skills=configured_skills,
                 app_config=self._app_config,
                 deferred_names=deferred_setup.deferred_names,
                 mcp_routing_hints_section=mcp_routing_hints_section,
                 user_id=get_effective_user_id(),
-                skill_names=skill_setup.skill_names or None,
+                skill_names=(
+                    skill_setup.skill_names
+                    if self._app_config.skills.deferred_discovery
+                    else None
+                ),
+                available_tool_names=available_tool_names if tool_allowlist is not None else None,
+                memory_enabled=memory_enabled,
             ),
             "state_schema": ThreadState,
         }
@@ -324,11 +365,11 @@ class DeerFlowClient:
         logger.info("Agent created: agent_name=%s, model=%s, thinking=%s", self._agent_name, model_name, thinking_enabled)
 
     @staticmethod
-    def _get_tools(*, model_name: str | None, subagent_enabled: bool):
+    def _get_tools(*, model_name: str | None, subagent_enabled: bool, groups: list[str] | None = None):
         """Lazy import to avoid circular dependency at module level."""
         from deerflow.tools import get_available_tools
 
-        return get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled)
+        return get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled, groups=groups)
 
     @staticmethod
     def _serialize_tool_calls(tool_calls) -> list[dict]:

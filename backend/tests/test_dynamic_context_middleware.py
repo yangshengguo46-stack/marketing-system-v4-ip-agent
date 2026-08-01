@@ -116,6 +116,25 @@ def test_memory_included_when_present():
     assert msgs[2].content == "Hi"
 
 
+def test_agent_memory_override_disables_injection_without_disabling_date():
+    app_config = SimpleNamespace(memory=SimpleNamespace(injection_enabled=True))
+    mw = _make_middleware(app_config=app_config, memory_enabled=False)
+    state = {"messages": [HumanMessage(content="Hi", id="msg-1")]}
+
+    with (
+        mock.patch(
+            "deerflow.agents.lead_agent.prompt._get_memory_context",
+            side_effect=AssertionError("memory must not be read"),
+        ),
+        mock.patch("deerflow.agents.middlewares.dynamic_context_middleware.datetime") as mock_dt,
+    ):
+        mock_dt.now.return_value.strftime.return_value = "2026-05-08, Friday"
+        result = mw.before_agent(state, _fake_runtime())
+
+    assert [type(message) for message in result["messages"]] == [SystemMessage, HumanMessage]
+    assert "<current_date>2026-05-08, Friday</current_date>" in result["messages"][0].content
+
+
 def test_first_run_records_exact_effective_memory():
     journal = mock.MagicMock()
     mw = _make_middleware()

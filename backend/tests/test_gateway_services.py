@@ -1633,3 +1633,37 @@ class TestInjectAuthenticatedUserContextAuthz:
         config = {"context": "not a dict"}
         with pytest.raises(TypeError, match="run context must be a mapping"):
             inject_authenticated_user_context(config, _make_request_with_auth_source("session"))
+
+
+def test_personal_ip_context_is_skipped_for_bounded_clean_agent(monkeypatch):
+    from app.gateway.services import personal_ip_context_enabled
+    from deerflow.config.agents_config import AgentConfig
+
+    monkeypatch.setattr(
+        "deerflow.config.agents_config.load_agent_config",
+        lambda name, user_id=None: AgentConfig(
+            name=name,
+            tool_allowlist=["web_search", "read_file"],
+        ),
+    )
+
+    assert personal_ip_context_enabled(
+        {"context": {"agent_name": "ip-agent", "user_id": "owner-1"}}
+    ) is False
+
+
+def test_personal_ip_context_remains_for_agents_with_native_ip_tools(monkeypatch):
+    from app.gateway.services import personal_ip_context_enabled
+    from deerflow.config.agents_config import AgentConfig
+
+    monkeypatch.setattr(
+        "deerflow.config.agents_config.load_agent_config",
+        lambda name, user_id=None: AgentConfig(
+            name=name,
+            tool_allowlist=["personal_ip_performance_inventory"],
+        ),
+    )
+
+    assert personal_ip_context_enabled(
+        {"context": {"agent_name": "operator", "user_id": "owner-1"}}
+    ) is True
