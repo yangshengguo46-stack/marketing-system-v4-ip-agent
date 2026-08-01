@@ -1,11 +1,12 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install ip-test-prepare ip-test-start ip-test-reset ip-test-status ip-test-stop ip-test-evidence-reset ip-test-evidence-start ip-test-evidence-login personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install ip-test-prepare ip-test-start ip-test-reset ip-test-status ip-test-stop ip-test-evidence-reset ip-test-evidence-start ip-test-evidence-login ip-m2-prepare ip-m2-run personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 PNPM ?= pnpm
 BACKEND_UV_RUN = cd backend && uv run
 IP_TEST_RUN = cd backend && PYTHONPATH=.. uv run python -m scripts.ip_agent_test_mode
+IP_M2_RUN = cd backend && PYTHONPATH=.. uv run python -m scripts.ip_agent_m2_replay
 VIDEO_E2E_DIR ?= .deer-flow/acceptance/video-e2e
 VIDEO_E2E_FINISHER ?= auto
 
@@ -33,6 +34,8 @@ help:
 	@echo "  make ip-test-evidence-reset - Reset into the isolated two-tool Evidence MCP profile"
 	@echo "  make ip-test-evidence-login - Open the dedicated Douyin login profile"
 	@echo "  make ip-test-evidence-start - Start the two-tool Evidence MCP test profile"
+	@echo "  make ip-m2-prepare    - Validate the isolated four-group M2 comparison matrix"
+	@echo "  make ip-m2-run        - Run locked Doubao M2 groups with controlled-exit config restore"
 	@echo "  make personal-ip-publish-acceptance - Run local-only eight-platform publish recovery checks"
 	@echo "  make personal-ip-cost-acceptance - Run video hard-budget reservation/retry/concurrency checks"
 	@echo "  make personal-ip-data-lifecycle-acceptance - Verify credential-safe backup, restore and whole-domain deletion"
@@ -128,6 +131,12 @@ ip-test-evidence-login:
 
 ip-test-evidence-start:
 	@$(IP_TEST_RUN) start --profile evidence
+
+ip-m2-prepare:
+	@$(IP_M2_RUN) prepare
+
+ip-m2-run:
+	@$(IP_M2_RUN) run
 
 personal-ip-publish-acceptance:
 	@$(MAKE) -C backend personal-ip-publish-acceptance

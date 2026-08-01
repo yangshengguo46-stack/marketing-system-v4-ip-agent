@@ -1,5 +1,7 @@
 """Tests for DeferredToolFilterMiddleware (closure deferred-set + state promotion)."""
 
+from types import SimpleNamespace
+
 from langchain_core.tools import tool as as_tool
 
 from deerflow.agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
@@ -24,10 +26,11 @@ def active_c(x: str) -> str:
 
 
 class _Req:
-    def __init__(self, tools, state):
+    def __init__(self, tools, state, *, journal=None):
         self.tools = tools
         self.state = state
         self.overridden = None
+        self.runtime = SimpleNamespace(context={"__run_journal": journal}) if journal else None
 
     def override(self, tools):
         self.overridden = tools
@@ -60,6 +63,33 @@ def test_no_deferred_names_is_noop():
     req = _Req([active_c], {})
     out = DeferredToolFilterMiddleware(frozenset(), "h1")._filter_tools(req)
     assert out.overridden is None  # returned unchanged
+
+
+def test_records_the_exact_post_promotion_model_binding():
+    calls = []
+
+    class _Journal:
+        def record_model_tool_visibility(self, **kwargs):
+            calls.append(kwargs)
+
+    req = _Req(
+        [mcp_a, mcp_b, active_c],
+        {"promoted": {"catalog_hash": "h1", "names": ["mcp_a"]}},
+        journal=_Journal(),
+    )
+
+    _mw()._filter_tools(req, hook="test")
+
+    assert calls == [
+        {
+            "bound_tool_names": ["active_c", "mcp_a"],
+            "deferred_tool_names": ["mcp_a", "mcp_b"],
+            "promoted_tool_names": ["mcp_a"],
+            "hidden_tool_names": ["mcp_b"],
+            "catalog_hash": "h1",
+            "hook": "test",
+        }
+    ]
 
 
 def test_blocked_message_for_unpromoted_deferred_call():

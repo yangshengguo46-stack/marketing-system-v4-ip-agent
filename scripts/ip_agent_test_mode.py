@@ -57,7 +57,10 @@ def resolve_test_mode_paths(root: Path) -> TestModePaths:
         config=state_dir / TEST_CONFIG_NAME,
         extensions_config=state_dir / TEST_EXTENSIONS_CONFIG_NAME,
         database_dir=state_dir / "data",
-        evidence_browser_profile_dir=state_dir / "evidence-mcp" / "browser-profile" / "douyin",
+        evidence_browser_profile_dir=state_dir
+        / "evidence-mcp"
+        / "browser-profile"
+        / "douyin",
     )
 
 
@@ -87,7 +90,9 @@ def _source_extensions_config(root: Path) -> Path:
     example = root / "extensions_config.example.json"
     if example.is_file():
         return example
-    raise FileNotFoundError("extensions_config.json and extensions_config.example.json are both missing")
+    raise FileNotFoundError(
+        "extensions_config.json and extensions_config.example.json are both missing"
+    )
 
 
 def _write_isolated_config(paths: TestModePaths, source_config: Path) -> None:
@@ -133,8 +138,13 @@ def _install_product_defaults(paths: TestModePaths, *, profile: TestProfile) -> 
     agent_source = defaults / "agents" / "ip-agent"
     if not user_source.is_file():
         raise FileNotFoundError(f"product default is missing: {user_source}")
-    if not (agent_source / "config.yaml").is_file() or not (agent_source / "SOUL.md").is_file():
-        raise FileNotFoundError(f"product agent defaults are incomplete: {agent_source}")
+    if (
+        not (agent_source / "config.yaml").is_file()
+        or not (agent_source / "SOUL.md").is_file()
+    ):
+        raise FileNotFoundError(
+            f"product agent defaults are incomplete: {agent_source}"
+        )
 
     paths.state_dir.mkdir(parents=True, exist_ok=True)
     paths.state_dir.chmod(0o700)
@@ -207,7 +217,9 @@ def _write_test_extensions(paths: TestModePaths, *, profile: TestProfile) -> Non
                 "DEER_FLOW_CONFIG_PATH": str(paths.config),
                 "DEER_FLOW_PROJECT_ROOT": str(paths.root),
                 "IP_AGENT_TEST_MODE": "1",
-                "IP_AGENT_EVIDENCE_BROWSER_PROFILE_DIR": str(paths.evidence_browser_profile_dir),
+                "IP_AGENT_EVIDENCE_BROWSER_PROFILE_DIR": str(
+                    paths.evidence_browser_profile_dir
+                ),
                 "IP_AGENT_EVIDENCE_BROWSER_HEADLESS": "1",
                 "MEDIAKIT_API_KEY": "$MEDIAKIT_API_KEY",
             },
@@ -218,14 +230,36 @@ def _write_test_extensions(paths: TestModePaths, *, profile: TestProfile) -> Non
                     "routing": {
                         "mode": "prefer",
                         "priority": 100,
-                        "keywords": ["抖音主页", "抖音账号", "对标账号", "profile URL", "benchmark account"],
+                        "keywords": [
+                            "抖音主页",
+                            "抖音账号",
+                            "对标账号",
+                            "v.douyin.com",
+                            "douyin.com/user/",
+                            "profile URL",
+                            "benchmark account",
+                        ],
                     }
                 },
                 "inspect_reference_videos": {
                     "routing": {
                         "mode": "prefer",
                         "priority": 90,
-                        "keywords": ["作品链接", "代表作品", "作品拆解", "拆解作品", "参考视频", "视频", "video URL", "reference video"],
+                        "keywords": [
+                            "作品链接",
+                            "代表作品",
+                            "作品拆解",
+                            "拆解作品",
+                            "参考视频",
+                            "视频",
+                            "对标账号",
+                            "v.douyin.com",
+                            "douyin.com/user/",
+                            "douyin.com/video/",
+                            "video URL",
+                            "reference video",
+                            "benchmark account",
+                        ],
                     }
                 },
             },
@@ -236,7 +270,9 @@ def _write_test_extensions(paths: TestModePaths, *, profile: TestProfile) -> Non
     )
 
 
-def _write_marker(paths: TestModePaths, *, profile: TestProfile, now: datetime | None = None) -> None:
+def _write_marker(
+    paths: TestModePaths, *, profile: TestProfile, now: datetime | None = None
+) -> None:
     marker = {
         "schema_version": TEST_MODE_SCHEMA_VERSION,
         "created_at": (now or datetime.now(UTC)).astimezone(UTC).isoformat(),
@@ -245,13 +281,19 @@ def _write_marker(paths: TestModePaths, *, profile: TestProfile, now: datetime |
         "database_dir": str(paths.database_dir),
         "profile": profile,
     }
-    _write_private_text(paths.marker, json.dumps(marker, ensure_ascii=False, indent=2) + "\n")
+    _write_private_text(
+        paths.marker, json.dumps(marker, ensure_ascii=False, indent=2) + "\n"
+    )
 
 
-def _validate_marker(paths: TestModePaths, *, expected_profile: TestProfile | None = None) -> dict[str, Any]:
+def _validate_marker(
+    paths: TestModePaths, *, expected_profile: TestProfile | None = None
+) -> dict[str, Any]:
     expected_state = (paths.root / TEST_STATE_RELATIVE).resolve()
     if paths.state_dir != expected_state:
-        raise RuntimeError("refusing test reset outside the repository's fixed test-state directory")
+        raise RuntimeError(
+            "refusing test reset outside the repository's fixed test-state directory"
+        )
     if not paths.marker.is_file():
         raise RuntimeError(f"refusing to rotate unmarked directory: {paths.state_dir}")
     try:
@@ -271,7 +313,9 @@ def _validate_marker(paths: TestModePaths, *, expected_profile: TestProfile | No
     if profile not in {TEST_PROFILE_CLEAN, TEST_PROFILE_EVIDENCE}:
         raise RuntimeError("test-mode marker contains an unknown profile")
     if expected_profile is not None and profile != expected_profile:
-        raise RuntimeError(f"test mode is prepared as profile '{profile}', not '{expected_profile}'; reset before switching profiles")
+        raise RuntimeError(
+            f"test mode is prepared as profile '{profile}', not '{expected_profile}'; reset before switching profiles"
+        )
     return marker
 
 
@@ -286,12 +330,16 @@ def prepare_test_mode(
     if paths.state_dir.exists():
         has_contents = any(paths.state_dir.iterdir())
         if has_contents and not paths.marker.is_file():
-            raise RuntimeError(f"refusing to prepare an unmarked non-empty directory: {paths.state_dir}")
+            raise RuntimeError(
+                f"refusing to prepare an unmarked non-empty directory: {paths.state_dir}"
+            )
         if paths.marker.is_file():
             _validate_marker(paths, expected_profile=profile)
     paths.state_dir.mkdir(parents=True, exist_ok=True)
     paths.state_dir.chmod(0o700)
-    _write_isolated_config(paths, (source_config or (paths.root / "config.yaml")).resolve())
+    _write_isolated_config(
+        paths, (source_config or (paths.root / "config.yaml")).resolve()
+    )
 
     _write_test_extensions(paths, profile=profile)
     _install_product_defaults(paths, profile=profile)
@@ -332,7 +380,9 @@ def reset_test_mode(
             suffix += 1
         paths.state_dir.rename(snapshot)
 
-    fresh = prepare_test_mode(paths.root, source_config=source_config, profile=profile, now=now)
+    fresh = prepare_test_mode(
+        paths.root, source_config=source_config, profile=profile, now=now
+    )
     return fresh, snapshot
 
 
@@ -363,7 +413,9 @@ def _status(paths: TestModePaths) -> dict[str, Any]:
             marker_valid = True
         except RuntimeError:
             marker_valid = False
-    snapshots = len(list(paths.snapshots_dir.iterdir())) if paths.snapshots_dir.is_dir() else 0
+    snapshots = (
+        len(list(paths.snapshots_dir.iterdir())) if paths.snapshots_dir.is_dir() else 0
+    )
     profile = None
     if prepared and marker_valid:
         profile = _validate_marker(paths).get("profile", TEST_PROFILE_CLEAN)
@@ -390,9 +442,15 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path(__file__).resolve().parents[1],
     )
-    parser.add_argument("--daemon", action="store_true", help="start services in the background")
-    parser.add_argument("--with-nginx", action="store_true", help="use the nginx-backed local profile")
-    parser.add_argument("--install", action="store_true", help="sync dependencies before starting")
+    parser.add_argument(
+        "--daemon", action="store_true", help="start services in the background"
+    )
+    parser.add_argument(
+        "--with-nginx", action="store_true", help="use the nginx-backed local profile"
+    )
+    parser.add_argument(
+        "--install", action="store_true", help="sync dependencies before starting"
+    )
     parser.add_argument(
         "--profile",
         choices=(TEST_PROFILE_CLEAN, TEST_PROFILE_EVIDENCE),
@@ -427,7 +485,9 @@ def main() -> None:
     if args.command == "login-douyin":
         _validate_marker(paths, expected_profile=TEST_PROFILE_EVIDENCE)
         environment = test_mode_environment(paths)
-        environment["IP_AGENT_EVIDENCE_BROWSER_PROFILE_DIR"] = str(paths.evidence_browser_profile_dir)
+        environment["IP_AGENT_EVIDENCE_BROWSER_PROFILE_DIR"] = str(
+            paths.evidence_browser_profile_dir
+        )
         command = [
             "uv",
             "run",

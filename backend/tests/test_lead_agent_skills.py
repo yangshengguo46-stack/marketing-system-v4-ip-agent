@@ -356,9 +356,12 @@ def test_custom_agent_operator_allowlist_creates_clean_runtime(monkeypatch):
     app_config.subagents.max_total_per_run = 20
     monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: app_config)
 
-    result = lead_agent_module.make_lead_agent({"configurable": {"agent_name": "ip-agent", "subagent_enabled": True}})
+    runtime_config = {"configurable": {"agent_name": "ip-agent", "subagent_enabled": True}}
+    result = lead_agent_module.make_lead_agent(runtime_config)
 
     assert {tool.name for tool in result["tools"]} == allowed
+    assert set(runtime_config["metadata"]["assembled_tool_names"]) == allowed
+    assert runtime_config["metadata"]["indexed_skill_names"] == []
     assert captured_middlewares["available_tool_names"] == allowed
     assert captured_middlewares["available_skills"] == set()
     assert captured_middlewares["memory_enabled"] is False

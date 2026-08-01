@@ -60,6 +60,26 @@ def _make_llm_response(content="Hello", usage=None, tool_calls=None, additional_
 
 class TestLlmCallbacks:
     @pytest.mark.anyio
+    async def test_model_tool_visibility_events_have_stable_call_indices(self, journal_setup):
+        journal, store = journal_setup
+
+        for bound in (["collect"], ["collect", "inspect"]):
+            journal.record_model_tool_visibility(
+                bound_tool_names=list(bound),
+                deferred_tool_names=["collect", "inspect"],
+                promoted_tool_names=list(bound),
+                hidden_tool_names=[name for name in ("collect", "inspect") if name not in bound],
+                catalog_hash="catalog",
+                hook="test",
+            )
+        await journal.flush()
+
+        events = await store.list_events("t1", "r1")
+        visibility = [event for event in events if event["event_type"] == "llm.tools.bound"]
+        assert [event["content"]["call_index"] for event in visibility] == [1, 2]
+        assert visibility[1]["content"]["bound_tool_names"] == ["collect", "inspect"]
+
+    @pytest.mark.anyio
     async def test_on_chat_model_start_persists_original_user_input_without_mutating_model_message(self, journal_setup):
         j, store = journal_setup
         wrapped_content = "--- BEGIN USER INPUT ---\nShow revenue\n--- END USER INPUT ---"

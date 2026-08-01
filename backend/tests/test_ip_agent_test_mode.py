@@ -194,9 +194,18 @@ def test_evidence_profile_adds_only_the_two_mcp_tools_to_the_clean_agent(tmp_pat
     assert server["tools"]["collect_douyin_benchmark_account"]["routing"] == {
         "mode": "prefer",
         "priority": 100,
-        "keywords": ["抖音主页", "抖音账号", "对标账号", "profile URL", "benchmark account"],
+        "keywords": [
+            "抖音主页",
+            "抖音账号",
+            "对标账号",
+            "v.douyin.com",
+            "douyin.com/user/",
+            "profile URL",
+            "benchmark account",
+        ],
     }
     assert server["tools"]["inspect_reference_videos"]["routing"]["mode"] == "prefer"
+    assert "对标账号" in server["tools"]["inspect_reference_videos"]["routing"]["keywords"]
     marker = json.loads(paths.marker.read_text(encoding="utf-8"))
     assert marker["profile"] == test_mode.TEST_PROFILE_EVIDENCE
 

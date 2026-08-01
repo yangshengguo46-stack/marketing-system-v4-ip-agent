@@ -48,13 +48,47 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
     def _hidden(self, state) -> set[str]:
         return set(self._deferred) - self._promoted(state)
 
-    def _filter_tools(self, request: ModelRequest) -> ModelRequest:
+    def _record_visibility(
+        self,
+        request: ModelRequest,
+        *,
+        active_tools: list,
+        promoted_names: set[str],
+        hidden_names: set[str],
+        hook: str,
+    ) -> None:
+        runtime = getattr(request, "runtime", None)
+        context = getattr(runtime, "context", None)
+        journal = context.get("__run_journal") if isinstance(context, dict) else None
+        if journal is None:
+            return
+        try:
+            journal.record_model_tool_visibility(
+                bound_tool_names=sorted(name for tool in active_tools if isinstance((name := getattr(tool, "name", None)), str) and name),
+                deferred_tool_names=sorted(self._deferred),
+                promoted_tool_names=sorted(promoted_names),
+                hidden_tool_names=sorted(hidden_names),
+                catalog_hash=self._catalog_hash,
+                hook=hook,
+            )
+        except Exception:
+            logger.debug("Failed to record model-bound deferred tool visibility", exc_info=True)
+
+    def _filter_tools(self, request: ModelRequest, *, hook: str = "direct") -> ModelRequest:
         if not self._deferred:
             return request
-        hide = self._hidden(request.state)
+        promoted = self._promoted(request.state)
+        hide = set(self._deferred) - promoted
+        active = [t for t in request.tools if getattr(t, "name", None) not in hide]
+        self._record_visibility(
+            request,
+            active_tools=active,
+            promoted_names=promoted,
+            hidden_names=hide,
+            hook=hook,
+        )
         if not hide:
             return request
-        active = [t for t in request.tools if getattr(t, "name", None) not in hide]
         if len(active) < len(request.tools):
             logger.debug("Filtered %d deferred tool schema(s) from model binding", len(request.tools) - len(active))
         return request.override(tools=active)
@@ -79,7 +113,7 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        return handler(self._filter_tools(request))
+        return handler(self._filter_tools(request, hook="wrap_model_call"))
 
     @override
     def wrap_tool_call(
@@ -98,7 +132,7 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        return await handler(self._filter_tools(request))
+        return await handler(self._filter_tools(request, hook="awrap_model_call"))
 
     @override
     async def awrap_tool_call(

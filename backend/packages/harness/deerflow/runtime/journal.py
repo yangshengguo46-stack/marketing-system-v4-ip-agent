@@ -116,6 +116,7 @@ class RunJournal(BaseCallbackHandler):
 
         # LLM request/response tracking
         self._llm_call_index = 0
+        self._model_request_index = 0
         self._seen_llm_starts: set[str] = set()  # langchain run_ids that fired on_chat_model_start
         self._current_run_tool_call_names: dict[str, str] = {}
         self._persisted_tool_message_identities: set[str] = set()
@@ -629,6 +630,33 @@ class RunJournal(BaseCallbackHandler):
             event_type=f"middleware:{tag}",
             category="middleware",
             content={"name": name, "hook": hook, "action": action, "changes": changes},
+        )
+
+    def record_model_tool_visibility(
+        self,
+        *,
+        bound_tool_names: list[str],
+        deferred_tool_names: list[str],
+        promoted_tool_names: list[str],
+        hidden_tool_names: list[str],
+        catalog_hash: str | None,
+        hook: str,
+    ) -> None:
+        """Record the exact post-routing tool schemas bound to one model call."""
+
+        self._model_request_index += 1
+        self._put(
+            event_type="llm.tools.bound",
+            category="trace",
+            content={
+                "call_index": self._model_request_index,
+                "hook": hook,
+                "bound_tool_names": bound_tool_names,
+                "deferred_tool_names": deferred_tool_names,
+                "promoted_tool_names": promoted_tool_names,
+                "hidden_tool_names": hidden_tool_names,
+                "catalog_hash": catalog_hash,
+            },
         )
 
     def record_memory_context(self, *, content_sha256: str) -> None:

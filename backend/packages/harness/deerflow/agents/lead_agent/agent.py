@@ -635,11 +635,7 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
                 app_config=resolved_app_config,
                 deferred_names=setup.deferred_names,
                 user_id=resolved_user_id,
-                skill_names=(
-                    skill_setup.skill_names
-                    if resolved_app_config.skills.deferred_discovery
-                    else None
-                ),
+                skill_names=(skill_setup.skill_names if resolved_app_config.skills.deferred_discovery else None),
             ),
             state_schema=ThreadState,
         )
@@ -689,6 +685,15 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
     final_tools = _filter_tools_by_allowlist(final_tools, tool_allowlist)
     available_tool_names = {tool.name for tool in final_tools}
     effective_subagent_enabled = subagent_enabled and "task" in available_tool_names
+    # Persist the post-assembly executable capability surface. Deferred MCP
+    # middleware may still hide individual schemas from a specific model call;
+    # those per-call bindings are journaled separately by the deferred filter.
+    config["metadata"].update(
+        {
+            "assembled_tool_names": sorted(available_tool_names),
+            "indexed_skill_names": sorted(skill_setup.skill_names),
+        }
+    )
     return create_agent(
         model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort, app_config=resolved_app_config, attach_tracing=False),
         tools=final_tools,
@@ -714,11 +719,7 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
             deferred_names=setup.deferred_names,
             mcp_routing_hints_section=mcp_routing_hints_section,
             user_id=resolved_user_id,
-            skill_names=(
-                skill_setup.skill_names
-                if resolved_app_config.skills.deferred_discovery
-                else None
-            ),
+            skill_names=(skill_setup.skill_names if resolved_app_config.skills.deferred_discovery else None),
             available_tool_names=available_tool_names if tool_allowlist is not None else None,
             memory_enabled=memory_enabled,
         ),
