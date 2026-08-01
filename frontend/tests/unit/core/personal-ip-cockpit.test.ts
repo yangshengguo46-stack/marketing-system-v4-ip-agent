@@ -16,11 +16,8 @@ describe("personal IP operating cockpit", () => {
       "publishing",
       "performance",
       "retrospective",
-      "evidence",
     ]);
-    expect(PERSONAL_IP_OPERATING_STAGES[0].label).toBe(
-      "影响力方向与商业验证",
-    );
+    expect(PERSONAL_IP_OPERATING_STAGES[0].label).toBe("影响力方向与商业验证");
   });
 
   it("keeps the full script-to-delivery video pipeline in order", () => {
@@ -40,15 +37,13 @@ describe("personal IP operating cockpit", () => {
   it("counts every explicit queue without treating missing data as zero", () => {
     const cockpit = {
       queues: {
-        subjects_needing_strategy_validation: ["subject-1"],
-        subjects_needing_differentiation_validation: ["subject-1"],
         preflights_awaiting_publish: ["preflight-1"],
         published_receipts_awaiting_metrics: ["receipt-1"],
         published_receipts_awaiting_retrospective: ["receipt-1"],
       },
     } as unknown as PersonalIPOperatingCockpit;
 
-    expect(countCockpitPending(cockpit)).toBe(5);
+    expect(countCockpitPending(cockpit)).toBe(3);
     expect(countCockpitPending(undefined)).toBe(0);
   });
 

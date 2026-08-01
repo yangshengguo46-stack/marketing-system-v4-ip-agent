@@ -230,7 +230,7 @@ status so two thinking rows can never stack.
   the same `timeline_revision_compiled` contract as Agent edits. Never persist
   pointer movement or overwrite earlier candidates/revisions. Only candidate
   selection, real paid calls and real publishing are meaningful confirmations;
-  evidence promotion stays automatic. Candidate version tiles must remain
+  business evidence is never auto-promoted into a rule. Candidate version tiles must remain
   directly previewable before selection. The smooth-motion action only
   pre-fills the native Agent workflow: measure cadence first, create a separate
   motion-compensated candidate only when recommended, then re-run QA and let

@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -157,14 +156,14 @@ def test_video_skill_candidate_enforces_scope_and_renders_server_owned_files() -
     assert "https://example.com" not in candidate["skill_markdown"]
     assert json.loads(candidate["reference_json"])["patterns"][0]["sha256"] == pattern["sha256"]
 
-    with pytest.raises(ValueError, match="promotion"):
-        compile_video_skill_candidate(
-            skill_name="portable-hook",
-            description="Use when applying a portable hook.",
-            scope="portable",
-            account_ids=[],
-            patterns=[pattern],
-        )
+    portable = compile_video_skill_candidate(
+        skill_name="portable-hook",
+        description="Use when applying a portable hook.",
+        scope="portable",
+        account_ids=[],
+        patterns=[pattern],
+    )
+    assert "promotion" not in portable
 
 
 def test_compiled_video_skill_package_passes_deterministic_security_scan(tmp_path) -> None:
@@ -183,52 +182,14 @@ def test_compiled_video_skill_package_passes_deterministic_security_scan(tmp_pat
     assert enforce_static_scan(skill_dir, skill_name=candidate["skill_name"]) == []
 
 
-def test_portable_video_skill_requires_approved_measured_promotion() -> None:
-    pattern = _pattern()
-    candidate = compile_video_skill_candidate(
-        skill_name="portable-video-hook",
-        description="Use when applying the validated hook across compatible accounts.",
-        scope="portable",
-        account_ids=[],
-        patterns=[pattern],
-        promotion={
-            "id": "promotion-1",
-            "status": "approved",
-            "evidence_type": "content_pattern",
-            "claim": "该问题钩子在三个独立发布中稳定提高三秒留存。",
-            "evidence_digest": "c" * 64,
-            "minimum_support": 3,
-        },
-    )
-
-    assert candidate["promotion"]["minimum_support"] == 3
-    assert "c" * 64 in candidate["skill_markdown"]
-    assert "promotion-1" not in candidate["skill_markdown"]
-
-
 @pytest.mark.asyncio
-async def test_native_video_pattern_tools_compile_and_resolve_promotion_server_side() -> None:
+async def test_native_video_pattern_tools_are_pure_compilers() -> None:
     pattern = _pattern()
-    promotion_repository = SimpleNamespace(
-        get=AsyncMock(
-            return_value={
-                "id": "promotion-1",
-                "owner_user_id": "user-1",
-                "status": "approved",
-                "evidence_type": "content_pattern",
-                "claim": "三个独立发布支持该模板。",
-                "evidence_digest": "d" * 64,
-                "minimum_support": 3,
-                "retrospective_ids": ["r1", "r2", "r3"],
-            }
-        )
-    )
     configure_personal_ip_runtime(
         PersonalIPRuntimeServices(
             connections=SimpleNamespace(),
             metrics=SimpleNamespace(),
             publish_receipts=SimpleNamespace(),
-            evidence_promotions=promotion_repository,
         )
     )
     runtime = SimpleNamespace(context={"user_id": "user-1"})
@@ -254,11 +215,10 @@ async def test_native_video_pattern_tools_compile_and_resolve_promotion_server_s
             scope="portable",
             account_ids=[],
             patterns=[pattern],
-            promotion_id="promotion-1",
         )
     )
     assert compiled_skill["operation_status"] == "ok"
-    promotion_repository.get.assert_awaited_once_with("promotion-1", owner_user_id="user-1")
+    assert "promotion" not in compiled_skill["compiled_skill_candidate"]
 
 
 def test_video_pattern_tools_are_registered_with_deerflow() -> None:

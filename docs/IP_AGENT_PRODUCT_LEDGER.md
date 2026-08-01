@@ -9,10 +9,17 @@ until its real execution path, evidence and user interaction are usable.
 Concrete findings, gates and execution order from the 2026-07-29 audit live in
 [IP_AGENT_AUDIT_REMEDIATION_LEDGER.md](IP_AGENT_AUDIT_REMEDIATION_LEDGER.md).
 
-Last audited: 2026-07-30. The baseline audit began at commit `fd78208`; this
+Last audited: 2026-08-01. The baseline audit began at commit `fd78208`; this
 audit includes the first five parallel work lines through `0578242`, UI-TARS,
 MineContext and the ledger-derived video workbench through `b7df0e9`, plus the
 current acceptance-fix and ledger change set.
+
+The 2026-08-01 semantic-gate cleanup removed automatic business judgment from
+the tool layer: strategy v5 and differentiation v2 are shape-only immutable
+notes; account diagnosis is an evidence reader; preflight accepts missing
+notes/history; new evidence promotion and its Agent/UI surfaces are gone.
+Owner/auth, credentials, rights, paid-call, publishing, deletion, hash and
+immutable-receipt boundaries remain product safety requirements.
 
 ## Current completion
 
@@ -27,10 +34,10 @@ Personal-IP incubation conversation.
 | ---------------------------------------------- | -----: | -------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | DeerFlow and Volcengine foundation             |    10% |      97% | Native DeerFlow runtime; Doubao/Seedream/Seedance routing; vendored MediaKit, UI-TARS and MineContext source; project-local FFmpeg; source archive and clean-room acceptance; minimal paid Seedream/Seedance/Speech route accepted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Real UI-TARS/MineContext OS-permission acceptance, Doubao reasoning/vision acceptance and full customer-machine launch                                                                                                                                                                                                                                                  |
 | Portfolio, accounts and browser login          |    10% |      90% | Eight fixed platform entries; owner/account-isolated Chromium profiles; real Douyin login persisted across restart; automatic dialog close; five-state connection summary and recovery UI                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Full real-account eight-platform acceptance matrix                                                                                                                                                                                                                                                                                                                      |
-| Entity/business modelling and preflight        |    20% |      64% | Immutable strategy v4 versions preserve person/brand/product/organization evidence, an explicit influence/behavioral/economic objective system, real benchmark research, two-to-three positioning alternatives, a bound differentiation thesis, naming/avatar/bio launch package, pilot experiments and validation evidence; HLLM source pin, MineContext evidence and server-owned preflight remain intact                                                                                                                                                                                                                                                                                                                                                                              | Run real natural incubation paths for a person, brand and product with live benchmark pages, candidate choice, launch assets, pilot publication and observed influence/behavioral/economic evidence; then prove the blind-prediction, publish and retrospective calibration loop                                                                                                                                                  |
+| Entity/business modelling and preflight        |    20% |      64% | Immutable strategy v5 and differentiation v2 working notes preserve person/brand/product/organization context without stage or completeness gates; HLLM source pin, MineContext evidence and owner-scoped preflight remain intact, while preflight can start without a strategy note or metric history                                                                                                                                                                                                                                                                                                                                                                              | Run real natural incubation paths for a person, brand and product with live benchmark pages, direct working recommendations, launch assets and pilot publication; then prove the blind-prediction, publish and retrospective learning loop                                                                                                                                                  |
 | Publishing and receipts                        |    15% |      72% | Immutable publish request; append-only attempts; atomic browser prepare/finish tools; strict eight-platform public-post proof; one-step UI-TARS desktop fallback with approval and sanitized receipts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Real UI-TARS desktop acceptance plus per-platform publish/recovery acceptance                                                                                                                                                                                                                                                                                           |
-| Metrics, retrospectives and evidence promotion |    20% |      70% | Normalized observations; exact snapshot deltas; portfolio aggregate; owner-wide customer workbench with seven-day growth, platform contribution, recent-work ranking and conservative paid-traffic candidates; immutable retrospective and automatic evidence promotion                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Extend verified real collection across the other seven platforms and prove that repeated outcomes promote a reusable topic/script/audience rule without overfitting one post                                                                                                                                                                                             |
-| Video production                               |    15% |      82% | One ledger and workbench; two typed modes; server-validated plan/assets/storyboard/material-inspection/selection/narration/timing/continuity/shot-QA/assembly contracts; recoverable local script-to-delivery acceptance; project-pinned local material-frame and generated-shot QA executors with motion-cadence evidence; non-overwriting motion-compensated 48/60fps candidate tool; deterministic Remotion candidate tool; checked HyperFrames preview path; one real paid Seedream-to-Seedance-to-Speech-to-local-MediaKit/FFmpeg generative production; visible one-shot human trim/save/lock followed by embedded-Agent local re-render, exact QA and immutable delivery receipts; evidence-bound video-pattern and Skill candidate compiler with account/portable scope policy; one real user-owned film measured and installed through `skill_manage` as an enabled experimental per-user Skill | Connect owned/open material search/acquisition; obtain explicit HyperFrames preview approval and render; accept a full multi-shot generative production and one real material-video production; use the installed learned Skill in a new production, publish and retrospect before any promotion claim; exercise cloud MediaKit only if that optional route is retained |
+| Metrics, retrospectives and learning evidence  |    20% |      70% | Normalized observations; exact snapshot deltas; portfolio aggregate; owner-wide customer workbench with seven-day growth, platform contribution, recent-work ranking and conservative paid-traffic candidates; immutable retrospectives; historical promotion records remain read-only and no longer gate work                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Extend verified real collection across the other seven platforms and prove that repeated outcomes improve a revisable topic/script/audience hypothesis without overfitting one post                                                                                                                                                                                             |
+| Video production                               |    15% |      82% | One ledger and workbench; two typed modes; server-validated plan/assets/storyboard/material-inspection/selection/narration/TTS timing/continuity/shot-QA/assembly contracts; recoverable local script-to-delivery acceptance; project-pinned local material-frame and generated-shot QA executors with motion-cadence evidence; non-overwriting motion-compensated 48/60fps candidate tool; deterministic Remotion candidate tool; checked HyperFrames preview path; one real paid Seedream-to-Seedance-to-Speech-to-local-MediaKit/FFmpeg generative production; visible one-shot human trim/save/lock followed by embedded-Agent local re-render, exact QA and immutable delivery receipts; video-pattern and Skill candidate compiler with optional legacy provenance; one real user-owned film measured and installed through `skill_manage` as an enabled experimental per-user Skill | Connect owned/open material search/acquisition; obtain explicit HyperFrames preview approval and render; accept a full multi-shot generative production and one real material-video production; use the installed learned Skill in a new production, publish and retrospect before making a broader method claim; exercise cloud MediaKit only if that optional route is retained |
 | Product UI, packaging and acceptance           |    10% |      92% | Eight-platform onboarding; dedicated Settings/MineContext privacy and lifecycle surface; dedicated video workbench; strategy internals and Skill names remain hidden; deterministic source archive containing pinned local-organ source; clean-room install, migrations, doctor and production build                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Full-stack launch on a clean customer machine/VM, real-account/OS-permission acceptance and a natural-conversation incubation acceptance without questionnaires or premature completion claims                                                                                                                                                                             |
 
 Weighted score: `9.7 + 9 + 12.8 + 10.8 + 14 + 12.3 + 9.2 = 77.8`, displayed as 78%.
@@ -39,21 +46,19 @@ Weighted score: `9.7 + 9 + 12.8 + 10.8 + 14 + 12.3 + 9.2 = 77.8`, displayed as 7
 
 The product-owned business loop is:
 
-`entity evidence -> influence/behavioral/economic objective system -> proprietary truth and differentiation thesis -> real contrast benchmarks -> positioning alternatives -> launch package -> pilot -> observed asset and commercial outcomes -> validated operating strategy -> blind prediction/preflight -> publish receipt -> retrospective -> evidence promotion -> reusable content rule`
+`user intent + available subject/account/benchmark evidence -> direct IP-form and expression judgment -> optional versioned working notes -> script/pilot -> blind prediction/preflight -> publish receipt -> observed outcome -> retrospective -> revisable hypothesis`
 
-Before a strategy is validated, customer-facing language may say current
-judgment, candidate direction or pilot plan. It must never say modeling or
-positioning is complete. A large follower target is not an
-operating plan. Influence is the common IP asset mechanism, not a mode that
-competes with monetization. Planning states influence, behavioral and economic
-goals separately, with time horizons, priority order, guardrails and explicit
-non-goals. Buyer, paid problem, credible outcome, offer and conversion path
-remain mandatory commercial truth rather than the definition of IP itself.
+Customer-facing language gives a current judgment, direction and next action,
+while distinguishing observed facts from assumptions. It must not wait for a
+server-generated modelling, positioning or validation certificate. Influence
+is the common IP asset mechanism, not a mode that competes with monetization.
+Business outcomes are useful reasoning dimensions, not mandatory fields that
+block story, script, benchmark analysis or preflight.
 
-The subject-level strategy is the only source of person, business, positioning,
-naming, biography, content direction and monetization truth. Platform accounts
+Subject-level strategy and differentiation records are versioned working notes,
+not certified business truth. Platform accounts
 contain only execution identity and login metadata. Content learning uses
-blind prediction, observed outcomes, retrospective and versioned rules rather
+blind prediction, observed outcomes, retrospective and revisable hypotheses rather
 than a second personality model.
 
 Video production is the second product workflow. Agent runtime, browser,
@@ -66,8 +71,8 @@ but raw external video is evidence rather than instruction. The product-owned
 compiler separates narrative, visual, camera, editing, caption, voice, audio and
 platform grammar, requires timestamp-capable analysis receipts and preserves
 source-use rights. A single example remains experimental; account templates
-remain account-scoped; cross-account templates require the existing automatic
-cross-publication evidence-promotion receipt. Installation stays inside
+remain account-scoped; broader reuse is a deliberate method judgment rather
+than an automatic cross-publication promotion receipt. Installation stays inside
 DeerFlow `skill_manage` so security scanning, owner isolation, history and
 rollback are not duplicated.
 
@@ -119,18 +124,17 @@ coverage evidence.
 
 ### P1 — execute and show the loop
 
-- [x] Add immutable strategy snapshots with monotonic stage gates:
-      entity evidence -> business model -> three-role benchmark coverage ->
-      two-to-three positioning alternatives -> naming/avatar/bio launch package
-      -> pilot -> commercial signal -> validation.
+- [x] Keep immutable strategy snapshots as bounded working notes. Remove
+      monotonic stage transitions, field-completeness certificates and every
+      downstream readiness gate; descriptive stages remain compatibility data.
 - [x] Make people, brands, products and organizations first-class operated
-      subjects; add immutable `ip-differentiation-thesis-v1` versions and
+      subjects; add immutable `ip-differentiation-thesis-v2` working-note versions and
       recognition/trust/intent/adoption/conversion/economic/extension
       observations. Positioning, preflight, account diagnosis, cinematic
       handoff and the owner-wide cockpit consume the same version.
-- [ ] Accept one real differentiation lineage from candidate through pilot,
-      three complete supportive cross-effect observations and a downstream
-      adoption or economic result before calling it validated.
+- [ ] Accept one real differentiation conversation that produces a useful
+      direction, contrasting alternatives, a first expression and a clearly
+      labelled set of assumptions without waiting for a status promotion.
 - [x] Split first-use orientation from returning-owner recovery. A lightweight
       server-validated subject/account existence check routes a true new owner
       directly from the current request without scanning empty operating
@@ -143,18 +147,15 @@ coverage evidence.
       work bypasses incubation, and a real Next.js + Gateway + SQLite replay
       proved three different stories produce three different grounded
       follow-ups without a suggestion side channel.
-- [x] Upgrade launch pilots and audience preflights to evidence-graded,
-      falsifiable behavior hypotheses with predicted/failure signals,
-      distribution assumptions and uncertainty. Reject viral guarantees and
-      unsupported neural shorthand in formal predictions.
-- [x] Add an owner-scoped, content-first connected-account diagnostic. It
-      compiles direct continue/adjust/new-account decisions from seven content
-      layers, the reach/trust/intent/conversion funnel and current platform
-      evidence; low reach alone cannot trigger a new account and content or
-      commercial observations older than 30 days cannot prove the current
-      operating condition. Eight internal platform Skills retain dated
-      first-party evidence and explicitly mark unpublished ranking weights
-      unknown.
+- [x] Preserve immutable audience preflights for blind comparison while allowing
+      a first pilot without strategy notes or metric history; evidence fields
+      inform judgment and no longer act as creative admission gates.
+- [x] Add an owner-scoped, content-first connected-account evidence reader.
+      It returns strategy/direction notes, publications, metrics, platform
+      observations and retrospectives without compiling a verdict, requiring a
+      fixed post count or applying a freshness gate. Eight internal platform
+      Skills use those observations for direct Agent judgment and explicitly
+      mark unpublished ranking weights unknown.
 - [x] Replace the false monetization-first/influence-first product decision
       with strategy v4's independent influence, behavioral and economic goals,
       time horizons, priority order, guardrails and explicit non-goals. Keep
@@ -167,12 +168,12 @@ coverage evidence.
       real benchmark pages, compare candidate positions, choose name/avatar/bio,
       publish a pilot and observe a commercial signal before claiming strategy
       validation.
-- [x] Make native preflight read the launch-ready strategy and aggregate
-      published history; callers can no longer inject a temporary
-      creator/audience profile that bypasses operating truth.
+- [x] Make native preflight optionally read the latest owner-scoped strategy
+      note and published history while still accepting a first pilot with
+      neither; callers cannot inject an expanded creator/account object.
 - [ ] Complete a real closed-loop acceptance: blind prediction -> publication
-      -> observed outcome -> retrospective -> three-publication evidence
-      promotion -> reusable content rule -> next preflight.
+      -> observed outcome -> retrospective -> explicit hypothesis revision ->
+      next preflight. No publication-count promotion gate is part of acceptance.
 - [x] Add one owner-scoped operating cockpit shared by the Gateway, user
       workspace and native DeerFlow tool. It joins all six business stages,
       exposes explicit queues and never filters conversation scope by account.
@@ -183,7 +184,7 @@ coverage evidence.
 - [x] Show the six-stage operating line and pending counts in the Personal-IP
       workspace.
 - [x] Add detailed read interactions for preflight, publication attempts,
-      observed metrics, retrospectives and automatically promoted evidence.
+      observed metrics, retrospectives and historical promotion records.
 - [x] Split account/context management from the customer operating workbench.
       Keep `工作台` above `新对话`; show only persisted seven-day growth,
       platform contribution, recent works and real queues. Missing observations
@@ -289,8 +290,8 @@ coverage evidence.
       evidence-backed grammar domains. Raw ASR/OCR and prompt-like external text
       cannot become Skill instructions.
 - [x] Add native DeerFlow tools that compile experimental, account and portable
-      video Skill candidates. Portable candidates resolve an approved
-      content/platform evidence promotion server-side; output is handed to the
+      video Skill candidates. Optional legacy promotion provenance may be
+      retained but cannot gate portability; output is handed to the
       existing `skill_manage` scanner, user storage and version history.
 - [x] Exercise the bundled MediaKit CLI against a real project-owned MP4 and
       pass its observed H.264/AAC, resolution, frame-rate and duration receipt
@@ -319,7 +320,7 @@ coverage evidence.
       static scanning; its pattern digest is `e8c2cc1f…72aa1`.
 - [ ] Accept one real benchmark video end to end: parse, inspect receipts,
       use the installed experimental or account Skill in a new production,
-      publish, retrospect and revise or promote the learned rules.
+      publish, retrospect and deliberately revise the learned methods.
 
 ### P1 — local computer and context organs
 
@@ -363,8 +364,9 @@ coverage evidence.
       encoding and falsifiable tests into the native versioned thesis rather
       than creating another filesystem ledger.
 - [x] Add a native content-calibration Skill over the existing immutable
-      preflight, publication receipt, retrospective and evidence-promotion
-      stores. Do not create a second filesystem truth.
+      preflight, publication receipt and retrospective stores. Historical
+      promotion rows are read-only compatibility data; do not create a second
+      filesystem truth.
 - [x] Pin and vendor 18 MIT production Skills for reference analysis,
       cinematic direction, visual style, continuity, production design,
       lighting, performance, sound, captions, color and commercial formats.
@@ -372,7 +374,7 @@ coverage evidence.
       including the 358-film / 393-creator / 304-mechanism research index and
       eight-track 96-module curriculum. Replace its standalone filesystem IP
       operating system with the product's subject strategy, preflight,
-      publication, metric, retrospective and evidence-promotion services.
+      publication, metric and retrospective services.
 - [x] Vendor SkillHone evaluation and optimization packages into an isolated
       evaluation-only lab. They are not enabled for customer conversations and
       cannot rewrite a live Skill.
@@ -381,7 +383,7 @@ coverage evidence.
       immutable preflight, publication, observed metrics and retrospective.
 - [ ] Build the first private probe/test set from retained strategy, content and
       video cases; run one candidate Skill through baseline, probe, held-out
-      regression, reviewed promotion and rollback acceptance.
+      regression, deliberate adoption and rollback acceptance.
 
 ## Counting rules
 

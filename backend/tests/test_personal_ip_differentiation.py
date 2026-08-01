@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from copy import deepcopy
-
 import pytest
 
 from deerflow.personal_ip.differentiation import (
@@ -111,8 +109,8 @@ DIFFERENTIATION_THESIS = {
 }
 
 
-def test_complete_pilot_thesis_is_valid_and_versioned() -> None:
-    assert PERSONAL_IP_DIFFERENTIATION_METHOD_VERSION == "ip-differentiation-thesis-v1"
+def test_direction_note_is_shape_validated_and_versioned() -> None:
+    assert PERSONAL_IP_DIFFERENTIATION_METHOD_VERSION == "ip-differentiation-thesis-v2"
     assert DIFFERENTIATION_STATUSES == (
         "candidate",
         "pilot",
@@ -127,43 +125,41 @@ def test_complete_pilot_thesis_is_valid_and_versioned() -> None:
     )
 
 
-def test_candidate_requires_a_choice_reason_belief_and_sacrifice() -> None:
-    for field in ("reason_to_choose", "reason_to_believe", "sacrifice"):
-        thesis = deepcopy(DIFFERENTIATION_THESIS)
-        thesis["strategic_difference"][field] = [] if field != "reason_to_choose" else ""
-        with pytest.raises(ValueError, match=field):
-            validate_differentiation_snapshot(
-                status="candidate",
-                evidence_refs=EVIDENCE_REFS,
-                **thesis,
-            )
+def test_empty_or_partial_direction_note_is_allowed() -> None:
+    validate_differentiation_snapshot(
+        status="validated",
+        primary_entity={},
+        supporting_entities=[],
+        decision_context={},
+        contrast_field={},
+        proprietary_truth={},
+        strategic_difference={"working_hypothesis": "先写下来再继续推演"},
+        dramatic_engine={},
+        distinctive_encoding={},
+        operating_fit={},
+        validation={},
+        evidence_refs=[],
+    )
 
 
-def test_pilot_rejects_viral_guarantees_and_neuroscience_shortcuts() -> None:
-    for claim, expected in (
-        ("这个表达一定会火", "cannot guarantee"),
-        ("这个画面触发多巴胺，所以用户不会划走", "observable"),
-    ):
-        thesis = deepcopy(DIFFERENTIATION_THESIS)
-        thesis["validation"]["hypotheses"] = [claim]
-        with pytest.raises(ValueError, match=expected):
-            validate_differentiation_snapshot(
-                status="pilot",
-                evidence_refs=EVIDENCE_REFS,
-                **thesis,
-            )
+def test_status_is_metadata_not_a_promotion_sequence() -> None:
+    assert validate_differentiation_transition(None, "validated") == "validated"
+    assert validate_differentiation_transition("retired", "candidate") == "candidate"
 
 
-def test_transition_is_deliberate_and_retirement_requires_reason() -> None:
-    assert validate_differentiation_transition(None, "candidate") == "candidate"
-    assert validate_differentiation_transition("candidate", "pilot") == "pilot"
-    with pytest.raises(ValueError, match="next differentiation status"):
-        validate_differentiation_transition("candidate", "validated")
-
-    thesis = deepcopy(DIFFERENTIATION_THESIS)
-    with pytest.raises(ValueError, match="retirement_reason"):
+def test_direction_note_still_rejects_non_json_shape() -> None:
+    with pytest.raises(ValueError, match="strategic_difference must be an object"):
         validate_differentiation_snapshot(
-            status="retired",
-            evidence_refs=EVIDENCE_REFS,
-            **thesis,
+            status="candidate",
+            primary_entity={},
+            supporting_entities=[],
+            decision_context={},
+            contrast_field={},
+            proprietary_truth={},
+            strategic_difference=[],
+            dramatic_engine={},
+            distinctive_encoding={},
+            operating_fit={},
+            validation={},
+            evidence_refs=[],
         )

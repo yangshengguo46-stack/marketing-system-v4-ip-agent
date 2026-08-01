@@ -9,7 +9,7 @@ description: 通过 Personal-IP 原生服务执行不可变发布前盲预测、
 
 ```text
 证据 → 生命周期欲望 → 单集欲望—行为映射 → 有范围的判断 → 不可变盲预测 → 发布回执
-→ 带覆盖的结果 → 复盘 → 达到门槛的方法升级
+→ 带覆盖的结果 → 复盘 → 可修订的方法假设
 ```
 
 完整数据契约见 `references/project-data-contract.md`。
@@ -20,7 +20,7 @@ description: 通过 Personal-IP 原生服务执行不可变发布前盲预测、
 
 - 先读 `personal_ip_operating_cockpit` 和对应主体的
   `personal_ip_read_strategy_context`；
-- 选定已达 launch-ready 的主体策略，账号只作为本次发布的操作目标；
+- 有主体策略笔记时读取并使用；没有时直接从本轮任务继续，账号只作为本次发布的操作目标；
 - 准备目标、完整 `desire_behavior`、情绪承诺、事件/人物/信息/情绪/世界变化、
   暗线增量、开头与兑现；
 - 准备指标名、基线、方向、最小变化、置信度和失败信号；
@@ -37,7 +37,7 @@ preflight 是不可变快照。要改变方案就创建新 variant，不修改�
 互动或分享的因果证据。平台分配、受众匹配、竞争、时间和随机反馈必须保留为结果
 不确定性的组成部分。
 
-`desire_behavior` 必须包含主体、底层驱力证据、意识欲望、当集目标、触发、反作用、得失、策略、可见行动、有代价选择、状态变化、观众欲望，并通过五项静音行为测试。缺失时preflight拒绝创建。
+`desire_behavior` 是分析剧情行动的电影方法，不是 preflight 准入证书。需要剧情时尽量写清主体、欲望、目标、阻力、可见行动、代价和状态变化；不适用或信息不足时说明假设并继续。
 
 ## 发布与指标
 
@@ -69,9 +69,8 @@ preflight 是不可变快照。要改变方案就创建新 variant，不修改�
 
 ## 方法升级
 
-至少3条来自不同发布回执的完整复盘支持同一条可反驳规则后，调用
-`personal_ip_promote_evidence`。服务端政策自动判断是否晋升，并写入不可变决定
-回执；内部学习不再要求用户批准。
+比较任意相关的复盘与观察，由智能体提出可反驳、可修订的方法假设。服务端只保存
+原始预测、发布与结果，不自动晋升或认证经营规律。
 
 规则写成 `if—then—because—exceptions—validation_check`。跨平台、格式或受众的
 可迁移判断还要在未参与归纳的留出内容上继续验证；通过局部门槛不等于已经证明普适。
@@ -80,8 +79,8 @@ preflight 是不可变快照。要改变方案就创建新 variant，不修改�
 
 ## 状态与读取
 
-- 用 `personal_ip_read_preflight`、`personal_ip_read_publish_receipt`、
-  `personal_ip_read_retrospective` 和 `personal_ip_read_evidence_promotion` 读取精确
+- 用 `personal_ip_read_preflight`、`personal_ip_read_publish_receipt` 和
+  `personal_ip_read_retrospective` 读取精确
   对象；
 - 用 `personal_ip_operating_cockpit` 查看主体和全账号组合的待办；
 - 不生成外置兼容包，不创建本地 JSONL 台账，不从聊天历史重建状态；

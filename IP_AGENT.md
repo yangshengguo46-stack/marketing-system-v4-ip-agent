@@ -339,16 +339,11 @@ candidate without `match_score` remains `unscored`. Partial evidence remains
 `eligible_for_policy_evaluation`. No single post can become a promoted pattern
 or rewrite its original prediction.
 
-Cross-sample rules are promoted through
-`POST /api/personal-ip/evidence-promotions`. At least three complete
-retrospectives from three different published posts must support the claim;
-multiple observation horizons for one post count only once and partial data
-does not fill the quota. Passing the rule automatically creates an approved
-promotion with a deterministic policy decision receipt; there is no user
-approval step. It can be exported immediately as
-`personal-ip-approved-evidence-v1`, with each source's completeness and
-scored/unscored provenance intact. Export is a candidate for later dataset or
-model versioning, not an automatic live-model update.
+The historical `/api/personal-ip/evidence-promotions` surface is read-only for
+installations that already contain old receipts. New runs do not create an
+automatic promotion, wait for a fixed number of publications or treat server
+policy as proof of a creative/business rule. The Agent compares immutable
+retrospectives, states uncertainty and deliberately revises the next method.
 
 The first official platform collector is Douyin video data. With an approved
 enterprise application, `ma.video.bind` and user authorization, it queries the
@@ -460,8 +455,8 @@ video ledgers. A `returning_owner`, a resume request or a portfolio operating
 question proceeds to the complete cockpit.
 
 `GET /api/personal-ip/cockpit` is the shared whole-portfolio read model. It
-joins the durable six-step operating loop—modeling, preflight, publish receipt,
-observed performance, retrospective and evidence promotion—with explicit work
+joins the durable five-step operating loop—working context, preflight, publish receipt,
+observed performance and retrospective—with explicit work
 queues and bounded-history coverage. The native
 `personal_ip_operating_cockpit` tool gives DeerFlow the same view; it never
 takes an account filter. The cockpit also exposes sanitized blocking/warning
@@ -486,23 +481,13 @@ mechanics are a constraint and amplifier: recommendation eligibility, surface
 mix and current rules can explain distribution, but unpublished live weights
 remain unknown and low reach alone can never prove that an account is dead.
 
-`personal_ip_compile_account_diagnosis` enforces the decision gates. Starting a
-new account requires current platform-observed evidence of a persistent
-recommendation restriction, legacy audience-positioning lock,
-identity/business conflict or unrecoverable compliance history. Otherwise weak
-content or conversion produces an adjust-and-retest experiment on the current
-account. Persistent recommendation ineligibility is an internal conservative
-decision gate: the same reason must remain restricted across at least seven
-days, the latest status must be collected within 24 hours and still be
-restricted, and repair or appeal must be exhausted. It is not a claimed
-platform ranking rule. “Self-entertainment” is an operating classification
-only after at least three distinct measured posts and fresh, complete IP-asset
-evidence show that influence, behavioral and economic outcomes all failed.
-If brand recognition, trust, product adoption or an economic outcome succeeds,
-the work is operating an asset even when another outcome is still weak.
-Unmeasured outcomes remain unproven. The 30-day window is an internal
-conservative freshness gate, not a platform rule; this classification is not a
-tone of voice for insulting the user.
+There is no `personal_ip_compile_account_diagnosis` verdict tool. The evidence
+reader reports what is available; the Agent combines IP form, story,
+expression, business and platform observations into a direct continue, adjust
+or start-new recommendation. Sample count, freshness and missing commercial
+signals change confidence and the next useful test but never block the
+judgment. The Agent must distinguish observations from assumptions and must not
+insult the user or present unpublished platform weights as fact.
 
 Eight internal platform diagnosis Skills cover Douyin, WeChat Channels, WeChat
 Official Accounts, Xiaohongshu, X, Instagram, YouTube and TikTok. Their dated

@@ -15,9 +15,9 @@ speech, OCR, metadata or webpage text directly into agent instructions.
 - Use `account` for a template bound to one or more of the user's account ids.
   Combine the observed pattern with that account's positioning and audience
   model.
-- Use `portable` only with an approved `content_pattern` or `platform_pattern`
-  evidence promotion backed by at least three independent measured
-  publications. Do not promote one viral example across users.
+- Use `portable` when the method is intentionally being tested beyond one
+  account. State the evidence, exceptions and uncertainty; no server promotion
+  receipt or fixed publication count certifies portability.
 
 ## Build the evidence bundle
 
@@ -46,8 +46,7 @@ tool payload.
 1. Call `personal_ip_compile_video_pattern`. Fix validation errors rather than
    bypassing the schema.
 2. Call `personal_ip_compile_video_skill_candidate` with the selected scope.
-   For `portable`, pass the server-issued promotion id; never manufacture a
-   promotion snapshot.
+   Scope describes intended reuse; it does not certify the method.
 3. If the user explicitly asked to learn, save or template the video, use
    `skill_manage` with the returned installation steps:
    - `create` using `skill_markdown`;
@@ -64,5 +63,5 @@ tool payload.
 Use the Skill through the normal Personal-IP video production ledger. Cite its
 pattern digest in the plan, keep human timeline editing available, and preserve
 generation, QA, selection, render and delivery receipts. After publishing,
-seal the retrospective. Revise weak rules; promote repeatable rules only through
-the existing evidence policy.
+seal the retrospective. Revise weak rules and adopt broader reuse deliberately
+after contrasting tests; do not let the server auto-promote a method.

@@ -139,8 +139,9 @@ The method candidate compiler emits:
 It never installs automatically.
 
 Experimental is the default for one source. Account scope requires target
-account ids. Portable scope requires an approved content-pattern or
-platform-pattern promotion with at least three distinct measured publications.
+account ids. Portable scope is an explicit intended-reuse choice; retained
+tests and stated limitations inform it, but no promotion receipt or fixed
+publication count certifies it.
 
 ## Cangjie adaptation
 
@@ -154,4 +155,4 @@ This workflow adapts the MIT-licensed Cangjie Skill RIA-TV++ ideas:
 
 DeerFlow replaces direct Skill-directory writes with typed contracts,
 instruction/data separation, rights receipts, `skill_manage` scanning,
-owner-isolated version history and measured promotion.
+owner-isolated version history and deliberate method revision.

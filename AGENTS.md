@@ -232,15 +232,12 @@ IP Agent distribution note:
   remains `insufficient_evidence`; complete evidence becomes
   `eligible_for_policy_evaluation`. Never invent a score when HLLM-Lite
   returned none.
-- Personal-IP evidence promotion lives in
-  `deerflow.persistence.personal_ip_evidence_promotions` and migration
-  `0012_personal_ip_evidence_promotions`. A promotion needs at least three
-  complete retrospectives from distinct publish receipts; different horizons
-  of one post count once and partial observations do not satisfy the threshold.
-  Passing that deterministic policy automatically approves the promotion and
-  stores a policy decision receipt. Evidence promotion is internal learning,
-  not a user approval task. Preserve source status/comparison provenance in
-  approved-evidence exports; exporting does not mutate a live model.
+- Migration `0012_personal_ip_evidence_promotions` and its repository are
+  historical compatibility only. New runs must not auto-promote evidence,
+  enforce a publication-count threshold or expose a promotion write tool/API.
+  Existing owner-scoped rows remain readable/exportable so upgrades do not
+  destroy provenance. Retrospectives are observations for agent judgment, not
+  server certificates that unlock creative or strategic work.
 - The first real platform collector is
   `deerflow.personal_ip.platform_metrics.DouyinVideoMetricCollector`. It calls
   only Douyin's fixed official video-query URL and emits post-level cumulative
@@ -458,23 +455,26 @@ IP Agent distribution note:
   needs two independent source contexts, trigger/non-trigger/edge tests and a
   sibling decoy when applicable. The compiler emits one atomic candidate plus
   reference/eval files; installation remains explicit through `skill_manage`,
-  and portable use still requires three distinct measured publications.
+  and portability is an explicit method judgment rather than a fixed
+  publication-count gate.
 - `product/cinematic-ip/matrix.yaml` and the 35 matching first-party packages
   under `skills/public/` form the private cinematic Personal-IP methodology
   layer. Keep the bundled 358-film / 393-creator / 304-mechanism SQLite index
   and eight-track 96-module curriculum source-auditable. Its evidence intake
   must write only through subject-level `personal_ip_strategy_versions` and
-  credential-free evidence references; its calibration path must reuse native
-  preflights, publish receipts, metrics, retrospectives and promotions. Never
+  credential-free evidence references; its calibration path may reuse native
+  preflights, publish receipts, metrics and retrospectives as observations. Never
   restore the source matrix's standalone `ip_os.py`, project JSON/JSONL ledger
   or writable curriculum completion ledger. Keep customer answers free of
   package names, paths, tools and internal routing.
-- Personal-IP operating truth is subject-scoped and versioned in
+- Personal-IP working context is subject-scoped and versioned in
   `personal_ip_strategy_versions`. Platform accounts are execution targets and
   must not regain person, business, positioning, naming, audience or voice
-  fields in API, UI, agent context or readiness gates. Preflight loads the
-  latest launch-ready strategy server-side; a caller-provided parallel
-  creator/audience profile is forbidden. First-use incubation is a natural
+  fields in API or UI. Strategy v5 stores shape-validated working notes; stages
+  are descriptive compatibility metadata, may move directly, and never gate
+  another tool. Preflight may include the latest note server-side when one
+  exists, but must also work without it; a caller-provided expanded
+  creator/audience profile remains forbidden. First-use incubation is a natural
   `ip-agent` conversation, not a customer questionnaire surface. For a
   server-validated empty portfolio and an orientation/incubation request,
   `PersonalIPContextMiddleware` must open with an ordinary entity-appropriate
@@ -482,64 +482,45 @@ IP Agent distribution note:
   exposing or enabling research/execution tools. The ordinary composer remains
   available, and the frontend must suppress generic follow-up suggestions while
   the versioned narrative-interview marker is active. Concrete supplied scripts,
-  assets, links and direct requests bypass or interrupt this delay. Strategy
-  versions must cover
-  entity evidence, commercial design, real benchmarks, two-to-three positioning
-  alternatives, name/avatar/bio launch assets, pilot experiments and observed
-  validation evidence. Influence is the common IP asset mechanism, never a mode
-  competing with monetization. Strategy v4 must store separate influence,
-  behavioral and economic goals, time horizons, priority order, guardrails and
-  deliberate non-goals. The legacy `monetization_first` / `influence_first`
-  field remains storage compatibility only and must not drive decisions. The
+  assets, links and direct requests bypass or interrupt this delay. A strategy
+  note may contain entity understanding, commercial design, benchmarks,
+  positioning alternatives, launch assets or experiments, but none is a
+  completeness certificate. Influence is the common IP asset mechanism, never
+  a mode competing with monetization. The legacy
+  `monetization_first` / `influence_first` field remains storage compatibility
+  only and must not drive decisions. The
   agent surface uses `personal_ip_record_strategy` and
-  `personal_ip_read_strategy_context`. Customer copy may say current
-  judgment/candidate/pilot before observed validation, never “建模完成” or
-  “定位完成”. Launch pilots must carry evidence level, target audience,
-  observable mechanism hypotheses, predicted signals, failure conditions,
-  distribution assumptions, observation window and uncertainty. Formal
-  hypotheses reject viral guarantees and dopamine/mirror-neuron/Zeigarnik
-  causal shorthand; platform allocation, competition, timing and stochastic
-  feedback remain explicit. Internal stages and fields stay private. Repeated content
-  outcomes become revisable versioned rules through blind prediction,
-  retrospective and evidence promotion; one viral post is not permanent truth.
+  `personal_ip_read_strategy_context`. Customer copy gives a direct working
+  judgment and marks material assumptions without claiming certainty.
+  Internal stages and fields stay private. Content outcomes inform revisable
+  hypotheses through preflight and retrospective; no server promotion rule
+  rewrites the active method.
 - Personal-IP subjects support `creator`, `brand`, `product` and
   `organization`. Migration `0020_personal_ip_differentiation` and
   `deerflow.persistence.personal_ip_differentiation` own the immutable
-  `ip-differentiation-thesis-v1` lineage plus recognition/trust/intent/adoption/
+  `ip-differentiation-thesis-v2` working-note lineage plus recognition/trust/intent/adoption/
   conversion/economic/extension observations. A candidate must bind intended
-  influence and real alternatives to proprietary evidence, choice and belief
-  reasons and explicit sacrifice. Pilot status additionally requires the
-  recurring dramatic engine, stable/variable distinctive encoding, operating
-  fit and falsifiable tests. Provisionally adopted requires one complete
-  supportive observation; validated requires three complete supportive
-  observations across two effect classes including a downstream action.
-  Contradictory, mixed and inconclusive results remain evidence but cannot
-  promote status. Strategy positioning onward
-  must reference a pilot or adopted differentiation version. Native tools,
+  influence and real alternatives when those facts are known, but statuses are
+  descriptive labels and may move directly without field-completeness or
+  observation-count gates. Contradictory, mixed and inconclusive results remain
+  available to agent judgment. A strategy may reference a differentiation
+  version, but the reference is optional and never an admission gate. Native tools,
   preflight, account diagnosis and the owner-wide cockpit must consume the
   same owner-scoped repository; never reconstruct this thesis in a script,
   series bible, account record or chat.
-- Connected-account diagnosis is content-first and evidence-bound.
+- Connected-account diagnosis is content-first and agent-judged.
   `deerflow.personal_ip.account_diagnosis` loads the authenticated account's
   current strategy, publications, metrics, creator-backend observations and
-  retrospectives, then compiles one direct
-  `insufficient_evidence`/`continue_current_account`/`adjust_and_retest`/
-  `start_new_account` decision. Platform mechanics are recommendation
+  retrospectives as a credential-free evidence context. There is no server
+  verdict compiler, fixed post minimum, freshness window or business-outcome
+  admission rule. The Agent gives a direct continue/adjust/start-new judgment,
+  identifies assumptions and may propose the smallest useful next test.
+  Platform mechanics are recommendation
   eligibility constraints and distribution amplifiers, never the primary
-  content thesis. Low reach alone must never trigger a new-account decision.
-  Starting over requires platform-observed structural evidence;
-  `self_entertainment` requires at least three distinct measured posts plus
-  fresh, complete server evidence that influence, behavioral and economic
-  outcomes all failed. A successful recognition, trust, adoption or economic
-  outcome proves active IP operation even when another axis is weak; missing
-  axes remain unproven. The 30-day window is an internal conservative freshness
-  gate, not a platform rule. Persistent
-  recommendation ineligibility requires the same normalized restriction
-  reason across at least seven days, the latest status observed within 24
-  hours still
-  restricted and exhausted repair/appeal evidence. Keep the eight matching internal platform
-  diagnosis Skills and their dated first-party evidence references aligned
-  with this compiler; unpublished ranking weights remain explicitly unknown.
+  content thesis. Evidence volume and recency affect confidence, not whether
+  judgment is allowed. Keep the eight matching internal platform diagnosis
+  Skills aligned with this reader; unpublished ranking weights remain
+  explicitly unknown.
 - `skills/public/personal-ip-operator/SKILL.md` must explicitly allow every
   native `personal_ip_*` tool plus the browser/media execution surfaces it
   directs the agent to use. MediaKit skills declare restrictive

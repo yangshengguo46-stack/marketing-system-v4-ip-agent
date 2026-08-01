@@ -22,8 +22,7 @@ cached page media or copied article prose.
 
 - Removed both copies of the standalone `ip_os.py` runtime.
 - Replaced local project/JSONL state with subject-level strategy versions,
-  Personal-IP preflights, publication receipts, metrics, retrospectives and
-  evidence promotions.
+  Personal-IP preflights, publication receipts, metrics and retrospectives.
 - Made the curriculum CLI read-only by removing its completion-ledger writer.
 - Kept platform accounts as concrete operation targets, never person or
   conversation authority.

@@ -12,22 +12,8 @@ from deerflow.persistence.personal_ip_differentiation import PersonalIPDifferent
 from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
 
 
-def test_completed_contradictory_observations_cannot_validate_a_thesis() -> None:
-    with pytest.raises(ValueError, match="supportive observations"):
-        PersonalIPDifferentiationRepository._enforce_observation_gate(
-            status="validated",
-            summary={
-                "complete_observation_count": 3,
-                "supportive_observation_count": 0,
-                "contradictory_observation_count": 3,
-                "supportive_observation_types": [],
-                "has_downstream_outcome": False,
-            },
-        )
-
-
 @pytest.mark.asyncio
-async def test_differentiation_versions_are_immutable_owner_scoped_and_evidence_gated(tmp_path) -> None:
+async def test_differentiation_versions_are_immutable_owner_scoped_notes(tmp_path) -> None:
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     try:
         sf = get_session_factory()
@@ -120,16 +106,16 @@ async def test_differentiation_versions_are_immutable_owner_scoped_and_evidence_
         )
         assert provisional["status"] == "provisionally_adopted"
 
-        with pytest.raises(ValueError, match="at least three complete"):
-            await repo.create_version(
-                owner_user_id="user-1",
-                operation_key="difference:validated:too-early",
-                subject_id=product["id"],
-                thesis_key="ip-agent-core",
-                status="validated",
-                evidence_refs=EVIDENCE_REFS,
-                **DIFFERENTIATION_THESIS,
-            )
+        early_validated = await repo.create_version(
+            owner_user_id="user-1",
+            operation_key="difference:validated:early",
+            subject_id=product["id"],
+            thesis_key="ip-agent-core",
+            status="validated",
+            evidence_refs=[],
+            **DIFFERENTIATION_THESIS,
+        )
+        assert early_validated["validation_summary"]["complete_observation_count"] == 1
 
         for index, observation_type in enumerate(("trust", "adoption"), start=2):
             await repo.record_observation(
@@ -179,7 +165,7 @@ async def test_differentiation_versions_are_immutable_owner_scoped_and_evidence_
 
 
 @pytest.mark.asyncio
-async def test_new_thesis_lineage_must_restart_as_candidate(tmp_path) -> None:
+async def test_new_thesis_lineage_can_use_any_descriptive_status(tmp_path) -> None:
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     try:
         sf = get_session_factory()
@@ -196,15 +182,16 @@ async def test_new_thesis_lineage_must_restart_as_candidate(tmp_path) -> None:
             evidence_refs=EVIDENCE_REFS,
             **DIFFERENTIATION_THESIS,
         )
-        with pytest.raises(ValueError, match="new thesis_key"):
-            await repo.create_version(
-                owner_user_id="user-1",
-                operation_key="difference:b",
-                subject_id=subject["id"],
-                thesis_key="direction-b",
-                status="pilot",
-                evidence_refs=EVIDENCE_REFS,
-                **DIFFERENTIATION_THESIS,
-            )
+        second = await repo.create_version(
+            owner_user_id="user-1",
+            operation_key="difference:b",
+            subject_id=subject["id"],
+            thesis_key="direction-b",
+            status="pilot",
+            evidence_refs=[],
+            **DIFFERENTIATION_THESIS,
+        )
+        assert second["thesis_key"] == "direction-b"
+        assert second["status"] == "pilot"
     finally:
         await close_engine()

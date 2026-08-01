@@ -36,8 +36,8 @@ Anonymous local SQLite evidence at audit time:
 | Video productions / events | 3 / 26 |
 
 This means the base and collection surface exist, but the main
-strategy-to-publication-to-learning loop has not yet produced persisted local
-evidence.
+direction-to-publication-to-learning loop has not yet produced persisted local
+evidence. Empty strategy or metric history is not itself an admission failure.
 
 ## Remediation register
 
@@ -53,8 +53,8 @@ evidence.
 | AUD-TST-005 | P0 | Manual E2E isolation | Repeated first-use testing reused the normal owner database, conversations, learned memory, MineContext and browser profiles, requiring destructive factory resets between trials. | `make ip-test-start` uses a fixed marked test home with independent SQLite/config/extensions/user state and a visible UI banner; `make ip-test-reset` refuses unmarked/tampered targets, stops services, rotates only that test home to a recoverable snapshot and preserves the normal runtime. Unit tests plus a live create/reset/recovery probe pass. | done |
 | AUD-QA-001 | P0 | Regression | The full backend suite had environment-sensitive failures and the root suite had one package-fixture failure. | Root suite, backend suite, frontend unit suite and `pnpm check` are green from the moved checkout. | done |
 | AUD-QA-002 | P1 | Build performance | Next production build is unusually slow and reports whole-project NFT tracing from a dynamic artifact route. | Scope the traced filesystem path, remove the warning and record a repeatable build time below the Playwright startup budget. | done |
-| AUD-LOOP-001 | P0 | Strategy | No local strategy version or launch-ready natural incubation has been persisted. | Complete one natural subject conversation through real benchmark evidence, alternatives, launch package, pilot and validation. | external gate |
-| AUD-LOOP-002 | P0 | Closed loop | Local preflight, publish, metric, retrospective and promotion tables are empty. | Seal three distinct publications from blind prediction through measured retrospective and one policy-approved evidence promotion. | external gate |
+| AUD-LOOP-001 | P0 | Strategy | No real natural incubation has yet produced a useful direction and first creative action. | Complete one natural subject conversation through whatever evidence is available, a direct IP-form/direction judgment, one script or pilot and explicit assumptions; no internal stage certificate is required. | external gate |
+| AUD-LOOP-002 | P0 | Closed loop | Local preflight, publish, metric and retrospective tables are empty. | Seal one real publication from blind prediction through observed retrospective, then use it to revise the next hypothesis; no evidence-promotion receipt or fixed publication count is required. | external gate |
 | AUD-DIST-001 | P1 | Platforms | Evidence is concentrated in Douyin/WeChat/Xiaohongshu; X, Instagram, YouTube and TikTok have no accepted evidence. | Run the account/login/collection/publish/recovery matrix per platform with explicit coverage states. | external gate |
 | AUD-VID-001 | P1 | Video | Local video E2E simulates paid providers; paid calls executed by that gate are zero. | Accept one full multi-shot generative production and one real faceless-material production with immutable provider/cost/QA receipts. | external gate |
 | AUD-COMP-001 | P1 | Publishing compliance | Publish requests remain generic JSON and do not yet enforce platform-specific disclosure, commercial-partnership or moderation fields. | Add versioned per-platform compliance schemas, validation and receipt evidence before prepare/finish. | done |
@@ -66,9 +66,10 @@ evidence.
 | AUD-ONB-002 | P0 | First reply | A first-use orientation could still enter the generic research/Skill loop, spend multiple provider calls and stall behind browser search or CAPTCHA before showing any answer. | Real Next.js + real Gateway + isolated empty SQLite returns one provisional route and one entity-sensitive clarification within three seconds on a cold local runtime; its structured answer advances to a target-group/core-problem question without repeating the first. Both runs use 0 model calls, 0 tokens, no follow-up-suggestion request and no web/Skill/ledger operation; concrete script/asset/link tests still reach the normal model path. | done |
 | AUD-ONB-003 | P0 | Narrative interview | The fast first-use path is still a deterministic pair of clarification cards. It collects fields but cannot reflect the user's language, revise a hypothesis, change the next question from the answer, or preserve narrative and disclosure control. | Real Next.js + real Gateway + isolated SQLite proves ordinary conversational onboarding with no intake cards; person, brand, product and organization openings use entity-appropriate grand-tour invitations; three materially different answers produce answer-grounded different follow-ups with one main question per turn; skip/correct/private/stop requests are honored; earliest-memory and sensitive-history prompts are never the default and are not repeated after refusal; direct tasks bypass incubation; confirmed facts, tentative interpretations and evidence gaps remain distinct; bounded interviewer calls do not regress to the full-agent 80k-token path. | done |
 | AUD-CAL-001 | P0 | Content evidence | Pilot/preflight guidance separated hypotheses from evidence in prose, but formal contracts could still contain neural shorthand or unsupported viral certainty and did not freeze distribution assumptions. | Strategy v4 and audience-preflight v2 tests require evidence level, observable mechanism, predicted signal, failure condition, distribution assumptions and uncertainty; neural shortcuts and viral guarantees are rejected; a first pilot with no account history stays an explicit unmeasured cold-start hypothesis. | done |
-| AUD-DIAG-001 | P0 | Account diagnosis | Connected accounts had collection and metrics surfaces but no unified evidence-bound decision for continuing, adjusting or starting over; platform folklore could outrank content and low reach could be mistaken for a dead account. | Native context/compiler tests cover owner scope, seven content layers, the full commercial funnel, three distinct measured posts, complete commercial-outcome coverage from observations no older than 30 days, server-bound intent/conversion states, non-hostile language, repairable restrictions, latest-within-24-hours/same-reason/seven-day/exhausted-remediation structural evidence and rejection of low-reach-only replacement; all eight platform Skills validate against dated first-party sources. | done |
-| AUD-IP-001 | P0 | IP scope | The operating model still treated IP mainly as a creator strategy; products were not first-class subjects and no immutable contract connected influence, differentiation, creative encoding and observed adoption/economic effects. | Migration 0020, repository and native-tool tests prove owner isolation, idempotency, product subjects, candidate/pilot gates, three-supportive-observation downstream validation, strategy/preflight/cockpit/account-diagnosis linkage; strategy v4 separates influence, behavioral and economic goals; the differentiation Skill validates and frontend type/check plus the real-backend product-subject scenario pass. | done |
+| AUD-DIAG-001 | P0 | Account diagnosis | Connected accounts had collection and metrics surfaces but no coherent basis for continuing, adjusting or starting over. The first fix overcorrected with a server verdict compiler, fixed sample count, freshness windows and a business-outcome matrix. | The native surface now exposes only an owner-scoped credential-free evidence reader. Architecture tests prove the compiler, `decision_ready`, fixed post minimum and freshness constants are absent; all eight platform Skills use the reader and make an Agent judgment whose confidence reflects missing evidence without blocking. | done |
+| AUD-IP-001 | P0 | IP scope | The operating model still treated IP mainly as a creator strategy; products were not first-class subjects and no shared context connected influence, differentiation and creative expression. The first fix then turned that context into compulsory stage and promotion gates. | Migration 0020 and repository/native-tool tests prove owner isolation, idempotency and all four subject types while strategy v5 and differentiation v2 remain shape-only versioned working notes. Direct stage movement, empty optional sections and gate-free preflight are covered; frontend type/check plus the real-backend product-subject scenario pass. | done |
 | AUD-ARCH-001 | P0 | Agent architecture | Personal-IP context middleware accumulated benchmark search planning, Skill routing, downstream locks and final-answer rewriting, while most native Personal-IP tool schemas were hidden behind deferred discovery. Together they created a second runtime and made installed capabilities hard to call. | Middleware owns only owner-scoped portfolio injection and bounded first-use narrative intake. Native first-party tools remain visible; deferred discovery applies only to MCP tools. Static architecture regressions pin both boundaries. | done |
+| AUD-ARCH-002 | P0 | Semantic gates | Strategy stages, differentiation promotions, account-diagnosis thresholds and automatic evidence promotion forced creative work through conflicting business certificates. Fixing one gate repeatedly broke an adjacent path. | Strategy/differentiation storage validates only shape and owner scope; account diagnosis is read-only context; preflight accepts absent notes/history; the promotion write API/tool/repository method is removed; a static architecture test pins those absences. Safety, credential, rights, paid-call, publishing, deletion, hash and immutable-receipt boundaries remain enforced. | done |
 | AUD-BENCH-001 | P0 | Benchmark capability | A named benchmark previously triggered generic search, then multiple middleware-specific gates attempted to control the failure and broke creative execution. | Rebuild benchmark handling only after capability contracts and the native orchestration path are explicit. Until then it is not accepted as a complete product path. | pending |
 | AUD-SRCH-001 | P0 | Search safety | The public fallback could return query-irrelevant adult spam when Ark Web Search was not activated. | Fallback calls DuckDuckGo with strict safe search, accepts public URLs only, removes unsafe and query-irrelevant entries, reports filtered coverage and returns no evidence when the exact live query has no safe relevant result. | done |
 
@@ -84,6 +85,13 @@ evidence.
    fallback.
 
 ## First-wave acceptance evidence
+
+- 2026-08-01 semantic-gate cleanup: 334 Personal-IP/audience backend tests,
+  eight Skill-stack architecture tests, frontend lint/typecheck and five
+  focused cockpit/workflow unit tests passed. The static pure-tool regression
+  pins direct strategy/direction status movement, an evidence-only account
+  reader, gate-free cold-start preflight, absence of promotion write/read Agent
+  tools, and absence of promotion data from current compilers/cockpit.
 
 - `backend`: relocation + web-tool isolation regression group, 73 passed.
 - `backend`: local eight-platform publish/recovery acceptance, 58 passed.
@@ -104,10 +112,10 @@ evidence.
   connection-error page was security-blocked from further navigation, so the
   visible banner is covered by the compiled frontend path rather than claimed
   as a successful browser observation in this acceptance.
-- IP influence-asset regression: 331 backend Personal-IP/migration tests
-  passed; strategy v4, account diagnosis v2 and the differentiation package
-  passed Ruff; the internal differentiation capability validated and the
-  seven routing/stack constraints passed.
+- IP influence-asset regression: the earlier 331-test run covered the original
+  strategy/account/differentiation implementation. It is historical evidence;
+  the current shape-only strategy v5, differentiation v2, evidence reader and
+  gate-free preflight are covered by the semantic-gate cleanup regression.
 - Relocated runtimes: backend and MineContext rebuilt offline; old source-path
   references are 0 and `make minecontext-doctor` passes.
 - First-use/evidence remediation: Personal-IP/HLLM regression 273 passed;

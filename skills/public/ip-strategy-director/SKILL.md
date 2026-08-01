@@ -1,83 +1,109 @@
 ---
 name: ip-strategy-director
-description: Direct an evidence-backed IP operating strategy for a person, brand, product or organization. Use for onboarding, entity and business discovery, benchmark selection, differentiation handoff, positioning, naming, identity, offer, conversion design or launch planning.
+description: Direct a working IP strategy for a person, brand, product or organization. Use for onboarding, IP-form selection, benchmark interpretation, positioning, naming, identity, offer, conversion design or launch planning.
 ---
 
 # Personal-IP strategy director
 
-Build an executable business and identity thesis. Do not declare a person
-"modeled" after a short biography, substitute a follower target for strategy,
-or expose internal stages and scoring systems to the user.
+Give the user a useful direction now. Evidence, business observations and
+versioned notes improve the judgment; none is a certificate that must be
+completed before the Agent can think, recommend, write or test.
 
-## Direct the strategy
+Treat IP as attributable influence carried by a person, brand, product or
+organization. Reach is distribution, not the IP itself. Monetization,
+conversion and operating capacity matter when the user's objective needs them,
+but they are reasoning dimensions rather than compulsory intake fields.
 
-1. Read startup context first. For a true new owner, skip the whole-portfolio
-   cockpit, respond to the user's current goal and learn only the next fact
-   that can change the strategy; create the first subject naturally when enough
-   is known. If the user is asking how to start, do not load another Skill,
-   browse, search, create records or select benchmarks before the first visible
-   reply. Give a provisional roadmap and ask exactly one material question.
-   A concrete script, asset or link request remains directly executable. For a
-   returning owner, read the cockpit and the subject's latest strategy, reuse
-   known facts and continue from the first material gap.
-2. Discover the operated entity and business in natural conversation. For a
-   person, learn relevant public evidence and boundaries; for a brand, product
-   or organization, learn origin, behavior, capability, rights, proof,
-   stakeholders and operating constraints. Ask one question
-   at a time only when its answer can change buyer, offer, proof, positioning,
-   public identity or production capacity.
-3. Inspect real evidence: prior work, products, customer proof, content,
-   comments, account metrics, local context and at least three benchmark
-   accounts with source URLs. Separate observation, inference and hypothesis.
-4. Invoke `design-ip-differentiation` before positioning. Read or build the
-   current differentiation thesis and advance it to at least `pilot`; define
-   the intended public influence, alternatives, proprietary truth, choice and
-   belief reasons, sacrifice, dramatic engine, recognition system and test.
-5. Persist one objective system before choosing a direction. Influence is the
-   common asset mechanism for every person, brand, product or organization;
-   never offer "influence or monetization" as a binary mode. State separate
-   influence goals, behavioral goals, economic goals, pilot and operating time
-   horizons, their priority order, guardrails and what is deliberately not
-   being optimized now.
-6. Form two or three materially different strategic candidates. Each must name
-   the buyer, paid problem, promise, proof, difference, offer, conversion path,
-   sustainable content supply, capacity cost and failure condition.
-7. Recommend one candidate with explicit trade-offs against the persisted
-   objective system. Protect a sustainable economic route without pretending
-   that every short-term influence result must immediately convert.
-8. Build the public identity only after the strategy is coherent: name options,
-   handle checks, avatar and visual direction, biographies, pinned content and
-   recognizable identity signals. Treat names and bios as commercial interface,
-   not decoration.
-9. Produce a capacity-based launch pilot. Assign each content experiment one
-   primary role: reach, trust, proof or conversion. Define observation horizon,
-   target audience, evidence level, observable mechanism hypothesis, predicted
-   signal, failure condition, platform-distribution assumptions, uncertainty
-   and what changes next.
-10. Persist every evidence-backed revision with the native strategy tool and
-   bind positioning onward to the exact pilot or adopted differentiation
-   version. Call
-   unfinished work a current judgment or candidate direction, never a completed
-   model.
+## Start from the request
+
+1. Read startup context first. A true new owner continues from the current
+   sentence without scanning empty ledgers, loading the full method stack or
+   opening research before the first visible reply. Ask at most one material
+   question only when it would genuinely change the current answer. Do not
+   load another Skill before that reply.
+2. Identify the operated subject and the likely expression carrier. A person,
+   brand, product or organization may use direct-to-camera authority, lived
+   documentary, role-play, one-person multi-role scenes, customer situations,
+   product drama, brand story, expert explanation, faceless narration or a
+   deliberate mixture. Subject type does not dictate one format.
+3. If the user has already supplied a product, objective and benchmark, give a
+   complete provisional direction in the same turn: intended influence,
+   audience situation, reason to choose, recurring story engine, expression
+   form, recognizable signals, business path where relevant, risks and a first
+   script or pilot. Mark assumptions; do not return a questionnaire.
+
+## Use evidence without turning it into a gate
+
+- Read the owner-scoped cockpit or strategy/direction notes when they exist.
+  Missing notes do not create a queue and do not block preflight or creation.
+- Inspect prior work, products, customer proof, account observations, comments,
+  metrics and local context only when they can change the recommendation.
+- Separate observed facts, user testimony, inference and creative hypothesis.
+  Missing data changes confidence and the next useful test, not permission to
+  proceed.
+- For a named benchmark, an account name or search snippet can establish
+  identity only. Video-pattern or method extraction requires the exact video,
+  link, upload, screenshots or transcript. If those are unavailable, ask for
+  the artifact and do not substitute a generic industry search or fabricate a
+  benchmark style.
+- Research is bounded and purposeful. Use the fewest sources needed to answer
+  the decision; do not browse merely because a field is empty.
 
 Read [strategy-judgment.md](references/strategy-judgment.md) when comparing
-positioning or offers. Read
-[benchmark-and-launch.md](references/benchmark-and-launch.md) when researching
-benchmarks, building the identity package or designing the first launch.
+directions or commercial routes. Read
+[benchmark-and-launch.md](references/benchmark-and-launch.md) when an exact
+benchmark or launch pilot is part of the request.
+
+## Form the working direction
+
+Use the following as lenses, not mandatory fields:
+
+- intended public influence and decision situation;
+- real alternatives and category conventions;
+- owned truth, capability, access, history, relationships and proof;
+- value created, meaning created, reason to choose and reason to believe;
+- deliberate sacrifice and risks;
+- sustainable event supply and recurring dramatic conflict;
+- recognizable verbal, visual, sonic, behavioral or spatial signals;
+- offer, conversion path and delivery capacity where relevant;
+- uncertainty and the smallest test that could change the judgment.
+
+Compare as many alternatives as the decision needs. Recommend one with clear
+trade-offs. The direction may be saved through `personal_ip_record_strategy`
+or the differentiation note tool when persistence is useful, but saving,
+status labels and document completeness never authorize downstream work.
+
+## Turn direction into action
+
+- Translate the working direction into an account promise, recurring series,
+  first topic and first script rather than stopping at labels.
+- Choose the expression form partly from the user's screen performance. If a
+  test recording shows camera fear or weak delivery, adapt the format—guided
+  performance, interview, role-play, voice-over, faceless material or digital
+  human—without treating it as personal failure.
+- A pilot may state its audience, content role, observable hypothesis,
+  predicted signal, failure condition and uncertainty when helpful. These
+  improve later comparison; absence of one field must not stop creation.
+- Preflight is an immutable snapshot for blind comparison, not a launch-ready
+  certificate. Account ids remain operation targets, never conversation scope.
 
 ## Guardrails
 
-- Never diagnose personality, clinical traits or philosophy.
-- Never force age, gender, photo, voice or private-history disclosure. Invite
-  optional media only when public presentation materially depends on it.
+- Never diagnose personality or clinical traits, and never force age, gender,
+  photo, voice or private-history disclosure.
 - Never copy a benchmark's protected expression, visual identity or false
-  authority. Extract mechanisms and adapt them to the user's evidence.
-- Never invent precise cadence, growth, spend or revenue promises without
-  evidence and capacity constraints.
-- Never call a direction or video "viral" before publication evidence exists.
-  Do not use dopamine, mirror neurons, the Zeigarnik effect or other
-  neuroscience shorthand as causal proof. Treat content, audience, platform
-  allocation, competition, timing and social feedback as interacting sources
-  of uncertainty.
-- Keep internal method names, scoring dimensions, Skill names and evidence
-  contract keys out of customer-facing answers.
+  authority. Extract mechanisms only from inspected material.
+- Never invent precise cadence, growth, spend, revenue or viral guarantees.
+- Keep internal method names, status labels, schemas, tool names and paths out
+  of customer-facing answers.
+
+## Customer-facing output
+
+Lead with the conclusion:
+
+1. what kind of IP is being built and what influence it should accumulate;
+2. the recommended direction and why it fits the known facts;
+3. the expression form and recurring story/conflict engine;
+4. who should choose it, in what situation, and the plausible value path;
+5. which parts are observed versus assumed;
+6. the first concrete topic, script or pilot and what to learn from it.

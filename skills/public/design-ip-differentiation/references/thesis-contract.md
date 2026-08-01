@@ -1,6 +1,6 @@
 # Differentiation thesis contract
 
-Use `ip-differentiation-thesis-v1` as the private versioned handoff. Do not show
+Use `ip-differentiation-thesis-v2` as the private versioned handoff. Do not show
 these keys or status names to customers.
 
 ## Documents
@@ -92,18 +92,16 @@ evidence_refs:
     id:
 ```
 
-## Status gates
+## Status labels
 
-- `candidate`: primary entity, decision context, proprietary truth, strategic
-  difference, validation hypotheses and real evidence references are complete.
-- `pilot`: the candidate plus contrast field, dramatic engine, distinctive
-  encoding and operating fit are complete.
-- `provisionally_adopted`: at least one sealed complete observation exists for
-  the thesis lineage.
-- `validated`: at least three sealed complete observations cover two or more
-  effect classes and include intent, adoption, conversion or economic effect.
-- `retired`: a retirement reason is mandatory. Retirement is append-only and
-  does not erase prior versions or observations.
+- `candidate`, `pilot`, `provisionally_adopted`, `validated` and `retired` are
+  descriptive compatibility labels, not a maturity ladder. Any useful note may
+  move directly to the label that best describes the current judgment.
+- No field-completeness, observation-count or effect-class rule controls a
+  status change. Missing sections stay empty and uncertainty stays visible.
+- Retirement remains append-only and does not erase prior versions or
+  observations; a reason is useful but not a storage admission certificate.
 
 Use one stable `thesis_key` while revising the same strategic direction.
-A materially new direction must use a new key and restart at `candidate`.
+A materially new direction should normally use a new key so its lineage stays
+clear; it does not have to restart a server stage sequence.

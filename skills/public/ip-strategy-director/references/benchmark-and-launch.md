@@ -25,7 +25,8 @@ profile pages and articles about the account can identify leads, but they are
 not representative-work evidence and cannot prove content mechanisms. After
 the cap, verify an exact source already found or request the user's artifact.
 
-Choose at least three real accounts with complementary value:
+Choose only as many real accounts as the current decision needs. Useful roles
+may include:
 
 - one close business-model analogue;
 - one strong content-system analogue;
@@ -44,12 +45,12 @@ commercial proof, coherent offer path and a mechanism the subject can execute.
 
 ## Build the identity package
 
-Create:
+Create only what the current launch needs, for example:
 
-- three name directions with memorability, relevance, future range and handle
+- name directions with memorability, relevance, future range and handle
   risks;
 - one avatar and visual-system direction;
-- two concise biographies that state audience, value and proof without inflated
+- concise biographies that state audience, value and proof without inflated
   authority;
 - pinned content for introduction, proof and conversion;
 - one low-friction next action.
@@ -67,16 +68,15 @@ Set cadence from production capacity. Define the comparison, observation
 horizon, required evidence and failure rule before publishing. Do not promise a
 follower count or deadline that the evidence cannot support.
 
-Each pilot experiment must record:
+Each pilot experiment can record these fields when useful for later comparison:
 
 - one target audience and one primary role;
-- evidence level: general prior, market-referenced, account-observed or
-  promoted rule;
+- evidence level: general prior, market-referenced or account-observed;
 - one or more observable mechanism hypotheses with predicted signals and
   failure conditions;
 - platform-distribution and audience-matching assumptions;
 - an observation window, uncertainty statement and change rule.
 
 Use observable behavior, not neuroscience shorthand. A market pattern can
-justify a test, but only the operated account's measured publications can
-validate it.
+justify a test; later account observations may strengthen, weaken or redirect
+the hypothesis without a server validation certificate.

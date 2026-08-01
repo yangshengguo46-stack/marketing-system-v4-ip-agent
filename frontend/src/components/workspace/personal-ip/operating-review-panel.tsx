@@ -25,7 +25,6 @@ const REVIEW_TABS = [
   { id: "publishing", label: "发布" },
   { id: "performance", label: "实绩" },
   { id: "retrospective", label: "复盘" },
-  { id: "evidence", label: "证据晋级" },
 ] as const;
 
 function text(value: unknown, fallback = "—") {
@@ -80,7 +79,7 @@ function itemTitle(item: ReviewEntry) {
   if (item.resource === "retrospectives") {
     return `${platformLabel(item.platform)} · 复盘`;
   }
-  return text(item.claim, "已晋级证据");
+  return "已记录";
 }
 
 function itemDescription(item: ReviewEntry) {
@@ -88,10 +87,7 @@ function itemDescription(item: ReviewEntry) {
     return displayTime(item.created_at, "时间未知");
   }
   if (item.resource === "publish-receipts") {
-    return displayTime(
-      item.published_at ?? item.updated_at,
-      "等待发布结果",
-    );
+    return displayTime(item.published_at ?? item.updated_at, "等待发布结果");
   }
   if (
     item.resource === "metrics" ||
@@ -102,7 +98,7 @@ function itemDescription(item: ReviewEntry) {
   if (item.resource === "retrospectives") {
     return displayTime(item.created_at, "时间未知");
   }
-  return `${arrayLength(item.retrospective_ids)} 份复盘支持`;
+  return "时间未知";
 }
 
 function statusLabel(status: unknown) {
@@ -180,41 +176,37 @@ export function OperatingReviewPanel({
         cockpit.recent.retrospectives ?? [],
         "retrospectives",
       ),
-      evidence: withResource(
-        cockpit.recent.evidence_promotions ?? [],
-        "evidence-promotions",
-      ),
     };
   }, [cockpit.recent]);
 
   return (
     <section className="space-y-4">
-        <div>
-          <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <ShieldCheckIcon className="size-5" />
-            回执与学习证据
-          </h2>
-          <p className="text-muted-foreground text-sm">
-            智能体负责执行，并根据多次真实表现持续更新可复用经验。
-          </p>
-        </div>
-        <Tabs defaultValue="preflight">
-          <TabsList className="max-w-full overflow-x-auto">
-            {REVIEW_TABS.map((tab) => (
-              <TabsTrigger key={tab.id} value={tab.id}>
-                {tab.label}
-                <Badge variant="outline" className="ml-1 px-1.5">
-                  {entries[tab.id].length}
-                </Badge>
-              </TabsTrigger>
-            ))}
-          </TabsList>
+      <div>
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <ShieldCheckIcon className="size-5" />
+          回执与学习证据
+        </h2>
+        <p className="text-muted-foreground text-sm">
+          智能体负责执行，并根据多次真实表现持续更新可复用经验。
+        </p>
+      </div>
+      <Tabs defaultValue="preflight">
+        <TabsList className="max-w-full overflow-x-auto">
           {REVIEW_TABS.map((tab) => (
-            <TabsContent key={tab.id} value={tab.id}>
-              <ReviewList items={entries[tab.id]} />
-            </TabsContent>
+            <TabsTrigger key={tab.id} value={tab.id}>
+              {tab.label}
+              <Badge variant="outline" className="ml-1 px-1.5">
+                {entries[tab.id].length}
+              </Badge>
+            </TabsTrigger>
           ))}
-        </Tabs>
+        </TabsList>
+        {REVIEW_TABS.map((tab) => (
+          <TabsContent key={tab.id} value={tab.id}>
+            <ReviewList items={entries[tab.id]} />
+          </TabsContent>
+        ))}
+      </Tabs>
     </section>
   );
 }

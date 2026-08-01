@@ -47,7 +47,8 @@ recognition progresses toward the intended influence and operating outcome.
    owned evidence, rare capability, causal mechanism, history, relationships,
    access, rights, product behavior, difficult choices and repeatable operating
    actions. Separate observation, inference and hypothesis.
-4. Form two or three materially different candidate directions. Each must state:
+4. Form enough materially different candidate directions to reveal a real
+   choice. When relevant, state:
    value created, meaning created, reason to choose, reason to believe,
    relevance hypothesis, what will deliberately be sacrificed, capacity cost,
    extension boundary and failure condition.
@@ -64,7 +65,8 @@ directions or deciding whether the difference is real.
 
 ## Turn strategy into a repeatable creative system
 
-Before promoting a candidate to `pilot`, compile both engines:
+When the current task benefits from a repeatable creative system, compile the
+two engines below. This is a creative aid, not a status gate:
 
 - The dramatic engine defines the recurring protagonist, public desire,
   counterforce, consequential choice, cost and state change, relationship
@@ -81,7 +83,7 @@ The system is not a frozen style guide. Stable signals create attribution;
 controlled variation prevents fatigue. Cinema craft, hooks and platform
 adaptation may strengthen the system but may not replace its strategic choice.
 
-At pilot status, record:
+When planning a pilot, record what is actually useful:
 
 - evidence level and immutable evidence references;
 - observable hypotheses rather than neuroscience shorthand;
@@ -94,9 +96,9 @@ advancing the private version.
 
 ## Bind downstream work
 
-- Positioning, name, biography, offer, conversion path and launch pilots must
-  reference a `pilot`, `provisionally_adopted` or `validated` differentiation
-  version. Do not let strategy reopen an unrelated parallel thesis.
+- Positioning, name, biography, offer, conversion path and launch pilots should
+  use the latest available direction note. A missing note does not block the
+  work; state the assumption and avoid silently opening a parallel thesis.
 - A series bible inherits the same protagonist, recurring choice, world,
   event generators, emotional promise, invariants and forbidden combinations.
 - A script translates one event into observable action and state change. It
@@ -107,8 +109,9 @@ advancing the private version.
   eligibility without changing the core choice unless observed evidence forces
   a new thesis version.
 
-If downstream work cannot trace its choices to the current thesis, stop and
-repair the missing link rather than inventing a new slogan inside the script.
+If downstream work cannot trace its choices to the current note, mark the new
+choice as an assumption and continue; update the note later if that choice is
+worth retaining.
 
 ## Observe, advance or retire
 
@@ -127,15 +130,11 @@ Use these effect classes:
 - extension: the same associations transferring to a new offer, series or
   entity without losing attribution.
 
-One complete supportive observation permits only `provisionally_adopted`.
-`validated` requires at least three complete supportive observations across at
-least two effect classes, including intent, adoption, conversion or economic
-evidence. Contradictory, mixed and inconclusive results remain learning
-evidence and cannot promote status. These are minimum product gates, not proof
-of universal causality. A new strategic
-direction starts a new thesis lineage at `candidate`; do not rewrite the old
-record. Retire a thesis when its choice is no longer relevant, believable,
-operable or attributable, and record the reason.
+Observations inform judgment but never promote a direction automatically.
+Status is a descriptive note chosen by the agent, not a maturity ladder
+enforced by storage. Compare supportive, contradictory, mixed and inconclusive
+evidence in context, state uncertainty, and write a new immutable version when
+the working direction changes instead of rewriting history.
 
 ## Guardrails
 

@@ -1,4 +1,4 @@
-"""ORM model for policy-gated cross-sample evidence promotions."""
+"""Historical ORM model for legacy evidence-promotion receipts."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ def _utc_now() -> datetime:
 
 
 class PersonalIPEvidencePromotionRow(Base):
-    """One evidence-backed pattern and its automatic policy decision receipt."""
+    """One legacy promotion row retained for read/export compatibility."""
 
     __tablename__ = "personal_ip_evidence_promotions"
 

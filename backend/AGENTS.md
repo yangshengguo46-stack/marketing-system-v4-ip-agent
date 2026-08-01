@@ -1069,7 +1069,7 @@ ByteDance HLLM-Creator is the audience intelligence foundation, not another
 agent runtime. Its complete source lives under `third_party/bytedance/HLLM` and
 its heavy model environment must remain separate from the Gateway environment.
 `deerflow.personal_ip.hllm_creator` is the thin data boundary: it maps
-chronological content plus aggregate metrics to the unchanged upstream parquet
+chronological content and any available aggregate metrics to the unchanged upstream parquet
 contract, labels the result as an aggregate cohort proxy, rejects individual
 viewer identity, and verifies the vendored source pin. Do not use an account or
 cohort embedding to narrow thread authority. See
@@ -1160,18 +1160,12 @@ Partial rows are `insufficient_evidence`; complete rows are
 `eligible_for_policy_evaluation`. This repository never rewrites the preflight.
 
 Migration `0012_personal_ip_evidence_promotions` and
-`deerflow.persistence.personal_ip_evidence_promotions` own policy-gated,
-cross-sample pattern promotions. Gateway endpoints are under
-`/api/personal-ip/evidence-promotions`. `minimum_support` is always at least
-three and counts distinct publish receipts whose retrospective status is
-`measured`; several horizons for one publication count once and partial rows
-never satisfy the threshold. Every cited row must be fully measured. Passing
-the rule automatically creates an approved promotion plus a deterministic
-policy decision receipt; there is no user decision endpoint. Approved records
-can export `personal-ip-approved-evidence-v1`; exports must retain every
-source's status, comparison state and training-eligibility provenance. A
-promotion creates a reviewable training candidate—it does not silently mutate
-a live model or rubric version.
+`deerflow.persistence.personal_ip_evidence_promotions` are retained for
+historical compatibility. The repository and Gateway expose owner-scoped
+read/list/export only. Do not restore the promotion POST, repository proposal
+method, native write tool, minimum-publication rule or automatic approval.
+Retrospectives remain immutable observations that the Agent can compare; they
+do not certify a reusable rule or unlock another operation.
 
 `deerflow.personal_ip.platform_metrics` owns provider-independent metric
 collector output plus the official Douyin implementation. The Douyin adapter
@@ -1267,7 +1261,7 @@ current request without reading empty workflow ledgers. This lightweight
 classification is separate from
 `deerflow.personal_ip.operating_cockpit.PersonalIPOperatingCockpitService`,
 which joins subjects/accounts, preflights, publish receipts, metrics, detailed
-platform observations, retrospectives, evidence promotions and video
+platform observations, retrospectives, historical evidence-promotion rows and video
 productions for one authenticated owner. The Gateway route and native
 `personal_ip_operating_cockpit` tool must share it. It is intentionally
 portfolio-wide, returns explicit pending ids, and labels history truncation;
@@ -1358,81 +1352,53 @@ interval `delta` from monotonic counter differences. The delta is always
 decreasing counters remain coverage metadata. The first snapshot is a baseline
 only and must not be aggregated as a daily total.
 
-`deerflow.persistence.personal_ip_brand` owns the subject-level operating
-strategy. `personal_ip_strategy_versions` is the immutable truth: entity
-evidence, business design, real benchmarks, positioning
-alternatives, launch package and pilot validation advance one stage at a time.
+`deerflow.persistence.personal_ip_brand` owns immutable subject-level working
+strategy notes. Strategy v5 validates bounded JSON shape and owner scope only:
+entity evidence, business design, benchmarks, positioning, launch material and
+pilot observations may be recorded in any useful combination. Descriptive
+stages may move directly and must never gate preflight or another tool.
 Influence is the common IP asset mechanism, not a mode competing with
-monetization. Strategy v4 requires separate influence, behavioral and economic
-goals, time horizons, priority order, guardrails and deliberate non-goals.
+monetization.
 The old `monetization_first` / `influence_first` value remains a read/write
 compatibility field only and must not drive product decisions. Historical retired tables may
 remain physically present for migration compatibility, but repositories,
 routers, context, preflight and customer UI must not expose or consume them.
-Native preflight resolves the latest launch-ready strategy for every subject
-and strips local ids before the provider request.
-`deerflow.personal_ip.strategy_methodology` owns the private stage prerequisites
-and `personal_ip_record_strategy` is the normal native write surface. The
-customer must never receive a fixed questionnaire, stage name or internal
-dimension list. The agent asks one relevant natural question at a time, reuses
-existing evidence and does not claim completion before a real pilot and
-validation decision.
-Strategy method v3 validates creator evidence separately from brand, product
-and organization evidence; non-person entities use category/lifecycle/
-operating facts, capability evidence, public interfaces, stakeholders,
-boundaries and capacity rather than invented demographics. It also validates
-each launch pilot as a falsifiable behavior
-hypothesis: target audience, role, evidence level, mechanism layer, predicted
-signal, failure condition, distribution assumptions, observation window and
-uncertainty are mandatory. The formal contract rejects viral guarantees and
-dopamine/mirror-neuron/Zeigarnik shorthand. Audience preflight v2 preserves
-the same fields per candidate so later retrospectives compare an observable
-prediction rather than only creative text.
+Native preflight may resolve the latest strategy note and strips local ids
+before the provider request, but it must work when no note exists.
+`deerflow.personal_ip.strategy_methodology` is a shape/storage helper and
+`personal_ip_record_strategy` is the normal native write surface. The customer
+must never receive a fixed questionnaire, stage name or internal dimension
+list. The Agent asks only what materially improves the current task and gives
+a direct working answer with explicit assumptions instead of waiting for a
+server completeness certificate.
 
 Migration `0020_personal_ip_differentiation` and
 `deerflow.persistence.personal_ip_differentiation` own immutable
-`ip-differentiation-thesis-v1` versions plus IP-asset observations. Subjects
+`ip-differentiation-thesis-v2` working-note versions plus IP-asset observations. Subjects
 may be creators, brands, products or organizations. Thesis statuses are
-candidate, pilot, provisionally adopted, validated and retired. A new
-`thesis_key` restarts at candidate; versions and observations are append-only.
-Pilot promotion requires a complete contrast field, proprietary truth,
-strategic choice/sacrifice, dramatic engine, distinctive encoding, operating
-fit and falsifiable validation plan. Provisionally adopted requires one
-complete supportive observation; validated requires at least three complete
-supportive observations across two effect classes and one
-intent/adoption/conversion/economic effect. Contradictory, mixed and
-inconclusive observations remain immutable evidence but never promote status.
+candidate, pilot, provisionally adopted, validated and retired for compatibility.
+Statuses are descriptive and may move directly; no field-completeness,
+observation-count or effect-class rule controls the transition. Versions and
+observations remain append-only and owner-scoped.
 `personal_ip_record_differentiation`,
 `personal_ip_read_differentiation` and
 `personal_ip_record_asset_observation` are the native write/read surfaces.
-Strategy positioning onward stores the exact differentiation version id;
-preflight strips local ids but retains its semantic contents. The operating
-cockpit and account diagnosis read the same repository.
+Strategy may store an exact differentiation version id when useful; preflight
+strips local ids but retains supplied semantic contents. The operating cockpit
+and account evidence reader use the same repository.
 
-`deerflow.personal_ip.account_diagnosis` owns connected-account go/adjust/new
-judgment. `PersonalIPAccountDiagnosticContextService` loads only the
-authenticated owner's exact operation target and returns compact strategy,
-sample, coverage and immutable evidence references. The native
-`personal_ip_account_diagnostic_context` and
-`personal_ip_compile_account_diagnosis` tools must re-read this server context;
-callers cannot inject an expanded account or arbitrary evidence. Every
-assessment covers the seven observable content-mechanism layers plus
-reach/trust/intent/conversion. Content remains primary; platform rules may
-prove recommendation eligibility and structural constraints, but low reach
-alone can never justify a new account. A new account requires a supported
-structural issue and platform-observation reference. Account diagnosis v2
-compiles influence, behavioral and economic outcome states from fresh sealed
-asset observations and commercial evidence. `self_entertainment` requires a
-decision-ready sample of at least three distinct posts and complete failure
-across all three axes; any successful recognition, trust, adoption, conversion
-or economic outcome is active IP operation, while missing axes remain
-unproven. The 30-day window is a conservative product freshness gate, not a
-platform rule. Persistent
-recommendation ineligibility must bind one normalized restriction reason
-across at least seven days;
-the latest account status must be observed within 24 hours, still be restricted
-and carry the exhausted
-repair/appeal result.
+`deerflow.personal_ip.account_diagnosis` owns one connected-account evidence
+reader, not a verdict compiler. `PersonalIPAccountDiagnosticContextService`
+loads only the authenticated owner's exact operation target and returns the
+available strategy/direction notes, publications, metrics, creator-backend
+observations, retrospectives and immutable evidence references. The native
+`personal_ip_account_diagnostic_context` tool must re-read this server context;
+callers cannot inject an expanded account or arbitrary evidence. The Agent
+applies IP form, story, expression, business and platform methods to give a
+direct continue/adjust/start-new judgment. No fixed sample count, freshness
+window, outcome-state matrix or server-generated `self_entertainment` label may
+gate that judgment. Missing evidence changes confidence and the next useful
+test; it does not block analysis.
 The eight `diagnose-*-account` Skills own platform-specific current-official
 evidence and must mark undisclosed ranking weights unknown.
 

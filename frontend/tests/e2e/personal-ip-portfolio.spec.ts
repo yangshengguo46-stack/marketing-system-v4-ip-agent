@@ -25,7 +25,7 @@ const EMPTY_ACCOUNT: PersonalIPAccount = {
 };
 
 const EMPTY_COCKPIT: PersonalIPOperatingCockpit = {
-  contract_version: "personal-ip-operating-cockpit-v6",
+  contract_version: "personal-ip-operating-cockpit-v7",
   generated_at: "2026-07-22T00:00:00Z",
   portfolio: {
     subject_count: 0,
@@ -34,18 +34,11 @@ const EMPTY_COCKPIT: PersonalIPOperatingCockpit = {
     platforms: [],
   },
   stages: Object.fromEntries(
-    [
-      "modeling",
-      "preflight",
-      "publishing",
-      "performance",
-      "retrospective",
-      "evidence",
-    ].map((id) => [id, { state: "empty", total: 0, pending: 0 }]),
+    ["modeling", "preflight", "publishing", "performance", "retrospective"].map(
+      (id) => [id, { state: "empty", total: 0, pending: 0 }],
+    ),
   ) as PersonalIPOperatingCockpit["stages"],
   queues: {
-    subjects_needing_strategy_validation: [],
-    subjects_needing_differentiation_validation: [],
     preflights_awaiting_publish: [],
     published_receipts_awaiting_metrics: [],
     published_receipts_awaiting_retrospective: [],

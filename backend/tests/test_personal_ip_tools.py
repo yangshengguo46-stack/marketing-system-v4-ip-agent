@@ -18,7 +18,6 @@ from deerflow.tools.builtins import (
     personal_ip_collect_browser_page_tool,
     personal_ip_collect_browser_portfolio_today_tool,
     personal_ip_collect_douyin_browser_page_tool,
-    personal_ip_compile_account_diagnosis_tool,
     personal_ip_compile_approved_video_assembly_tool,
     personal_ip_compile_generated_shot_qa_tool,
     personal_ip_compile_video_asset_manifest_tool,
@@ -163,7 +162,6 @@ async def test_douyin_sync_tool_uses_connection_reference_without_returning_toke
 def test_personal_ip_native_tools_are_available_without_thread_account_binding() -> None:
     names = {tool.name for tool in BUILTIN_TOOLS}
     assert personal_ip_account_diagnostic_context_tool.name == "personal_ip_account_diagnostic_context"
-    assert personal_ip_compile_account_diagnosis_tool.name == "personal_ip_compile_account_diagnosis"
     assert personal_ip_metrics_aggregate_tool.name == "personal_ip_metrics_aggregate"
     assert personal_ip_ingest_media_execution_tool.name == "personal_ip_ingest_media_execution"
     assert personal_ip_inspect_local_video_material_tool.name == "personal_ip_inspect_local_video_material"
@@ -202,7 +200,6 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     assert personal_ip_collect_browser_page_tool in BUILTIN_TOOLS
     assert {
         "personal_ip_account_diagnostic_context",
-        "personal_ip_compile_account_diagnosis",
         "personal_ip_metrics_aggregate",
         "personal_ip_ingest_media_execution",
         "personal_ip_inspect_local_video_material",
@@ -244,18 +241,7 @@ def test_personal_ip_native_tools_are_available_without_thread_account_binding()
     assert "account_id" not in browser_portfolio_schema.get("properties", {})
     strategy_schema = personal_ip_record_strategy_tool.tool_call_schema.model_json_schema()
     assert "mode" not in strategy_schema.get("properties", {})
-    diagnosis_schema = personal_ip_compile_account_diagnosis_tool.tool_call_schema.model_json_schema()
-    assert "AccountDiagnosisAssessment" in diagnosis_schema.get("$defs", {})
-    assessment_schema = diagnosis_schema["$defs"]["AccountDiagnosisAssessment"]
-    assert {
-        "platform_role",
-        "mechanisms",
-        "funnel",
-        "account_structure",
-        "decision",
-        "classification",
-        "next_experiment",
-    } <= set(assessment_schema["properties"])
+    assert "stage" not in strategy_schema.get("required", [])
 
 
 @pytest.mark.asyncio
@@ -598,9 +584,9 @@ async def test_native_account_diagnostic_context_uses_authenticated_owner(
 ) -> None:
     build = AsyncMock(
         return_value={
-            "contract_version": "personal-ip-account-diagnostic-context-v2",
+            "contract_version": "personal-ip-account-evidence-context-v3",
             "account": {"id": "account-1", "platform": "youtube"},
-            "sample": {"decision_ready": False},
+            "inventory": {"metric_observation_count": 0},
         }
     )
     configure_personal_ip_runtime(

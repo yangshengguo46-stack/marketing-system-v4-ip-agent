@@ -16,7 +16,6 @@ export const PERSONAL_IP_OPERATING_STAGES = [
   { id: "publishing", label: "发布回执" },
   { id: "performance", label: "实绩回收" },
   { id: "retrospective", label: "复盘校准" },
-  { id: "evidence", label: "证据晋级" },
 ] as const;
 
 export const PERSONAL_IP_VIDEO_STAGES = [
@@ -58,7 +57,7 @@ export type PersonalIPOperationalAlert = {
 };
 
 export type PersonalIPOperatingCockpit = {
-  contract_version: "personal-ip-operating-cockpit-v6";
+  contract_version: "personal-ip-operating-cockpit-v7";
   generated_at: string;
   portfolio: {
     subject_count: number;
@@ -68,8 +67,6 @@ export type PersonalIPOperatingCockpit = {
   };
   stages: Record<PersonalIPOperatingStageId, PersonalIPOperatingStage>;
   queues: {
-    subjects_needing_strategy_validation: string[];
-    subjects_needing_differentiation_validation: string[];
     preflights_awaiting_publish: string[];
     published_receipts_awaiting_metrics: string[];
     published_receipts_awaiting_retrospective: string[];

@@ -11,9 +11,10 @@ from app.gateway.routers import personal_ip_evidence_promotions as router_module
 
 
 @pytest.mark.asyncio
-async def test_evidence_promotion_router_auto_promotes_and_exports(monkeypatch) -> None:
+async def test_evidence_promotion_router_is_read_only_legacy_access(monkeypatch) -> None:
     repository = SimpleNamespace(
-        propose=AsyncMock(return_value={"id": "promotion-1", "status": "approved"}),
+        list=AsyncMock(return_value=[{"id": "promotion-1", "status": "approved"}]),
+        get=AsyncMock(return_value={"id": "promotion-1", "status": "approved"}),
         export_approved=AsyncMock(return_value={"contract_version": "personal-ip-approved-evidence-v1"}),
     )
     app = FastAPI()
@@ -24,26 +25,21 @@ async def test_evidence_promotion_router_auto_promotes_and_exports(monkeypatch) 
         return SimpleNamespace(id="user-1")
 
     monkeypatch.setattr(router_module, "get_current_user_from_request", current_user)
-    async with httpx.AsyncClient(base_url="http://test", transport=httpx.ASGITransport(app=app)) as client:
-        proposed = await client.post(
+    async with httpx.AsyncClient(
+        base_url="http://test",
+        transport=httpx.ASGITransport(app=app),
+    ) as client:
+        create = await client.post(
             "/api/personal-ip/evidence-promotions",
-            json={
-                "proposal_key": "pattern:v1",
-                "evidence_type": "content_pattern",
-                "claim": "直接开门见山更有效。",
-                "retrospective_ids": ["retro-1", "retro-2", "retro-3"],
-                "minimum_support": 3,
-            },
+            json={"claim": "不再由服务器晋升"},
         )
-        removed_decision = await client.post(
-            "/api/personal-ip/evidence-promotions/promotion-1/decisions",
-            json={"decision": "approved"},
-        )
+        listed = await client.get("/api/personal-ip/evidence-promotions")
+        detail = await client.get("/api/personal-ip/evidence-promotions/promotion-1")
         exported = await client.get("/api/personal-ip/evidence-promotions/promotion-1/export")
 
-    assert proposed.status_code == 201
-    assert proposed.json()["status"] == "approved"
-    assert removed_decision.status_code == 404
+    assert create.status_code == 405
+    assert listed.json()[0]["id"] == "promotion-1"
+    assert detail.json()["id"] == "promotion-1"
     assert exported.status_code == 200
-    assert repository.propose.await_args.kwargs["owner_user_id"] == "user-1"
-    assert repository.export_approved.await_args.kwargs["owner_user_id"] == "user-1"
+    repository.list.assert_awaited_once_with("user-1", status=None, limit=100)
+    repository.get.assert_awaited_once_with("promotion-1", owner_user_id="user-1")

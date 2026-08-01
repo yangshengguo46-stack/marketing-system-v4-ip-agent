@@ -18,7 +18,7 @@ Baseline: `3e56b0a`
   native begin/event/read tools. No second runtime, state machine, migration or
   mutable projection was introduced.
 - Restricted workbench confirmations to candidate selection, real paid calls
-  and real publishing. Evidence promotion remains automatic.
+  and real publishing. Business evidence is never auto-promoted into a rule.
 - Preserved provider/model/task id, cost state, failure category, attempt,
   `retry_of`, artifact/hash and QA evidence while stripping query/fragment data
   from displayed artifact references.

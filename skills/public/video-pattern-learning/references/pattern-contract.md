@@ -53,9 +53,9 @@ Also supply non-empty `reusable_variables` and `fixed_constraints`.
 
 ## Skill scopes
 
-- `experimental`: no account ids, no promotion id
-- `account`: one or more account ids, no promotion id
-- `portable`: no account ids, approved promotion id required
+- `experimental`: no account ids
+- `account`: one or more account ids
+- `portable`: no account ids; portability remains a revisable method judgment
 
 The compiler returns files, not an installed Skill. Installation must pass
 through `skill_manage`.

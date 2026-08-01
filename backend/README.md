@@ -130,14 +130,13 @@ FastAPI application providing REST endpoints for frontend integration:
 | `GET /api/personal-ip/video-productions/{id}/workbench` | Project the immutable video ledger into the four-stage workbench |
 | `GET /api/personal-ip/video-productions/{id}/artifacts/{sha256}` | Stream an owner-scoped, hash-verified media artifact recorded in an execution receipt or asset manifest |
 | `POST /api/personal-ip/video-productions/{id}/timeline-revisions` | Server-compile one shared human/agent edit snapshot and append it to the video ledger |
-Personal-IP operating strategy belongs to a subject, not a platform account.
-Its immutable repository requires person evidence, a buyer/problem/offer/conversion
-model, real benchmark coverage, two or three positioning alternatives, a
-name/avatar/bio launch package, pilot evidence and a validation decision.
-Monetization-first is the default; influence-first remains available only as
-an explicit mode and still preserves monetization options. Preflight loads the
-latest launch-ready strategy server-side; callers cannot inject a parallel
-creator/audience profile.
+Personal-IP strategy belongs to a subject, not a platform account. Its
+immutable repository stores shape-validated working notes; evidence, business
+design, benchmarks, positioning, launch material and pilot observations are
+optional inputs rather than a readiness certificate. Descriptive stages may
+move directly and do not gate another tool. Preflight may load the latest note
+server-side when one exists and also works without one; callers cannot inject
+an expanded creator/account profile.
 
 Browser-first account status reads navigate each logged-in profile to its
 registered creator dashboard and seal a new observation with `observed_at`.

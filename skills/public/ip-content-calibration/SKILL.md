@@ -23,7 +23,7 @@ and one viral post is not a proven rule.
    recent platform evidence.
 2. Scope every judgment to `subject × account × platform × content format`.
    Cross-account advice is a hypothesis unless independent evidence supports it.
-3. Label inputs as observed, inferred, experimental or promoted. Do not turn
+3. Label inputs as observed, inferred or experimental. Do not turn
    missing metrics into zeroes or stale evidence into current evidence.
 4. Read [editorial-rubric.md](references/editorial-rubric.md) and evaluate the
    content as a director. Lead with the highest-leverage correction rather than
@@ -45,15 +45,15 @@ and one viral post is not a proven rule.
 4. Diagnose the earliest failed contract: discovery, stop/hold, consumption,
    trust/proof, social transmission, intent, conversion or distribution. Change
    one major variable per experiment when causal learning matters.
-5. Promote a falsifiable audience, content or platform pattern only after at
-   least three complete retrospectives from distinct publications support it.
-   Promotion is internal and automatic; do not ask the user to approve it.
-6. Compile promoted patterns into versioned account Skills. Portable Skills
-   require cross-account evidence and a held-out regression check in the
-   isolated skill lab. Never let a production run rewrite its active Skill.
+5. Compare the result with earlier observations and form a revisable audience,
+   content or platform hypothesis. The number of examples changes confidence;
+   it is not a server admission rule and never blocks the next creative step.
+6. When a repeated pattern is useful, draft a versioned method candidate and
+   test it against contrasting or held-out examples before deliberate adoption.
+   Never let a production run rewrite its active Skill automatically.
 
-Read [learning-policy.md](references/learning-policy.md) before promoting,
-generalizing, replacing or retiring a rule.
+Read [learning-policy.md](references/learning-policy.md) before generalizing,
+replacing or retiring a working hypothesis.
 
 ## Customer-facing behavior
 

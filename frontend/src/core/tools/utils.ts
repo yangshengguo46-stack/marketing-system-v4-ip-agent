@@ -47,8 +47,7 @@ export function explainToolCall(
     toolCall.name === "personal_ip_performance_inventory" ||
     toolCall.name === "personal_ip_platform_observation_inventory" ||
     toolCall.name === "personal_ip_read_platform_observation" ||
-    toolCall.name === "personal_ip_read_retrospective" ||
-    toolCall.name === "personal_ip_read_evidence_promotion"
+    toolCall.name === "personal_ip_read_retrospective"
   ) {
     return t.toolCalls.personalIpReadingEvidence;
   } else if (toolCall.name === "personal_ip_select_browser_account") {

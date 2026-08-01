@@ -17,7 +17,6 @@ from deerflow.persistence.personal_ip_subjects.model import PersonalIPSubjectRow
 from deerflow.personal_ip.strategy_methodology import (
     PERSONAL_IP_STRATEGY_METHOD_VERSION,
     normalize_evidence_refs,
-    strategy_stage_index,
     validate_strategy_snapshot,
     validate_strategy_transition,
 )
@@ -120,7 +119,7 @@ class PersonalIPBrandRepository:
                     if differentiation_version_id is not None
                     else existing_data.get("differentiation_version_id")
                 )
-                normalized_evidence = normalize_evidence_refs(evidence_refs, required=True) if evidence_refs is not None else existing_data["evidence_refs"]
+                normalized_evidence = normalize_evidence_refs(evidence_refs) if evidence_refs is not None else existing_data["evidence_refs"]
                 if (
                     existing.stage != str(stage or "").strip()
                     or existing.mode != mode_key
@@ -157,7 +156,6 @@ class PersonalIPBrandRepository:
             merged_validation = dict(validation) if validation is not None else dict(latest_data.get("validation") or {})
             merged_evidence = normalize_evidence_refs(
                 evidence_refs if evidence_refs is not None else list(latest_data.get("evidence_refs") or []),
-                required=True,
             )
             merged_differentiation_id = (
                 _clean_required(
@@ -168,15 +166,13 @@ class PersonalIPBrandRepository:
                 if differentiation_version_id is not None
                 else latest_data.get("differentiation_version_id")
             )
-            if target_stage and strategy_stage_index(target_stage) >= strategy_stage_index("positioning_candidates"):
-                if not merged_differentiation_id:
-                    raise ValueError("positioning requires a pilot or adopted differentiation thesis")
+            if merged_differentiation_id:
                 differentiation = await session.get(
                     PersonalIPDifferentiationVersionRow,
                     merged_differentiation_id,
                 )
-                if differentiation is None or differentiation.owner_user_id != owner or differentiation.subject_id != subject_key or differentiation.status not in {"pilot", "provisionally_adopted", "validated"}:
-                    raise ValueError("positioning requires a pilot or adopted differentiation thesis")
+                if differentiation is None or differentiation.owner_user_id != owner or differentiation.subject_id != subject_key:
+                    raise ValueError("Personal-IP differentiation version not found")
             validate_strategy_snapshot(
                 stage=target_stage,
                 mode=mode_key,

@@ -76,10 +76,10 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > receipt and post-level observations into one digest. They expose calibrated
 > versus unscored predictions; a single result never promotes itself into model
 > training.
-> Evidence promotion requires at least three complete retrospectives from
-> different published posts. Passing that policy automatically stores an
-> approved promotion receipt without user approval. Approved manifests retain
-> completeness/scored provenance for downstream training.
+> Retrospectives remain immutable observations for comparison and method
+> revision. The old evidence-promotion table is read-only compatibility data:
+> new runs do not auto-promote a rule, wait for a publication-count threshold
+> or use a server certificate to unlock creative work.
 > The first real platform collector targets Douyin's official authorized-video
 > API and stores current counters as post snapshots. Private/missing videos are
 > unavailable, not zero. Its approved mini-app flow now uses one-use state,
@@ -120,15 +120,13 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > may appear only as a clearly dated fallback after a current read fails. The
 > conversation shows customer-safe progress such as “正在读取账号的最新数据”
 > while keeping raw tool names, Skill names and private reasoning hidden.
-> Connected-account diagnosis is content-first. The Agent evaluates seven
-> observable content layers and the reach/trust/intent/conversion funnel before
-> treating platform mechanics as eligibility constraints or distribution
-> amplifiers. Low reach alone cannot trigger a new-account recommendation;
-> starting over requires current platform-observed structural evidence. Eight
-> internal platform adapters retain dated first-party sources and leave
-> unpublished ranking weights explicitly unknown. Operating classifications
-> use content and commercial observations from the last 30 days so old results
-> cannot masquerade as the account's current condition.
+> Connected-account diagnosis is content-first. An owner-scoped reader returns
+> the available posts, metrics, creator-backend observations, strategy notes and
+> retrospectives without compiling a server verdict. The Agent applies IP form,
+> story, expression, business and platform methods to recommend continuing,
+> adjusting or starting over. Sample size and recency affect confidence; they
+> are not fixed admission gates. Eight internal platform adapters leave
+> unpublished ranking weights explicitly unknown.
 >
 > A new Personal-IP conversation first reads a lightweight startup context
 > containing only active subject/account existence. A true new owner starts
@@ -148,22 +146,22 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > IP is treated as an influence asset for a person, brand, product or
 > organization: attributable public expectations that can change attention,
 > trust, choice or action. Reach is distribution, not the asset. The private
-> operating truth progresses through entity evidence → business model → real
-> benchmarks → an evidence-bound differentiation thesis → positioning
-> alternatives → name/avatar/bio launch package → pilot → observed commercial
-> or adoption signal → validated operating direction. The differentiation
-> thesis freezes intended influence, alternatives, proprietary truth, reason
-> to choose and believe, explicit sacrifice, a recurring dramatic engine,
-> distinctive verbal/visual/sonic/behavioral encoding and falsifiable tests.
+> working context may contain entity evidence, business design, real
+> benchmarks, a differentiation direction, positioning alternatives,
+> name/avatar/bio material, pilots and observed outcomes. These are versioned
+> notes for reasoning, not a compulsory ladder or a readiness certificate. The
+> differentiation note may preserve intended influence, alternatives,
+> proprietary truth, reason to choose and believe, sacrifice, dramatic engine
+> and distinctive encoding when they are useful.
 > Influence is the common asset mechanism, never a mode competing with
 > monetization. Strategy v4 records influence, behavioral and economic goals
 > separately with time horizons, priority order, guardrails and explicit
 > non-goals. A short
 > self-description can save only a draft and can never claim “建模完成”.
-> The continuing loop is differentiation → expression intent → preflight → publish
+> The continuing loop is direction → expression intent → preflight → publish
 > receipt → observed performance → audience feedback → retrospective →
-> recognition/trust/intent/adoption/economic observation → evidence promotion →
-> next version. Differentiation and content strategy are versioned at the
+> revisable working hypothesis → next version. No automatic business-rule
+> promotion sits in that chain. Differentiation and content strategy are versioned at the
 > subject level. Accounts now contain only platform execution/login identity,
 > so eight platforms do not create eight competing personas. DeerFlow can read the same state through
 > a native tool, so account ids remain operation targets rather than chat

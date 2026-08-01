@@ -3,9 +3,7 @@ import { expect, test } from "@playwright/test";
 import { mockLangGraphAPI } from "./utils/mock-api";
 
 test.describe("Sidebar navigation", () => {
-  test("sidebar contains only customer-facing work areas", async ({
-    page,
-  }) => {
+  test("sidebar contains only customer-facing work areas", async ({ page }) => {
     mockLangGraphAPI(page);
 
     await page.goto("/workspace/chats/new");
@@ -54,8 +52,6 @@ test.describe("Sidebar navigation", () => {
           },
           stages: {},
           queues: {
-            subjects_needing_strategy_validation: [],
-            subjects_needing_differentiation_validation: [],
             preflights_awaiting_publish: [],
             published_receipts_awaiting_metrics: [],
             published_receipts_awaiting_retrospective: [],

@@ -22,9 +22,10 @@ Evaluate each candidate on:
 7. **Durability and risk** — platform dependence, rights, reputation, privacy,
    claims, operational fragility and burnout are bounded.
 
-Reject candidates whose economics depend entirely on an unspecified future
-audience, whose proof cannot support the promise, or whose content supply
-requires a false persona.
+Flag candidates whose economics depend entirely on an unspecified future
+audience, whose proof cannot yet support the promise, or whose content supply
+requires a false persona. Offer a safer working alternative or a small test;
+do not turn this comparison into a server admission gate.
 
 ## Evidence order
 

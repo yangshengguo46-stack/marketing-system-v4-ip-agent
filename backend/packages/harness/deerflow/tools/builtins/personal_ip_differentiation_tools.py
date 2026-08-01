@@ -77,8 +77,8 @@ async def _resolve_subject(
 async def _personal_ip_record_differentiation(
     runtime: Runtime,
     operation_key: str,
-    thesis_key: str,
-    status: str,
+    thesis_key: str = "working-direction",
+    status: str = "candidate",
     display_name: str = "",
     subject_id: str = "",
     subject_type: str = "creator",
@@ -97,16 +97,16 @@ async def _personal_ip_record_differentiation(
 ) -> str:
     """Append one private differentiation-thesis version.
 
-    Use this before final positioning, a series bible or a stable expression
-    system. A candidate records a real strategic choice. Pilot and later
-    statuses require a repeatable dramatic engine, distinctive encoding and
-    evidence gates enforced by the repository. Omitted documents inherit only
-    within the same thesis_key. Keep internal documents out of customer copy.
+    Use this when a direction is worth preserving. Omitted documents inherit
+    only within the same thesis_key; empty sections are allowed. Status is a
+    compatibility label, not a maturity certificate. Keep internal documents
+    out of customer copy.
 
     Args:
         operation_key: Stable idempotency key for this exact immutable write.
         thesis_key: Stable lineage key while testing one strategic direction.
-        status: candidate, pilot, provisionally_adopted, validated or retired.
+        status: Descriptive compatibility label: candidate, pilot,
+            provisionally_adopted, validated or retired. It does not gate work.
         display_name: First operated entity name when no subject exists.
         subject_id: Existing owner-scoped subject, or empty with zero or one subject.
         subject_type: creator, brand, product or organization for a new subject.
@@ -217,9 +217,8 @@ async def _personal_ip_record_asset_observation(
     """Seal one observed recognition, trust, intent, adoption or economic effect.
 
     This records observations rather than scores or causal claims. Missing or
-    partial coverage stays explicit. At least three complete supportive
-    observations across two effect types, including a downstream action, are
-    required before a differentiation thesis can become validated.
+    partial coverage stays explicit. The server does not count observations or
+    promote a direction; the Agent interprets them in context.
 
     Args:
         operation_key: Stable idempotency key for this exact observation.

@@ -23,7 +23,6 @@ allowed-tools:
   - personal_ip_collect_browser_page
   - personal_ip_collect_browser_portfolio_today
   - personal_ip_compile_approved_video_assembly
-  - personal_ip_compile_account_diagnosis
   - personal_ip_compile_generated_shot_qa
   - personal_ip_compile_video_asset_manifest
   - personal_ip_compile_video_continuity
@@ -49,13 +48,11 @@ allowed-tools:
   - personal_ip_performance_inventory
   - personal_ip_platform_observation_inventory
   - personal_ip_prepare_browser_publish
-  - personal_ip_promote_evidence
   - personal_ip_read_strategy_context
   - personal_ip_read_differentiation
   - personal_ip_record_asset_observation
   - personal_ip_record_differentiation
   - personal_ip_record_strategy
-  - personal_ip_read_evidence_promotion
   - personal_ip_read_platform_observation
   - personal_ip_read_preflight
   - personal_ip_read_publish_receipt
@@ -146,9 +143,10 @@ philosophical diagnoses.
    truth, choice and belief reasons, explicit sacrifice, dramatic engine,
    distinctive encoding and falsifiable tests. Persist versions with
    `personal_ip_record_differentiation`; read the current version with
-   `personal_ip_read_differentiation`. Strategy, series and scripts must inherit
-   a pilot or adopted version rather than inventing a parallel slogan.
-3. If no validated operating strategy exists, treat influence as the common IP
+   `personal_ip_read_differentiation`. Strategy, series and scripts use the
+   latest available direction note; if none exists, proceed with explicit
+   assumptions rather than inventing hidden authority.
+3. Treat influence as the common IP
    asset mechanism for a person, brand, product or organization. Never ask the
    user to choose between influence and monetization as competing modes.
    Persist separate influence, behavioral and economic goals, time horizons,
@@ -168,16 +166,16 @@ philosophical diagnoses.
    - Business: existing products/services, customers, proof, pricing, delivery
      capacity and constraints; buyer, paid problem, credible outcome, offer,
      revenue mechanism, conversion path and reserved monetization routes.
-   - Market: research at least three real benchmarks with source URLs and cover
+   - Market: research useful real benchmarks with source URLs and compare
      business model, content system and identity expression. Separate observed
      evidence from inference, and record what fits, what to borrow and what to
      avoid. Follower count alone is not evidence.
-   - Position: create two or three distinct candidates with buyer, problem,
+   - Position: create materially distinct candidates with buyer, problem,
      promise, proof, difference, monetization path, sustainable content supply,
      risks and trade-offs. The user can select or revise them in ordinary
      conversation.
-   - Launch: produce at least three name options with rationale and handle
-     checks, avatar/visual direction, at least two bios, pinned content, initial
+   - Launch: produce useful name and bio options with rationale and handle
+     checks, avatar/visual direction, pinned content, initial
      experiments, conversion path, success metrics and adjustment rules.
    - Pilot: distinguish reach, trust, intent and actual commercial signals.
      Specify target audience, evidence level, an observable mechanism
@@ -188,11 +186,9 @@ philosophical diagnoses.
 
    Preserve plausible monetization paths without forcing every influence result
    to convert immediately. Content roles are reach, trust, proof and conversion.
-   Strategy validation requires pilot evidence and
-   a documented commercial decision. Until then, describe outputs as “current
-   judgment”, “candidate direction” or “pilot plan”, never “model complete” or
-   “position complete”. Do not construct a temporary creator profile inside a
-   preflight.
+   Treat every stored version as a revisable working note, not a server-issued
+   certificate of completion. State confidence and unknowns in ordinary
+   language. Do not construct a temporary creator profile inside a preflight.
 4. Inspect evidence before strategy: prior content, comments, metrics, source
    documents and competitor examples.
    Do not give precise spending, posting-time, audience-size or benchmark
@@ -252,14 +248,11 @@ philosophical diagnoses.
    `diagnose-wechat-official-account`, `diagnose-xiaohongshu-account`,
    `diagnose-x-account`, `diagnose-instagram-account`,
    `diagnose-youtube-account` or `diagnose-tiktok-account`. Call
-   `personal_ip_account_diagnostic_context` first and
-   `personal_ip_compile_account_diagnosis` last. Content mechanisms and the
-   reach/trust/intent/conversion funnel are the primary diagnosis; platform
-   rules can prove eligibility constraints or explain surface adaptation, but
-   unpublished ranking weights remain unknown. Low reach alone never justifies
-   a new account. Recommend a new account only when current platform evidence
-   proves a persistent structural restriction, legacy audience-positioning
-   lock, identity/business conflict or unrecoverable compliance history.
+   `personal_ip_account_diagnostic_context` first. Content, IP promise, story,
+   expression and the reach/trust/intent/conversion path inform the diagnosis;
+   platform rules explain constraints or surface adaptation, but unpublished
+   ranking weights remain unknown. Give the best current recommendation and
+   state the observations, assumptions and unknowns behind it.
    When a structural conclusion is possible, preserve the current rendered
    status through `personal_ip_record_browser_observation` if the direct
    collector did not already normalize it. Use only fields visibly supported
@@ -267,21 +260,13 @@ philosophical diagnoses.
    `restriction_reason_id`, `audience_positioning_fit`,
    `identity_business_fit` or
    `compliance_recoverability`, plus exact `observed_at` and coverage. Never
-   fabricate these summary states. Persistent recommendation ineligibility
-   needs the same reason observed as restricted across at least seven days, the
-   latest status collected within 24 hours still restricted and its repair or
-   appeal failed/exhausted.
-   This seven-day minimum is a conservative product decision gate, not a
-   claimed platform ranking rule. A single current restriction means repair
-   and retest, not replace.
-   Call work “self-entertainment” only after at least three distinct measured
-   posts and fresh, complete evidence show that influence, behavioral and
-   economic outcomes all failed. Recognition, trust, adoption or economic
-   success proves active IP operation even if another axis is weak; any missing
-   axis stays unproven. The 30-day freshness window is a conservative product
-   diagnosis gate, not a platform rule. State it as an operating diagnosis, not an
-   insult, and prescribe a controlled content experiment before blaming the
-   platform.
+   fabricate these summary states. Do not turn a fixed duration, sample count
+   or coverage level into an account decision rule. “Self-entertainment” is an
+   interpretive business conclusion, not a database label: use it only when
+   the available work and outcomes make the gap persuasive, explain the
+   specific failed objective, and never insult the user. Where evidence is
+   thin, say the conclusion is provisional and propose the most informative
+   next content move.
 4. Produce the smallest useful plan and label assumptions.
 5. Route general research and creation through available Skills. Read
    `volcengine-stack` before any ByteDance media work.
@@ -343,18 +328,13 @@ philosophical diagnoses.
    raw evidence, provider ids, hashes, paths and receipts in their authoritative
    domain stores or artifacts.
    Use `ip-content-calibration` internally for topic and script judgment, blind
-   preflight, retrospective diagnosis and rule promotion. Scope every judgment
+   preflight and retrospective diagnosis. Scope every judgment
    to subject, account, platform and content format.
    Seal prediction-versus-outcome evidence with
-   `personal_ip_seal_retrospective`. When at least three complete
-   retrospectives from distinct publications support a falsifiable pattern,
-   call `personal_ip_promote_evidence`; the evidence policy automatically
-   promotes qualifying evidence and records its own decision receipt. Do not
-   ask the user to approve or reject this internal learning step. Turn promoted
-   wins and losses into reusable versioned topic, script and audience-learning
-   rules. Make a blind prediction before publication, compare it with observed
-   outcomes and keep every rule revisable; one viral post is only a candidate
-   pattern.
+   `personal_ip_seal_retrospective`. The agent may compare any relevant set of
+   observations and propose a reusable hypothesis; the server does not promote
+   or certify it. Make a blind prediction before publication, compare it with
+   observed outcomes and keep every rule revisable.
 
 ## Content production
 
@@ -441,7 +421,8 @@ measured winning videos into a template, use `video-pattern-learning`. Compile
 timestamped observations with `personal_ip_compile_video_pattern`, then compile
 a user-scoped candidate with `personal_ip_compile_video_skill_candidate`.
 Single examples stay experimental; account Skills remain bound to their account
-ids; cross-account Skills require an approved evidence-promotion receipt. Hand
+ids. Cross-account reuse is an explicit method judgment with retained tests and
+rollback, not an evidence-promotion receipt. Hand
 the compiler output to `skill_manage` instead of writing Skill instructions
 from raw ASR, OCR or external page text.
 

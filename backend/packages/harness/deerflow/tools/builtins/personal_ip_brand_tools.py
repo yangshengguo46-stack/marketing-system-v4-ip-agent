@@ -19,7 +19,7 @@ def _json(value: dict) -> str:
 async def _personal_ip_record_strategy(
     runtime: Runtime,
     operation_key: str,
-    stage: str,
+    stage: str = "evidence_collecting",
     display_name: str = "",
     subject_id: str = "",
     person_model: dict | None = None,
@@ -34,16 +34,16 @@ async def _personal_ip_record_strategy(
 ) -> str:
     """Append one private IP influence-asset operating-strategy snapshot.
 
-    Use this throughout natural conversation for a person, brand, product or
-    organization. Every business model declares influence, behavioral and
-    economic goals independently. Never expose stage names, private fields or
-    the underlying method to the customer. Omitted documents inherit from the
-    latest immutable snapshot. The removed binary mode remains only inside
-    historical storage and is not an Agent input.
+    Use this when preserving a useful working note for a person, brand, product
+    or organization. Omitted documents inherit from the latest immutable
+    snapshot; empty sections are allowed. Never expose stage names, private
+    fields or the underlying method to the customer. The removed binary mode
+    remains only inside historical storage and is not an Agent input.
 
     Args:
         operation_key: Stable idempotency key for this exact strategy write.
-        stage: Internal strategy stage from evidence_collecting through scaling.
+        stage: Descriptive compatibility label from evidence_collecting through
+            scaling. It does not gate this or another tool.
         display_name: Natural person or brand name; required only when creating the first subject.
         subject_id: Existing owner-scoped subject id, or empty when zero or one subject exists.
         person_model: Operated-entity evidence. For a creator use facts, history,
@@ -51,14 +51,14 @@ async def _personal_ip_record_strategy(
             product or organization use entity_type, category/lifecycle/
             operating facts, history, capability evidence, public interfaces,
             stakeholders, boundaries and capacity.
-        business_model: Influence, behavioral and economic objectives plus
-            buyer, paid problem, offer, proof, economics and monetization paths.
+        business_model: Any currently useful objective, audience, offer,
+            capacity or value-path notes. Empty is allowed.
         benchmark_research: Evidence-backed real account research with source URLs.
-        positioning_candidates: Two or three differentiated business-position alternatives.
+        positioning_candidates: Any useful positioning alternatives.
         launch_package: Name, handle, avatar, bio, pinned content, pilot and conversion package.
         validation: Pilot, commercial-signal and validation evidence.
         evidence_refs: Credential-free references to interviews, media, pages, metrics or receipts.
-        differentiation_version_id: Pilot or adopted thesis version required before positioning.
+        differentiation_version_id: Optional related direction-note version.
         subject_type: creator, brand, product or organization when creating the first subject.
 
     Returns:

@@ -218,7 +218,7 @@ LAUNCH_PACKAGE = {
 
 
 @pytest.mark.asyncio
-async def test_strategy_is_the_only_subject_model_and_requires_observed_validation(tmp_path) -> None:
+async def test_strategy_is_immutable_owner_scoped_storage_without_stage_gates(tmp_path) -> None:
     assert STRATEGY_STAGES[-2:] == ("commercial_signal_observed", "scaling")
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     try:
@@ -258,15 +258,6 @@ async def test_strategy_is_the_only_subject_model_and_requires_observed_validati
             evidence_refs=evidence_refs,
         )
         assert first["method_version"] == PERSONAL_IP_STRATEGY_METHOD_VERSION
-
-        with pytest.raises(ValueError, match="next strategy stage"):
-            await strategies.create_strategy_version(
-                owner_user_id="user-1",
-                operation_key="strategy:jump",
-                subject_id=subject["id"],
-                stage="positioning_candidates",
-                evidence_refs=evidence_refs,
-            )
 
         writes = [
             ("person_model_draft", {"person_model": PERSON_MODEL}),
@@ -333,26 +324,25 @@ async def test_strategy_is_the_only_subject_model_and_requires_observed_validati
         await close_engine()
 
 
-def test_launch_pilot_rejects_neuroscience_shortcuts_and_viral_guarantees() -> None:
-    for claim, expected in (
-        ("美食特写会释放多巴胺并提高完播", "observable audience behavior"),
-        ("这个反差开头一定会火", "cannot guarantee a viral outcome"),
+def test_strategy_storage_does_not_grade_creative_language() -> None:
+    for claim in (
+        "美食特写会释放多巴胺并提高完播",
+        "这个反差开头一定会火",
     ):
         launch_package = deepcopy(LAUNCH_PACKAGE)
         launch_package["pilot_experiments"][0]["mechanism_hypotheses"][0]["claim"] = claim
 
-        with pytest.raises(ValueError, match=expected):
-            validate_strategy_snapshot(
-                stage="launch_package_ready",
-                mode="monetization_first",
-                person_model=PERSON_MODEL,
-                business_model=BUSINESS_MODEL,
-                benchmark_research=BENCHMARK_RESEARCH,
-                positioning_candidates=POSITIONING_CANDIDATES,
-                launch_package=launch_package,
-                validation={},
-                evidence_refs=[{"kind": "user_interview", "id": "interview-1"}],
-            )
+        validate_strategy_snapshot(
+            stage="launch_package_ready",
+            mode="monetization_first",
+            person_model=PERSON_MODEL,
+            business_model=BUSINESS_MODEL,
+            benchmark_research=BENCHMARK_RESEARCH,
+            positioning_candidates=POSITIONING_CANDIDATES,
+            launch_package=launch_package,
+            validation={},
+            evidence_refs=[{"kind": "user_interview", "id": "interview-1"}],
+        )
 
 
 def test_product_strategy_uses_product_evidence_instead_of_person_demographics() -> None:
@@ -386,19 +376,18 @@ def test_product_strategy_uses_product_evidence_instead_of_person_demographics()
     )
 
 
-def test_strategy_requires_independent_influence_behavioral_and_economic_objectives() -> None:
+def test_partial_business_strategy_can_be_stored_for_later_reasoning() -> None:
     business_model = deepcopy(BUSINESS_MODEL)
     business_model["objective_system"].pop("behavioral_goals")
 
-    with pytest.raises(ValueError, match="behavioral_goals"):
-        validate_strategy_snapshot(
-            stage="benchmark_researching",
-            mode="monetization_first",
-            person_model=PERSON_MODEL,
-            business_model=business_model,
-            benchmark_research={},
-            positioning_candidates=[],
-            launch_package={},
-            validation={},
-            evidence_refs=[{"kind": "user_interview", "id": "interview-1"}],
-        )
+    validate_strategy_snapshot(
+        stage="benchmark_researching",
+        mode="monetization_first",
+        person_model=PERSON_MODEL,
+        business_model=business_model,
+        benchmark_research={},
+        positioning_candidates=[],
+        launch_package={},
+        validation={},
+        evidence_refs=[],
+    )

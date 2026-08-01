@@ -13,11 +13,7 @@ from typing import Any
 from langchain.tools import tool
 
 from deerflow.config.paths import get_paths
-from deerflow.personal_ip.account_diagnosis import (
-    AccountDiagnosisAssessment,
-    PersonalIPAccountDiagnosticContextService,
-    compile_account_diagnosis,
-)
+from deerflow.personal_ip.account_diagnosis import PersonalIPAccountDiagnosticContextService
 from deerflow.personal_ip.browser_collection import (
     BrowserPlatformCollectionError,
     BrowserPlatformCollectionService,
@@ -165,7 +161,6 @@ def _operating_cockpit_service(services: PersonalIPRuntimeServices) -> PersonalI
         "metrics": services.metrics,
         "platform_observations": services.platform_observations,
         "retrospectives": services.retrospectives,
-        "evidence_promotions": services.evidence_promotions,
         "video_productions": services.video_productions,
     }
     missing = sorted(name for name, repository in required.items() if repository is None)
@@ -235,7 +230,7 @@ async def _personal_ip_operating_cockpit(runtime: Runtime) -> str:
     operating question after startup context says the complete read is needed.
     Do not use it for a confirmed new_owner cold start. It joins every subject
     and platform account with modeling, preflight, publishing, performance,
-    retrospective, evidence-promotion and video production queues. It
+    retrospective and video production queues. It
     intentionally has no account filter because one conversation coordinates
     the user's entire portfolio.
 
@@ -267,20 +262,19 @@ async def _personal_ip_account_diagnostic_context(
     runtime: Runtime,
     account_id: str,
 ) -> str:
-    """Load evidence for a content-first diagnosis of one platform account.
+    """Read owner-scoped evidence for one platform account.
 
-    Use this when deciding whether a connected account should continue, change
-    direction or be replaced. The account id selects only the concrete target.
-    Strategy, content, performance, conversion and recommendation-eligibility
-    evidence are loaded server-side. Low reach alone is never evidence that a
-    new account is required.
+    The account id selects only the concrete target. The tool returns available
+    strategy notes, content, performance, platform and outcome observations.
+    It never decides whether the account should continue, adjust or be
+    replaced; the agent makes that judgment with the relevant methods.
 
     Args:
         account_id: Exact Personal-IP platform account to diagnose.
 
     Returns:
-        Compact evidence references, sample and coverage gates, and the
-        content-first account-decision guardrails.
+        Credential-free observations, provenance references and inventory
+        counts. Missing data remains missing and does not block analysis.
     """
     try:
         context = await _account_diagnostic_service(get_personal_ip_runtime()).build(
@@ -302,56 +296,6 @@ async def _personal_ip_account_diagnostic_context(
                 "status": "error",
                 "category": "internal",
                 "message": "Personal-IP account diagnostic context is unavailable",
-            }
-        )
-
-
-async def _personal_ip_compile_account_diagnosis(
-    runtime: Runtime,
-    account_id: str,
-    assessment: AccountDiagnosisAssessment,
-) -> str:
-    """Compile an evidence-bound continue, adjust or new-account decision.
-
-    Evaluate all seven observable content-mechanism layers plus reach, trust,
-    intent and conversion. Platform rules are eligibility constraints and
-    distribution amplifiers, not the main content judgment. The compiler
-    reloads authenticated evidence and rejects invented references, viral
-    guarantees, evidence-free self-entertainment labels and new-account advice
-    based only on low reach.
-
-    Args:
-        account_id: Exact Personal-IP platform account being diagnosed.
-        assessment: Complete personal-ip-account-diagnosis-v2 assessment.
-
-    Returns:
-        Compiled diagnosis with evidence-context and diagnosis digests.
-    """
-    try:
-        context = await _account_diagnostic_service(get_personal_ip_runtime()).build(
-            owner_user_id=resolve_runtime_user_id(runtime),
-            account_id=account_id,
-        )
-        return _json(
-            compile_account_diagnosis(
-                context=context,
-                assessment=assessment.model_dump(mode="json"),
-            )
-        )
-    except (RuntimeError, TypeError, ValueError) as exc:
-        return _json(
-            {
-                "status": "error",
-                "category": "invalid_request",
-                "message": str(exc),
-            }
-        )
-    except Exception:
-        return _json(
-            {
-                "status": "error",
-                "category": "internal",
-                "message": "Personal-IP account diagnosis is unavailable",
             }
         )
 
@@ -838,7 +782,6 @@ async def _personal_ip_compile_video_skill_candidate(
     scope: str,
     account_ids: list[str],
     patterns: list[dict],
-    promotion_id: str = "",
 ) -> str:
     """Compile a video pattern into safe files for the existing Skill manager.
 
@@ -849,55 +792,24 @@ async def _personal_ip_compile_video_skill_candidate(
     Args:
         skill_name: Lowercase hyphen-case custom Skill name.
         description: What the template does and when it should be invoked.
-        scope: experimental, account or portable. Use experimental for a
-            single benchmark or viral video, account for account-positioning
-            templates, and portable only after cross-publication validation.
+        scope: experimental, account or portable. Scope describes intended use;
+            it does not certify business validity.
         account_ids: Required only for account scope; empty for other scopes.
         patterns: One to twenty sealed personal-ip-video-pattern-v1 contracts.
-        promotion_id: Approved evidence promotion id required only for portable
-            scope. It must be content_pattern or platform_pattern backed by at
-            least three independent measured publications.
 
     Returns:
         JSON server-rendered SKILL.md, references/pattern.json and installation
         steps for ``skill_manage``.
     """
+    del runtime
     try:
         scope_key = str(scope or "").strip()
-        promotion = None
-        promotion_key = str(promotion_id or "").strip()
-        if scope_key == "portable":
-            services = get_personal_ip_runtime()
-            if services.evidence_promotions is None:
-                raise RuntimeError("Personal-IP evidence promotion is not available")
-            if not promotion_key:
-                raise ValueError("portable skills require promotion_id")
-            promotion = await services.evidence_promotions.get(
-                promotion_key,
-                owner_user_id=resolve_runtime_user_id(runtime),
-            )
-            if promotion is None:
-                raise ValueError("approved evidence promotion was not found")
-            promotion = {
-                key: promotion.get(key)
-                for key in (
-                    "id",
-                    "status",
-                    "evidence_type",
-                    "claim",
-                    "evidence_digest",
-                    "minimum_support",
-                )
-            }
-        elif promotion_key:
-            raise ValueError("promotion_id may only be supplied for portable skills")
         candidate = compile_video_skill_candidate(
             skill_name=skill_name,
             description=description,
             scope=scope_key,
             account_ids=account_ids,
             patterns=patterns,
-            promotion=promotion,
         )
         return _json({"operation_status": "ok", "compiled_skill_candidate": candidate})
     except (RuntimeError, TypeError, ValueError) as exc:
@@ -982,7 +894,6 @@ async def _personal_ip_compile_video_method_skill_candidate(
     method_id: str,
     scope: str,
     account_ids: list[str],
-    promotion_id: str = "",
 ) -> str:
     """Compile one atomic video-derived method for the existing Skill manager.
 
@@ -994,52 +905,22 @@ async def _personal_ip_compile_video_method_skill_candidate(
         distillation: Sealed personal-ip-video-method-distillation-v1 contract.
         method_id: Exact method id inside the distillation; one method becomes
             one Skill candidate.
-        scope: experimental, account or portable. Portable requires an approved
-            content or platform evidence promotion backed by at least three
-            distinct measured publications.
+        scope: experimental, account or portable. Scope describes intended use;
+            it does not certify business validity.
         account_ids: Required only for account scope; empty for other scopes.
-        promotion_id: Server-issued approved promotion id, required only for
-            portable scope.
 
     Returns:
         JSON server-rendered SKILL.md, references/distillation.json,
         evals/test-prompts.json and installation steps for ``skill_manage``.
     """
+    del runtime
     try:
         scope_key = str(scope or "").strip()
-        promotion = None
-        promotion_key = str(promotion_id or "").strip()
-        if scope_key == "portable":
-            services = get_personal_ip_runtime()
-            if services.evidence_promotions is None:
-                raise RuntimeError("Personal-IP evidence promotion is not available")
-            if not promotion_key:
-                raise ValueError("portable method skills require promotion_id")
-            promotion = await services.evidence_promotions.get(
-                promotion_key,
-                owner_user_id=resolve_runtime_user_id(runtime),
-            )
-            if promotion is None:
-                raise ValueError("approved evidence promotion was not found")
-            promotion = {
-                key: promotion.get(key)
-                for key in (
-                    "id",
-                    "status",
-                    "evidence_type",
-                    "claim",
-                    "evidence_digest",
-                    "minimum_support",
-                )
-            }
-        elif promotion_key:
-            raise ValueError("promotion_id may only be supplied for portable skills")
         candidate = compile_video_method_skill_candidate(
             distillation=distillation,
             method_id=method_id,
             scope=scope_key,
             account_ids=account_ids,
-            promotion=promotion,
         )
         return _json(
             {
@@ -3289,11 +3170,6 @@ personal_ip_account_diagnostic_context_tool = tool(
     "personal_ip_account_diagnostic_context",
     parse_docstring=True,
 )(_personal_ip_account_diagnostic_context)
-
-personal_ip_compile_account_diagnosis_tool = tool(
-    "personal_ip_compile_account_diagnosis",
-    parse_docstring=True,
-)(_personal_ip_compile_account_diagnosis)
 
 personal_ip_begin_video_production_tool = tool(
     "personal_ip_begin_video_production",

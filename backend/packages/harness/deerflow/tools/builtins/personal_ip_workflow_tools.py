@@ -16,10 +16,7 @@ from deerflow.personal_ip.browser_profiles import get_browser_account_target, se
 from deerflow.personal_ip.browser_publishing import normalize_publication_url, verify_browser_publication_evidence
 from deerflow.personal_ip.hllm_creator import HLLMCreatorAdapter
 from deerflow.personal_ip.runtime import get_personal_ip_runtime
-from deerflow.personal_ip.strategy_methodology import (
-    PERSONAL_IP_STRATEGY_METHOD_VERSION,
-    strategy_stage_index,
-)
+from deerflow.personal_ip.strategy_methodology import PERSONAL_IP_STRATEGY_METHOD_VERSION
 from deerflow.runtime.user_context import resolve_runtime_user_id
 from deerflow.tools.types import Runtime
 
@@ -136,53 +133,75 @@ async def _personal_ip_run_preflight(
         services = get_personal_ip_runtime()
         if services.preflights is None:
             raise RuntimeError("Personal-IP preflight persistence is not available")
-        if services.brand is None:
-            raise RuntimeError("Personal-IP brand persistence is not available")
-        if services.differentiation is None:
-            raise RuntimeError("Personal-IP differentiation persistence is not available")
         owner_user_id = resolve_runtime_user_id(runtime)
         normalized_subject_ids = list(dict.fromkeys(subject_ids))
         if not normalized_subject_ids:
             raise ValueError("preflight requires at least one Personal-IP subject")
-        strategy_contexts: list[dict] = []
+        if services.subjects is None:
+            raise RuntimeError("Personal-IP subject persistence is not available")
         for subject_id in normalized_subject_ids:
-            strategy = await services.brand.get_latest_strategy(
+            subject = await services.subjects.get(
                 subject_id,
                 owner_user_id=owner_user_id,
             )
-            if strategy is None:
-                raise ValueError(f"Personal-IP strategy not found for subject {subject_id}")
-            if strategy_stage_index(strategy["stage"]) < strategy_stage_index("launch_package_ready"):
-                raise ValueError(f"Personal-IP launch package is not ready for subject {subject_id}")
-            differentiation_version_id = str(strategy.get("differentiation_version_id") or "").strip()
-            if not differentiation_version_id:
-                raise ValueError(f"Personal-IP differentiation thesis is not ready for subject {subject_id}")
-            differentiation = await services.differentiation.get_version(
-                differentiation_version_id,
-                owner_user_id=owner_user_id,
+            if subject is None or subject.get("status") != "active":
+                raise ValueError("Personal-IP subject not found")
+        if services.accounts is not None:
+            for account_id in list(dict.fromkeys(target_account_ids)):
+                account = await services.accounts.get(
+                    account_id,
+                    owner_user_id=owner_user_id,
+                )
+                if account is None or account.get("status") != "active":
+                    raise ValueError("Personal-IP account not found")
+        strategy_contexts: list[dict] = []
+        for subject_id in normalized_subject_ids:
+            strategy = (
+                await services.brand.get_latest_strategy(
+                    subject_id,
+                    owner_user_id=owner_user_id,
+                )
+                if services.brand is not None
+                else None
             )
-            if differentiation is None or differentiation.get("status") not in {
-                "pilot",
-                "provisionally_adopted",
-                "validated",
-            }:
-                raise ValueError(f"Personal-IP differentiation thesis is not ready for subject {subject_id}")
+            direction = None
+            if services.differentiation is not None:
+                direction_id = str(strategy.get("differentiation_version_id") or "").strip() if strategy else ""
+                if direction_id:
+                    direction = await services.differentiation.get_version(
+                        direction_id,
+                        owner_user_id=owner_user_id,
+                    )
+                if direction is None:
+                    direction = await services.differentiation.get_latest(
+                        subject_id,
+                        owner_user_id=owner_user_id,
+                    )
             strategy_contexts.append(
                 {
-                    "stage": strategy["stage"],
-                    "person_model": strategy["person_model"],
-                    "business_model": strategy["business_model"],
-                    "positioning_candidates": strategy["positioning_candidates"],
-                    "launch_package": strategy["launch_package"],
-                    "differentiation": {
-                        "method_version": differentiation["method_version"],
-                        "status": differentiation["status"],
-                        "primary_entity": differentiation["primary_entity"],
-                        "decision_context": differentiation["decision_context"],
-                        "strategic_difference": differentiation["strategic_difference"],
-                        "dramatic_engine": differentiation["dramatic_engine"],
-                        "distinctive_encoding": differentiation["distinctive_encoding"],
-                    },
+                    "subject_id_present": True,
+                    "strategy": (
+                        {
+                            "person_model": strategy.get("person_model", {}),
+                            "business_model": strategy.get("business_model", {}),
+                            "benchmark_research": strategy.get("benchmark_research", {}),
+                            "positioning_candidates": strategy.get("positioning_candidates", []),
+                            "launch_package": strategy.get("launch_package", {}),
+                        }
+                        if strategy
+                        else {}
+                    ),
+                    "direction": (
+                        {
+                            "primary_entity": direction.get("primary_entity", {}),
+                            "decision_context": direction.get("decision_context", {}),
+                            "strategic_difference": direction.get("strategic_difference", {}),
+                            "dramatic_engine": direction.get("dramatic_engine", {}),
+                            "distinctive_encoding": direction.get("distinctive_encoding", {}),
+                        }
+                        if direction
+                        else {}
+                    ),
                 }
             )
         creator_profile = {
@@ -664,75 +683,6 @@ async def _personal_ip_read_retrospective(runtime: Runtime, retrospective_id: st
         return _json({"status": "error", "category": "internal", "message": "Personal-IP retrospective is unavailable"})
 
 
-async def _personal_ip_promote_evidence(
-    runtime: Runtime,
-    proposal_key: str,
-    evidence_type: str,
-    claim: str,
-    retrospective_ids: list[str],
-    minimum_support: int = 3,
-) -> str:
-    """Promote a cross-sample pattern when the evidence policy is satisfied.
-
-    At least three independent, completely measured published posts must support
-    the claim. Passing the rule automatically creates an approved policy receipt;
-    this internal learning action does not require user confirmation.
-
-    Args:
-        proposal_key: Stable idempotency key for this exact claim and evidence set.
-        evidence_type: audience_pattern, content_pattern, platform_pattern or training_cohort.
-        claim: Falsifiable pattern supported by the selected retrospectives.
-        retrospective_ids: Complete retrospective ids from distinct publications.
-        minimum_support: Required independent measured posts, at least 3.
-
-    Returns:
-        JSON automatically approved promotion and its policy decision receipt.
-    """
-    try:
-        services = get_personal_ip_runtime()
-        if services.evidence_promotions is None:
-            raise RuntimeError("Personal-IP evidence promotion is not available")
-        result = await services.evidence_promotions.propose(
-            owner_user_id=resolve_runtime_user_id(runtime),
-            proposal_key=proposal_key,
-            evidence_type=evidence_type,
-            claim=claim,
-            retrospective_ids=retrospective_ids,
-            minimum_support=int(minimum_support),
-        )
-        return _json({"operation_status": "ok", **result})
-    except (RuntimeError, TypeError, ValueError) as exc:
-        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
-    except Exception:
-        return _json({"status": "error", "category": "internal", "message": "Evidence could not be promoted"})
-
-
-async def _personal_ip_read_evidence_promotion(runtime: Runtime, promotion_id: str) -> str:
-    """Read one evidence promotion and its automatic policy decision receipt.
-
-    Args:
-        promotion_id: Server-issued evidence promotion id from the cockpit.
-
-    Returns:
-        JSON claim, support summary, evidence ids and decision history.
-    """
-    try:
-        services = get_personal_ip_runtime()
-        if services.evidence_promotions is None:
-            raise RuntimeError("Personal-IP evidence promotion is not available")
-        result = await services.evidence_promotions.get(
-            str(promotion_id or "").strip(),
-            owner_user_id=resolve_runtime_user_id(runtime),
-        )
-        if result is None:
-            return _json({"status": "error", "category": "not_found", "message": "Evidence promotion not found"})
-        return _json({"operation_status": "ok", **result})
-    except (RuntimeError, TypeError, ValueError) as exc:
-        return _json({"status": "error", "category": "invalid_request", "message": str(exc)})
-    except Exception:
-        return _json({"status": "error", "category": "internal", "message": "Evidence promotion is unavailable"})
-
-
 personal_ip_run_preflight_tool = tool("personal_ip_run_preflight", parse_docstring=True)(_personal_ip_run_preflight)
 personal_ip_read_preflight_tool = tool("personal_ip_read_preflight", parse_docstring=True)(_personal_ip_read_preflight)
 personal_ip_begin_publish_receipt_tool = tool("personal_ip_begin_publish_receipt", parse_docstring=True)(_personal_ip_begin_publish_receipt)
@@ -742,5 +692,3 @@ personal_ip_record_publish_attempt_tool = tool("personal_ip_record_publish_attem
 personal_ip_read_publish_receipt_tool = tool("personal_ip_read_publish_receipt", parse_docstring=True)(_personal_ip_read_publish_receipt)
 personal_ip_seal_retrospective_tool = tool("personal_ip_seal_retrospective", parse_docstring=True)(_personal_ip_seal_retrospective)
 personal_ip_read_retrospective_tool = tool("personal_ip_read_retrospective", parse_docstring=True)(_personal_ip_read_retrospective)
-personal_ip_promote_evidence_tool = tool("personal_ip_promote_evidence", parse_docstring=True)(_personal_ip_promote_evidence)
-personal_ip_read_evidence_promotion_tool = tool("personal_ip_read_evidence_promotion", parse_docstring=True)(_personal_ip_read_evidence_promotion)

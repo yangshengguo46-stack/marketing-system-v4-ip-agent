@@ -86,18 +86,18 @@ def test_adapter_rejects_individual_viewer_identity() -> None:
         )
 
 
-def test_adapter_requires_observed_aggregate_metrics() -> None:
+def test_adapter_accepts_content_history_without_operating_metrics() -> None:
     adapter = HLLMCreatorAdapter()
     history = _history_item(1)
     history["metrics"] = {}
 
-    with pytest.raises(ValueError, match="aggregate metrics"):
-        adapter.build_example(
-            history=[history],
-            audience_profile={"cohort_label": "潜在客户"},
-            creator_profile={},
-            target={"content_id": "draft-1", "title": "标题", "description": "说明"},
-        )
+    example = adapter.build_example(
+        history=[history],
+        audience_profile={"cohort_label": "潜在客户"},
+        creator_profile={},
+        target={"content_id": "draft-1", "title": "标题", "description": "说明"},
+    )
+    assert "aggregate_metrics={}" in example["title_list"][0]
 
 
 def test_adapter_embeds_only_sealed_local_context_projection() -> None:

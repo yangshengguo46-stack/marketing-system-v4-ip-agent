@@ -788,50 +788,6 @@ def _accounts(values: Sequence[str], *, required: bool) -> list[str]:
     return result
 
 
-def _normalize_promotion(
-    promotion: Mapping[str, Any] | None,
-    *,
-    scope: str,
-) -> dict[str, Any] | None:
-    if scope != "portable":
-        if promotion:
-            raise ValueError("promotion may only be supplied for portable skills")
-        return None
-    if not isinstance(promotion, Mapping):
-        raise ValueError("portable skills require an approved evidence promotion")
-    value = _snapshot(dict(promotion), field="promotion", expected=dict)
-    _strict_keys(
-        value,
-        field="promotion",
-        allowed={
-            "id",
-            "status",
-            "evidence_type",
-            "claim",
-            "evidence_digest",
-            "minimum_support",
-        },
-    )
-    if value.get("status") != "approved":
-        raise ValueError("portable skills require an approved evidence promotion")
-    if value.get("evidence_type") not in {"content_pattern", "platform_pattern"}:
-        raise ValueError("portable method skills require content_pattern or platform_pattern evidence")
-    minimum_support = value.get("minimum_support")
-    if isinstance(minimum_support, bool) or not isinstance(minimum_support, int) or minimum_support < 3:
-        raise ValueError("portable method skill promotion must have at least 3 measured samples")
-    return {
-        "id": _text(value.get("id"), field="promotion.id", limit=128),
-        "status": "approved",
-        "evidence_type": value["evidence_type"],
-        "claim": _text(value.get("claim"), field="promotion.claim"),
-        "evidence_digest": _sha256(
-            value.get("evidence_digest"),
-            field="promotion.evidence_digest",
-        ),
-        "minimum_support": minimum_support,
-    }
-
-
 def _markdown(value: Any) -> str:
     return str(value).replace("\\", "\\\\").replace("`", "\\`").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -842,13 +798,11 @@ def _render_method_skill(
     distillation: Mapping[str, Any],
     scope: str,
     account_ids: Sequence[str],
-    promotion: Mapping[str, Any] | None,
 ) -> str:
     triggers = "; ".join(method["trigger_signals"][:3])
     non_triggers = "; ".join(method["non_triggers"][:2])
     description = f"Use when {triggers}. Do not use for {non_triggers}."
     accounts = ", ".join(f"`{_markdown(account_id)}`" for account_id in account_ids) if account_ids else "none"
-    promotion_text = f"`{promotion['evidence_digest']}` / {promotion['minimum_support']} measured publications" if promotion else "not promoted; treat this as a source-supported hypothesis"
     lines = [
         "---",
         f"name: {method['skill_name']}",
@@ -863,7 +817,6 @@ def _render_method_skill(
         "",
         f"- Scope: `{scope}`",
         f"- Account ids: {accounts}",
-        f"- Evidence promotion: {promotion_text}",
         f"- Distillation digest: `{distillation['sha256']}`",
         f"- Source usage rights: `{distillation['source']['usage_rights']}`",
         f"- Independent source contexts: {len(method['qualification']['independent_context_groups'])}",
@@ -907,7 +860,7 @@ def _render_method_skill(
             "1. Apply the method only to the current account-owned objective and cite the distillation digest in the production plan.",
             "2. Keep paid generation, publishing and account changes behind their existing confirmations.",
             "3. After publishing, seal observed outcomes and a retrospective.",
-            "4. Revise this Skill through `skill_manage`; portable promotion requires at least three distinct measured publications.",
+            "4. Revise this Skill through `skill_manage`; portability is a method judgment backed by retained tests, not a server promotion gate.",
             "",
             "## Stop conditions",
             "",
@@ -926,7 +879,6 @@ def compile_video_method_skill_candidate(
     method_id: str,
     scope: str,
     account_ids: Sequence[str],
-    promotion: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Render one atomic method Skill candidate for ``skill_manage``."""
 
@@ -943,14 +895,12 @@ def compile_video_method_skill_candidate(
         raise ValueError("experimental method skills must not bind account_ids")
     if scope_key == "portable" and accounts:
         raise ValueError("portable method skills must not bind account_ids")
-    normalized_promotion = _normalize_promotion(promotion, scope=scope_key)
     method = indexed[selected_id]
     skill_markdown = _render_method_skill(
         method=method,
         distillation=normalized,
         scope=scope_key,
         account_ids=accounts,
-        promotion=normalized_promotion,
     )
     reference = _seal(
         {
@@ -959,7 +909,6 @@ def compile_video_method_skill_candidate(
             "account_ids": accounts,
             "method_id": selected_id,
             "distillation": normalized,
-            "promotion": normalized_promotion,
             "installation": {
                 "automatic_install": False,
                 "security_scan_required": True,
@@ -982,7 +931,6 @@ def compile_video_method_skill_candidate(
             "account_ids": accounts,
             "method_id": selected_id,
             "distillation_digest": normalized["sha256"],
-            "promotion": normalized_promotion,
             "skill_markdown": skill_markdown,
             "reference_path": "references/distillation.json",
             "reference_json": json.dumps(

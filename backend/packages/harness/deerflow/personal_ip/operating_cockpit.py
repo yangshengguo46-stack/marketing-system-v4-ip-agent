@@ -7,7 +7,7 @@ from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
 
-OPERATING_COCKPIT_CONTRACT_VERSION = "personal-ip-operating-cockpit-v6"
+OPERATING_COCKPIT_CONTRACT_VERSION = "personal-ip-operating-cockpit-v7"
 STARTUP_CONTEXT_CONTRACT_VERSION = "personal-ip-startup-context-v1"
 _HISTORY_LIMIT = 500
 _RECENT_LIMIT = 20
@@ -313,7 +313,6 @@ class PersonalIPOperatingCockpitService:
         metrics,
         platform_observations,
         retrospectives,
-        evidence_promotions,
         video_productions,
     ) -> None:
         self._subjects = subjects
@@ -325,7 +324,6 @@ class PersonalIPOperatingCockpitService:
         self._metrics = metrics
         self._platform_observations = platform_observations
         self._retrospectives = retrospectives
-        self._evidence_promotions = evidence_promotions
         self._video_productions = video_productions
 
     async def build(self, *, owner_user_id: str) -> dict[str, Any]:
@@ -343,7 +341,6 @@ class PersonalIPOperatingCockpitService:
             metrics,
             platform_observations,
             retrospectives,
-            promotions,
             video_productions,
         ) = await asyncio.gather(
             self._subjects.list(owner, include_archived=False),
@@ -356,7 +353,6 @@ class PersonalIPOperatingCockpitService:
             self._metrics.list(owner, limit=_HISTORY_LIMIT),
             self._platform_observations.list(owner, limit=_HISTORY_LIMIT),
             self._retrospectives.list(owner, limit=_HISTORY_LIMIT),
-            self._evidence_promotions.list(owner, limit=_HISTORY_LIMIT),
             self._video_productions.list(owner, limit=_HISTORY_LIMIT),
         )
         active_video_productions = [production for production in video_productions if production.get("status") in {"draft", "running", "awaiting_review", "blocked"}][:_ALERT_DETAIL_LIMIT]
@@ -387,21 +383,11 @@ class PersonalIPOperatingCockpitService:
             key = str(strategy.get("subject_id") or "")
             if key and key not in latest_strategy_by_subject:
                 latest_strategy_by_subject[key] = strategy
-        validated_strategy_subject_ids = {subject_id for subject_id, strategy in latest_strategy_by_subject.items() if strategy.get("stage") in {"commercial_signal_observed", "scaling"}}
         latest_differentiation_by_subject: dict[str, dict[str, Any]] = {}
         for version in differentiation_versions:
             key = str(version.get("subject_id") or "")
             if key and key not in latest_differentiation_by_subject:
                 latest_differentiation_by_subject[key] = version
-        validated_differentiation_subject_ids = {subject_id for subject_id, version in latest_differentiation_by_subject.items() if version.get("status") == "validated"}
-        subjects_needing_strategy = sorted(str(subject["id"]) for subject in subjects if str(subject.get("id")) not in latest_strategy_by_subject)
-        subjects_needing_strategy_validation = sorted(str(subject["id"]) for subject in subjects if str(subject.get("id")) not in validated_strategy_subject_ids)
-        subjects_needing_differentiation = sorted(str(subject["id"]) for subject in subjects if str(subject.get("id")) not in latest_differentiation_by_subject)
-        subjects_needing_differentiation_validation = sorted(str(subject["id"]) for subject in subjects if str(subject.get("id")) not in validated_differentiation_subject_ids)
-        modeling_pending_subject_ids = sorted(set(subjects_needing_strategy_validation) | set(subjects_needing_differentiation_validation))
-        modeling_ready_subject_ids = validated_strategy_subject_ids & validated_differentiation_subject_ids
-        strategy_stage_counts = Counter(str(strategy.get("stage") or "evidence_collecting") for strategy in latest_strategy_by_subject.values())
-        differentiation_status_counts = Counter(str(version.get("status") or "candidate") for version in latest_differentiation_by_subject.values())
         receipt_preflight_ids = {str(receipt.get("preflight_id")) for receipt in receipts if receipt.get("preflight_id")}
         preflights_awaiting_publish = sorted(preflight["id"] for preflight in preflights if preflight.get("status") == "sealed" and preflight.get("id") not in receipt_preflight_ids)
         published_receipts = [receipt for receipt in receipts if receipt.get("status") == "published"]
@@ -424,7 +410,6 @@ class PersonalIPOperatingCockpitService:
             "metrics": metrics,
             "platform_observations": platform_observations,
             "retrospectives": retrospectives,
-            "evidence_promotions": promotions,
             "video_productions": video_productions,
         }
         preflight_summaries = [
@@ -454,20 +439,12 @@ class PersonalIPOperatingCockpitService:
             "stages": {
                 "modeling": _stage(
                     total=len(subjects),
-                    pending=len(modeling_pending_subject_ids),
-                    ready=len(modeling_ready_subject_ids),
-                    subjects_needing_strategy=len(subjects_needing_strategy),
-                    subjects_needing_differentiation=len(subjects_needing_differentiation),
-                    launch_packages_ready=strategy_stage_counts["launch_package_ready"],
-                    pilots_running=strategy_stage_counts["pilot_running"],
-                    commercial_signals_observed=strategy_stage_counts["commercial_signal_observed"],
-                    strategies_validated=(strategy_stage_counts["commercial_signal_observed"] + strategy_stage_counts["scaling"]),
+                    pending=0,
+                    subjects_with_notes=len(set(latest_strategy_by_subject) | set(latest_differentiation_by_subject)),
+                    subjects_with_strategy=len(latest_strategy_by_subject),
                     strategy_versions=len(strategies),
                     differentiation_versions=len(differentiation_versions),
-                    differentiation_candidates=differentiation_status_counts["candidate"],
-                    differentiation_pilots=differentiation_status_counts["pilot"],
-                    differentiation_provisionally_adopted=differentiation_status_counts["provisionally_adopted"],
-                    differentiation_validated=differentiation_status_counts["validated"],
+                    subjects_with_direction=len(latest_differentiation_by_subject),
                     asset_observations=len(asset_observations),
                 ),
                 "preflight": _stage(
@@ -493,15 +470,8 @@ class PersonalIPOperatingCockpitService:
                     measured=sum(retrospective.get("status") == "measured" for retrospective in retrospectives),
                     partial=sum(retrospective.get("status") == "partial" for retrospective in retrospectives),
                 ),
-                "evidence": _stage(
-                    total=len(promotions),
-                    pending=0,
-                    approved=sum(promotion.get("status") == "approved" for promotion in promotions),
-                ),
             },
             "queues": {
-                "subjects_needing_strategy_validation": subjects_needing_strategy_validation,
-                "subjects_needing_differentiation_validation": subjects_needing_differentiation_validation,
                 "preflights_awaiting_publish": preflights_awaiting_publish,
                 "published_receipts_awaiting_metrics": published_awaiting_metrics,
                 "published_receipts_awaiting_retrospective": published_awaiting_retrospective,
@@ -608,20 +578,6 @@ class PersonalIPOperatingCockpitService:
                 "retrospectives": _project(
                     retrospectives,
                     ("id", "publish_receipt_id", "account_id", "platform", "horizon", "status", "comparison_state", "created_at"),
-                ),
-                "evidence_promotions": _project(
-                    promotions,
-                    (
-                        "id",
-                        "evidence_type",
-                        "claim",
-                        "status",
-                        "minimum_support",
-                        "retrospective_ids",
-                        "evidence_summary",
-                        "created_at",
-                        "updated_at",
-                    ),
                 ),
             },
             "video": {

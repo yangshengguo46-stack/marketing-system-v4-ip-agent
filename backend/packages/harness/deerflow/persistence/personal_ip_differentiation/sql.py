@@ -41,7 +41,6 @@ _VERSION_DOCUMENTS = (
     "validation",
 )
 _COVERAGE_STATUSES = {"complete", "partial", "unavailable"}
-_OBSERVATION_RESULTS = {"supports", "contradicts", "mixed", "inconclusive"}
 _SENSITIVE_KEY_FRAGMENTS = (
     "access_token",
     "refresh_token",
@@ -173,20 +172,6 @@ class PersonalIPDifferentiationRepository:
             "latest_observed_at": coerce_iso(latest) if latest is not None else None,
         }
 
-    @staticmethod
-    def _enforce_observation_gate(*, status: str, summary: Mapping[str, Any]) -> None:
-        count = int(summary.get("supportive_observation_count") or 0)
-        types = {str(item) for item in summary.get("supportive_observation_types") or []}
-        if status == "provisionally_adopted" and count < 1:
-            raise ValueError("provisionally_adopted requires at least one complete supportive observation")
-        if status == "validated":
-            if count < 3:
-                raise ValueError("validated requires at least three complete supportive observations")
-            if len(types) < 2:
-                raise ValueError("validated requires at least two distinct observation types")
-            if not bool(summary.get("has_downstream_outcome")):
-                raise ValueError("validated requires an intent, adoption, conversion or economic observation")
-
     async def create_version(
         self,
         *,
@@ -239,7 +224,6 @@ class PersonalIPDifferentiationRepository:
                     )
                 replay_payload["evidence_refs"] = normalize_evidence_refs(
                     evidence_refs if evidence_refs is not None else existing_data["evidence_refs"],
-                    required=True,
                 )
                 validate_differentiation_snapshot(
                     status=status_key,
@@ -263,8 +247,6 @@ class PersonalIPDifferentiationRepository:
             ).scalar_one_or_none()
             latest_data = self._version_to_dict(latest) if latest is not None else {}
             same_lineage = latest is not None and latest.thesis_key == lineage
-            if latest is not None and not same_lineage and status_key != "candidate":
-                raise ValueError("a new thesis_key must restart as candidate")
             target_status = validate_differentiation_transition(latest.status if same_lineage else None, status_key)
 
             merged: dict[str, Any] = {}
@@ -278,7 +260,6 @@ class PersonalIPDifferentiationRepository:
                     merged[field] = [] if field == "supporting_entities" else {}
             merged_evidence = normalize_evidence_refs(
                 evidence_refs if evidence_refs is not None else (latest_data.get("evidence_refs") if same_lineage else []),
-                required=True,
             )
             validate_differentiation_snapshot(
                 status=target_status,
@@ -291,7 +272,6 @@ class PersonalIPDifferentiationRepository:
                 subject_id=subject_key,
                 thesis_key=lineage,
             )
-            self._enforce_observation_gate(status=target_status, summary=summary)
             user_payload = {
                 "subject_id": subject_key,
                 "thesis_key": lineage,
@@ -370,10 +350,9 @@ class PersonalIPDifferentiationRepository:
         normalized_measures = _json_copy(dict(measures), field="measures")
         _reject_sensitive(normalized_measures)
         result_key = str(normalized_measures.get("result") or "").strip()
-        if result_key not in _OBSERVATION_RESULTS:
-            raise ValueError("measures.result must be supports, contradicts, mixed or inconclusive")
-        normalized_measures["result"] = result_key
-        normalized_evidence = normalize_evidence_refs(evidence_refs, required=True)
+        if result_key:
+            normalized_measures["result"] = result_key
+        normalized_evidence = normalize_evidence_refs(evidence_refs)
 
         async with self._sf() as session:
             existing = (

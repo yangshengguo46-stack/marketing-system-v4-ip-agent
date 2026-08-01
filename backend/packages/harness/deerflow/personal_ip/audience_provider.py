@@ -123,7 +123,6 @@ class AudienceCreativeVariant(BaseModel):
         "unmeasured_hypothesis",
         "market_referenced_hypothesis",
         "account_history_conditioned",
-        "promoted_rule",
     ]
     mechanism_hypotheses: list[AudienceMechanismHypothesis] = Field(min_length=1, max_length=8)
     distribution_assumptions: list[str] = Field(min_length=1, max_length=8)
@@ -152,9 +151,9 @@ class AudiencePreflightResult(BaseModel):
     @model_validator(mode="after")
     def validate_evidence_basis(self) -> AudiencePreflightResult:
         if self.audience_basis == "cold_start_hypothesis":
-            inflated = [variant.variant_id for variant in self.variants if variant.evidence_level in {"account_history_conditioned", "promoted_rule"}]
+            inflated = [variant.variant_id for variant in self.variants if variant.evidence_level == "account_history_conditioned"]
             if inflated:
-                raise ValueError("cold-start variants cannot claim account-history or promoted-rule evidence")
+                raise ValueError("cold-start variants cannot claim account-history evidence")
         return self
 
 

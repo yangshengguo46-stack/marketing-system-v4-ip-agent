@@ -142,8 +142,10 @@ def _stable_item_id(content_id: str) -> int:
 
 
 def _aggregate_metrics(value: Any, *, field: str) -> dict[str, int | float]:
-    if not isinstance(value, Mapping) or not value:
-        raise ValueError(f"{field} requires observed aggregate metrics")
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{field} must be an object when supplied")
     metrics: dict[str, int | float] = {}
     for key, raw in sorted(value.items(), key=lambda item: str(item[0])):
         if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not math.isfinite(float(raw)):

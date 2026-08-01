@@ -367,31 +367,14 @@ def test_method_skill_candidate_is_atomic_scannable_and_not_auto_installed(
     assert enforce_static_scan(skill_dir, skill_name=candidate["skill_name"]) == []
 
 
-def test_portable_method_skill_requires_measured_promotion() -> None:
-    with pytest.raises(ValueError, match="promotion"):
-        compile_video_method_skill_candidate(
-            distillation=_distillation(),
-            method_id="evidence-loop",
-            scope="portable",
-            account_ids=[],
-        )
-
-    candidate = compile_video_method_skill_candidate(
+def test_portable_method_skill_is_a_pure_candidate() -> None:
+    portable = compile_video_method_skill_candidate(
         distillation=_distillation(),
         method_id="evidence-loop",
         scope="portable",
         account_ids=[],
-        promotion={
-            "id": "promotion-1",
-            "status": "approved",
-            "evidence_type": "content_pattern",
-            "claim": "三个独立发布支持这条内容判断规则。",
-            "evidence_digest": "2" * 64,
-            "minimum_support": 3,
-        },
     )
-    assert candidate["promotion"]["minimum_support"] == 3
-    assert "2" * 64 in candidate["skill_markdown"]
+    assert "promotion" not in portable
 
 
 @pytest.mark.asyncio

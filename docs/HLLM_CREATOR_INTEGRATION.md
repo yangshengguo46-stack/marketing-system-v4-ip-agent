@@ -136,16 +136,13 @@ and partial metric coverage stays partial. Partial rows are
 `eligible_for_policy_evaluation`. No retrospective automatically enters HLLM
 training.
 
-`personal_ip_evidence_promotions` is the automatic policy gate. A promoted
-audience/content/platform pattern or training cohort must cite at least three
-complete retrospectives from distinct publish receipts; repeated horizons of
-one post count once, and partial observations do not satisfy support. The agent
-assembles the candidate, and passing the rule immediately stores an approved
-promotion plus a policy decision receipt. User approval is not required.
-Approved evidence exports use `personal-ip-approved-evidence-v1` and retain
-source completeness and score provenance. Converting those approved manifests
-into a versioned HLLM dataset/checkpoint remains a separate controlled
-model-building action.
+`personal_ip_evidence_promotions` is historical compatibility data. New runs do
+not create promotion receipts or use a fixed retrospective count to certify an
+audience/content/platform rule. Existing owner-scoped rows remain readable and
+exportable with their original source completeness and score provenance so an
+upgrade does not destroy history. Turning any retained observations into a
+versioned HLLM dataset/checkpoint remains a separate, deliberate model-building
+action with its own evaluation; it is never an automatic result of publishing.
 
 ## Minimal patch policy
 

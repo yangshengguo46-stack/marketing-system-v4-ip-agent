@@ -140,19 +140,6 @@ def _repos():
             )
         ),
         "retrospectives": SimpleNamespace(list=AsyncMock(return_value=[])),
-        "evidence_promotions": SimpleNamespace(
-            list=AsyncMock(
-                return_value=[
-                    {
-                        "id": "promotion-1",
-                        "evidence_type": "content_pattern",
-                        "claim": "开头直给结果提高完播",
-                        "status": "approved",
-                        "updated_at": "2026-07-22T04:00:00Z",
-                    }
-                ]
-            )
-        ),
         "video_productions": SimpleNamespace(
             list=AsyncMock(
                 return_value=[
@@ -257,7 +244,7 @@ async def test_operating_cockpit_closes_the_portfolio_workflow_read_model() -> N
     repos = _repos()
     result = await PersonalIPOperatingCockpitService(**repos).build(owner_user_id="user-1")
 
-    assert result["contract_version"] == "personal-ip-operating-cockpit-v6"
+    assert result["contract_version"] == "personal-ip-operating-cockpit-v7"
     assert result["portfolio"] == {
         "subject_count": 1,
         "account_count": 2,
@@ -265,8 +252,8 @@ async def test_operating_cockpit_closes_the_portfolio_workflow_read_model() -> N
         "platforms": ["douyin", "xiaohongshu"],
     }
     assert result["stages"]["modeling"]["pending"] == 0
-    assert result["stages"]["modeling"]["strategies_validated"] == 1
-    assert result["stages"]["modeling"]["differentiation_validated"] == 1
+    assert result["stages"]["modeling"]["subjects_with_strategy"] == 1
+    assert result["stages"]["modeling"]["subjects_with_direction"] == 1
     assert result["stages"]["modeling"]["asset_observations"] == 1
     assert result["stages"]["preflight"]["total"] == 1
     assert result["stages"]["publishing"]["published"] == 1
@@ -274,10 +261,8 @@ async def test_operating_cockpit_closes_the_portfolio_workflow_read_model() -> N
     assert result["stages"]["performance"]["metric_observations"] == 1
     assert result["stages"]["performance"]["platform_observations"] == 1
     assert result["stages"]["retrospective"]["pending"] == 1
-    assert result["stages"]["evidence"]["pending"] == 0
-    assert result["stages"]["evidence"]["approved"] == 1
-    assert result["queues"]["subjects_needing_strategy_validation"] == []
-    assert result["queues"]["subjects_needing_differentiation_validation"] == []
+    assert "evidence" not in result["stages"]
+    assert "evidence_promotions" not in result["recent"]
     assert result["queues"]["published_receipts_awaiting_retrospective"] == ["receipt-1"]
     assert "evidence_awaiting_decision" not in result["queues"]
     assert result["video"]["production_count"] == 2
@@ -309,21 +294,25 @@ async def test_operating_cockpit_closes_the_portfolio_workflow_read_model() -> N
 
 
 @pytest.mark.asyncio
-async def test_operating_cockpit_marks_missing_strategy_as_pending() -> None:
+async def test_operating_cockpit_reports_missing_notes_without_blocking_work() -> None:
     repos = _repos()
     repos["brand"].list_strategies = AsyncMock(return_value=[])
+    repos["differentiation"].list_versions = AsyncMock(return_value=[])
 
     result = await PersonalIPOperatingCockpitService(**repos).build(owner_user_id="user-1")
 
-    assert result["stages"]["modeling"]["ready"] == 0
-    assert result["stages"]["modeling"]["pending"] == 1
-    assert result["stages"]["modeling"]["subjects_needing_strategy"] == 1
-    assert result["queues"]["subjects_needing_strategy_validation"] == ["subject-1"]
+    assert result["stages"]["modeling"]["pending"] == 0
+    assert result["stages"]["modeling"]["subjects_with_notes"] == 0
+    assert set(result["queues"]) == {
+        "preflights_awaiting_publish",
+        "published_receipts_awaiting_metrics",
+        "published_receipts_awaiting_retrospective",
+    }
 
 
 @pytest.mark.asyncio
 async def test_operating_cockpit_router_uses_authenticated_owner(monkeypatch) -> None:
-    build = AsyncMock(return_value={"contract_version": "personal-ip-operating-cockpit-v6", "stages": {}})
+    build = AsyncMock(return_value={"contract_version": "personal-ip-operating-cockpit-v7", "stages": {}})
     app = FastAPI()
     app.include_router(router_module.router)
 
@@ -341,5 +330,5 @@ async def test_operating_cockpit_router_uses_authenticated_owner(monkeypatch) ->
         response = await client.get("/api/personal-ip/cockpit")
 
     assert response.status_code == 200
-    assert response.json()["contract_version"] == "personal-ip-operating-cockpit-v6"
+    assert response.json()["contract_version"] == "personal-ip-operating-cockpit-v7"
     build.assert_awaited_once_with(owner_user_id="user-1")

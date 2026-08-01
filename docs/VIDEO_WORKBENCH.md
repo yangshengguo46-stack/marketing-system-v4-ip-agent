@@ -144,7 +144,7 @@ Every revision remains an editable rough cut. Before delivery QA, a user or
 Agent deliberately seals the latest revision with `final_edit_locked`. A later
 revision invalidates that lock; the repository rejects stale-lock QA and
 delivery. Candidate selection, real paid-provider calls and real publishing
-remain the only confirmation UI. Evidence promotion is automatic.
+remain the only confirmation UI. Business evidence is never auto-promoted into a rule.
 
 After the lock, the normal local final path is
 `personal_ip_render_locked_video_delivery`. It accepts only a production id,

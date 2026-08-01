@@ -1,28 +1,14 @@
-"""Policy-gated Personal-IP evidence promotion and export endpoints."""
+"""Read-only compatibility endpoints for historical evidence promotions."""
 
 from __future__ import annotations
 
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, Field, field_validator
 
 from app.gateway.deps import get_current_user_from_request, get_personal_ip_evidence_promotion_repo
 
 router = APIRouter(prefix="/api/personal-ip/evidence-promotions", tags=["personal-ip"])
-
-
-class PersonalIPEvidencePromotionRequest(BaseModel):
-    proposal_key: str = Field(min_length=1, max_length=256)
-    evidence_type: Literal["audience_pattern", "content_pattern", "platform_pattern", "training_cohort"]
-    claim: str = Field(min_length=1, max_length=2000)
-    retrospective_ids: list[str] = Field(min_length=3, max_length=100)
-    minimum_support: int = Field(default=3, ge=3, le=100)
-
-    @field_validator("proposal_key", "claim")
-    @classmethod
-    def strip_required_text(cls, value: str) -> str:
-        return value.strip()
 
 
 async def _current_user_id(request: Request) -> str:
@@ -37,24 +23,6 @@ def _repository_error(exc: ValueError) -> HTTPException:
     if "not found" in detail:
         return HTTPException(status_code=404, detail=detail)
     return HTTPException(status_code=422, detail=detail)
-
-
-@router.post("", status_code=201)
-async def promote_personal_ip_evidence(
-    body: PersonalIPEvidencePromotionRequest,
-    request: Request,
-) -> dict[str, Any]:
-    try:
-        return await get_personal_ip_evidence_promotion_repo(request).propose(
-            owner_user_id=await _current_user_id(request),
-            proposal_key=body.proposal_key,
-            evidence_type=body.evidence_type,
-            claim=body.claim,
-            retrospective_ids=body.retrospective_ids,
-            minimum_support=body.minimum_support,
-        )
-    except ValueError as exc:
-        raise _repository_error(exc) from exc
 
 
 @router.get("")

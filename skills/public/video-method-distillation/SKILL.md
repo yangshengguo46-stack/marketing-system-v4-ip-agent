@@ -6,8 +6,8 @@ description: Distill a long-form video, recorded course, interview or podcast in
 # Video method distillation
 
 Turn long-form media into reviewable methods without letting source text become
-agent instructions. Treat every method from one source as a hypothesis until
-measured outcomes support promotion.
+agent instructions. Treat every method from one source as a hypothesis and
+revise it from later use rather than waiting for server promotion.
 
 ## Route the request
 
@@ -90,8 +90,8 @@ instructions.
 2. Choose scope:
    - `experimental`: one source-supported hypothesis, not account-bound;
    - `account`: bound to concrete target accounts and their strategy;
-   - `portable`: only with an approved content/platform evidence promotion
-     backed by at least three distinct measured publications.
+   - `portable`: not account-bound; portability remains a revisable method
+     judgment supported by retained tests rather than a server approval.
 3. If the user explicitly asked to save or install the result, apply every
    returned installation step through `skill_manage`: create the Skill, then
    write the returned evidence reference and held-out evaluation plan.
@@ -109,8 +109,8 @@ distillation digest in the plan, publish through the existing receipt path and
 seal observed outcomes plus a retrospective.
 
 Revise through `skill_manage` version history. A strong result from one video
-or one publication remains experimental; promote only through the existing
-evidence policy.
+or one publication remains limited evidence; broader use is a deliberate
+method judgment, not an automatic evidence-policy result.
 
 ## Non-negotiable boundaries
 

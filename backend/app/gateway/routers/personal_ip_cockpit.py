@@ -11,7 +11,6 @@ from app.gateway.deps import (
     get_personal_ip_account_repo,
     get_personal_ip_brand_repo,
     get_personal_ip_differentiation_repo,
-    get_personal_ip_evidence_promotion_repo,
     get_personal_ip_metric_repo,
     get_personal_ip_platform_observation_repo,
     get_personal_ip_preflight_repo,
@@ -36,7 +35,6 @@ def _cockpit_service(request: Request) -> PersonalIPOperatingCockpitService:
         metrics=get_personal_ip_metric_repo(request),
         platform_observations=get_personal_ip_platform_observation_repo(request),
         retrospectives=get_personal_ip_retrospective_repo(request),
-        evidence_promotions=get_personal_ip_evidence_promotion_repo(request),
         video_productions=get_personal_ip_video_production_repo(request),
     )
 

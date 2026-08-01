@@ -229,9 +229,9 @@ def test_cinematic_ip_stack_uses_native_product_state() -> None:
         "personal_ip_run_preflight",
         "personal_ip_prepare_browser_publish",
         "personal_ip_seal_retrospective",
-        "personal_ip_promote_evidence",
     ):
         assert tool_name in calibrate_text
+    assert "personal_ip_promote_evidence" not in calibrate_text
 
     curriculum_cli = (curriculum / "scripts" / "curriculum_cli.py").read_text(
         encoding="utf-8"
@@ -263,6 +263,7 @@ def test_differentiation_thesis_is_bound_to_strategy_and_cinematic_work() -> Non
     direction = (
         ROOT / "skills" / "public" / "direct-ip-visual-language" / "SKILL.md"
     ).read_text(encoding="utf-8")
-    assert "design-ip-differentiation" in strategy
+    assert "differentiation note tool" in strategy
+    assert "status labels and document completeness never authorize downstream work" in strategy
     assert "差异化版本" in series
     assert "差异化识别系统" in direction

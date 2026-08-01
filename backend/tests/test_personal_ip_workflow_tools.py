@@ -14,8 +14,6 @@ from deerflow.tools.builtins import (
     personal_ip_begin_publish_receipt_tool,
     personal_ip_finish_browser_publish_tool,
     personal_ip_prepare_browser_publish_tool,
-    personal_ip_promote_evidence_tool,
-    personal_ip_read_evidence_promotion_tool,
     personal_ip_read_preflight_tool,
     personal_ip_read_publish_receipt_tool,
     personal_ip_read_retrospective_tool,
@@ -27,8 +25,6 @@ from deerflow.tools.builtins.personal_ip_workflow_tools import (
     _personal_ip_begin_publish_receipt,
     _personal_ip_finish_browser_publish,
     _personal_ip_prepare_browser_publish,
-    _personal_ip_promote_evidence,
-    _personal_ip_read_evidence_promotion,
     _personal_ip_read_preflight,
     _personal_ip_read_publish_receipt,
     _personal_ip_read_retrospective,
@@ -74,7 +70,23 @@ def _pilot_differentiation():
     )
 
 
-def test_personal_ip_workflow_tools_are_native_with_policy_promotion() -> None:
+def _active_subjects():
+    return SimpleNamespace(
+        get=AsyncMock(
+            return_value={"id": "subject-1", "status": "active"},
+        )
+    )
+
+
+def _active_accounts():
+    return SimpleNamespace(
+        get=AsyncMock(
+            return_value={"id": "acct-1", "status": "active"},
+        )
+    )
+
+
+def test_personal_ip_workflow_tools_keep_observation_tools() -> None:
     tools = [
         personal_ip_run_preflight_tool,
         personal_ip_read_preflight_tool,
@@ -85,17 +97,13 @@ def test_personal_ip_workflow_tools_are_native_with_policy_promotion() -> None:
         personal_ip_read_publish_receipt_tool,
         personal_ip_seal_retrospective_tool,
         personal_ip_read_retrospective_tool,
-        personal_ip_promote_evidence_tool,
-        personal_ip_read_evidence_promotion_tool,
     ]
     assert all(item in BUILTIN_TOOLS for item in tools)
     names = {item.name for item in tools}
     assert names == {
         "personal_ip_begin_publish_receipt",
         "personal_ip_finish_browser_publish",
-        "personal_ip_promote_evidence",
         "personal_ip_prepare_browser_publish",
-        "personal_ip_read_evidence_promotion",
         "personal_ip_read_preflight",
         "personal_ip_read_publish_receipt",
         "personal_ip_read_retrospective",
@@ -259,6 +267,8 @@ async def test_run_preflight_uses_strategy_without_local_ids(monkeypatch) -> Non
             metrics=SimpleNamespace(),
             publish_receipts=SimpleNamespace(),
             preflights=preflights,
+            subjects=_active_subjects(),
+            accounts=_active_accounts(),
             brand=brand,
             differentiation=_pilot_differentiation(),
         )
@@ -343,6 +353,7 @@ async def test_run_preflight_supports_a_first_pilot_without_account_history(monk
             metrics=SimpleNamespace(),
             publish_receipts=SimpleNamespace(),
             preflights=preflights,
+            subjects=_active_subjects(),
             brand=brand,
             differentiation=_pilot_differentiation(),
         )
@@ -423,6 +434,7 @@ async def test_run_preflight_requires_both_local_evidence_purposes(monkeypatch) 
             metrics=SimpleNamespace(),
             publish_receipts=SimpleNamespace(),
             preflights=preflights,
+            subjects=_active_subjects(),
             brand=brand,
             differentiation=_pilot_differentiation(),
             minecontext=minecontext,
@@ -488,10 +500,6 @@ async def test_native_workflow_tools_preserve_owner_scope_and_append_only_sequen
         seal=AsyncMock(return_value={"id": "retro-1", "status": "measured"}),
         get=AsyncMock(return_value={"id": "retro-1", "prediction": {}, "outcome": {}}),
     )
-    promotions = SimpleNamespace(
-        propose=AsyncMock(return_value={"id": "promotion-1", "status": "approved"}),
-        get=AsyncMock(return_value={"id": "promotion-1", "status": "approved"}),
-    )
     configure_personal_ip_runtime(
         PersonalIPRuntimeServices(
             connections=SimpleNamespace(),
@@ -499,7 +507,6 @@ async def test_native_workflow_tools_preserve_owner_scope_and_append_only_sequen
             publish_receipts=publish_receipts,
             preflights=preflights,
             retrospectives=retrospectives,
-            evidence_promotions=promotions,
         )
     )
     runtime = SimpleNamespace(context={"user_id": "user-1"})
@@ -539,17 +546,6 @@ async def test_native_workflow_tools_preserve_owner_scope_and_append_only_sequen
         )
     )
     retrospective_detail = json.loads(await _personal_ip_read_retrospective(runtime, "retro-1"))
-    promotion = json.loads(
-        await _personal_ip_promote_evidence(
-            runtime,
-            proposal_key="pattern:hook-1",
-            evidence_type="content_pattern",
-            claim="开头直给结果提高完播",
-            retrospective_ids=["retro-1", "retro-2", "retro-3"],
-            minimum_support=3,
-        )
-    )
-    promotion_detail = json.loads(await _personal_ip_read_evidence_promotion(runtime, "promotion-1"))
 
     assert created["id"] == "publish-1"
     assert attempted["status"] == "published"
@@ -557,8 +553,6 @@ async def test_native_workflow_tools_preserve_owner_scope_and_append_only_sequen
     assert preflight_detail["id"] == "preflight-1"
     assert retrospective["id"] == "retro-1"
     assert retrospective_detail["id"] == "retro-1"
-    assert promotion["id"] == "promotion-1"
-    assert promotion_detail["id"] == "promotion-1"
     assert publish_receipts.begin.await_args.kwargs["owner_user_id"] == "user-1"
     assert publish_receipts.record_attempt.await_args.kwargs["occurred_at"].isoformat() == "2026-07-22T05:00:00+00:00"
     retrospectives.seal.assert_awaited_once_with(
@@ -567,14 +561,6 @@ async def test_native_workflow_tools_preserve_owner_scope_and_append_only_sequen
         publish_receipt_id="publish-1",
         horizon="T+3d",
         metric_observation_ids=["metric-1"],
-    )
-    promotions.propose.assert_awaited_once_with(
-        owner_user_id="user-1",
-        proposal_key="pattern:hook-1",
-        evidence_type="content_pattern",
-        claim="开头直给结果提高完播",
-        retrospective_ids=["retro-1", "retro-2", "retro-3"],
-        minimum_support=3,
     )
 
 

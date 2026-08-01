@@ -10,8 +10,7 @@ export type PersonalIPWorkflowResource =
   | "publish-receipts"
   | "metrics"
   | "platform-observations"
-  | "retrospectives"
-  | "evidence-promotions";
+  | "retrospectives";
 
 async function readError(response: Response): Promise<string> {
   const payload = (await response.json().catch(() => null)) as {
