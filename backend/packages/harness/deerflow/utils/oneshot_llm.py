@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 
+from langchain_core.callbacks.manager import Callbacks
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from deerflow.config.app_config import AppConfig
@@ -38,6 +39,7 @@ async def run_oneshot_llm(
     app_config: AppConfig,
     model_name: str | None = None,
     thread_id: str | None = None,
+    callbacks: Callbacks = None,
 ) -> str:
     """Run a single non-graph system+user LLM turn and return the raw text.
 
@@ -48,12 +50,19 @@ async def run_oneshot_llm(
         app_config: Application config used to build the model.
         model_name: Optional model override; ``None`` uses the default model.
         thread_id: Optional thread id, forwarded to Langfuse for tracing only.
+        callbacks: Optional run-scoped callbacks for this internal model call.
 
     Returns:
         The extracted plain-text content of the model response (uncleaned).
     """
     model = create_chat_model(name=model_name, thinking_enabled=False, app_config=app_config)
     invoke_config: dict = {"run_name": run_name}
+    if callbacks is not None:
+        invoke_config["callbacks"] = callbacks
+        # Journaled one-shot helpers run below the lead Agent. A distinct caller
+        # tag keeps their responses from replacing the user-facing answer and
+        # preserves the exact internal run name in each receipt.
+        invoke_config["tags"] = [f"middleware:{run_name}"]
     inject_langfuse_metadata(
         invoke_config,
         thread_id=thread_id,

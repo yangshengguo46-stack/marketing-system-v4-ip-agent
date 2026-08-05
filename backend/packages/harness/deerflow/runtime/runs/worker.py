@@ -20,6 +20,7 @@ import copy
 import inspect
 import logging
 import os
+import re
 import threading
 import weakref
 from collections.abc import AsyncIterator
@@ -72,8 +73,31 @@ from .schemas import RunStatus
 
 logger = logging.getLogger(__name__)
 
+_GENERIC_RUN_ERROR_MESSAGE = "The run failed unexpectedly. Please retry."
+_GENERIC_RUN_ERROR_REASON = "internal_error"
+_SAFE_LLM_FALLBACK_REASONS = frozenset(
+    {
+        "auth",
+        "burst_rate",
+        "busy",
+        "circuit_open",
+        "empty_terminal_response",
+        "generic",
+        "quota",
+        "transient",
+    }
+)
+
 _checkpoint_locks_guard = threading.Lock()
 _checkpoint_locks_by_loop: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, dict[str, asyncio.Lock]] = weakref.WeakKeyDictionary()
+
+
+def _safe_exception_type(error: BaseException) -> str:
+    """Return one bounded diagnostic label without touching exception text."""
+    error_type = type(error).__name__
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", error_type):
+        return error_type
+    return "Exception"
 
 
 @asynccontextmanager
@@ -499,7 +523,11 @@ async def run_agent(
                             break
                         llm_error_fallback_message = llm_error_fallback_message or _extract_llm_error_fallback_message(chunk, pre_existing_message_ids)
                         sse_event = _lg_mode_to_sse_event(single_mode)
-                        await bridge.publish(run_id, sse_event, serialize(chunk, mode=single_mode))
+                        await bridge.publish(
+                            run_id,
+                            sse_event,
+                            _sanitize_llm_error_fallback_payload(serialize(chunk, mode=single_mode)),
+                        )
                         if single_mode == "custom":
                             await subagent_events.add(chunk)
                     return
@@ -520,7 +548,11 @@ async def run_agent(
 
                     llm_error_fallback_message = llm_error_fallback_message or _extract_llm_error_fallback_message(chunk, pre_existing_message_ids)
                     sse_event = _lg_mode_to_sse_event(mode)
-                    await bridge.publish(run_id, sse_event, serialize(chunk, mode=mode))
+                    await bridge.publish(
+                        run_id,
+                        sse_event,
+                        _sanitize_llm_error_fallback_payload(serialize(chunk, mode=mode)),
+                    )
                     if mode == "custom":
                         await subagent_events.add(chunk)
 
@@ -615,15 +647,27 @@ async def run_agent(
             logger.info("Run %s was cancelled", run_id)
 
     except Exception as exc:
-        error_msg = f"{exc}"
-        logger.exception("Run %s failed: %s", run_id, error_msg)
-        await run_manager.set_status(run_id, RunStatus.error, error=error_msg)
+        error_type = _safe_exception_type(exc)
+        logger.error(
+            "Run %s failed with error_type=%s reason=%s",
+            run_id,
+            error_type,
+            _GENERIC_RUN_ERROR_REASON,
+            exc_info=False,
+        )
+        await run_manager.set_status(
+            run_id,
+            RunStatus.error,
+            error=_GENERIC_RUN_ERROR_MESSAGE,
+            stop_reason=_GENERIC_RUN_ERROR_REASON,
+        )
         await bridge.publish(
             run_id,
             "error",
             {
-                "message": error_msg,
-                "name": type(exc).__name__,
+                "message": _GENERIC_RUN_ERROR_MESSAGE,
+                "name": error_type,
+                "reason": _GENERIC_RUN_ERROR_REASON,
             },
         )
 
@@ -1414,15 +1458,35 @@ def _lg_mode_to_sse_event(mode: str) -> str:
 
 
 def _error_fallback_message_from_metadata(metadata: dict[str, Any], content: Any) -> str:
-    detail = metadata.get("error_detail")
-    if isinstance(detail, str) and detail.strip():
-        return detail.strip()
-    reason = metadata.get("error_reason")
-    if isinstance(reason, str) and reason.strip():
-        return reason.strip()
     if isinstance(content, str) and content.strip():
         return content.strip()[:2000]
+    reason = metadata.get("error_reason")
+    if isinstance(reason, str) and reason in _SAFE_LLM_FALLBACK_REASONS:
+        return reason
     return "LLM provider failed after retries"
+
+
+def _sanitize_llm_error_fallback_payload(value: Any) -> Any:
+    """Strip raw provider details from fallback messages before SSE export."""
+    if isinstance(value, dict):
+        if value.get("deerflow_error_fallback") is True:
+            raw_error_type = value.get("error_type")
+            error_type = "Exception"
+            if isinstance(raw_error_type, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", raw_error_type):
+                error_type = raw_error_type
+            raw_reason = value.get("error_reason")
+            reason = raw_reason if isinstance(raw_reason, str) and raw_reason in _SAFE_LLM_FALLBACK_REASONS else "generic"
+            return {
+                "deerflow_error_fallback": True,
+                "error_type": error_type,
+                "error_reason": reason,
+            }
+        return {key: _sanitize_llm_error_fallback_payload(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_llm_error_fallback_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_llm_error_fallback_payload(item) for item in value)
+    return value
 
 
 def _message_id(obj: Any) -> str | None:

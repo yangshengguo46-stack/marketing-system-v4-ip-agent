@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install ip-test-prepare ip-test-start ip-test-reset ip-test-status ip-test-stop ip-test-evidence-reset ip-test-evidence-start ip-test-evidence-login ip-test-evidence-mediakit-key ip-m2-prepare ip-m2-run ip-m2-method-prepare ip-m2-method-run ip-m2-method-recover ip-m2-method-unblind personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install ip-test-prepare ip-test-start ip-test-reset ip-test-status ip-test-stop ip-test-evidence-reset ip-test-evidence-start ip-test-evidence-login ip-test-evidence-mediakit-key ip-m2-prepare ip-m2-run ip-m2-method-prepare ip-m2-method-run ip-m2-method-recover ip-m2-method-unblind personal-ip-writer-v2-acceptance personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 PNPM ?= pnpm
@@ -8,6 +8,8 @@ BACKEND_UV_RUN = cd backend && uv run
 IP_TEST_RUN = cd backend && PYTHONPATH=.. uv run python -m scripts.ip_agent_test_mode
 IP_M2_RUN = cd backend && PYTHONPATH=.. uv run python -m scripts.ip_agent_m2_replay
 IP_M2_METHOD_RUN = cd backend && PYTHONPATH=.. uv run python -m scripts.ip_agent_m2_method_attribution
+IP_WRITER_V2_RUN = cd backend && uv run python ../scripts/personal_ip_writer_v2_acceptance.py
+IP_WRITER_V2_ARGS ?= readiness
 IP_M2_METHOD_BASE_URL ?= http://127.0.0.1:8011
 IP_M2_METHOD_ORDER ?= placebo-method
 IP_M2_METHOD_SPEC ?= product/research/ip-agent/m2/method-attribution/experiment.json
@@ -45,6 +47,7 @@ help:
 	@echo "  make ip-m2-method-run - Run the one-call, zero-tool M2-E3 placebo/method pair"
 	@echo "  make ip-m2-method-recover - Remove only a marked interrupted M2-E3 Agent/Skill"
 	@echo "  make ip-m2-method-unblind RESULTS=... REVIEWS='a.json b.json' - Verify reviews and unblind"
+	@echo "  make personal-ip-writer-v2-acceptance - Run zero-cost Writer Brain v2 readiness (override IP_WRITER_V2_ARGS for an explicitly gated live run)"
 	@echo "  make personal-ip-publish-acceptance - Run local-only eight-platform publish recovery checks"
 	@echo "  make personal-ip-cost-acceptance - Run video hard-budget reservation/retry/concurrency checks"
 	@echo "  make personal-ip-data-lifecycle-acceptance - Verify credential-safe backup, restore and whole-domain deletion"
@@ -163,6 +166,9 @@ ip-m2-method-unblind:
 	@test -n "$(RESULTS)" || (echo "Set RESULTS=/path/to/results.json" && exit 2)
 	@test -n "$(REVIEWS)" || (echo "Set REVIEWS='/path/review-a.json /path/review-b.json'" && exit 2)
 	@$(IP_M2_METHOD_RUN) unblind --results "$(RESULTS)" $(foreach review,$(REVIEWS),--review "$(review)")
+
+personal-ip-writer-v2-acceptance:
+	@$(IP_WRITER_V2_RUN) $(IP_WRITER_V2_ARGS)
 
 personal-ip-publish-acceptance:
 	@$(MAKE) -C backend personal-ip-publish-acceptance

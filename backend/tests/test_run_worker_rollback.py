@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import logging
 from contextlib import suppress
 from types import SimpleNamespace
 from typing import Any
@@ -13,6 +14,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from deerflow.runtime.context_keys import CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY
 from deerflow.runtime.runs.manager import ConflictError, RunManager
 from deerflow.runtime.runs.schemas import RunStatus
+from deerflow.runtime.runs.store.memory import MemoryRunStore
 from deerflow.runtime.runs.worker import (
     RunContext,
     _agent_factory_supports_app_config,
@@ -211,18 +213,22 @@ async def test_run_agent_marks_llm_error_fallback_as_error_status():
         publish_end=AsyncMock(),
         cleanup=AsyncMock(),
     )
+    raw_secret = "provider-secret-that-must-never-persist"
+    owner_prompt = "OWNER_PROMPT: 用户未公开的完整需求"
+    private_path = "/private/provider/request/path"
+    safe_message = "The configured LLM provider is temporarily unavailable after multiple retries."
 
     class DummyAgent:
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
             yield {
                 "messages": [
                     AIMessage(
-                        content="The configured LLM provider is temporarily unavailable after multiple retries.",
+                        content=safe_message,
                         additional_kwargs={
                             "deerflow_error_fallback": True,
                             "error_type": "APIConnectionError",
                             "error_reason": "transient",
-                            "error_detail": "Connection error.",
+                            "error_detail": (f"503 Authorization: Bearer {raw_secret}; raw_body={{'prompt': {owner_prompt!r}}}; path={private_path}"),
                         },
                     )
                 ]
@@ -244,7 +250,102 @@ async def test_run_agent_marks_llm_error_fallback_as_error_status():
     fetched = await run_manager.get(record.run_id)
     assert fetched is not None
     assert fetched.status == RunStatus.error
-    assert fetched.error == "Connection error."
+    assert fetched.error == safe_message
+    externally_visible = repr(
+        {
+            "run": fetched,
+            "sse": bridge.publish.await_args_list,
+        }
+    )
+    for forbidden in (
+        raw_secret,
+        owner_prompt,
+        "Authorization",
+        "Bearer",
+        "raw_body",
+        private_path,
+    ):
+        assert forbidden not in externally_visible
+    bridge.publish_end.assert_awaited_once_with(record.run_id)
+
+
+@pytest.mark.anyio
+async def test_run_agent_generic_exception_redacts_persistence_sse_and_logs(caplog):
+    raw_secret = "provider-secret-that-must-never-persist"
+    owner_prompt = "OWNER_PROMPT: 用户未公开的完整提示词"
+    private_path = "/private/provider/request/path"
+    exception_message = f"401 Authorization: Bearer {raw_secret}; raw_body={{'prompt': {owner_prompt!r}}}; path={private_path}"
+
+    class ProviderRequestError(RuntimeError):
+        pass
+
+    store = MemoryRunStore()
+    run_manager = RunManager(store=store)
+    record = await run_manager.create("thread-1")
+    bridge = SimpleNamespace(
+        publish=AsyncMock(),
+        publish_end=AsyncMock(),
+        cleanup=AsyncMock(),
+    )
+
+    def factory(*, config):
+        del config
+        raise ProviderRequestError(exception_message)
+
+    caplog.set_level(logging.ERROR, logger="deerflow.runtime.runs.worker")
+    await run_agent(
+        bridge,
+        run_manager,
+        record,
+        ctx=RunContext(checkpointer=None),
+        agent_factory=factory,
+        graph_input={},
+        config={},
+    )
+
+    safe_message = "The run failed unexpectedly. Please retry."
+    fetched = await run_manager.get(record.run_id)
+    assert fetched is not None
+    assert fetched.status == RunStatus.error
+    assert fetched.error == safe_message
+    assert fetched.stop_reason == "internal_error"
+
+    stored = await store.get(record.run_id)
+    assert stored is not None
+    assert stored["error"] == safe_message
+    assert stored["stop_reason"] == "internal_error"
+
+    error_payloads = [publish.args[2] for publish in bridge.publish.await_args_list if len(publish.args) >= 3 and publish.args[1] == "error"]
+    assert error_payloads == [
+        {
+            "message": safe_message,
+            "name": "ProviderRequestError",
+            "reason": "internal_error",
+        }
+    ]
+
+    worker_error_records = [log_record for log_record in caplog.records if log_record.name == "deerflow.runtime.runs.worker" and log_record.levelno >= logging.ERROR]
+    assert len(worker_error_records) == 1
+    assert worker_error_records[0].getMessage() == (f"Run {record.run_id} failed with error_type=ProviderRequestError reason=internal_error")
+    assert not worker_error_records[0].exc_info
+
+    externally_visible = repr(
+        {
+            "run": stored,
+            "sse": error_payloads,
+            "logs": caplog.text,
+        }
+    )
+    for forbidden in (
+        raw_secret,
+        owner_prompt,
+        "Authorization",
+        "Bearer",
+        "raw_body",
+        private_path,
+    ):
+        assert forbidden not in externally_visible
+
     bridge.publish_end.assert_awaited_once_with(record.run_id)
 
 
@@ -663,7 +764,7 @@ def test_try_extract_from_message_finds_fallback_on_message_object():
             "error_reason": "transient",
         },
     )
-    assert _try_extract_from_message(msg) == "Connection error."
+    assert _try_extract_from_message(msg) == "fallback"
 
 
 def test_try_extract_from_message_finds_fallback_on_dict():
@@ -674,7 +775,7 @@ def test_try_extract_from_message_finds_fallback_on_dict():
             "error_detail": "Quota exceeded.",
         },
     }
-    assert _try_extract_from_message(msg) == "Quota exceeded."
+    assert _try_extract_from_message(msg) == "fallback"
 
 
 def test_try_extract_from_message_returns_none_for_normal_message():
@@ -710,7 +811,7 @@ def test_extract_llm_error_fallback_message_finds_fallback_in_messages_list():
         ],
         "other_state": "large_value" * 1000,
     }
-    assert _extract_llm_error_fallback_message(state) == "Connection error."
+    assert _extract_llm_error_fallback_message(state) == "Unavailable."
 
 
 def test_extract_llm_error_fallback_message_finds_fallback_in_raw_message():
@@ -721,7 +822,7 @@ def test_extract_llm_error_fallback_message_finds_fallback_in_raw_message():
             "error_reason": "quota",
         },
     )
-    assert _extract_llm_error_fallback_message(msg) == "quota"
+    assert _extract_llm_error_fallback_message(msg) == "Unavailable."
 
 
 def test_extract_llm_error_fallback_message_finds_fallback_in_tuple():
@@ -735,7 +836,7 @@ def test_extract_llm_error_fallback_message_finds_fallback_in_tuple():
             },
         ),
     )
-    assert _extract_llm_error_fallback_message(item) == "Circuit open."
+    assert _extract_llm_error_fallback_message(item) == "Unavailable."
 
 
 def test_extract_llm_error_fallback_message_returns_none_for_empty_values():
@@ -761,7 +862,7 @@ def test_extract_llm_error_fallback_message_finds_fallback_in_updates_mode():
             ]
         }
     }
-    assert _extract_llm_error_fallback_message(update_chunk) == "Connection error."
+    assert _extract_llm_error_fallback_message(update_chunk) == "Unavailable."
 
 
 def test_extract_llm_error_fallback_message_updates_mode_no_fallback():
@@ -796,7 +897,7 @@ def test_try_extract_skips_message_with_pre_existing_id():
     )
     assert _try_extract_from_message(msg, {"stale-1"}) is None
     # Without the filter, the same message would still surface the marker.
-    assert _try_extract_from_message(msg) == "Connection error."
+    assert _try_extract_from_message(msg) == "Unavailable."
 
 
 def test_try_extract_still_finds_fresh_message_when_others_are_stale():
@@ -809,7 +910,7 @@ def test_try_extract_still_finds_fresh_message_when_others_are_stale():
             "error_detail": "Connection error.",
         },
     )
-    assert _try_extract_from_message(msg, {"stale-1", "stale-2"}) == "Connection error."
+    assert _try_extract_from_message(msg, {"stale-1", "stale-2"}) == "Unavailable."
 
 
 def test_try_extract_skips_dict_message_with_pre_existing_id():
@@ -822,7 +923,7 @@ def test_try_extract_skips_dict_message_with_pre_existing_id():
         },
     }
     assert _try_extract_from_message(msg, {"stale-2"}) is None
-    assert _try_extract_from_message(msg) == "Quota exceeded."
+    assert _try_extract_from_message(msg) == "Unavailable."
 
 
 def test_extract_llm_error_fallback_message_skips_stale_history():
@@ -866,11 +967,11 @@ def test_extract_llm_error_fallback_message_returns_fresh_marker_alongside_stale
             ),
         ]
     }
-    assert _extract_llm_error_fallback_message(state, {"stale-1", "stale-fallback"}) == "Fresh error."
+    assert _extract_llm_error_fallback_message(state, {"stale-1", "stale-fallback"}) == "New failure."
 
 
 def test_extract_llm_error_fallback_message_default_filter_is_empty():
-    """Passing no pre_existing_ids must preserve the original (pre-fix) behavior."""
+    """Passing no pre_existing_ids still detects the current fallback safely."""
     state = {
         "messages": [
             AIMessage(
@@ -883,7 +984,7 @@ def test_extract_llm_error_fallback_message_default_filter_is_empty():
             )
         ]
     }
-    assert _extract_llm_error_fallback_message(state) == "Connection error."
+    assert _extract_llm_error_fallback_message(state) == "Unavailable."
 
 
 def test_collect_pre_existing_message_ids_pulls_ids_from_snapshot():

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
@@ -40,6 +41,18 @@ logger = logging.getLogger(__name__)
 _LEGACY_SUMMARY_MESSAGE_NAME = "summary"
 _RECONCILED_TOOL_MESSAGE_NAMES = frozenset({"ask_clarification"})
 _PERSISTED_HIDDEN_HUMAN_INPUT_RESPONSE_SOURCES = frozenset({"ask_clarification"})
+_SAFE_LLM_FALLBACK_REASONS = frozenset(
+    {
+        "auth",
+        "burst_rate",
+        "busy",
+        "circuit_open",
+        "empty_terminal_response",
+        "generic",
+        "quota",
+        "transient",
+    }
+)
 
 
 def _should_persist_human_input_message(message: BaseMessage) -> bool:
@@ -179,12 +192,19 @@ class RunJournal(BaseCallbackHandler):
         self._put(event_type="run.end", category="outputs", content=outputs, metadata={"status": "success"})
         self._flush_sync()
 
-    def on_chain_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
+    def on_chain_error(
+        self,
+        error: BaseException,
+        *,
+        run_id: UUID,
+        tags: list[str] | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._put(
             event_type="run.error",
             category="error",
-            content=str(error),
-            metadata={"error_type": type(error).__name__},
+            content={"error_category": "run_failed"},
+            metadata=self._safe_error_metadata(error, tags),
         )
         self._flush_sync()
 
@@ -272,17 +292,15 @@ class RunJournal(BaseCallbackHandler):
             usage = getattr(message, "usage_metadata", None)
             usage_dict = dict(usage) if usage else {}
             additional_kwargs = getattr(message, "additional_kwargs", None) or {}
-            if isinstance(additional_kwargs, dict) and additional_kwargs.get("deerflow_error_fallback"):
+            is_error_fallback = isinstance(additional_kwargs, dict) and additional_kwargs.get("deerflow_error_fallback") is True
+            if is_error_fallback:
                 self._had_llm_error_fallback = True
-                detail = additional_kwargs.get("error_detail")
                 reason = additional_kwargs.get("error_reason")
                 fallback_text = self._message_text(message).strip()
-                if isinstance(detail, str) and detail.strip():
-                    self._llm_error_fallback_message = detail.strip()
-                elif isinstance(reason, str) and reason.strip():
-                    self._llm_error_fallback_message = reason.strip()
-                elif fallback_text:
+                if fallback_text:
                     self._llm_error_fallback_message = fallback_text[:2000]
+                elif isinstance(reason, str) and reason.strip():
+                    self._llm_error_fallback_message = reason if reason in _SAFE_LLM_FALLBACK_REASONS else "generic"
 
             # Resolve call index
             call_index = self._llm_call_index
@@ -293,10 +311,16 @@ class RunJournal(BaseCallbackHandler):
                 self._seen_llm_starts.add(rid)
 
             # Trace event: llm_response (OpenAI completion format)
+            event_content = message.model_dump()
+            if is_error_fallback and isinstance(event_content, dict):
+                event_content = {
+                    **event_content,
+                    "additional_kwargs": self._safe_llm_fallback_metadata(additional_kwargs),
+                }
             self._put(
                 event_type="llm.ai.response",
                 category="message",
-                content=message.model_dump(),
+                content=event_content,
                 metadata={
                     "caller": caller,
                     "usage": usage_dict,
@@ -341,9 +365,21 @@ class RunJournal(BaseCallbackHandler):
         if messages:
             self._counted_message_llm_run_ids.add(str(run_id))
 
-    def on_llm_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
+    def on_llm_error(
+        self,
+        error: BaseException,
+        *,
+        run_id: UUID,
+        tags: list[str] | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._llm_start_times.pop(str(run_id), None)
-        self._put(event_type="llm.error", category="trace", content=str(error))
+        self._put(
+            event_type="llm.error",
+            category="error",
+            content={"error_category": "llm_call_failed"},
+            metadata=self._safe_error_metadata(error, tags),
+        )
 
     def on_tool_start(self, serialized, input_str, *, run_id, parent_run_id=None, tags=None, metadata=None, inputs=None, **kwargs):
         """Handle tool start event, cache tool call ID for later correlation"""
@@ -508,6 +544,48 @@ class RunJournal(BaseCallbackHandler):
         # callback tags, while subagents and middleware explicitly tag
         # themselves.
         return "lead_agent"
+
+    @staticmethod
+    def _safe_error_label(value: str, *, fallback: str) -> str:
+        """Bound internal diagnostic labels without persisting exception text."""
+        if re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", value):
+            return value
+        return fallback
+
+    @classmethod
+    def _safe_llm_fallback_metadata(cls, metadata: Mapping[str, Any]) -> dict[str, Any]:
+        """Keep only bounded fallback classification fields in persisted messages."""
+        raw_reason = metadata.get("error_reason")
+        reason = raw_reason if isinstance(raw_reason, str) and raw_reason in _SAFE_LLM_FALLBACK_REASONS else "generic"
+        raw_error_type = metadata.get("error_type")
+        error_type = cls._safe_error_label(raw_error_type, fallback="Exception") if isinstance(raw_error_type, str) else "Exception"
+        return {
+            "deerflow_error_fallback": True,
+            "error_type": error_type,
+            "error_reason": reason,
+        }
+
+    def _safe_error_metadata(
+        self,
+        error: BaseException,
+        tags: list[str] | None,
+    ) -> dict[str, str]:
+        caller = self._identify_caller(tags)
+        if caller.startswith("middleware:"):
+            fallback_caller = "middleware:internal"
+        elif caller.startswith("subagent:"):
+            fallback_caller = "subagent:internal"
+        else:
+            fallback_caller = "lead_agent"
+        safe_caller = self._safe_error_label(caller, fallback=fallback_caller)
+        _, separator, nested_name = safe_caller.partition(":")
+        run_name = nested_name if separator else safe_caller
+        error_type = self._safe_error_label(type(error).__name__, fallback="Exception")
+        return {
+            "error_type": error_type,
+            "caller": safe_caller,
+            "run_name": run_name,
+        }
 
     def _record_model_usage(
         self,

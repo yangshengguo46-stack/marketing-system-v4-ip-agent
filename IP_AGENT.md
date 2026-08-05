@@ -402,12 +402,22 @@ make ip-test-reset
 make ip-test-start
 make ip-test-status
 
+make personal-ip-writer-v2-acceptance
 make personal-ip-data-lifecycle-acceptance
 make personal-ip-publish-acceptance
 make personal-ip-observability-acceptance
 make personal-ip-cost-acceptance
 make video-e2e-local
 ```
+
+`make personal-ip-writer-v2-acceptance` is readiness-only by default: it
+validates the frozen four-case catalog, product Agent artifact, runtime
+capability contract and credential-free model configuration without contacting
+the Gateway, reading credential values, opening the database or creating a
+result directory. A real one-case canary is available only through the
+script's `live` command with the exact `LIVE=1`, one `CASE`, and
+`ACK=RUN_REAL_DEFAULT_AGENT` opt-in; it accepts only a loopback Gateway, never
+retries a model call and seals the result outside the completion ledger.
 
 `make ip-test-reset` rotates only the marked isolated test home into a
 recoverable snapshot. It never rewrites the normal Owner home.

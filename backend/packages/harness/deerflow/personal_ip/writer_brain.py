@@ -15,6 +15,8 @@ import re
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import Any
 
+from langchain_core.callbacks.manager import Callbacks
+
 from deerflow.config.app_config import AppConfig
 from deerflow.persistence.personal_ip_content import PersonalIPContentRepository
 from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
@@ -606,6 +608,7 @@ class WriterBrainService:
         app_config: AppConfig,
         thread_id: str | None,
         verified_evidence_snapshots: dict[str, dict[str, Any]] | None = None,
+        callbacks: Callbacks = None,
     ) -> dict[str, Any]:
         writer_request_digest = hashlib.sha256(_canonical(request.model_dump(mode="json")).encode("utf-8")).hexdigest()
         replay = await self._content.replay_commit(
@@ -633,13 +636,19 @@ class WriterBrainService:
             )
             if replay_lineage is None:
                 raise ValueError("replayed content work is unavailable")
+            replay_program = replay_lineage.get("editorial_program_version")
+            if not isinstance(replay_program, Mapping):
+                raise ValueError("replayed v2 content work has no EditorialProgramVersion")
             return {
                 "schema_version": WRITER_BRAIN_SCHEMA_VERSION,
                 "content_work_id": replay_work_id,
                 "breakdown_version_id": replay_breakdown["id"] if replay_breakdown else None,
-                "editorial_program_version_id": replay_lineage["content_work"].get("editorial_program_version_id"),
+                "editorial_program_version_id": replay_program["id"],
+                "editorial_program_version_number": replay_program["version_number"],
                 "direction_version_id": replay_direction["id"],
+                "direction_version_number": replay_direction["version_number"],
                 "script_version_id": replay_script["id"],
+                "script_version_number": replay_script["version_number"],
                 "story_mode": replay_script["story_mode"],
                 "locked_story": replay_script.get("locked_story"),
                 "locked_story_sha256": replay_script.get("locked_story_digest"),
@@ -671,6 +680,7 @@ class WriterBrainService:
             raise ValueError(f"{resolved.direction.truth_mode} writing requires an explicit usable claim_basis")
 
         locked_story: str | None = None
+        callback_config = {"callbacks": callbacks} if callbacks is not None else {}
         if resolved.story_engine_seed is not None:
             raw_story = await self._run_model(
                 system_instruction=_STORY_SYSTEM,
@@ -678,6 +688,7 @@ class WriterBrainService:
                 run_name="ip-agent-story-engine-v2",
                 app_config=app_config,
                 thread_id=thread_id,
+                **callback_config,
             )
             locked_story = validate_locked_story(raw_story, forbidden_terms=forbidden_terms)
 
@@ -691,6 +702,7 @@ class WriterBrainService:
             run_name="ip-agent-script-writer-v2",
             app_config=app_config,
             thread_id=thread_id,
+            **callback_config,
         )
         script_text = validate_script_text(raw_script)
         if resolved.direction.truth_mode == "fictional":
@@ -706,6 +718,7 @@ class WriterBrainService:
             run_name="ip-agent-script-boundary-verifier-v2",
             app_config=app_config,
             thread_id=thread_id,
+            **callback_config,
         )
         semantic_route_digest = semantic_causal_route_digest(resolved.direction.semantic_route) if resolved.direction.semantic_route is not None else None
         boundary_receipt = validate_script_boundary_result(
@@ -809,13 +822,19 @@ class WriterBrainService:
             direction_version = appended["direction_version"]
             breakdown_version = appended["breakdown_version"]
 
+        editorial_program_version = result.get("editorial_program_version")
+        if not isinstance(editorial_program_version, Mapping):
+            raise ValueError("v2 content work has no EditorialProgramVersion")
         return {
             "schema_version": WRITER_BRAIN_SCHEMA_VERSION,
             "content_work_id": (result["content_work"]["id"] if "content_work" in result else result["content_work_id"]),
             "breakdown_version_id": breakdown_version["id"] if breakdown_version else None,
-            "editorial_program_version_id": (result["content_work"].get("editorial_program_version_id") if "content_work" in result else (result.get("editorial_program_version") or {}).get("id")),
+            "editorial_program_version_id": editorial_program_version["id"],
+            "editorial_program_version_number": editorial_program_version["version_number"],
             "direction_version_id": direction_version["id"],
+            "direction_version_number": direction_version["version_number"],
             "script_version_id": script_version["id"],
+            "script_version_number": script_version["version_number"],
             "story_mode": script_version["story_mode"],
             "locked_story": script_version.get("locked_story"),
             "locked_story_sha256": script_version.get("locked_story_digest"),

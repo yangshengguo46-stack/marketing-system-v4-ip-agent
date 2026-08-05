@@ -162,7 +162,67 @@ def test_async_model_call_marks_transient_retry_exhaustion_as_error_fallback(
     assert "temporarily unavailable" in str(result.content)
     assert result.additional_kwargs["deerflow_error_fallback"] is True
     assert result.additional_kwargs["error_reason"] == "transient"
-    assert result.additional_kwargs["error_detail"] == "Connection error."
+    assert result.additional_kwargs == {
+        "deerflow_error_fallback": True,
+        "error_type": "FakeError",
+        "error_reason": "transient",
+    }
+
+
+def test_async_model_error_fallback_never_embeds_raw_provider_exception(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    middleware = _build_middleware(retry_max_attempts=1)
+    raw_secret = "provider-secret-that-must-never-persist"
+    owner_prompt = "OWNER_PROMPT: 用户未公开的完整需求"
+    private_path = "/private/provider/request/path"
+
+    async def handler(_request) -> AIMessage:
+        raise FakeError(
+            f"401 invalid_api_key Authorization: Bearer {raw_secret}; raw_body={{'prompt': {owner_prompt!r}}}; path={private_path}",
+            status_code=401,
+        )
+
+    result = asyncio.run(middleware.awrap_model_call(SimpleNamespace(), handler))
+
+    assert isinstance(result, AIMessage)
+    assert "authentication or access is invalid" in str(result.content)
+    assert result.additional_kwargs == {
+        "deerflow_error_fallback": True,
+        "error_type": "FakeError",
+        "error_reason": "auth",
+    }
+    externally_visible = repr({"message": result.model_dump(), "logs": caplog.text})
+    for forbidden in (
+        raw_secret,
+        owner_prompt,
+        "Authorization",
+        "Bearer",
+        "raw_body",
+        private_path,
+    ):
+        assert forbidden not in externally_visible
+
+
+def test_async_generic_model_error_uses_safe_user_message() -> None:
+    middleware = _build_middleware(retry_max_attempts=1)
+    raw_secret = "provider-secret-that-must-never-persist"
+    owner_prompt = "OWNER_PROMPT: 用户未公开的完整需求"
+
+    async def handler(_request) -> AIMessage:
+        raise FakeError(
+            f"provider rejected raw_body={{'token': '{raw_secret}', 'prompt': {owner_prompt!r}}}",
+            status_code=400,
+        )
+
+    result = asyncio.run(middleware.awrap_model_call(SimpleNamespace(), handler))
+
+    assert isinstance(result, AIMessage)
+    assert result.content == "The configured LLM provider rejected the request. Please check the model configuration and try again."
+    externally_visible = repr(result.model_dump())
+    assert raw_secret not in externally_visible
+    assert owner_prompt not in externally_visible
+    assert "raw_body" not in externally_visible
 
 
 def test_sync_model_call_uses_retry_after_header(monkeypatch: pytest.MonkeyPatch) -> None:

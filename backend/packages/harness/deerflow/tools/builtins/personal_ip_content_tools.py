@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from langchain.tools import tool
+from langchain_core.callbacks import BaseCallbackHandler
 
 from deerflow.config.app_config import AppConfig
 from deerflow.personal_ip.content_contracts import (
@@ -12,6 +13,7 @@ from deerflow.personal_ip.content_contracts import (
     ContentWorkAppend,
     ContentWorkCreate,
     WriterBrainRequest,
+    WriterBrainToolRequest,
 )
 from deerflow.personal_ip.evidence_binding import bind_breakdown_to_reference_evidence
 from deerflow.personal_ip.runtime import get_personal_ip_runtime
@@ -41,7 +43,7 @@ def _bind_external_breakdown(
     return request.model_copy(update={"breakdown": bound.breakdown}), {str(bound.breakdown.evidence_request_id): bound.evidence_snapshot}
 
 
-async def _ip_content_write(runtime: Runtime, request: WriterBrainRequest) -> str:
+async def _ip_content_write(runtime: Runtime, request: WriterBrainToolRequest) -> str:
     """Generate and save one complete, versioned content script.
 
     Use this after the Owner and you have chosen a total-editor decision and a
@@ -84,7 +86,7 @@ async def _ip_content_write(runtime: Runtime, request: WriterBrainRequest) -> st
         request: Typed writer-brain handoff. Use content_work_id to derive a new version.
 
     Returns:
-        JSON ids, locked-story digest and complete saved script.
+        JSON ids, persisted version numbers, locked-story digest and complete saved script.
     """
     try:
         services = get_personal_ip_runtime()
@@ -98,7 +100,10 @@ async def _ip_content_write(runtime: Runtime, request: WriterBrainRequest) -> st
         tool_call_id = str(runtime.tool_call_id or "").strip()
         if not run_id or not tool_call_id:
             raise RuntimeError("Writer run identity is not available")
+        request = WriterBrainRequest.model_validate(request.model_dump(mode="json"))
         request, evidence_snapshots = _bind_external_breakdown(runtime, request)
+        journal = context.get("__run_journal")
+        callbacks = [journal] if isinstance(journal, BaseCallbackHandler) else None
         result = await WriterBrainService(
             services.content,
             subjects=services.subjects,
@@ -110,6 +115,7 @@ async def _ip_content_write(runtime: Runtime, request: WriterBrainRequest) -> st
             app_config=app_config,
             thread_id=str(context.get("thread_id") or "") or None,
             verified_evidence_snapshots=evidence_snapshots,
+            callbacks=callbacks,
         )
         return _json({"operation_status": "ok", **result})
     except (RuntimeError, TypeError, ValueError) as exc:

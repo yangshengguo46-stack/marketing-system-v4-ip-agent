@@ -130,7 +130,12 @@ def test_second_empty_post_tool_response_becomes_visible_error_fallback():
     assert "returned no final response" in str(final.content)
     assert final.additional_kwargs["deerflow_error_fallback"] is True
     assert _empty_terminal_messages(result["messages"]) == []
-    assert _extract_llm_error_fallback_message(result) == ("Model returned an empty terminal response after one retry")
+    assert final.additional_kwargs == {
+        "deerflow_error_fallback": True,
+        "error_type": "EmptyTerminalResponse",
+        "error_reason": "empty_terminal_response",
+    }
+    assert _extract_llm_error_fallback_message(result) == str(final.content)
 
 
 @pytest.mark.asyncio

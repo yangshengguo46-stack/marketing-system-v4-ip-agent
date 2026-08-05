@@ -19,6 +19,7 @@ import re
 from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
 EntryRoute = Literal["zero_start", "benchmark"]
 StoryMode = Literal["factual", "fictional", "hybrid"]
@@ -824,6 +825,27 @@ class WriterBrainRequest(_Contract):
         return self
 
 
+class WriterBrainToolDirectionDraft(DirectionDraft):
+    """Model-authored v2 direction before the server binds immutable digests."""
+
+    contract_version: SkipJsonSchema[Literal["personal-ip-direction-v2"]] = "personal-ip-direction-v2"
+    route_kind: ContentRouteKind
+    editorial_program_digest: SkipJsonSchema[str | None] = None
+
+
+class WriterBrainToolStoryEngineSeed(StoryEngineSeed):
+    """Model-authored semantic seed before the server binds its route digest."""
+
+    semantic_route_digest: SkipJsonSchema[str | None] = None
+
+
+class WriterBrainToolRequest(WriterBrainRequest):
+    """The v2-only model-facing handoff normalized into WriterBrainRequest."""
+
+    direction: WriterBrainToolDirectionDraft
+    story_engine_seed: WriterBrainToolStoryEngineSeed | None = None
+
+
 class BreakdownSaveRequest(_Contract):
     """Persist a standalone evidence breakdown before a writing decision."""
 
@@ -930,4 +952,7 @@ __all__ = [
     "validate_direction_program_binding",
     "validate_script_direction_binding",
     "WriterBrainRequest",
+    "WriterBrainToolDirectionDraft",
+    "WriterBrainToolRequest",
+    "WriterBrainToolStoryEngineSeed",
 ]

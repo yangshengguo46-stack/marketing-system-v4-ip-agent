@@ -4,11 +4,12 @@ Uses MemoryRunEventStore as the backend for direct event inspection.
 """
 
 import asyncio
+import json
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from deerflow.runtime.events.store.memory import MemoryRunEventStore
 from deerflow.runtime.journal import RunJournal
@@ -460,16 +461,129 @@ class TestIdentifyCaller:
 
 class TestChainErrorCallback:
     @pytest.mark.anyio
-    async def test_on_chain_error_writes_run_error(self, journal_setup):
+    async def test_on_chain_error_writes_only_bounded_safe_failure_metadata(self, journal_setup):
         j, store = journal_setup
-        j.on_chain_error(ValueError("boom"), run_id=uuid4())
+        raw_secret = "provider-secret-that-must-never-persist"
+        owner_prompt = "OWNER_PROMPT: 请不要公开这段原始需求"
+        j.on_chain_error(
+            ValueError(f"Authorization: Bearer {raw_secret}; request_body={{'prompt': {owner_prompt!r}}}; /private/provider/request/path"),
+            run_id=uuid4(),
+            tags=["lead_agent"],
+        )
         await asyncio.sleep(0.05)
         await j.flush()
         events = await store.list_events("t1", "r1")
         error_events = [e for e in events if e["event_type"] == "run.error"]
         assert len(error_events) == 1
-        assert "boom" in error_events[0]["content"]
-        assert error_events[0]["metadata"]["error_type"] == "ValueError"
+        event = error_events[0]
+        assert event["category"] == "error"
+        assert event["content"] == {"error_category": "run_failed"}
+        assert event["metadata"] == {
+            "error_type": "ValueError",
+            "caller": "lead_agent",
+            "run_name": "lead_agent",
+        }
+        serialized = json.dumps(event, ensure_ascii=False)
+        assert len(serialized) < 1_000
+        for forbidden in (
+            raw_secret,
+            owner_prompt,
+            "Authorization",
+            "Bearer",
+            "request_body",
+            "/private/provider/request/path",
+        ):
+            assert forbidden not in serialized
+
+
+class TestLlmErrorCallback:
+    @pytest.mark.anyio
+    async def test_on_llm_error_writes_only_bounded_safe_failure_metadata(self, journal_setup):
+        j, store = journal_setup
+        raw_secret = "provider-secret-that-must-never-persist"
+        owner_prompt = "OWNER_PROMPT: 用户未公开的完整提示词"
+        run_id = uuid4()
+        j._llm_start_times[str(run_id)] = 1.0
+
+        j.on_llm_error(
+            RuntimeError(f"401 Authorization: Bearer {raw_secret}; raw_body={{'prompt': {owner_prompt!r}}}; /private/provider/request/path"),
+            run_id=run_id,
+            tags=["middleware:ip-agent-script-writer-v2"],
+        )
+        await j.flush()
+
+        assert str(run_id) not in j._llm_start_times
+        events = await store.list_events("t1", "r1")
+        error_events = [event for event in events if event["event_type"] == "llm.error"]
+        assert len(error_events) == 1
+        event = error_events[0]
+        assert event["category"] == "error"
+        assert event["content"] == {"error_category": "llm_call_failed"}
+        assert event["metadata"] == {
+            "error_type": "RuntimeError",
+            "caller": "middleware:ip-agent-script-writer-v2",
+            "run_name": "ip-agent-script-writer-v2",
+        }
+        serialized = json.dumps(event, ensure_ascii=False)
+        assert len(serialized) < 1_000
+        for forbidden in (
+            raw_secret,
+            owner_prompt,
+            "Authorization",
+            "Bearer",
+            "raw_body",
+            "/private/provider/request/path",
+        ):
+            assert forbidden not in serialized
+
+
+class TestLlmFallbackRedaction:
+    @pytest.mark.anyio
+    async def test_fallback_message_drops_raw_provider_detail_from_journal(self, journal_setup):
+        j, store = journal_setup
+        raw_secret = "provider-secret-that-must-never-persist"
+        owner_prompt = "OWNER_PROMPT: 用户未公开的完整需求"
+        private_path = "/private/provider/request/path"
+        safe_message = "The configured LLM provider rejected the request because authentication or access is invalid. Please check the provider credentials and try again."
+        fallback = AIMessage(
+            content=safe_message,
+            additional_kwargs={
+                "deerflow_error_fallback": True,
+                "error_type": "ProviderRequestError",
+                "error_reason": "auth",
+                "error_detail": (f"401 Authorization: Bearer {raw_secret}; raw_body={{'prompt': {owner_prompt!r}}}; path={private_path}"),
+            },
+        )
+
+        j.on_llm_end(
+            _make_llm_response(
+                fallback.content,
+                additional_kwargs=fallback.additional_kwargs,
+            ),
+            run_id=uuid4(),
+            parent_run_id=None,
+            tags=["lead_agent"],
+        )
+        await j.flush()
+
+        assert j.llm_error_fallback_message == safe_message
+        events = await store.list_events("t1", "r1")
+        response = next(event for event in events if event["event_type"] == "llm.ai.response")
+        assert response["content"]["additional_kwargs"] == {
+            "deerflow_error_fallback": True,
+            "error_type": "ProviderRequestError",
+            "error_reason": "auth",
+        }
+        externally_visible = json.dumps(events, ensure_ascii=False)
+        for forbidden in (
+            raw_secret,
+            owner_prompt,
+            "Authorization",
+            "Bearer",
+            "raw_body",
+            private_path,
+        ):
+            assert forbidden not in externally_visible
 
 
 class TestTokenTrackingDisabled:

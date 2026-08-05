@@ -133,17 +133,14 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
             message_updates = [RemoveMessage(id=last.id)] if last.id else []
             return {"messages": message_updates, "jump_to": "model"}
 
-        additional_kwargs = dict(last.additional_kwargs or {})
-        additional_kwargs.update(
-            {
-                "deerflow_error_fallback": True,
-                "error_reason": "Model returned an empty terminal response after one retry",
-            }
-        )
         fallback = last.model_copy(
             update={
                 "content": _FALLBACK_CONTENT,
-                "additional_kwargs": additional_kwargs,
+                "additional_kwargs": {
+                    "deerflow_error_fallback": True,
+                    "error_type": "EmptyTerminalResponse",
+                    "error_reason": "empty_terminal_response",
+                },
             }
         )
         return {"messages": [fallback]}

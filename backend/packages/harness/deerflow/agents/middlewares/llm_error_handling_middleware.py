@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import re
 import threading
 import time
 from collections import deque
@@ -27,6 +28,18 @@ from deerflow.config.app_config import AppConfig
 logger = logging.getLogger(__name__)
 
 _RETRIABLE_STATUS_CODES = {408, 409, 425, 429, 500, 502, 503, 504}
+_FALLBACK_ERROR_REASONS = frozenset(
+    {
+        "auth",
+        "burst_rate",
+        "busy",
+        "circuit_open",
+        "empty_terminal_response",
+        "generic",
+        "quota",
+        "transient",
+    }
+)
 _BUSY_PATTERNS = (
     "server busy",
     "temporarily unavailable",
@@ -663,20 +676,19 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         *,
         error_type: str,
         reason: str,
-        detail: str,
     ) -> AIMessage:
+        safe_error_type = error_type if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", error_type) else "Exception"
+        safe_reason = reason if reason in _FALLBACK_ERROR_REASONS else "generic"
         return AIMessage(
             content=content,
             additional_kwargs={
                 "deerflow_error_fallback": True,
-                "error_type": error_type,
-                "error_reason": reason,
-                "error_detail": detail,
+                "error_type": safe_error_type,
+                "error_reason": safe_reason,
             },
         )
 
     def _build_user_message(self, exc: BaseException, reason: str) -> str:
-        detail = _extract_error_detail(exc)
         if reason == "quota":
             return "The configured LLM provider rejected the request because the account is out of quota, billing is unavailable, or usage is restricted. Please fix the provider account and try again."
         if reason == "auth":
@@ -699,14 +711,13 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                     "smaller steps, or shorten the requested output, and try again."
                 )
             return "The configured LLM provider is temporarily unavailable after multiple retries. Please wait a moment and continue the conversation."
-        return f"LLM request failed: {detail}"
+        return "The configured LLM provider rejected the request. Please check the model configuration and try again."
 
     def _build_user_fallback_message(self, exc: BaseException, reason: str) -> AIMessage:
         return self._build_error_fallback_message(
             self._build_user_message(exc, reason),
             error_type=type(exc).__name__,
             reason=reason,
-            detail=_extract_error_detail(exc),
         )
 
     def _emit_retry_event(
@@ -748,7 +759,6 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                 self._build_circuit_breaker_message(),
                 error_type="CircuitBreakerOpen",
                 reason="circuit_open",
-                detail="LLM circuit breaker is open",
             )
 
         attempt = 1
@@ -769,21 +779,23 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                     wait_ms = self._build_retry_delay_ms(prev_delay_ms, exc, reason)
                     prev_delay_ms = wait_ms
                     logger.warning(
-                        "Transient LLM error on attempt %d/%d; retrying in %dms: %s",
+                        "Transient LLM error on attempt %d/%d; retrying in %dms error_type=%s reason=%s",
                         attempt,
                         max_attempts,
                         wait_ms,
-                        _extract_error_detail(exc),
+                        type(exc).__name__,
+                        reason,
                     )
                     self._emit_retry_event(attempt, wait_ms, reason, max_attempts=max_attempts)
                     time.sleep(wait_ms / 1000)
                     attempt += 1
                     continue
                 logger.warning(
-                    "LLM call failed after %d attempt(s): %s",
+                    "LLM call failed after %d attempt(s) error_type=%s reason=%s",
                     attempt,
-                    _extract_error_detail(exc),
-                    exc_info=exc,
+                    type(exc).__name__,
+                    reason,
+                    exc_info=False,
                 )
                 if retriable and reason != "burst_rate":
                     self._record_failure()
@@ -807,7 +819,6 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                 self._build_circuit_breaker_message(),
                 error_type="CircuitBreakerOpen",
                 reason="circuit_open",
-                detail="LLM circuit breaker is open",
             )
 
         attempt = 1
@@ -828,21 +839,23 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                     wait_ms = self._build_retry_delay_ms(prev_delay_ms, exc, reason)
                     prev_delay_ms = wait_ms
                     logger.warning(
-                        "Transient LLM error on attempt %d/%d; retrying in %dms: %s",
+                        "Transient LLM error on attempt %d/%d; retrying in %dms error_type=%s reason=%s",
                         attempt,
                         max_attempts,
                         wait_ms,
-                        _extract_error_detail(exc),
+                        type(exc).__name__,
+                        reason,
                     )
                     self._emit_retry_event(attempt, wait_ms, reason, max_attempts=max_attempts)
                     await asyncio.sleep(wait_ms / 1000)
                     attempt += 1
                     continue
                 logger.warning(
-                    "LLM call failed after %d attempt(s): %s",
+                    "LLM call failed after %d attempt(s) error_type=%s reason=%s",
                     attempt,
-                    _extract_error_detail(exc),
-                    exc_info=exc,
+                    type(exc).__name__,
+                    reason,
+                    exc_info=False,
                 )
                 if retriable and reason != "burst_rate":
                     self._record_failure()
