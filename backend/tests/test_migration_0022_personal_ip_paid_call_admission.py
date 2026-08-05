@@ -67,7 +67,7 @@ async def test_0022_through_0026_upgrade_paid_call_schema(tmp_path) -> None:
         assert "execution_run_id" not in await _columns(engine, "personal_ip_paid_call_events")
 
         await asyncio.to_thread(_upgrade, config, "head")
-        assert await _version(engine) == "0028_personal_ip_script_production_binding"
+        assert await _version(engine) == "0029_personal_ip_final_artifacts"
         assert {
             "request_digest",
             "origin_run_id",
@@ -245,7 +245,7 @@ async def test_0025_preserves_rows_and_0026_refuses_active_provider_tasks(
                 )
             )
         await asyncio.to_thread(_upgrade, config, "head")
-        assert await _version(engine) == ("0028_personal_ip_script_production_binding")
+        assert await _version(engine) == ("0029_personal_ip_final_artifacts")
         async with engine.connect() as connection:
             row = (
                 await connection.execute(
@@ -272,7 +272,7 @@ async def test_0024_upgrades_empty_legacy_test_profile_without_reset(tmp_path) -
         config = _get_alembic_config(engine)
         await asyncio.to_thread(_upgrade, config, "head")
 
-        assert await _version(engine) == "0028_personal_ip_script_production_binding"
+        assert await _version(engine) == "0029_personal_ip_final_artifacts"
         assert {
             "server_name",
             "tool_name",

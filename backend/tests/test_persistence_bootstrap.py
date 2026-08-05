@@ -48,7 +48,7 @@ from deerflow.persistence.migrations._helpers import _normalize_default
 asyncio_test = pytest.mark.asyncio
 
 
-HEAD = "0028_personal_ip_script_production_binding"
+HEAD = "0029_personal_ip_final_artifacts"
 BASELINE = "0001_baseline"
 
 

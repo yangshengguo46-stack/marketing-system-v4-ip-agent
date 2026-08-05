@@ -56,6 +56,7 @@ async def test_data_lifecycle_router_binds_every_operation_to_authenticated_owne
         "state_digest": "a" * 64,
         "confirmation_phrase": DELETE_CONFIRMATION_PHRASE,
         "backup_acknowledged": True,
+        "artifact_files_acknowledged": True,
         "delete_local_context": True,
     }
     async with httpx.AsyncClient(
@@ -114,6 +115,7 @@ async def test_data_lifecycle_router_rejects_restore_conflict_and_stale_delete(
                 "state_digest": "b" * 64,
                 "confirmation_phrase": DELETE_CONFIRMATION_PHRASE,
                 "backup_acknowledged": True,
+                "artifact_files_acknowledged": True,
                 "delete_local_context": True,
             },
         )

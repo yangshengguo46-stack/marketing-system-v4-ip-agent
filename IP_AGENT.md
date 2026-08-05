@@ -259,6 +259,21 @@ production/event ledger remains the only production truth: one script may drive
 many productions, while each production seals its source snapshot and never
 rebinds when a later script version appears.
 
+A linked production can become completed only when the latest locked timeline,
+the exact latest successful delivery execution and the latest passing delivery
+QA are sealed atomically with one `personal-ip-final-artifact-v1` record. The
+formal Artifact is the only final-video projection for a linked production;
+QA previews, generic event attachments and raw local paths never substitute for
+it. Its stable identity binds the Owner, Work, Script, production, execution
+receipts, QA receipt, storage key, content SHA-256, size, canonical MIME and
+public metadata.
+
+Artifact identity and local byte availability are deliberately separate. JSON
+Owner backups contain the signed identity and receipts but not the video bytes,
+so restore always sets `content_available=false`. Playback and download then
+fail closed until the Owner reattaches the original bytes and the server verifies
+their exact SHA-256, size and MIME without changing Artifact identity.
+
 An empty Skill list removes Skill discovery/evolution instructions. Disabled
 memory removes memory loading and updates. The allowlist is applied after all
 configured, built-in, MCP, ACP, sub-Agent and self-modification tools are
@@ -283,12 +298,16 @@ entry above, they are not tools of the default Agent:
 - publish requests and append-only attempts;
 - metrics and credential-free platform observations;
 - video productions and their append-only event ledger;
+- formal final-Artifact receipts plus Owner-scoped content read and exact-byte
+  reattachment APIs;
 - the factual workspace dashboard.
 
-The general video workbench runtime entry remains off. The content board may
-start and display a linked production without exposing the legacy production
-tool catalog; reachability and end-to-end execution status are recorded only in
-`docs/IP_AGENT_PRODUCT_LEDGER.md`.
+The general video workbench Agent runtime entry remains off. The content board
+may start and display a linked production, and the dedicated Owner production
+surface may edit its existing ledger and play, download or reattach a formal
+Artifact. This does not expose the legacy production tool catalog or add real
+supplier execution to the default Agent. Reachability and end-to-end execution
+status are recorded only in `docs/IP_AGENT_PRODUCT_LEDGER.md`.
 
 The dashboard displays observations and their timestamps. Missing data stays
 `未采集`; it does not infer high potential, paid-traffic suitability, or a
@@ -302,6 +321,16 @@ commercial/AI disclosure and public-post proof. Video execution still enforces
 rights, paid-call approval and reservation, immutable receipts, paths, hashes,
 candidate consistency, QA and idempotency. Owner data export, same-owner
 empty-scope restore and confirmed deletion remain enforced.
+
+Current Owner backups use a server-keyed HMAC manifest and `key_id`; legacy
+v1-v3 backups retain their historical unkeyed digest contract only. Formal video
+bytes are downloaded separately. Destructive deletion requires an independent
+Artifact-file acknowledgement, verifies each recorded file identity, moves the
+exact file to Owner-local quarantine before database commit, restores it on a
+pre-commit failure and purges it only after commit. This two-phase boundary does
+not claim global atomicity across the database, MineContext, filesystem and
+process crashes, or recursive deletion of historical files that have no formal
+Artifact receipt.
 
 These are execution invariants, not creative or business judgments.
 

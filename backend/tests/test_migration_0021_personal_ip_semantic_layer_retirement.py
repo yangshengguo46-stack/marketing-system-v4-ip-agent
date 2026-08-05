@@ -79,7 +79,7 @@ async def test_upgrade_drops_empty_semantic_schema_and_publish_dependency(tmp_pa
         tables, columns, version = _tables_and_publish_columns(db_path)
         assert not (_RETIRED_TABLES & tables)
         assert "preflight_id" not in columns
-        assert version == "0028_personal_ip_script_production_binding"
+        assert version == "0029_personal_ip_final_artifacts"
     finally:
         await close_engine()
 
@@ -97,7 +97,7 @@ async def test_fresh_database_never_creates_retired_tables(tmp_path: Path) -> No
         tables, columns, version = _tables_and_publish_columns(db_path)
         assert not (_RETIRED_TABLES & tables)
         assert "preflight_id" not in columns
-        assert version == "0028_personal_ip_script_production_binding"
+        assert version == "0029_personal_ip_final_artifacts"
     finally:
         await close_engine()
 

@@ -81,7 +81,9 @@ export function PersonalIPDataSettingsPage() {
         throw new Error("服务端没有完成恢复校验");
       }
       await refreshPersonalIP();
-      toast.success("备份已恢复；平台账号需要重新登录授权");
+      toast.success(
+        "备份台账已恢复；正式成片需重新导入，平台账号需重新登录授权",
+      );
     } catch (error) {
       toast.error(messageOf(error));
     } finally {
@@ -113,6 +115,7 @@ export function PersonalIPDataSettingsPage() {
         state_digest: preview.state_digest,
         confirmation_phrase: phrase,
         backup_acknowledged: true,
+        artifact_files_acknowledged: true,
         delete_local_context: true,
       });
       setPreview(undefined);
@@ -144,16 +147,18 @@ export function PersonalIPDataSettingsPage() {
             <DownloadIcon className="size-4" /> 数据与备份
           </CardTitle>
           <CardDescription className="max-w-3xl leading-6">
-            导出经营主体、账号、发布回执、指标与平台观测、平台连接外壳和视频制作账本。备份不含密码、Cookie、平台访问令牌、一次性授权状态或付费调用准入记录。
+            导出经营主体、内容版本、账号、发布与观测回执、视频制作账本和正式成片元数据。JSON
+            备份不包含成片二进制、密码、Cookie、平台访问令牌、一次性授权状态或付费调用准入记录。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert>
             <ShieldAlertIcon />
-            <AlertTitle>恢复后需要重新登录平台</AlertTitle>
+            <AlertTitle>成片需单独下载，恢复后需重新登录平台</AlertTitle>
             <AlertDescription>
-              为避免凭证泄露，平台授权不会进入备份。恢复只允许在当前 Personal‑IP
-              数据为空时执行，并会逐表校验备份摘要。
+              请在删除数据前从 Production
+              下载需要保留的成片。平台授权不会进入备份；恢复只允许在当前
+              Personal‑IP 数据为空时执行，并会逐表校验备份摘要。
             </AlertDescription>
           </Alert>
           <div className="flex flex-wrap gap-2">
@@ -163,7 +168,7 @@ export function PersonalIPDataSettingsPage() {
               ) : (
                 <DownloadIcon />
               )}
-              导出完整备份
+              导出台账备份
             </Button>
             <Button
               variant="outline"
@@ -198,7 +203,7 @@ export function PersonalIPDataSettingsPage() {
           </CardTitle>
           <CardDescription className="leading-6">
             删除所有 Personal‑IP
-            业务数据、加密平台凭证、未完成授权状态和本地上下文。此操作无法撤销。
+            业务数据、正式成片文件、加密平台凭证、未完成授权状态和本地上下文。此操作无法撤销。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -219,7 +224,7 @@ export function PersonalIPDataSettingsPage() {
             <div className="border-destructive/40 bg-destructive/5 space-y-4 rounded-lg border p-4">
               <p className="text-sm font-medium">
                 将永久删除 {preview.total_records}{" "}
-                条数据库记录及全部本地上下文。
+                条数据库记录、正式成片文件及全部本地上下文。
               </p>
               <label className="flex items-start gap-2 text-sm">
                 <input
@@ -230,7 +235,9 @@ export function PersonalIPDataSettingsPage() {
                     setBackupAcknowledged(event.target.checked)
                   }
                 />
-                <span>我已导出所需备份，或确认不需要备份。</span>
+                <span>
+                  我已导出台账备份，并已单独下载需要保留的成片；或确认不需要保留这些数据。
+                </span>
               </label>
               <label className="block space-y-2 text-sm">
                 <span>

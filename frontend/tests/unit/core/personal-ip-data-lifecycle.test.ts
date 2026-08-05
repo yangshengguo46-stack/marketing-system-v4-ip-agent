@@ -32,12 +32,13 @@ beforeEach(() => {
 describe("Personal-IP data lifecycle API", () => {
   it("exports and restores the credential-free owner backup contract", async () => {
     const backup = {
-      schema_version: "personal-ip-owner-backup-v3" as const,
+      schema_version: "personal-ip-owner-backup-v4" as const,
       owner_user_id: "user-1",
       exported_at: "2026-07-30T12:00:00Z",
       datasets: [],
       verification: {
-        algorithm: "sha256-canonical-json-v1" as const,
+        algorithm: "hmac-sha256-canonical-json-v1" as const,
+        key_id: "owner-backup-key-2026-08",
         data_digest: "a".repeat(64),
         manifest_digest: "b".repeat(64),
       },
@@ -69,8 +70,8 @@ describe("Personal-IP data lifecycle API", () => {
     );
   });
 
-  it("accepts v1, v2 and v3 backup uploads and rejects unknown contracts", () => {
-    const candidate = {
+  it("accepts the exact legacy and HMAC-authenticated v4 verification contracts", () => {
+    const legacyCandidate = {
       owner_user_id: "user-1",
       exported_at: "2026-08-05T00:00:00Z",
       datasets: [],
@@ -88,21 +89,50 @@ describe("Personal-IP data lifecycle API", () => {
     ]) {
       expect(
         isPersonalIPBackup({
-          ...candidate,
+          ...legacyCandidate,
           schema_version: schemaVersion,
         }),
       ).toBe(true);
     }
+
+    const v4Candidate = {
+      ...legacyCandidate,
+      schema_version: "personal-ip-owner-backup-v4",
+      verification: {
+        ...legacyCandidate.verification,
+        algorithm: "hmac-sha256-canonical-json-v1",
+        key_id: "owner-backup-key-2026-08",
+      },
+    };
+    expect(isPersonalIPBackup(v4Candidate)).toBe(true);
     expect(
       isPersonalIPBackup({
-        ...candidate,
+        ...legacyCandidate,
         schema_version: "personal-ip-owner-backup-v4",
       }),
     ).toBe(false);
     expect(
       isPersonalIPBackup({
-        ...candidate,
+        ...v4Candidate,
+        verification: { ...v4Candidate.verification, key_id: "" },
+      }),
+    ).toBe(false);
+    expect(
+      isPersonalIPBackup({
+        ...v4Candidate,
         schema_version: "personal-ip-owner-backup-v3",
+      }),
+    ).toBe(false);
+    expect(
+      isPersonalIPBackup({
+        ...legacyCandidate,
+        schema_version: "personal-ip-owner-backup-v5",
+      }),
+    ).toBe(false);
+    expect(
+      isPersonalIPBackup({
+        ...v4Candidate,
+        schema_version: "personal-ip-owner-backup-v4",
         datasets: null,
       }),
     ).toBe(false);
@@ -117,7 +147,9 @@ describe("Personal-IP data lifecycle API", () => {
       state_digest: "c".repeat(64),
       confirmation_phrase: "永久删除我的全部个人IP数据",
       requires_backup_acknowledgement: true,
+      requires_artifact_file_acknowledgement: true,
       includes_local_context: true,
+      includes_artifact_files: true,
       irreversible: true,
     };
     mockedFetch
@@ -136,12 +168,25 @@ describe("Personal-IP data lifecycle API", () => {
       state_digest: preview.state_digest,
       confirmation_phrase: preview.confirmation_phrase,
       backup_acknowledged: true,
+      artifact_files_acknowledged: true,
       delete_local_context: true,
     });
 
     expect(mockedFetch).toHaveBeenLastCalledWith(
       "/backend/api/personal-ip/data/delete",
-      expect.objectContaining({ method: "POST" }),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schema_version: "personal-ip-destructive-delete-confirmation-v1",
+          owner_user_id: preview.owner_user_id,
+          state_digest: preview.state_digest,
+          confirmation_phrase: preview.confirmation_phrase,
+          backup_acknowledged: true,
+          artifact_files_acknowledged: true,
+          delete_local_context: true,
+        }),
+      },
     );
   });
 

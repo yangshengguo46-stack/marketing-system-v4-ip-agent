@@ -7,12 +7,15 @@ import json
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
+from deerflow.persistence.personal_ip_artifacts.model import PersonalIPArtifactRow
 from deerflow.persistence.personal_ip_content.model import (
     PersonalIPContentWorkRow,
     PersonalIPScriptVersionRow,
@@ -41,6 +44,8 @@ from deerflow.utils.time import coerce_iso
 VIDEO_PRODUCTION_CONTRACT_VERSION = "personal-ip-video-production-v1"
 LINKED_VIDEO_PRODUCTION_CONTRACT_VERSION = "personal-ip-video-production-v2"
 SCRIPT_SOURCE_SNAPSHOT_CONTRACT_VERSION = "personal-ip-script-source-snapshot-v1"
+FINAL_ARTIFACT_CONTRACT_VERSION = "personal-ip-final-artifact-v1"
+FINAL_ARTIFACT_ROLE = "final_video"
 
 VIDEO_EVENT_STAGES: dict[str, str] = {
     "video_plan_compiled": "blueprint",
@@ -132,6 +137,7 @@ VIDEO_ENTITY_TYPES = {
     "timeline",
     "delivery",
     "asset",
+    "artifact",
 }
 
 COMPILED_VIDEO_EVENT_CONTRACTS: dict[str, tuple[str, str]] = {
@@ -207,6 +213,71 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+def _sha256(value: Any, *, field: str) -> str:
+    digest = str(value or "").strip().lower()
+    if len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
+        raise ValueError(f"{field} must be a lowercase SHA-256 digest")
+    return digest
+
+
+def _positive_size(value: Any, *, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{field} must be a positive integer")
+    return value
+
+
+def _owner_storage_key(value: Any) -> str:
+    if not isinstance(value, str):
+        raise ValueError("storage_key must be an Owner-relative POSIX path")
+    storage_key = value
+    if not storage_key or len(storage_key) > 1_024 or storage_key != storage_key.strip() or any(ord(character) < 32 or ord(character) == 127 for character in storage_key):
+        raise ValueError("storage_key must contain 1 to 1024 characters")
+    parsed = urlsplit(storage_key)
+    windows_path = PureWindowsPath(storage_key)
+    if "\\" in storage_key or parsed.scheme or parsed.netloc or parsed.query or parsed.fragment or storage_key.startswith("//") or windows_path.is_absolute() or bool(windows_path.drive):
+        raise ValueError("storage_key must be an Owner-relative POSIX path")
+    path = PurePosixPath(storage_key)
+    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+        raise ValueError("storage_key must be an Owner-relative POSIX path")
+    canonical = path.as_posix()
+    if canonical != storage_key:
+        raise ValueError("storage_key must be a canonical Owner-relative POSIX path")
+    if len(path.parts) < 2 or path.parts[0] != "video-deliveries":
+        raise ValueError("storage_key must be inside the Owner video-deliveries namespace")
+    return canonical
+
+
+def _artifact_receipt_matches(
+    value: Any,
+    *,
+    source_ref: str,
+    sha256: str,
+    size_bytes: int,
+    mime_type: str,
+) -> bool:
+    return isinstance(value, dict) and value.get("ref") == source_ref and value.get("sha256") == sha256 and value.get("size_bytes") == size_bytes and value.get("mime_type") == mime_type
+
+
+def _validate_public_artifact_metadata(value: Any, *, field: str = "metadata") -> None:
+    if isinstance(value, dict):
+        for raw_key, child in value.items():
+            key = str(raw_key).strip().lower().replace("-", "_")
+            if key in {"local_path", "path", "ref", "source_ref", "storage_key"}:
+                raise ValueError(f"{field} contains a private artifact locator: {raw_key}")
+            _validate_public_artifact_metadata(child, field=f"{field}.{raw_key}")
+        return
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            _validate_public_artifact_metadata(child, field=f"{field}[{index}]")
+        return
+    if isinstance(value, str):
+        candidate = value.strip()
+        parsed = urlsplit(candidate)
+        windows_path = PureWindowsPath(candidate)
+        if parsed.scheme == "file" or PurePosixPath(candidate).is_absolute() or windows_path.is_absolute() or (bool(windows_path.drive) and windows_path.drive[0].isalpha()):
+            raise ValueError(f"{field} must not contain an absolute filesystem locator")
+
+
 class PersonalIPVideoProductionRepository:
     """Persist an immutable request and append-only stage/provider receipts."""
 
@@ -225,6 +296,7 @@ class PersonalIPVideoProductionRepository:
         for field in ("created_at", "updated_at"):
             if isinstance(data.get(field), datetime):
                 data[field] = coerce_iso(data[field])
+        data["final_artifact"] = None
         return data
 
     @staticmethod
@@ -238,6 +310,55 @@ class PersonalIPVideoProductionRepository:
             if isinstance(data.get(field), datetime):
                 data[field] = coerce_iso(data[field])
         return data
+
+    @staticmethod
+    def _artifact_dict(
+        row: PersonalIPArtifactRow,
+        *,
+        include_storage_key: bool = False,
+    ) -> dict[str, Any]:
+        data = row.to_dict()
+        data.pop("owner_user_id", None)
+        storage_key = data.pop("storage_key")
+        data["metadata"] = data.pop("metadata_json") or {}
+        data["content_sha256"] = data.pop("sha256")
+        if include_storage_key:
+            data["storage_key"] = storage_key
+        if isinstance(data.get("created_at"), datetime):
+            data["created_at"] = coerce_iso(data["created_at"])
+        return data
+
+    @classmethod
+    async def _attach_final_artifact(
+        cls,
+        session: AsyncSession,
+        production: dict[str, Any],
+    ) -> None:
+        statement = select(PersonalIPArtifactRow).where(
+            PersonalIPArtifactRow.owner_user_id == production["owner_user_id"],
+            PersonalIPArtifactRow.production_id == production["id"],
+            PersonalIPArtifactRow.role == FINAL_ARTIFACT_ROLE,
+        )
+        artifact = (await session.execute(statement)).scalar_one_or_none()
+        production["final_artifact"] = cls._artifact_dict(artifact) if artifact is not None else None
+
+    @staticmethod
+    async def _lock_owner_lifecycle(
+        session: AsyncSession,
+        owner_user_id: str,
+    ) -> str:
+        """Serialize Artifact mutation with Owner backup/delete/restore."""
+
+        dialect = session.get_bind().dialect.name
+        if dialect == "sqlite":
+            await session.execute(text("BEGIN IMMEDIATE"))
+        elif dialect == "postgresql":
+            await session.begin()
+            await session.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
+                {"lock_key": f"personal-ip-data-lifecycle:{owner_user_id}"},
+            )
+        return dialect
 
     @classmethod
     def _attach_budget_state(
@@ -417,6 +538,7 @@ class PersonalIPVideoProductionRepository:
                 result = self._production_dict(existing)
                 result["events"] = await self._events(session, existing.id)
                 self._attach_budget_state(result, result["events"])
+                await self._attach_final_artifact(session, result)
                 return result
             if linked_work is not None and linked_work.status != "active":
                 raise ValueError("Personal-IP linked content work is archived")
@@ -473,7 +595,76 @@ class PersonalIPVideoProductionRepository:
             result = self._production_dict(row)
             result["events"] = await self._events(session, row.id)
             self._attach_budget_state(result, result["events"])
+            await self._attach_final_artifact(session, result)
             return result
+
+    async def get_artifact(
+        self,
+        artifact_id: str,
+        *,
+        owner_user_id: str,
+        include_storage_key: bool = False,
+    ) -> dict[str, Any] | None:
+        artifact_key = _clean_required(artifact_id, field="artifact_id", limit=64)
+        owner = _clean_required(owner_user_id, field="owner_user_id", limit=64)
+        async with self._sf() as session:
+            artifact = (
+                await session.execute(
+                    select(PersonalIPArtifactRow).where(
+                        PersonalIPArtifactRow.id == artifact_key,
+                        PersonalIPArtifactRow.owner_user_id == owner,
+                    )
+                )
+            ).scalar_one_or_none()
+            if artifact is None:
+                return None
+            return self._artifact_dict(
+                artifact,
+                include_storage_key=include_storage_key,
+            )
+
+    async def mark_artifact_content_available(
+        self,
+        artifact_id: str,
+        *,
+        owner_user_id: str,
+        expected_sha256: str,
+        expected_size_bytes: int,
+        expected_mime_type: str,
+    ) -> dict[str, Any] | None:
+        """Mark re-uploaded original bytes available without changing identity."""
+
+        artifact_key = _clean_required(artifact_id, field="artifact_id", limit=64)
+        owner = _clean_required(owner_user_id, field="owner_user_id", limit=64)
+        content_sha256 = _sha256(expected_sha256, field="expected_sha256")
+        if expected_sha256 != content_sha256:
+            raise ValueError("expected_sha256 must be a canonical lowercase SHA-256 digest")
+        content_size = _positive_size(
+            expected_size_bytes,
+            field="expected_size_bytes",
+        )
+        content_mime_type = str(expected_mime_type or "")
+        if content_mime_type != content_mime_type.strip().lower() or not content_mime_type.startswith("video/") or len(content_mime_type) > 255 or any(character.isspace() for character in content_mime_type):
+            raise ValueError("expected_mime_type must be a canonical video MIME type")
+
+        async with self._sf() as session:
+            dialect = await self._lock_owner_lifecycle(session, owner)
+            statement = select(PersonalIPArtifactRow).where(
+                PersonalIPArtifactRow.id == artifact_key,
+                PersonalIPArtifactRow.owner_user_id == owner,
+            )
+            if dialect != "sqlite":
+                statement = statement.with_for_update()
+            artifact = (await session.execute(statement)).scalar_one_or_none()
+            if artifact is None:
+                return None
+            if artifact.sha256 != content_sha256 or artifact.size_bytes != content_size or artifact.mime_type != content_mime_type:
+                raise ValueError("re-uploaded content does not match immutable Artifact identity")
+            if not artifact.content_available:
+                artifact.content_available = True
+                await session.commit()
+                await session.refresh(artifact)
+            return self._artifact_dict(artifact)
 
     async def list(
         self,
@@ -503,8 +694,20 @@ class PersonalIPVideoProductionRepository:
             PersonalIPVideoProductionRow.id.desc(),
         ).limit(max(1, min(int(limit), 500)))
         async with self._sf() as session:
-            rows = (await session.execute(statement)).scalars()
-            return [self._production_dict(row) for row in rows]
+            rows = list((await session.execute(statement)).scalars())
+            results = [self._production_dict(row) for row in rows]
+            if not rows:
+                return results
+            artifact_statement = select(PersonalIPArtifactRow).where(
+                PersonalIPArtifactRow.owner_user_id == owner_user_id,
+                PersonalIPArtifactRow.production_id.in_([row.id for row in rows]),
+                PersonalIPArtifactRow.role == FINAL_ARTIFACT_ROLE,
+            )
+            artifacts = list((await session.execute(artifact_statement)).scalars())
+            artifacts_by_production = {artifact.production_id: self._artifact_dict(artifact) for artifact in artifacts}
+            for result in results:
+                result["final_artifact"] = artifacts_by_production.get(result["id"])
+            return results
 
     async def bind_thread(
         self,
@@ -542,6 +745,7 @@ class PersonalIPVideoProductionRepository:
             result = self._production_dict(row)
             result["events"] = await self._events(session, row.id)
             self._attach_budget_state(result, result["events"])
+            await self._attach_final_artifact(session, result)
             return result
 
     @staticmethod
@@ -631,6 +835,7 @@ class PersonalIPVideoProductionRepository:
         result = self._production_dict(production)
         result["events"] = await self._events(session, production.id)
         self._attach_budget_state(result, result["events"])
+        await self._attach_final_artifact(session, result)
         result["budget_operation"] = operation
         return result
 
@@ -1213,6 +1418,404 @@ class PersonalIPVideoProductionRepository:
                 },
             )
 
+    async def complete_delivery_and_seal_artifact(
+        self,
+        production_id: str,
+        *,
+        owner_user_id: str,
+        event_key: str,
+        qa_event_key: str,
+        source_execution_event_keys: Sequence[str],
+        source_ref: str,
+        storage_key: str,
+        sha256: str,
+        size_bytes: int,
+        mime_type: str,
+        metadata: dict[str, Any],
+        provider: str,
+        model: str | None = None,
+        provider_task_id: str | None = None,
+        cost: dict[str, Any],
+        occurred_at: datetime | None = None,
+    ) -> dict[str, Any] | None:
+        """Atomically complete one linked production and seal its final video.
+
+        Filesystem verification belongs to the caller. This transaction binds
+        that verified receipt to the exact successful source execution, the
+        latest passed delivery QA and the immutable linked ScriptVersion.
+        ``source_ref`` is used only for receipt matching and is never persisted
+        in the formal Artifact or delivery event.
+        """
+
+        production_key = _clean_required(production_id, field="production_id", limit=64)
+        owner = _clean_required(owner_user_id, field="owner_user_id", limit=64)
+        delivery_key = _clean_required(event_key, field="event_key", limit=256)
+        qa_key = _clean_required(qa_event_key, field="qa_event_key", limit=256)
+        source_keys = _normalized_ids(
+            source_execution_event_keys,
+            field="source_execution_event_keys",
+            limit=32,
+            item_limit=256,
+        )
+        if not source_keys:
+            raise ValueError("source_execution_event_keys must not be empty")
+        verified_source_ref = _clean_required(source_ref, field="source_ref", limit=2_048)
+        relative_storage_key = _owner_storage_key(storage_key)
+        content_sha256 = _sha256(sha256, field="sha256")
+        content_size = _positive_size(size_bytes, field="size_bytes")
+        content_mime_type = str(mime_type or "").strip().lower()
+        if not content_mime_type.startswith("video/") or len(content_mime_type) > 255 or any(character.isspace() for character in content_mime_type):
+            raise ValueError("mime_type must be a video MIME type")
+        metadata_snapshot = _json_snapshot(
+            metadata,
+            field="metadata",
+            expected=dict,
+            byte_limit=256_000,
+        )
+        if "delivery_qa" in metadata_snapshot:
+            raise ValueError("metadata.delivery_qa is server-owned")
+        _validate_public_artifact_metadata(metadata_snapshot)
+        provider_key = _clean_required(provider, field="provider", limit=80)
+        model_key = _clean_optional(model, field="model", limit=160)
+        provider_task_key = _clean_optional(
+            provider_task_id,
+            field="provider_task_id",
+            limit=256,
+        )
+        cost_snapshot = _json_snapshot(
+            cost,
+            field="cost",
+            expected=dict,
+            byte_limit=256_000,
+        )
+
+        async with self._sf() as session:
+            dialect = await self._lock_owner_lifecycle(session, owner)
+            production_statement = select(PersonalIPVideoProductionRow).where(
+                PersonalIPVideoProductionRow.id == production_key,
+                PersonalIPVideoProductionRow.owner_user_id == owner,
+            )
+            if dialect != "sqlite":
+                production_statement = production_statement.with_for_update()
+            production = (await session.execute(production_statement)).scalar_one_or_none()
+            if production is None:
+                return None
+            if production.contract_version != LINKED_VIDEO_PRODUCTION_CONTRACT_VERSION or production.content_work_id is None or production.script_version_id is None or production.source_kind != "script":
+                raise ValueError("formal final Artifact requires a linked ScriptVersion production")
+
+            timeline_statement = (
+                select(PersonalIPVideoProductionEventRow)
+                .where(
+                    PersonalIPVideoProductionEventRow.production_id == production.id,
+                    PersonalIPVideoProductionEventRow.event_type == "timeline_revision_compiled",
+                    PersonalIPVideoProductionEventRow.status == "succeeded",
+                )
+                .order_by(PersonalIPVideoProductionEventRow.sequence.desc())
+                .limit(1)
+            )
+            timeline = (await session.execute(timeline_statement)).scalar_one_or_none()
+            lock_statement = (
+                select(PersonalIPVideoProductionEventRow)
+                .where(
+                    PersonalIPVideoProductionEventRow.production_id == production.id,
+                    PersonalIPVideoProductionEventRow.event_type == "final_edit_locked",
+                    PersonalIPVideoProductionEventRow.status == "succeeded",
+                )
+                .order_by(PersonalIPVideoProductionEventRow.sequence.desc())
+                .limit(1)
+            )
+            final_lock = (await session.execute(lock_statement)).scalar_one_or_none()
+            if timeline is None or final_lock is None or final_lock.sequence <= timeline.sequence:
+                raise ValueError("final Artifact requires the latest timeline to be final_edit_locked")
+            timeline_payload = timeline.payload_json or {}
+            lock_payload = final_lock.payload_json or {}
+            if lock_payload.get("source_revision_id") != timeline_payload.get("revision_id") or lock_payload.get("source_timeline_sha256") != timeline_payload.get("sha256") or lock_payload.get("ready_for_delivery_qa") is not True:
+                raise ValueError("final Artifact lock does not freeze the latest timeline revision")
+
+            source_statement = select(PersonalIPVideoProductionEventRow).where(
+                PersonalIPVideoProductionEventRow.production_id == production.id,
+                PersonalIPVideoProductionEventRow.event_key.in_(source_keys),
+            )
+            source_rows = list((await session.execute(source_statement)).scalars())
+            source_by_key = {row.event_key: row for row in source_rows}
+            if set(source_by_key) != set(source_keys):
+                raise ValueError("final Artifact source execution receipt not found")
+            ordered_sources = [source_by_key[key] for key in source_keys]
+            previous_sequence = final_lock.sequence
+            for source_event in ordered_sources:
+                source_payload = source_event.payload_json or {}
+                outputs = source_payload.get("outputs")
+                if (
+                    source_event.event_type != "media_processing_completed"
+                    or source_event.status != "succeeded"
+                    or source_event.entity_type != "delivery"
+                    or source_event.sequence <= previous_sequence
+                    or source_payload.get("contract_version") != "personal-ip-media-execution-v1"
+                    or source_payload.get("capability") != "media_processing"
+                    or source_payload.get("status") != "succeeded"
+                    or source_event.output_refs_json != [verified_source_ref]
+                    or not isinstance(outputs, list)
+                    or len(outputs) != 1
+                    or not _artifact_receipt_matches(
+                        outputs[0],
+                        source_ref=verified_source_ref,
+                        sha256=content_sha256,
+                        size_bytes=content_size,
+                        mime_type=content_mime_type,
+                    )
+                ):
+                    raise ValueError("final Artifact does not match its successful source execution")
+                previous_sequence = source_event.sequence
+
+            latest_delivery_execution_statement = (
+                select(PersonalIPVideoProductionEventRow)
+                .where(
+                    PersonalIPVideoProductionEventRow.production_id == production.id,
+                    PersonalIPVideoProductionEventRow.entity_type == "delivery",
+                    PersonalIPVideoProductionEventRow.event_type.in_(
+                        {
+                            "media_processing_requested",
+                            "media_processing_completed",
+                            "media_processing_failed",
+                        }
+                    ),
+                )
+                .order_by(PersonalIPVideoProductionEventRow.sequence.desc())
+                .limit(1)
+            )
+            latest_delivery_execution = (await session.execute(latest_delivery_execution_statement)).scalar_one_or_none()
+            if latest_delivery_execution is None or latest_delivery_execution.id != ordered_sources[-1].id:
+                raise ValueError("final Artifact source execution is stale; the latest delivery media execution requires new QA")
+
+            qa_statement = select(PersonalIPVideoProductionEventRow).where(
+                PersonalIPVideoProductionEventRow.production_id == production.id,
+                PersonalIPVideoProductionEventRow.event_key == qa_key,
+            )
+            qa_event = (await session.execute(qa_statement)).scalar_one_or_none()
+            latest_qa_statement = (
+                select(PersonalIPVideoProductionEventRow)
+                .where(
+                    PersonalIPVideoProductionEventRow.production_id == production.id,
+                    PersonalIPVideoProductionEventRow.event_type == "delivery_qa_completed",
+                )
+                .order_by(PersonalIPVideoProductionEventRow.sequence.desc())
+                .limit(1)
+            )
+            latest_qa = (await session.execute(latest_qa_statement)).scalar_one_or_none()
+            if qa_event is None or latest_qa is None or qa_event.id != latest_qa.id:
+                raise ValueError("final Artifact requires the latest delivery QA receipt")
+            qa_payload = qa_event.payload_json or {}
+            if (
+                qa_event.event_type != "delivery_qa_completed"
+                or qa_event.status != "succeeded"
+                or qa_event.sequence <= previous_sequence
+                or qa_payload.get("contract_version") != "personal-ip-delivery-qa-v1"
+                or qa_payload.get("passed") is not True
+                or qa_event.output_refs_json != [verified_source_ref]
+                or not _artifact_receipt_matches(
+                    qa_payload.get("artifact"),
+                    source_ref=verified_source_ref,
+                    sha256=content_sha256,
+                    size_bytes=content_size,
+                    mime_type=content_mime_type,
+                )
+            ):
+                raise ValueError("final Artifact does not match its exact passed delivery QA")
+            metadata_snapshot = _json_snapshot(
+                {
+                    **metadata_snapshot,
+                    "delivery_qa": {
+                        "checks": qa_payload.get("checks") if isinstance(qa_payload.get("checks"), list) else [],
+                        "delivery_spec": qa_payload.get("delivery_spec") if isinstance(qa_payload.get("delivery_spec"), dict) else {},
+                        "executors": qa_payload.get("executors") if isinstance(qa_payload.get("executors"), dict) else {},
+                        "probe": qa_payload.get("probe") if isinstance(qa_payload.get("probe"), dict) else {},
+                    },
+                },
+                field="metadata",
+                expected=dict,
+                byte_limit=256_000,
+            )
+            _validate_public_artifact_metadata(metadata_snapshot)
+
+            existing_event_statement = select(PersonalIPVideoProductionEventRow).where(
+                PersonalIPVideoProductionEventRow.production_id == production.id,
+                PersonalIPVideoProductionEventRow.event_key == delivery_key,
+            )
+            existing_event = (await session.execute(existing_event_statement)).scalar_one_or_none()
+            existing_artifact_statement = select(PersonalIPArtifactRow).where(
+                PersonalIPArtifactRow.production_id == production.id,
+                PersonalIPArtifactRow.role == FINAL_ARTIFACT_ROLE,
+            )
+            existing_artifact = (await session.execute(existing_artifact_statement)).scalar_one_or_none()
+            if existing_event is not None:
+                if (
+                    existing_artifact is None
+                    or existing_event.event_type != "delivery_completed"
+                    or existing_event.status != "succeeded"
+                    or existing_event.entity_type != "artifact"
+                    or existing_artifact.delivery_event_id != existing_event.id
+                ):
+                    raise ValueError("event_key already records an incomplete final Artifact delivery")
+                artifact_id = existing_artifact.id
+                delivery_event_id = existing_event.id
+            else:
+                if existing_artifact is not None:
+                    raise ValueError("production already records a final Artifact under a different event_key")
+                if production.status in {"completed", "cancelled"}:
+                    raise ValueError("terminal video production cannot seal a new final Artifact")
+                artifact_id = f"artifact-{uuid.uuid4().hex}"
+                delivery_event_id = f"video-event-{uuid.uuid4().hex}"
+
+            source_receipts = [
+                {
+                    "event_digest": event.event_digest,
+                    "event_id": event.id,
+                    "event_key": event.event_key,
+                }
+                for event in ordered_sources
+            ]
+            artifact_digest_payload = {
+                "artifact_id": artifact_id,
+                "content_sha256": content_sha256,
+                "content_work_id": production.content_work_id,
+                "contract_version": FINAL_ARTIFACT_CONTRACT_VERSION,
+                "delivery_event_id": delivery_event_id,
+                "metadata": metadata_snapshot,
+                "mime_type": content_mime_type,
+                "owner_user_id": owner,
+                "production_id": production.id,
+                "qa_event_digest": qa_event.event_digest,
+                "qa_event_id": qa_event.id,
+                "role": FINAL_ARTIFACT_ROLE,
+                "script_version_id": production.script_version_id,
+                "size_bytes": content_size,
+                "source_execution_events": source_receipts,
+                "storage_key": relative_storage_key,
+            }
+            artifact_digest = _digest(artifact_digest_payload)
+            artifact_projection = {
+                "artifact_digest": artifact_digest,
+                "content_sha256": content_sha256,
+                "contract_version": FINAL_ARTIFACT_CONTRACT_VERSION,
+                "id": artifact_id,
+                "metadata": metadata_snapshot,
+                "mime_type": content_mime_type,
+                "production_id": production.id,
+                "role": FINAL_ARTIFACT_ROLE,
+                "size_bytes": content_size,
+            }
+            delivery_payload = {
+                "accepted": True,
+                "artifact": artifact_projection,
+                "content_work_id": production.content_work_id,
+                "contract_version": FINAL_ARTIFACT_CONTRACT_VERSION,
+                "qa_event_digest": qa_event.event_digest,
+                "qa_event_id": qa_event.id,
+                "script_version_id": production.script_version_id,
+                "source_execution_events": source_receipts,
+            }
+            event_time = _utc(occurred_at if occurred_at is not None else (existing_event.occurred_at if existing_event is not None else None))
+            input_refs = [
+                *(f"video-event://{event.id}" for event in ordered_sources),
+                f"video-event://{qa_event.id}",
+            ]
+            output_refs = [f"artifact://{artifact_id}"]
+            event_digest_payload = {
+                "cost": cost_snapshot,
+                "entity_id": artifact_id,
+                "entity_type": "artifact",
+                "event_type": "delivery_completed",
+                "input_refs": input_refs,
+                "model": model_key,
+                "occurred_at": coerce_iso(event_time),
+                "output_refs": output_refs,
+                "payload": delivery_payload,
+                "provider": provider_key,
+                "provider_task_id": provider_task_key,
+                "stage": "delivery",
+                "status": "succeeded",
+            }
+            event_digest = _digest(event_digest_payload)
+
+            if existing_event is not None and existing_artifact is not None:
+                if (
+                    existing_artifact.qa_event_id != qa_event.id
+                    or existing_artifact.storage_key != relative_storage_key
+                    or existing_artifact.sha256 != content_sha256
+                    or existing_artifact.size_bytes != content_size
+                    or existing_artifact.mime_type != content_mime_type
+                    or existing_artifact.metadata_json != metadata_snapshot
+                    or existing_artifact.artifact_digest != artifact_digest
+                    or existing_event.event_digest != event_digest
+                ):
+                    raise ValueError("event_key already records a different final Artifact")
+                result = self._production_dict(production)
+                result["events"] = await self._events(session, production.id)
+                self._attach_budget_state(result, result["events"])
+                result["final_artifact"] = self._artifact_dict(existing_artifact)
+                return result
+
+            sequence = production.event_count + 1
+            now = datetime.now(UTC)
+            delivery_event = PersonalIPVideoProductionEventRow(
+                id=delivery_event_id,
+                owner_user_id=owner,
+                production_id=production.id,
+                event_key=delivery_key,
+                event_digest=event_digest,
+                sequence=sequence,
+                event_type="delivery_completed",
+                stage="delivery",
+                status="succeeded",
+                entity_type="artifact",
+                entity_id=artifact_id,
+                provider=provider_key,
+                model=model_key,
+                provider_task_id=provider_task_key,
+                payload_json=delivery_payload,
+                input_refs_json=input_refs,
+                output_refs_json=output_refs,
+                cost_json=cost_snapshot,
+                occurred_at=event_time,
+                created_at=now,
+            )
+            artifact = PersonalIPArtifactRow(
+                id=artifact_id,
+                owner_user_id=owner,
+                production_id=production.id,
+                qa_event_id=qa_event.id,
+                delivery_event_id=delivery_event_id,
+                contract_version=FINAL_ARTIFACT_CONTRACT_VERSION,
+                role=FINAL_ARTIFACT_ROLE,
+                storage_key=relative_storage_key,
+                sha256=content_sha256,
+                size_bytes=content_size,
+                mime_type=content_mime_type,
+                content_available=True,
+                metadata_json=metadata_snapshot,
+                artifact_digest=artifact_digest,
+                created_at=now,
+            )
+            session.add(delivery_event)
+            # There is deliberately no ORM relationship between the generic
+            # event ledger and first-class Artifacts. Flush the referenced
+            # delivery receipt first so SQLite/PostgreSQL can enforce the FK
+            # while both writes remain inside this one transaction.
+            await session.flush()
+            session.add(artifact)
+            production.event_count = sequence
+            production.current_stage = "delivery"
+            production.status = "completed"
+            production.updated_at = now
+            await session.commit()
+            await session.refresh(production)
+            await session.refresh(artifact)
+            result = self._production_dict(production)
+            result["events"] = await self._events(session, production.id)
+            self._attach_budget_state(result, result["events"])
+            result["final_artifact"] = self._artifact_dict(artifact)
+            return result
+
     async def append_event(
         self,
         production_id: str,
@@ -1232,6 +1835,7 @@ class PersonalIPVideoProductionRepository:
         cost: dict[str, Any],
         occurred_at: datetime | None = None,
         trusted_human_confirmation: bool = False,
+        trusted_delivery_qa: bool = False,
     ) -> dict[str, Any] | None:
         owner = _clean_required(owner_user_id, field="owner_user_id", limit=64)
         event_key_value = _clean_required(event_key, field="event_key", limit=256)
@@ -1313,6 +1917,11 @@ class PersonalIPVideoProductionRepository:
                 production = (await session.execute(production_statement)).scalar_one_or_none()
             if production is None or production.owner_user_id != owner:
                 return None
+            linked_production = production.contract_version == LINKED_VIDEO_PRODUCTION_CONTRACT_VERSION and production.content_work_id is not None and production.script_version_id is not None
+            if linked_production and event_type_key == "delivery_completed":
+                raise ValueError("linked production delivery_completed must use complete_delivery_and_seal_artifact")
+            if linked_production and event_type_key == "delivery_qa_completed" and trusted_delivery_qa is not True:
+                raise ValueError("linked production delivery QA requires a trusted executor")
             if compiled_contract is not None:
                 production_mode = (production.source_json or {}).get("production_mode")
                 validation_kwargs: dict[str, Any] = {
@@ -1350,6 +1959,7 @@ class PersonalIPVideoProductionRepository:
                 result = self._production_dict(production)
                 result["events"] = await self._events(session, production.id)
                 self._attach_budget_state(result, result["events"])
+                await self._attach_final_artifact(session, result)
                 return result
             if production.status in {"completed", "cancelled"}:
                 raise ValueError("terminal video production cannot accept new events")
@@ -1451,4 +2061,5 @@ class PersonalIPVideoProductionRepository:
             result = self._production_dict(production)
             result["events"] = await self._events(session, production.id)
             self._attach_budget_state(result, result["events"])
+            await self._attach_final_artifact(session, result)
             return result

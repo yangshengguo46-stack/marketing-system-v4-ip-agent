@@ -66,6 +66,7 @@ import {
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { FinalArtifactContentImport } from "@/components/workspace/personal-ip/final-artifact-content-import";
 import {
   WorkspaceBody,
   WorkspaceContainer,
@@ -80,8 +81,12 @@ import {
   type VideoWorkbenchConfirmation,
   type VideoWorkbenchTask,
   PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
+  formatPersonalIPFinalArtifactSize,
   formatVideoCost,
+  personalIPFinalArtifactContentURL,
   personalIPVideoArtifactURL,
+  selectPersonalIPFinalArtifact,
+  selectPersonalIPFinalArtifactReceipt,
   useBindVideoProductionThread,
   usePersonalIPVideoProductions,
   usePersonalIPMediaModelCatalog,
@@ -115,20 +120,10 @@ const ENTITY_LABELS: Record<string, string> = {
   shot: "镜头",
   candidate: "候选片段",
   audio: "音频",
+  artifact: "成片",
   timeline: "时间线",
   delivery: "交付",
   production: "制作",
-};
-
-const DELIVERY_CHECK_LABELS: Record<string, string> = {
-  audio: "声音正常",
-  black_frames: "无异常黑帧",
-  decode: "视频可完整播放",
-  duration: "时长正确",
-  fps: "帧率符合要求",
-  freeze_frames: "无异常卡帧",
-  resolution: "画面尺寸正确",
-  subtitles: "字幕时间正确",
 };
 
 const EVENT_LABELS: Record<string, string> = {
@@ -2145,7 +2140,7 @@ function TimelineEditor({
         lockId,
         note: `锁定时间线修订 ${workbench.timeline.revision_id}，进入最终渲染与交付 QA`,
       });
-      toast.success("剪辑已完成，可以生成成片");
+      toast.success("剪辑已锁定，等待受控成片执行");
     } catch {
       toast.error("暂时无法完成剪辑，请重试");
     }
@@ -3645,49 +3640,16 @@ function DeliveryTab({
     decision: "approved" | "rejected",
   ) => void;
 }) {
-  const currentQa =
-    workbench.delivery.current_qa_event ??
-    [...workbench.delivery.qa_events].reverse().find(Boolean);
-  const payload = currentQa?.payload ?? {};
-  const payloadArtifact =
-    payload.artifact &&
-    typeof payload.artifact === "object" &&
-    typeof (payload.artifact as Record<string, unknown>).ref === "string"
-      ? (payload.artifact as VideoArtifact)
-      : undefined;
-  const currentArtifact =
-    payloadArtifact ??
-    workbench.delivery.artifacts.find(
-      (artifact) =>
-        currentQa?.output_refs?.includes(artifact.ref) &&
-        artifact.mime_type?.startsWith("video/"),
-    ) ??
-    [...workbench.delivery.artifacts]
-      .reverse()
-      .find((artifact) => artifact.mime_type?.startsWith("video/"));
-  const playbackRef = displayableMediaRef(
-    currentArtifact,
-    workbench.production.id,
+  const finalArtifactReceipt = selectPersonalIPFinalArtifactReceipt(
+    workbench.production,
   );
-  const checks = payload.checks;
-  const checkEntries =
-    checks && typeof checks === "object" ? Object.entries(checks) : [];
+  const finalArtifact = selectPersonalIPFinalArtifact(workbench.production);
+  const playbackRef = finalArtifact
+    ? personalIPFinalArtifactContentURL(finalArtifact.id)
+    : null;
   const publishConfirmations = workbench.confirmations.filter(
     (item) => item.kind === "real_publish",
   );
-  const passedChecks = checkEntries.filter(([, raw]) => {
-    const detail =
-      raw && typeof raw === "object"
-        ? (raw as Record<string, unknown>)
-        : { passed: raw };
-    return detail.passed === true;
-  }).length;
-  const fileSize =
-    typeof currentArtifact?.size_bytes === "number"
-      ? currentArtifact.size_bytes >= 1024 * 1024
-        ? `${(currentArtifact.size_bytes / 1024 / 1024).toFixed(1)} MB`
-        : `${Math.max(1, Math.round(currentArtifact.size_bytes / 1024))} KB`
-      : null;
   return (
     <div className="mx-auto w-full max-w-[1440px] space-y-4">
       <section className="overflow-hidden rounded-[28px] border border-[#3f352b]/12 bg-[#f9f6ef] shadow-[0_18px_50px_-38px_rgba(49,41,33,0.45)]">
@@ -3695,45 +3657,30 @@ function DeliveryTab({
           <div>
             <p className="flex items-center gap-2 text-base font-semibold">
               <FilmIcon className="size-4 text-[#c95038]" />
-              {currentArtifact ? "最终成片" : "成片尚未完成"}
+              {finalArtifactReceipt ? "最终成片" : "正式成片未完成"}
             </p>
             <p className="mt-1 text-[10px] text-[#79736a]">
-              {currentArtifact
-                ? "播放确认后即可保存到本地。"
-                : "完成剪辑后，成片会出现在这里。"}
+              {finalArtifact
+                ? "该成片已完成交付 QA，并由服务端正式实体绑定。"
+                : finalArtifactReceipt
+                  ? "正式成片回执仍在，重新导入核验通过后即可播放和下载。"
+                  : "只有完成交付 QA 并返回可核验正式实体后，这里才会显示成片。"}
             </p>
           </div>
           <Badge
-            variant={
-              workbench.delivery.qa_passed
-                ? "outline"
-                : currentArtifact
-                  ? "secondary"
-                  : "outline"
-            }
+            variant="outline"
             className={cn(
-              "hidden",
-              workbench.delivery.qa_passed &&
+              finalArtifactReceipt &&
                 "border-emerald-600/30 bg-emerald-50 text-emerald-800",
             )}
           >
-            {workbench.delivery.qa_passed ? (
-              <CheckCircle2Icon />
-            ) : currentArtifact ? (
-              <LoaderCircleIcon />
-            ) : (
-              <FilmIcon />
-            )}
-            {workbench.delivery.qa_passed
-              ? "检查通过"
-              : currentArtifact
-                ? "等待检查"
-                : "尚未生成"}
+            {finalArtifactReceipt ? <ShieldCheckIcon /> : <FilmIcon />}
+            {finalArtifactReceipt ? "交付 QA 已通过" : "尚未完成"}
           </Badge>
         </header>
 
         <div className="flex min-h-[440px] items-center justify-center bg-[#171614] xl:min-h-[560px]">
-          {currentArtifact && playbackRef ? (
+          {finalArtifact && playbackRef ? (
             <div className="flex size-full items-center justify-center p-3">
               <video
                 aria-label="最终成片播放器"
@@ -3750,124 +3697,46 @@ function DeliveryTab({
               <span className="mb-4 flex size-16 items-center justify-center rounded-full border border-white/15 bg-white/8">
                 <FilmIcon className="size-7 text-white/75" />
               </span>
-              <strong className="text-lg">还没有可播放的成片</strong>
+              <strong className="text-lg">
+                {finalArtifactReceipt
+                  ? "成片文件待重新导入"
+                  : "还没有可核验的正式成片"}
+              </strong>
             </div>
           )}
         </div>
 
-        {currentArtifact && playbackRef && (
-          <footer className="flex justify-end border-t border-[#3f352b]/10 px-5 py-4">
-            <Button asChild className="ml-auto bg-[#ef5f3f] hover:bg-[#d94d31]">
-              <a href={playbackRef} download>
-                <DownloadIcon /> 保存到本地
-              </a>
-            </Button>
+        {finalArtifactReceipt && (
+          <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#3f352b]/10 px-5 py-4">
+            <div className="text-[10px] leading-5 text-[#79736a]">
+              <p>
+                {finalArtifactReceipt.mime_type} ·{" "}
+                {formatPersonalIPFinalArtifactSize(
+                  finalArtifactReceipt.size_bytes,
+                )}
+              </p>
+              <p title={finalArtifactReceipt.content_sha256}>
+                SHA-256 {finalArtifactReceipt.content_sha256.slice(0, 12)}…
+              </p>
+            </div>
+            {finalArtifact && playbackRef ? (
+              <Button
+                asChild
+                className="ml-auto bg-[#ef5f3f] hover:bg-[#d94d31]"
+              >
+                <a href={playbackRef} download>
+                  <DownloadIcon /> 保存到本地
+                </a>
+              </Button>
+            ) : (
+              <FinalArtifactContentImport
+                artifact={finalArtifactReceipt}
+                className="w-full sm:max-w-lg"
+              />
+            )}
           </footer>
         )}
       </section>
-
-      <div className="hidden gap-4 md:grid-cols-2">
-        <Card
-          className={cn(
-            "gap-3 border-[#3f352b]/12 bg-white/60",
-            workbench.delivery.qa_passed
-              ? "border-emerald-500/40"
-              : currentArtifact
-                ? "border-amber-500/40"
-                : "",
-          )}
-        >
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ShieldCheckIcon className="size-4" /> 交付检查
-              </CardTitle>
-              <Badge
-                variant={workbench.delivery.qa_passed ? "outline" : "secondary"}
-              >
-                {workbench.delivery.qa_passed ? (
-                  <CheckCircle2Icon />
-                ) : (
-                  <AlertTriangleIcon />
-                )}
-                {workbench.delivery.qa_passed
-                  ? "已通过"
-                  : workbench.delivery.qa_passed === false
-                    ? "需要处理"
-                    : "等待检查"}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {workbench.delivery.qa_stale && (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900">
-                剪辑在上次检查后有修改，需要重新生成并检查成片。
-              </div>
-            )}
-            {checkEntries.length > 0 ? (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {checkEntries.map(([key, raw]) => {
-                  const detail =
-                    raw && typeof raw === "object"
-                      ? (raw as Record<string, unknown>)
-                      : { passed: raw };
-                  const passed = detail.passed === true;
-                  return (
-                    <div
-                      key={key}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-[#3f352b]/10 bg-white/70 px-3 py-2 text-xs"
-                    >
-                      <span>{DELIVERY_CHECK_LABELS[key] ?? "媒体检查"}</span>
-                      <Badge variant={passed ? "outline" : "destructive"}>
-                        {passed ? "通过" : "未通过"}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-sm leading-6 text-[#79736a]">
-                成片生成后，智能体会自动检查播放、画面、声音、字幕和交付规格。
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="gap-3 border-[#3f352b]/12 bg-white/60">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <PackageCheckIcon className="size-4" /> 成片文件
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {currentArtifact ? (
-              <>
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#3f352b]/10 bg-white/70 p-3">
-                  <div className="min-w-0">
-                    <strong className="block truncate text-sm">
-                      {shortRef(currentArtifact.ref)}
-                    </strong>
-                    <span className="mt-1 block text-[10px] text-[#79736a]">
-                      {currentArtifact.mime_type ?? "视频文件"}
-                      {fileSize ? ` · ${fileSize}` : ""}
-                    </span>
-                  </div>
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
-                    <CheckCircle2Icon className="size-4" />
-                  </span>
-                </div>
-                <p className="text-xs text-[#79736a]">
-                  {passedChecks}/{checkEntries.length || "—"} 项检查通过
-                </p>
-              </>
-            ) : (
-              <p className="text-sm leading-6 text-[#79736a]">
-                当前没有交付文件。完成最终剪辑后，成片会出现在这里。
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
 
       <div className="hidden">
         {publishConfirmations.map((confirmation) => (

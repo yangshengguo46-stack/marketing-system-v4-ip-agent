@@ -128,7 +128,10 @@ FastAPI application providing REST endpoints for frontend integration:
 | `DELETE /api/threads/{id}` | Delete DeerFlow-managed local thread data after LangGraph thread deletion; unexpected failures are logged server-side and return a generic 500 detail |
 | `GET /api/threads/{id}/artifacts/{path}` | Serve generated artifacts |
 | `GET /api/personal-ip/video-productions/{id}/workbench` | Project the immutable video ledger into the four-stage workbench |
-| `GET /api/personal-ip/video-productions/{id}/artifacts/{sha256}` | Stream an owner-scoped, hash-verified media artifact recorded in an execution receipt or asset manifest |
+| `GET /api/personal-ip/video-productions/{id}/artifacts/{sha256}` | Legacy-v1 only: stream an owner-scoped, hash-verified event artifact; linked-v2 productions fail closed |
+| `GET /api/personal-ip/artifacts/{artifact_id}` | Read customer-safe formal final-Artifact metadata without storage locators |
+| `GET /api/personal-ip/artifacts/{artifact_id}/content` | Re-verify and stream the available formal final video, including a single byte range |
+| `PUT /api/personal-ip/artifacts/{artifact_id}/content` | Reattach exact restored bytes after SHA-256, size and canonical MIME verification |
 | `POST /api/personal-ip/video-productions/{id}/timeline-revisions` | Server-compile one shared human/agent edit snapshot and append it to the video ledger |
 Personal-IP strategy belongs to a subject, not a platform account. Its
 immutable repository stores shape-validated working notes; evidence, business

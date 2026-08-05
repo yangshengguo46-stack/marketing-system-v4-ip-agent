@@ -74,7 +74,9 @@ async def test_video_artifact_stream_is_owner_scoped_hash_verified_and_seekable(
     monkeypatch,
     tmp_path,
 ) -> None:
-    artifact_path = tmp_path / "delivery.mp4"
+    paths = Paths(tmp_path / ".deer-flow")
+    artifact_path = paths.user_dir("user-1") / "video-deliveries" / "delivery.mp4"
+    artifact_path.parent.mkdir(parents=True)
     artifact_bytes = b"0123456789-video-payload"
     artifact_path.write_bytes(artifact_bytes)
     digest = hashlib.sha256(artifact_bytes).hexdigest()
@@ -106,6 +108,7 @@ async def test_video_artifact_stream_is_owner_scoped_hash_verified_and_seekable(
         return SimpleNamespace(id="user-1")
 
     monkeypatch.setattr(router_module, "get_current_user_from_request", current_user)
+    monkeypatch.setattr(router_module, "get_paths", lambda: paths)
     async with httpx.AsyncClient(base_url="http://test", transport=httpx.ASGITransport(app=app)) as client:
         response = await client.get(
             f"/api/personal-ip/video-productions/video-production-1/artifacts/{digest}",
@@ -120,6 +123,109 @@ async def test_video_artifact_stream_is_owner_scoped_hash_verified_and_seekable(
     assert response.headers["cache-control"] == "private, max-age=31536000, immutable"
     assert missing.status_code == 404
     repository.get.assert_awaited_with("video-production-1", owner_user_id="user-1")
+
+
+@pytest.mark.asyncio
+async def test_legacy_video_artifact_route_rejects_file_uri_outside_owner_root(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    paths = Paths(tmp_path / ".deer-flow")
+    outside = tmp_path / "outside.mp4"
+    payload = b"outside-owner-video"
+    outside.write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+    repository = SimpleNamespace(
+        get=AsyncMock(
+            return_value={
+                "id": "video-production-1",
+                "events": [
+                    {
+                        "status": "succeeded",
+                        "payload": {
+                            "artifact": {
+                                "ref": outside.resolve().as_uri(),
+                                "sha256": digest,
+                                "size_bytes": len(payload),
+                                "mime_type": "video/mp4",
+                            }
+                        },
+                    }
+                ],
+            }
+        )
+    )
+    app = FastAPI()
+    app.state.personal_ip_video_production_repo = repository
+    app.include_router(router_module.router)
+
+    async def current_user(_request):
+        return SimpleNamespace(id="user-1")
+
+    monkeypatch.setattr(router_module, "get_current_user_from_request", current_user)
+    monkeypatch.setattr(router_module, "get_paths", lambda: paths)
+    async with httpx.AsyncClient(
+        base_url="http://test",
+        transport=httpx.ASGITransport(app=app),
+    ) as client:
+        response = await client.get(f"/api/personal-ip/video-productions/video-production-1/artifacts/{digest}")
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_linked_v2_video_artifact_route_never_falls_back_to_event_refs(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    paths = Paths(tmp_path / ".deer-flow")
+    artifact_path = paths.user_dir("user-1") / "video-deliveries" / "delivery.mp4"
+    artifact_path.parent.mkdir(parents=True)
+    payload = b"linked-v2-video"
+    artifact_path.write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+    repository = SimpleNamespace(
+        get=AsyncMock(
+            return_value={
+                "id": "video-production-1",
+                "contract_version": "personal-ip-video-production-v2",
+                "events": [
+                    {
+                        "status": "succeeded",
+                        "payload": {
+                            "artifact": {
+                                "ref": artifact_path.resolve().as_uri(),
+                                "sha256": digest,
+                                "size_bytes": len(payload),
+                                "mime_type": "video/mp4",
+                            }
+                        },
+                    }
+                ],
+            }
+        )
+    )
+    app = FastAPI()
+    app.state.personal_ip_video_production_repo = repository
+    app.include_router(router_module.router)
+
+    async def current_user(_request):
+        return SimpleNamespace(id="user-1")
+
+    monkeypatch.setattr(
+        router_module,
+        "get_current_user_from_request",
+        current_user,
+    )
+    monkeypatch.setattr(router_module, "get_paths", lambda: paths)
+    async with httpx.AsyncClient(
+        base_url="http://test",
+        transport=httpx.ASGITransport(app=app),
+    ) as client:
+        response = await client.get(f"/api/personal-ip/video-productions/video-production-1/artifacts/{digest}")
+
+    assert response.status_code == 404
+    assert artifact_path.read_bytes() == payload
 
 
 @pytest.mark.asyncio
@@ -310,6 +416,46 @@ async def test_video_production_router_rejects_unknown_event_type(monkeypatch) -
                 "entity_id": "video-production-1",
                 "payload": {},
             },
+        )
+
+    assert response.status_code == 422
+    repository.append_event.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("event_type", ["delivery_qa_completed", "delivery_completed"])
+async def test_public_video_event_endpoint_rejects_server_owned_delivery_events(
+    monkeypatch,
+    event_type: str,
+) -> None:
+    repository = SimpleNamespace(append_event=AsyncMock())
+    app = FastAPI()
+    app.state.personal_ip_video_production_repo = repository
+    app.include_router(router_module.router)
+
+    async def current_user(_request):
+        return SimpleNamespace(id="user-1")
+
+    monkeypatch.setattr(router_module, "get_current_user_from_request", current_user)
+    body = {
+        "event_key": f"{event_type}:1",
+        "event_type": event_type,
+        "status": "succeeded",
+        "entity_type": "artifact" if event_type == "delivery_completed" else "delivery",
+        "entity_id": "artifact-1" if event_type == "delivery_completed" else "delivery-1",
+        "payload": {},
+        "input_refs": [],
+        "output_refs": ["artifact://artifact-1"],
+        "provider": "caller",
+        "cost": {},
+    }
+    async with httpx.AsyncClient(
+        base_url="http://test",
+        transport=httpx.ASGITransport(app=app),
+    ) as client:
+        response = await client.post(
+            "/api/personal-ip/video-productions/video-production-1/events",
+            json=body,
         )
 
     assert response.status_code == 422

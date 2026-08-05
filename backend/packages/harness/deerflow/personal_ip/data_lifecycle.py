@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import hmac
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -22,9 +23,11 @@ from typing import Any
 from sqlalchemy import DateTime, delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from deerflow.config.paths import Paths, get_paths
 from deerflow.ip_agent.evidence_contracts import ReferenceVideoEvidence
 from deerflow.persistence.base import Base
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
+from deerflow.persistence.personal_ip_artifacts.model import PersonalIPArtifactRow
 from deerflow.persistence.personal_ip_content.model import (
     PersonalIPBreakdownVersionRow,
     PersonalIPContentWorkRow,
@@ -49,6 +52,8 @@ from deerflow.persistence.personal_ip_video_productions.model import (
     PersonalIPVideoProductionRow,
 )
 from deerflow.persistence.personal_ip_video_productions.sql import (
+    FINAL_ARTIFACT_CONTRACT_VERSION,
+    FINAL_ARTIFACT_ROLE,
     LINKED_VIDEO_PRODUCTION_CONTRACT_VERSION,
     SCRIPT_SOURCE_SNAPSHOT_CONTRACT_VERSION,
     VIDEO_PRODUCTION_CONTRACT_VERSION,
@@ -60,16 +65,42 @@ from deerflow.personal_ip.content_contracts import (
     ScriptDraft,
 )
 from deerflow.personal_ip.evidence_binding import reference_evidence_refs
-from deerflow.personal_ip.video_contracts import VIDEO_PRODUCTION_MODES
+from deerflow.personal_ip.final_artifacts import (
+    PreparedFinalArtifactDeletion,
+    commit_owner_final_artifact_deletion,
+    normalize_storage_key,
+    prepare_owner_final_artifact_deletion,
+    rollback_owner_final_artifact_deletion,
+)
+from deerflow.personal_ip.video_contracts import (
+    VIDEO_PRODUCTION_MODES,
+    validate_compiled_video_contract,
+)
 
 LEGACY_BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v1"
 CONTENT_BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v2"
-BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v3"
+PRODUCTION_BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v3"
+BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v4"
 RESTORE_RECEIPT_VERSION = "personal-ip-owner-restore-receipt-v1"
 DELETE_PREVIEW_VERSION = "personal-ip-destructive-delete-preview-v1"
 DELETE_CONFIRMATION_VERSION = "personal-ip-destructive-delete-confirmation-v1"
 DELETE_RECEIPT_VERSION = "personal-ip-destructive-delete-receipt-v1"
 DELETE_CONFIRMATION_PHRASE = "永久删除我的全部个人IP数据"
+LEGACY_BACKUP_VERIFICATION_ALGORITHM = "sha256-canonical-json-v1"
+BACKUP_VERIFICATION_ALGORITHM = "hmac-sha256-canonical-json-v1"
+
+_CREDENTIAL_POLICY = {
+    "credentials_included": False,
+    "oauth_states_included": False,
+    "paid_call_admissions_included": False,
+    "platform_reauthorization_required_after_restore": True,
+    "paid_call_reapproval_required_after_restore": True,
+}
+_ARTIFACT_POLICY = {
+    "metadata_included": True,
+    "binary_files_included": False,
+    "content_must_be_downloaded_separately": True,
+}
 
 _FORBIDDEN_EXPORT_KEYS = {
     "access_token",
@@ -105,10 +136,12 @@ _DATASETS: tuple[_Dataset, ...] = (
     _Dataset("platform_connections", PersonalIPPlatformConnectionRow),
     _Dataset("video_productions", PersonalIPVideoProductionRow),
     _Dataset("video_production_events", PersonalIPVideoProductionEventRow),
+    _Dataset("artifacts", PersonalIPArtifactRow),
 )
+_PRE_ARTIFACT_DATASETS: tuple[_Dataset, ...] = tuple(item for item in _DATASETS if item.name != "artifacts")
 _LEGACY_DATASETS: tuple[_Dataset, ...] = tuple(
     item
-    for item in _DATASETS
+    for item in _PRE_ARTIFACT_DATASETS
     if item.name
     not in {
         "content_works",
@@ -668,6 +701,333 @@ def _validate_production_restore_datasets(
             raise ValueError("backup video production event_count does not match its events")
 
 
+def _artifact_receipt_matches(
+    value: Any,
+    *,
+    source_ref: str,
+    sha256: str,
+    size_bytes: int,
+    mime_type: str,
+) -> bool:
+    return isinstance(value, Mapping) and value.get("ref") == source_ref and value.get("sha256") == sha256 and value.get("size_bytes") == size_bytes and value.get("mime_type") == mime_type
+
+
+def _validate_artifact_restore_datasets(
+    datasets: Sequence[Mapping[str, Any]],
+    *,
+    require_formal_artifacts: bool,
+) -> None:
+    """Reject self-resigned Artifact backups without exact terminal lineage."""
+
+    records_by_name = {str(dataset["name"]): dataset["records"] for dataset in datasets}
+    productions = _record_index(
+        "video_productions",
+        records_by_name["video_productions"],
+    )
+    events = _record_index(
+        "video_production_events",
+        records_by_name["video_production_events"],
+    )
+    artifacts = _record_index("artifacts", records_by_name["artifacts"])
+    events_by_production: dict[str, list[Mapping[str, Any]]] = {}
+    for event in events.values():
+        production_id = str(event.get("production_id") or "")
+        events_by_production.setdefault(production_id, []).append(event)
+
+    production_roles: set[tuple[str, str]] = set()
+    delivery_roles: set[tuple[str, str]] = set()
+    artifact_delivery_event_ids: set[str] = set()
+    for artifact_id, artifact in artifacts.items():
+        production_id = artifact.get("production_id")
+        production = productions.get(str(production_id))
+        if production is None:
+            raise ValueError("backup final Artifact production does not belong to this Owner backup")
+        if production.get("contract_version") != LINKED_VIDEO_PRODUCTION_CONTRACT_VERSION or production.get("content_work_id") is None or production.get("script_version_id") is None or production.get("source_kind") != "script":
+            raise ValueError("backup final Artifact requires a linked ScriptVersion production")
+        if production.get("status") != "completed" or production.get("current_stage") != "delivery":
+            raise ValueError("backup final Artifact production must be completed at delivery")
+
+        contract_version = artifact.get("contract_version")
+        role = artifact.get("role")
+        if contract_version != FINAL_ARTIFACT_CONTRACT_VERSION:
+            raise ValueError("backup final Artifact contract version is invalid")
+        if role != FINAL_ARTIFACT_ROLE:
+            raise ValueError("backup final Artifact role is invalid")
+        production_role = (str(production_id), str(role))
+        if production_role in production_roles:
+            raise ValueError("backup final Artifact production and role must be unique")
+        production_roles.add(production_role)
+
+        storage_key = artifact.get("storage_key")
+        try:
+            normalized_storage_key = normalize_storage_key(storage_key) if isinstance(storage_key, str) else None
+        except ValueError as exc:
+            raise ValueError("backup final Artifact storage key is invalid") from exc
+        if not isinstance(storage_key, str) or len(storage_key) > 1_024 or normalized_storage_key != storage_key:
+            raise ValueError("backup final Artifact storage key is invalid")
+        content_sha256 = _require_sha256(
+            artifact.get("sha256"),
+            field="final Artifact sha256",
+        )
+        size_bytes = artifact.get("size_bytes")
+        if not isinstance(size_bytes, int) or isinstance(size_bytes, bool) or size_bytes <= 0:
+            raise ValueError("backup final Artifact size is invalid")
+        mime_type = artifact.get("mime_type")
+        if not isinstance(mime_type, str) or mime_type != mime_type.strip().lower() or not mime_type.startswith("video/") or len(mime_type) > 255 or any(character.isspace() for character in mime_type):
+            raise ValueError("backup final Artifact MIME type is invalid")
+        metadata = artifact.get("metadata_json")
+        if not isinstance(metadata, Mapping):
+            raise ValueError("backup final Artifact metadata is invalid")
+        if not isinstance(artifact.get("content_available"), bool):
+            raise ValueError("backup final Artifact content availability is invalid")
+
+        production_events = events_by_production.get(str(production_id), [])
+        timeline_events = [event for event in production_events if event.get("event_type") == "timeline_revision_compiled" and event.get("status") == "succeeded"]
+        lock_events = [event for event in production_events if event.get("event_type") == "final_edit_locked" and event.get("status") == "succeeded"]
+        if not timeline_events or not lock_events:
+            raise ValueError("backup final Artifact requires a timeline and final edit lock")
+        timeline = max(timeline_events, key=lambda event: int(event["sequence"]))
+        final_lock = max(lock_events, key=lambda event: int(event["sequence"]))
+        production_mode = (production.get("source_json") or {}).get("production_mode")
+        try:
+            timeline_payload = validate_compiled_video_contract(
+                timeline.get("payload_json") or {},
+                contract_version="personal-ip-video-timeline-revision-v1",
+                production_id=str(production_id),
+                production_mode=production_mode,
+            )
+            lock_payload = validate_compiled_video_contract(
+                final_lock.get("payload_json") or {},
+                contract_version="personal-ip-video-final-edit-lock-v1",
+                production_id=str(production_id),
+                production_mode=production_mode,
+            )
+        except ValueError as exc:
+            raise ValueError("backup final Artifact edit lock is invalid") from exc
+        if (
+            int(final_lock["sequence"]) <= int(timeline["sequence"])
+            or lock_payload.get("source_revision_id") != timeline_payload.get("revision_id")
+            or lock_payload.get("source_timeline_sha256") != timeline_payload.get("sha256")
+            or lock_payload.get("ready_for_delivery_qa") is not True
+        ):
+            raise ValueError("backup final Artifact lock does not freeze the latest timeline")
+
+        qa_event_id = artifact.get("qa_event_id")
+        qa_event = events.get(str(qa_event_id))
+        latest_qa = max(
+            (event for event in production_events if event.get("event_type") == "delivery_qa_completed"),
+            key=lambda event: int(event["sequence"]),
+            default=None,
+        )
+        if (
+            qa_event is None
+            or qa_event.get("production_id") != production_id
+            or latest_qa is None
+            or latest_qa.get("id") != qa_event_id
+            or qa_event.get("event_type") != "delivery_qa_completed"
+            or qa_event.get("stage") != "delivery"
+            or qa_event.get("status") != "succeeded"
+        ):
+            raise ValueError("backup final Artifact requires the latest passed delivery QA")
+        qa_payload = qa_event.get("payload_json")
+        qa_output_refs = qa_event.get("output_refs_json")
+        if (
+            not isinstance(qa_payload, Mapping)
+            or qa_payload.get("contract_version") != "personal-ip-delivery-qa-v1"
+            or qa_payload.get("passed") is not True
+            or not isinstance(qa_output_refs, list)
+            or len(qa_output_refs) != 1
+            or not isinstance(qa_output_refs[0], str)
+            or not qa_output_refs[0]
+        ):
+            raise ValueError("backup final Artifact delivery QA is invalid")
+        source_ref = qa_output_refs[0]
+        if not _artifact_receipt_matches(
+            qa_payload.get("artifact"),
+            source_ref=source_ref,
+            sha256=content_sha256,
+            size_bytes=size_bytes,
+            mime_type=mime_type,
+        ):
+            raise ValueError("backup final Artifact does not match its delivery QA")
+        expected_qa_metadata = {
+            "checks": (qa_payload.get("checks") if isinstance(qa_payload.get("checks"), list) else []),
+            "delivery_spec": (qa_payload.get("delivery_spec") if isinstance(qa_payload.get("delivery_spec"), Mapping) else {}),
+            "executors": (qa_payload.get("executors") if isinstance(qa_payload.get("executors"), Mapping) else {}),
+            "probe": (qa_payload.get("probe") if isinstance(qa_payload.get("probe"), Mapping) else {}),
+        }
+        if metadata.get("delivery_qa") != expected_qa_metadata:
+            raise ValueError("backup final Artifact metadata does not match its delivery QA")
+
+        delivery_event_id = artifact.get("delivery_event_id")
+        delivery_event = events.get(str(delivery_event_id))
+        delivery_role = (str(delivery_event_id), str(role))
+        if delivery_role in delivery_roles:
+            raise ValueError("backup final Artifact delivery and role must be unique")
+        delivery_roles.add(delivery_role)
+        if (
+            delivery_event is None
+            or delivery_event.get("production_id") != production_id
+            or delivery_event.get("event_type") != "delivery_completed"
+            or delivery_event.get("stage") != "delivery"
+            or delivery_event.get("status") != "succeeded"
+            or delivery_event.get("entity_type") != "artifact"
+            or delivery_event.get("entity_id") != artifact_id
+            or delivery_event.get("output_refs_json") != [f"artifact://{artifact_id}"]
+        ):
+            raise ValueError("backup final Artifact delivery event is invalid or mismatched")
+        artifact_delivery_event_ids.add(str(delivery_event_id))
+        if delivery_event.get("sequence") != production.get("event_count") or int(delivery_event["sequence"]) != max(int(event["sequence"]) for event in production_events):
+            raise ValueError("backup final Artifact delivery event must be terminal")
+
+        delivery_payload = delivery_event.get("payload_json")
+        if not isinstance(delivery_payload, Mapping):
+            raise ValueError("backup final Artifact delivery payload is invalid")
+        source_receipts = delivery_payload.get("source_execution_events")
+        if not isinstance(source_receipts, list) or not source_receipts or len(source_receipts) > 32:
+            raise ValueError("backup final Artifact source execution receipts are invalid")
+        source_event_ids: set[str] = set()
+        source_event_keys: set[str] = set()
+        source_events: list[Mapping[str, Any]] = []
+        previous_sequence = int(final_lock["sequence"])
+        for receipt in source_receipts:
+            if not isinstance(receipt, Mapping) or set(receipt) != {
+                "event_digest",
+                "event_id",
+                "event_key",
+            }:
+                raise ValueError("backup final Artifact source execution receipt is invalid")
+            source_event_id = receipt.get("event_id")
+            source_event_key = receipt.get("event_key")
+            if not isinstance(source_event_id, str) or source_event_id in source_event_ids or not isinstance(source_event_key, str) or not source_event_key or source_event_key in source_event_keys:
+                raise ValueError("backup final Artifact source execution receipt is duplicated")
+            source_event_ids.add(source_event_id)
+            source_event_keys.add(source_event_key)
+            source_event = events.get(source_event_id)
+            source_payload = source_event.get("payload_json") if isinstance(source_event, Mapping) else None
+            outputs = source_payload.get("outputs") if isinstance(source_payload, Mapping) else None
+            if (
+                source_event is None
+                or source_event.get("production_id") != production_id
+                or source_event.get("event_key") != source_event_key
+                or source_event.get("event_digest") != receipt.get("event_digest")
+                or source_event.get("event_type") != "media_processing_completed"
+                or source_event.get("status") != "succeeded"
+                or source_event.get("entity_type") != "delivery"
+                or int(source_event["sequence"]) <= previous_sequence
+                or not isinstance(source_payload, Mapping)
+                or source_payload.get("contract_version") != "personal-ip-media-execution-v1"
+                or source_payload.get("capability") != "media_processing"
+                or source_payload.get("status") != "succeeded"
+                or source_event.get("output_refs_json") != [source_ref]
+                or not isinstance(outputs, list)
+                or len(outputs) != 1
+                or not _artifact_receipt_matches(
+                    outputs[0],
+                    source_ref=source_ref,
+                    sha256=content_sha256,
+                    size_bytes=size_bytes,
+                    mime_type=mime_type,
+                )
+            ):
+                raise ValueError("backup final Artifact source execution is invalid or mismatched")
+            previous_sequence = int(source_event["sequence"])
+            source_events.append(source_event)
+        latest_delivery_execution = max(
+            (
+                event
+                for event in production_events
+                if event.get("entity_type") == "delivery"
+                and event.get("event_type")
+                in {
+                    "media_processing_requested",
+                    "media_processing_completed",
+                    "media_processing_failed",
+                }
+            ),
+            key=lambda event: int(event["sequence"]),
+            default=None,
+        )
+        if latest_delivery_execution is None or latest_delivery_execution.get("id") != source_events[-1].get("id"):
+            raise ValueError("backup final Artifact source execution is stale; the latest delivery media execution requires new QA")
+        if int(qa_event["sequence"]) <= previous_sequence:
+            raise ValueError("backup final Artifact delivery QA must follow source execution")
+
+        expected_source_receipts = [
+            {
+                "event_digest": event["event_digest"],
+                "event_id": event["id"],
+                "event_key": event["event_key"],
+            }
+            for event in source_events
+        ]
+        artifact_projection = {
+            "artifact_digest": artifact.get("artifact_digest"),
+            "content_sha256": content_sha256,
+            "contract_version": contract_version,
+            "id": artifact_id,
+            "metadata": metadata,
+            "mime_type": mime_type,
+            "production_id": production_id,
+            "role": role,
+            "size_bytes": size_bytes,
+        }
+        expected_delivery_payload = {
+            "accepted": True,
+            "artifact": artifact_projection,
+            "content_work_id": production.get("content_work_id"),
+            "contract_version": contract_version,
+            "qa_event_digest": qa_event.get("event_digest"),
+            "qa_event_id": qa_event_id,
+            "script_version_id": production.get("script_version_id"),
+            "source_execution_events": expected_source_receipts,
+        }
+        if delivery_payload != expected_delivery_payload:
+            raise ValueError("backup final Artifact delivery payload does not match its lineage")
+        expected_input_refs = [
+            *(f"video-event://{event['id']}" for event in source_events),
+            f"video-event://{qa_event_id}",
+        ]
+        if delivery_event.get("input_refs_json") != expected_input_refs:
+            raise ValueError("backup final Artifact delivery inputs do not match its lineage")
+
+        artifact_digest_payload = {
+            "artifact_id": artifact_id,
+            "content_sha256": content_sha256,
+            "content_work_id": production.get("content_work_id"),
+            "contract_version": contract_version,
+            "delivery_event_id": delivery_event_id,
+            "metadata": metadata,
+            "mime_type": mime_type,
+            "owner_user_id": artifact.get("owner_user_id"),
+            "production_id": production_id,
+            "qa_event_digest": qa_event.get("event_digest"),
+            "qa_event_id": qa_event_id,
+            "role": role,
+            "script_version_id": production.get("script_version_id"),
+            "size_bytes": size_bytes,
+            "source_execution_events": expected_source_receipts,
+            "storage_key": storage_key,
+        }
+        artifact_digest = _require_sha256(
+            artifact.get("artifact_digest"),
+            field="final Artifact artifact_digest",
+        )
+        if artifact_digest != _digest(artifact_digest_payload):
+            raise ValueError("backup final Artifact digest does not match its lineage")
+
+    for event in events.values():
+        if event.get("event_type") == "delivery_completed" and event.get("entity_type") == "artifact" and str(event.get("id")) not in artifact_delivery_event_ids:
+            raise ValueError("backup contains a formal Artifact delivery without its Artifact")
+    if require_formal_artifacts:
+        artifact_production_ids = {str(artifact.get("production_id")) for artifact in artifacts.values()}
+        for production_id, production in productions.items():
+            linked = production.get("contract_version") == LINKED_VIDEO_PRODUCTION_CONTRACT_VERSION and production.get("content_work_id") is not None and production.get("script_version_id") is not None
+            completed_delivery = production.get("status") == "completed" and production.get("current_stage") == "delivery"
+            if linked and completed_delivery and production_id not in artifact_production_ids:
+                raise ValueError("current backup linked completed production requires a formal final Artifact")
+
+
 class PersonalIPDataLifecycleService:
     """Owner-scoped lifecycle service over every Personal-IP persistence table."""
 
@@ -676,9 +1036,17 @@ class PersonalIPDataLifecycleService:
         session_factory: async_sessionmaker[AsyncSession],
         *,
         minecontext: Any | None,
+        backup_signing_key: str | bytes,
+        paths: Paths | None = None,
     ) -> None:
+        signing_key = backup_signing_key.encode("utf-8") if isinstance(backup_signing_key, str) else backup_signing_key
+        if not isinstance(signing_key, bytes) or len(signing_key) < 32:
+            raise ValueError("Personal-IP backup signing key must contain at least 32 bytes")
         self._sf = session_factory
         self._minecontext = minecontext
+        self._paths = paths or get_paths()
+        self._backup_signing_key = hashlib.sha256(b"personal-ip-owner-backup-signing-v1\0" + signing_key).digest()
+        self._backup_signing_key_id = hashlib.sha256(b"personal-ip-owner-backup-key-id-v1\0" + self._backup_signing_key).hexdigest()[:16]
 
     @staticmethod
     async def _lock_owner(session: AsyncSession, owner_user_id: str) -> None:
@@ -745,8 +1113,8 @@ class PersonalIPDataLifecycleService:
     def _data_digest(datasets: Sequence[Mapping[str, Any]]) -> str:
         return _digest([{"name": dataset["name"], "records": dataset["records"]} for dataset in datasets])
 
-    @staticmethod
     def _manifest_digest(
+        self,
         *,
         owner_user_id: str,
         exported_at: str,
@@ -754,15 +1122,35 @@ class PersonalIPDataLifecycleService:
         data_digest: str,
         schema_version: str = BACKUP_SCHEMA_VERSION,
     ) -> str:
-        return _digest(
-            {
-                "schema_version": schema_version,
-                "owner_user_id": owner_user_id,
-                "exported_at": exported_at,
-                "dataset_digests": [{"name": item["name"], "count": item["count"], "digest": item["digest"]} for item in datasets],
-                "data_digest": data_digest,
-            }
-        )
+        manifest = {
+            "schema_version": schema_version,
+            "owner_user_id": owner_user_id,
+            "exported_at": exported_at,
+            "dataset_digests": [
+                {
+                    "name": item["name"],
+                    "count": item["count"],
+                    "digest": item["digest"],
+                }
+                for item in datasets
+            ],
+            "data_digest": data_digest,
+        }
+        if schema_version == BACKUP_SCHEMA_VERSION:
+            manifest.update(
+                {
+                    "credential_policy": _CREDENTIAL_POLICY,
+                    "artifact_policy": _ARTIFACT_POLICY,
+                    "verification_algorithm": BACKUP_VERIFICATION_ALGORITHM,
+                    "signing_key_id": self._backup_signing_key_id,
+                }
+            )
+            return hmac.new(
+                self._backup_signing_key,
+                b"personal-ip-owner-backup-v4\0" + _canonical(manifest),
+                hashlib.sha256,
+            ).hexdigest()
+        return _digest(manifest)
 
     async def export_backup(
         self,
@@ -774,6 +1162,11 @@ class PersonalIPDataLifecycleService:
             raise ValueError("owner_user_id is required")
         exported_at = _iso(now or datetime.now(UTC))
         async with self._sf() as session:
+            # A v4 manifest spans productions, events and Artifacts.  Share the
+            # same Owner lifecycle lock as seal/reattach/delete so PostgreSQL's
+            # statement-level READ COMMITTED snapshots cannot produce a validly
+            # signed but internally torn backup.
+            await self._lock_owner(session, owner_user_id)
             datasets = await self._export_datasets(session, owner_user_id)
         data_digest = self._data_digest(datasets)
         manifest_digest = self._manifest_digest(
@@ -786,16 +1179,12 @@ class PersonalIPDataLifecycleService:
             "schema_version": BACKUP_SCHEMA_VERSION,
             "owner_user_id": owner_user_id,
             "exported_at": exported_at,
-            "credential_policy": {
-                "credentials_included": False,
-                "oauth_states_included": False,
-                "paid_call_admissions_included": False,
-                "platform_reauthorization_required_after_restore": True,
-                "paid_call_reapproval_required_after_restore": True,
-            },
+            "credential_policy": dict(_CREDENTIAL_POLICY),
+            "artifact_policy": dict(_ARTIFACT_POLICY),
             "datasets": datasets,
             "verification": {
-                "algorithm": "sha256-canonical-json-v1",
+                "algorithm": BACKUP_VERIFICATION_ALGORITHM,
+                "key_id": self._backup_signing_key_id,
                 "data_digest": data_digest,
                 "manifest_digest": manifest_digest,
             },
@@ -803,21 +1192,38 @@ class PersonalIPDataLifecycleService:
         _assert_credential_free(backup)
         return backup
 
-    @staticmethod
-    def _verify_backup(owner_user_id: str, backup: Mapping[str, Any]) -> list[dict[str, Any]]:
+    def _verify_backup(
+        self,
+        owner_user_id: str,
+        backup: Mapping[str, Any],
+    ) -> list[dict[str, Any]]:
         schema_version = backup.get("schema_version")
         if schema_version not in {
             BACKUP_SCHEMA_VERSION,
+            PRODUCTION_BACKUP_SCHEMA_VERSION,
             CONTENT_BACKUP_SCHEMA_VERSION,
             LEGACY_BACKUP_SCHEMA_VERSION,
         }:
             raise ValueError("unsupported Personal-IP backup schema version")
         if backup.get("owner_user_id") != owner_user_id:
             raise ValueError("backup owner does not match the authenticated owner")
+        if schema_version == BACKUP_SCHEMA_VERSION:
+            if backup.get("credential_policy") != _CREDENTIAL_POLICY:
+                raise ValueError("backup credential policy is invalid")
+            if backup.get("artifact_policy") != _ARTIFACT_POLICY:
+                raise ValueError("backup Artifact policy is invalid")
         datasets = backup.get("datasets")
         if not isinstance(datasets, list):
             raise ValueError("backup datasets are required")
-        specifications = _LEGACY_DATASETS if schema_version == LEGACY_BACKUP_SCHEMA_VERSION else _DATASETS
+        if schema_version == LEGACY_BACKUP_SCHEMA_VERSION:
+            specifications = _LEGACY_DATASETS
+        elif schema_version in {
+            CONTENT_BACKUP_SCHEMA_VERSION,
+            PRODUCTION_BACKUP_SCHEMA_VERSION,
+        }:
+            specifications = _PRE_ARTIFACT_DATASETS
+        else:
+            specifications = _DATASETS
         expected_names = [item.name for item in specifications]
         if [item.get("name") for item in datasets if isinstance(item, Mapping)] != expected_names:
             raise ValueError("backup dataset inventory is incomplete or out of order")
@@ -864,34 +1270,48 @@ class PersonalIPDataLifecycleService:
         verification = backup.get("verification")
         if not isinstance(verification, Mapping):
             raise ValueError("backup verification receipt is required")
-        data_digest = PersonalIPDataLifecycleService._data_digest(normalized)
+        if schema_version == BACKUP_SCHEMA_VERSION and verification.get("algorithm") != BACKUP_VERIFICATION_ALGORITHM:
+            raise ValueError("backup verification algorithm is invalid")
+        if schema_version != BACKUP_SCHEMA_VERSION and verification.get("algorithm") != LEGACY_BACKUP_VERIFICATION_ALGORITHM:
+            raise ValueError("legacy backup verification algorithm is invalid")
+        if schema_version == BACKUP_SCHEMA_VERSION and verification.get("key_id") != self._backup_signing_key_id:
+            raise ValueError("backup signing key is unavailable or does not match")
+        data_digest = self._data_digest(normalized)
         if verification.get("data_digest") != data_digest:
             raise ValueError("backup data digest mismatch")
         exported_at = backup.get("exported_at")
         if not isinstance(exported_at, str):
             raise ValueError("backup exported_at is required")
-        manifest_digest = PersonalIPDataLifecycleService._manifest_digest(
+        manifest_digest = self._manifest_digest(
             owner_user_id=owner_user_id,
             exported_at=exported_at,
             datasets=normalized,
             data_digest=data_digest,
             schema_version=str(schema_version),
         )
-        if verification.get("manifest_digest") != manifest_digest:
+        recorded_manifest_digest = verification.get("manifest_digest")
+        if not isinstance(recorded_manifest_digest, str) or not hmac.compare_digest(
+            recorded_manifest_digest,
+            manifest_digest,
+        ):
             raise ValueError("backup manifest digest mismatch")
         if schema_version == BACKUP_SCHEMA_VERSION:
             promoted = normalized
         else:
-            # V1 predates content lineage; both V1 and V2 predate the
-            # ScriptVersion-to-production columns.  Verify their original
-            # inventory, shapes and hashes above, then upgrade only the
-            # in-memory restore representation.
+            # V1 predates content lineage, V1/V2 predate the
+            # ScriptVersion-to-production columns, and V1-V3 predate the
+            # first-class Artifact entity. Verify each original inventory,
+            # shape and hash above, then upgrade only the in-memory restore
+            # representation.
             legacy_by_name = {item["name"]: item for item in normalized}
             promoted = []
             for specification in _DATASETS:
                 existing = legacy_by_name.get(specification.name)
                 records = [dict(record) for record in existing["records"]] if existing is not None else []
-                if specification.name == "video_productions":
+                if specification.name == "video_productions" and schema_version in {
+                    LEGACY_BACKUP_SCHEMA_VERSION,
+                    CONTENT_BACKUP_SCHEMA_VERSION,
+                }:
                     for record in records:
                         record["content_work_id"] = None
                         record["script_version_id"] = None
@@ -905,6 +1325,21 @@ class PersonalIPDataLifecycleService:
                 )
         _validate_content_restore_datasets(promoted)
         _validate_production_restore_datasets(promoted)
+        _validate_artifact_restore_datasets(
+            promoted,
+            require_formal_artifacts=schema_version == BACKUP_SCHEMA_VERSION,
+        )
+        # The JSON contract intentionally contains only immutable Artifact
+        # identity and receipts. A restore must never turn that metadata into
+        # a claim that the separately downloaded bytes are present. Exact
+        # bytes can be reattached later only after hash/size/MIME verification.
+        artifact_dataset = next(dataset for dataset in promoted if dataset["name"] == "artifacts")
+        for record in artifact_dataset["records"]:
+            record["content_available"] = False
+        artifact_dataset["digest"] = _dataset_digest(
+            "artifacts",
+            artifact_dataset["records"],
+        )
         return promoted
 
     @staticmethod
@@ -925,6 +1360,7 @@ class PersonalIPDataLifecycleService:
         backup: Mapping[str, Any],
     ) -> dict[str, Any]:
         datasets = self._verify_backup(owner_user_id, backup)
+        source_data_digest = str((backup.get("verification") or {}).get("data_digest") or "")
         async with self._sf() as session:
             try:
                 await self._lock_owner(session, owner_user_id)
@@ -953,8 +1389,12 @@ class PersonalIPDataLifecycleService:
             "schema_version": RESTORE_RECEIPT_VERSION,
             "owner_user_id": owner_user_id,
             "verified": True,
+            "ledger_verified": True,
+            "source_data_digest": source_data_digest,
             "restored_data_digest": restored_digest,
             "restored_records": sum(item["count"] for item in datasets),
+            "artifact_contents_restored": False,
+            "artifact_contents_requiring_reattach": next(item["count"] for item in datasets if item["name"] == "artifacts"),
             "credentials_restored": False,
             "paid_call_admissions_restored": False,
             "platform_reauthorization_required": True,
@@ -992,7 +1432,9 @@ class PersonalIPDataLifecycleService:
             "state_digest": state_digest,
             "confirmation_phrase": DELETE_CONFIRMATION_PHRASE,
             "requires_backup_acknowledgement": True,
+            "requires_artifact_file_acknowledgement": counts["artifacts"] > 0,
             "includes_local_context": True,
+            "includes_artifact_files": True,
             "irreversible": True,
         }
 
@@ -1009,6 +1451,8 @@ class PersonalIPDataLifecycleService:
             raise ValueError("exact destructive-delete confirmation phrase is required")
         if confirmation.get("backup_acknowledged") is not True:
             raise ValueError("backup acknowledgement is required")
+        if confirmation.get("artifact_files_acknowledged") is not True:
+            raise ValueError("Artifact file acknowledgement is required")
         if confirmation.get("delete_local_context") is not True:
             raise ValueError("whole Personal-IP deletion must include local context")
 
@@ -1020,6 +1464,8 @@ class PersonalIPDataLifecycleService:
         now: datetime | None = None,
     ) -> dict[str, Any]:
         self._validate_delete_confirmation(owner_user_id, confirmation)
+        prepared_artifact_deletion: PreparedFinalArtifactDeletion | None = None
+        database_committed = False
         async with self._sf() as session:
             try:
                 await self._lock_owner(session, owner_user_id)
@@ -1038,6 +1484,19 @@ class PersonalIPDataLifecycleService:
                 )
                 if confirmation.get("state_digest") != current_state_digest:
                     raise ValueError("Personal-IP state changed after the delete preview; prepare a fresh confirmation")
+
+                # Verify every formal Artifact against its immutable receipt
+                # and move the exact bytes out of the public namespace before
+                # deleting any Owner state.  The move is reversible until the
+                # database transaction commits.
+                artifact_records = next(item["records"] for item in datasets if item["name"] == "artifacts")
+                prepared_artifact_deletion = await asyncio.to_thread(
+                    prepare_owner_final_artifact_deletion,
+                    owner_user_id,
+                    artifact_records,
+                    paths=self._paths,
+                )
+
                 if self._minecontext is None:
                     raise RuntimeError("MineContext lifecycle service is unavailable")
                 local_receipt = await asyncio.to_thread(
@@ -1056,9 +1515,30 @@ class PersonalIPDataLifecycleService:
                 for dataset in reversed(_DATASETS):
                     await session.execute(delete(dataset.model).where(dataset.model.owner_user_id == owner_user_id))
                 await session.commit()
+                database_committed = True
             except Exception:
                 await session.rollback()
+                if prepared_artifact_deletion is not None and not database_committed:
+                    await asyncio.to_thread(
+                        rollback_owner_final_artifact_deletion,
+                        prepared_artifact_deletion,
+                    )
                 raise
+
+        # Only after the database is durably empty may quarantined bytes be
+        # purged.  The helper is idempotent, so retry once for a transient
+        # filesystem error without weakening identity verification.
+        assert prepared_artifact_deletion is not None
+        try:
+            deleted_artifact_files = await asyncio.to_thread(
+                commit_owner_final_artifact_deletion,
+                prepared_artifact_deletion,
+            )
+        except OSError:
+            deleted_artifact_files = await asyncio.to_thread(
+                commit_owner_final_artifact_deletion,
+                prepared_artifact_deletion,
+            )
         return {
             "schema_version": DELETE_RECEIPT_VERSION,
             "owner_user_id": owner_user_id,
@@ -1066,6 +1546,8 @@ class PersonalIPDataLifecycleService:
             "record_counts": counts,
             "state_digest": current_state_digest,
             "local_context_deleted": True,
+            "artifact_files_deleted": True,
+            "deleted_artifact_files": deleted_artifact_files,
             "credentials_deleted": True,
             "oauth_states_deleted": True,
             "paid_call_admissions_deleted": True,

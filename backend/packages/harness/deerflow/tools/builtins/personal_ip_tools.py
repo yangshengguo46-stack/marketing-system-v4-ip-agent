@@ -23,6 +23,11 @@ from deerflow.personal_ip.browser_collection import (
 )
 from deerflow.personal_ip.browser_profiles import select_browser_account_target
 from deerflow.personal_ip.douyin_oauth import DouyinMiniAppOAuthClient, DouyinOAuthError
+from deerflow.personal_ip.final_artifacts import (
+    public_artifact_metadata,
+    remove_unsealed_final_artifact,
+    seal_final_artifact,
+)
 from deerflow.personal_ip.final_timeline_renderer import render_locked_timeline_delivery
 from deerflow.personal_ip.frame_interpolation import interpolate_video_candidate
 from deerflow.personal_ip.generated_shot_qa import run_generated_shot_qa
@@ -1701,6 +1706,7 @@ async def _personal_ip_render_locked_video_delivery(
     try:
         production = await _load_video_production(runtime, str(production_id or "").strip())
         production_key = str(production.get("id") or production_id)
+        linked_delivery = production.get("contract_version") == "personal-ip-video-production-v2"
         timeline = _latest_video_contract(production, "timeline_revision_compiled")
         lock = _latest_video_contract(production, "final_edit_locked")
         revision_id = str(timeline.get("revision_id") or "").strip()
@@ -1716,6 +1722,11 @@ async def _personal_ip_render_locked_video_delivery(
             None,
         )
         if existing_delivery is not None:
+            existing_artifact = (existing_delivery.get("payload") or {}).get("artifact")
+            if linked_delivery:
+                existing_artifact = production.get("final_artifact") or existing_artifact
+                if isinstance(existing_artifact, dict):
+                    existing_artifact = public_artifact_metadata(existing_artifact)
             return _json(
                 {
                     "operation_status": "ok",
@@ -1724,7 +1735,7 @@ async def _personal_ip_render_locked_video_delivery(
                     "status": production.get("status"),
                     "current_stage": production.get("current_stage"),
                     "event_count": production.get("event_count"),
-                    "artifact": (existing_delivery.get("payload") or {}).get("artifact"),
+                    "artifact": existing_artifact,
                     "delivery_event_key": delivery_event_key,
                 }
             )
@@ -1753,11 +1764,39 @@ async def _personal_ip_render_locked_video_delivery(
             ffmpeg_path=str(ffmpeg_path),
             ffprobe_path=str(ffprobe_path),
         )
-        receipt = render["receipt"]
-        normalized = normalize_media_execution_receipt(receipt, entity_type="delivery")
+        qa = render["qa"]
+
+        async def cleanup_unsealed_linked_render() -> None:
+            if not linked_delivery:
+                return
+            artifact = qa["artifact"]
+            await asyncio.shield(
+                asyncio.to_thread(
+                    remove_unsealed_final_artifact,
+                    owner_user_id,
+                    render["output_path"],
+                    expected_sha256=artifact.get("sha256"),
+                    expected_size_bytes=artifact.get("size_bytes"),
+                    expected_mime_type=artifact.get("mime_type"),
+                    paths=paths,
+                )
+            )
+
+        try:
+            receipt = render["receipt"]
+            normalized = normalize_media_execution_receipt(
+                receipt,
+                entity_type="delivery",
+            )
+        except BaseException:
+            await cleanup_unsealed_linked_render()
+            raise
         services = get_personal_ip_runtime()
         if services.video_productions is None:
+            await cleanup_unsealed_linked_render()
             raise RuntimeError("Personal-IP video production is not available")
+        # An exception is not proof that the transaction rolled back. Keep the
+        # exact render so a possibly committed receipt cannot lose its bytes.
         rendered = await services.video_productions.append_event(
             production_key,
             owner_user_id=owner_user_id,
@@ -1776,10 +1815,14 @@ async def _personal_ip_render_locked_video_delivery(
             occurred_at=normalized["occurred_at"],
         )
         if rendered is None:
+            await cleanup_unsealed_linked_render()
             raise ValueError("Video production not found")
 
-        qa = render["qa"]
         artifact_ref = str(qa["artifact"]["ref"])
+        qa_append_kwargs: dict[str, Any] = {}
+        if linked_delivery:
+            qa_append_kwargs["trusted_delivery_qa"] = True
+        # Apply the same commit-uncertainty rule to the QA receipt.
         qa_result = await services.video_productions.append_event(
             production_key,
             owner_user_id=owner_user_id,
@@ -1796,10 +1839,23 @@ async def _personal_ip_render_locked_video_delivery(
             provider_task_id=None,
             cost={"status": "known", "amount": 0.0, "currency": "CNY", "basis": "local delivery QA"},
             occurred_at=None,
+            **qa_append_kwargs,
         )
         if qa_result is None:
+            await cleanup_unsealed_linked_render()
             raise ValueError("Video production not found")
         if qa.get("passed") is not True:
+            await cleanup_unsealed_linked_render()
+            public_qa = qa
+            if linked_delivery:
+                public_qa = {
+                    **qa,
+                    "artifact": {
+                        "content_sha256": qa["artifact"].get("sha256"),
+                        "size_bytes": qa["artifact"].get("size_bytes"),
+                        "mime_type": qa["artifact"].get("mime_type"),
+                    },
+                }
             return _json(
                 {
                     "operation_status": "blocked",
@@ -1807,38 +1863,74 @@ async def _personal_ip_render_locked_video_delivery(
                     "status": qa_result.get("status"),
                     "current_stage": qa_result.get("current_stage"),
                     "event_count": qa_result.get("event_count"),
-                    "artifact": qa["artifact"],
-                    "qa": qa,
+                    "artifact": public_qa["artifact"],
+                    "qa": public_qa,
                     "message": "Locked timeline rendered, but current delivery QA failed",
                 }
             )
 
-        completed = await services.video_productions.append_event(
-            production_key,
-            owner_user_id=owner_user_id,
-            event_key=delivery_event_key,
-            event_type="delivery_completed",
-            status="succeeded",
-            entity_type="delivery",
-            entity_id=str(lock.get("lock_id") or revision_id),
-            payload={
-                "accepted": True,
-                "qa_event_key": qa_event_key,
-                "artifact": qa["artifact"],
-                "source_revision_id": revision_id,
-                "source_timeline_sha256": revision_sha,
-                "lock_id": lock.get("lock_id"),
-            },
-            input_refs=[artifact_ref],
-            output_refs=[artifact_ref],
-            provider="project-ffmpeg",
-            model=None,
-            provider_task_id=None,
-            cost={"status": "known", "amount": 0.0, "currency": "CNY", "basis": "local locked-timeline delivery"},
-            occurred_at=None,
-        )
+        delivery_cost = {
+            "status": "known",
+            "amount": 0.0,
+            "currency": "CNY",
+            "basis": "local locked-timeline delivery",
+        }
+        if linked_delivery:
+            completed = await seal_final_artifact(
+                services.video_productions,
+                production_key,
+                owner_user_id=owner_user_id,
+                event_key=delivery_event_key,
+                qa_event_key=qa_event_key,
+                source_execution_event_keys=[render_event_key],
+                source_ref=artifact_ref,
+                local_path=render["output_path"],
+                expected_sha256=qa["artifact"].get("sha256"),
+                expected_size_bytes=qa["artifact"].get("size_bytes"),
+                expected_mime_type=qa["artifact"].get("mime_type"),
+                metadata={
+                    "source_revision_id": revision_id,
+                    "source_timeline_sha256": revision_sha,
+                    "lock_id": lock.get("lock_id"),
+                },
+                provider="project-ffmpeg",
+                model=None,
+                provider_task_id=None,
+                cost=delivery_cost,
+                occurred_at=None,
+                paths=paths,
+            )
+        else:
+            completed = await services.video_productions.append_event(
+                production_key,
+                owner_user_id=owner_user_id,
+                event_key=delivery_event_key,
+                event_type="delivery_completed",
+                status="succeeded",
+                entity_type="delivery",
+                entity_id=str(lock.get("lock_id") or revision_id),
+                payload={
+                    "accepted": True,
+                    "qa_event_key": qa_event_key,
+                    "artifact": qa["artifact"],
+                    "source_revision_id": revision_id,
+                    "source_timeline_sha256": revision_sha,
+                    "lock_id": lock.get("lock_id"),
+                },
+                input_refs=[artifact_ref],
+                output_refs=[artifact_ref],
+                provider="project-ffmpeg",
+                model=None,
+                provider_task_id=None,
+                cost=delivery_cost,
+                occurred_at=None,
+            )
         if completed is None:
             raise ValueError("Video production not found")
+        delivered_artifact = completed.get("final_artifact") if linked_delivery else qa["artifact"]
+        public_qa = qa
+        if linked_delivery:
+            public_qa = {**qa, "artifact": delivered_artifact}
         return _json(
             {
                 "operation_status": "ok",
@@ -1849,8 +1941,8 @@ async def _personal_ip_render_locked_video_delivery(
                 "status": completed.get("status"),
                 "current_stage": completed.get("current_stage"),
                 "event_count": completed.get("event_count"),
-                "artifact": qa["artifact"],
-                "qa": qa,
+                "artifact": delivered_artifact,
+                "qa": public_qa,
                 "render_event_key": render_event_key,
                 "qa_event_key": qa_event_key,
                 "delivery_event_key": delivery_event_key,

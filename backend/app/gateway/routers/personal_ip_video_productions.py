@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.gateway.deps import get_current_user_from_request, get_personal_ip_video_production_repo
 from deerflow.config.paths import VIRTUAL_PATH_PREFIX, get_paths, make_safe_user_id
-from deerflow.personal_ip.video_acceptance import artifact_for_path
+from deerflow.personal_ip.final_artifacts import storage_key_for_owner_file, verify_final_artifact
 from deerflow.personal_ip.video_contracts import (
     compile_final_edit_lock,
     compile_timeline_revision,
@@ -149,7 +149,7 @@ class PersonalIPVideoProductionEventRequest(BaseModel):
     event_key: str = Field(min_length=1, max_length=256)
     event_type: VideoEventType
     status: Literal["planned", "running", "succeeded", "failed", "awaiting_review", "approved", "rejected"]
-    entity_type: Literal["production", "character", "scene", "prop", "shot", "candidate", "audio", "timeline", "delivery", "asset"]
+    entity_type: Literal["production", "character", "scene", "prop", "shot", "candidate", "audio", "timeline", "delivery", "asset", "artifact"]
     entity_id: str = Field(min_length=1, max_length=128)
     payload: dict[str, Any] = Field(default_factory=dict)
     input_refs: list[str] = Field(default_factory=list, max_length=500)
@@ -164,6 +164,12 @@ class PersonalIPVideoProductionEventRequest(BaseModel):
     @classmethod
     def strip_event_text(cls, value: str) -> str:
         return value.strip()
+
+    @model_validator(mode="after")
+    def reject_server_owned_delivery_events(self):
+        if self.event_type in {"delivery_qa_completed", "delivery_completed"}:
+            raise ValueError("delivery QA and final delivery are server-owned operations")
+        return self
 
 
 class PersonalIPVideoProductionThreadRequest(BaseModel):
@@ -303,9 +309,12 @@ def _recorded_local_artifact(
     *,
     owner_user_id: str,
 ) -> tuple[Path, dict[str, Any]] | None:
+    if production.get("contract_version") == "personal-ip-video-production-v2":
+        return None
     expected_sha = str(artifact_sha256 or "").strip().lower()
     if len(expected_sha) != 64 or any(char not in "0123456789abcdef" for char in expected_sha):
         return None
+    configured_paths = get_paths()
     for event in reversed(production.get("events") or []):
         if not isinstance(event, dict) or event.get("status") != "succeeded":
             continue
@@ -324,36 +333,47 @@ def _recorded_local_artifact(
             ref = str(candidate.get("ref") or candidate.get("source_ref") or "").strip()
             parsed = urlsplit(ref)
             paths: list[Path] = []
-            if parsed.scheme == "file" and parsed.netloc in {"", "localhost"}:
-                paths.append(Path(unquote(parsed.path)).resolve())
-            elif parsed.scheme == "" and parsed.netloc == "":
+            if parsed.scheme == "file" and parsed.netloc in {"", "localhost"} and not parsed.query and not parsed.fragment:
+                paths.append(Path(unquote(parsed.path)))
+            elif parsed.scheme == "" and parsed.netloc == "" and not parsed.query and not parsed.fragment:
                 virtual_path = unquote(parsed.path)
                 stripped = virtual_path.lstrip("/")
                 prefix = VIRTUAL_PATH_PREFIX.lstrip("/")
                 if stripped == prefix or stripped.startswith(prefix + "/"):
                     relative = stripped[len(prefix) :].lstrip("/")
-                    threads_root = get_paths().user_dir(make_safe_user_id(owner_user_id)) / "threads"
+                    threads_root = configured_paths.user_dir(make_safe_user_id(owner_user_id)) / "threads"
                     if threads_root.is_dir():
                         for thread_dir in threads_root.iterdir():
                             if not thread_dir.is_dir():
                                 continue
-                            user_data_root = (thread_dir / "user-data").resolve()
-                            resolved = (user_data_root / relative).resolve()
-                            try:
-                                resolved.relative_to(user_data_root)
-                            except ValueError:
-                                continue
-                            paths.append(resolved)
+                            paths.append(thread_dir / "user-data" / relative)
             for path in paths:
-                if not path.is_file():
-                    continue
-                verified = artifact_for_path(path)
-                if verified["sha256"] != expected_sha:
-                    continue
                 recorded_size = candidate.get("size_bytes")
-                if isinstance(recorded_size, int) and verified["size_bytes"] != recorded_size:
+                try:
+                    storage_key = storage_key_for_owner_file(
+                        owner_user_id,
+                        path,
+                        paths=configured_paths,
+                        require_final_namespace=False,
+                    )
+                    verified = verify_final_artifact(
+                        owner_user_id,
+                        storage_key,
+                        expected_sha256=expected_sha,
+                        expected_size_bytes=(recorded_size if isinstance(recorded_size, int) else None),
+                        expected_mime_type=candidate.get("mime_type"),
+                        paths=configured_paths,
+                        require_video=False,
+                        require_final_namespace=False,
+                    )
+                except (OSError, ValueError):
                     continue
-                return path, {**candidate, **verified}
+                return verified.path, {
+                    **candidate,
+                    "sha256": verified.sha256,
+                    "size_bytes": verified.size_bytes,
+                    "mime_type": verified.mime_type,
+                }
     return None
 
 
@@ -570,6 +590,8 @@ async def get_personal_ip_video_artifact(
     )
     if production is None:
         raise HTTPException(status_code=404, detail="Personal-IP video production not found")
+    if production.get("contract_version") == "personal-ip-video-production-v2":
+        raise HTTPException(status_code=404, detail="Recorded video artifact not found")
     resolved = await asyncio.to_thread(
         _recorded_local_artifact,
         production,

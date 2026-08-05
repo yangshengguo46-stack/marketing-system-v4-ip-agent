@@ -27,6 +27,7 @@ class PersonalIPDeleteConfirmationRequest(BaseModel):
     state_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
     confirmation_phrase: str = Field(min_length=1, max_length=64)
     backup_acknowledged: bool
+    artifact_files_acknowledged: bool
     delete_local_context: bool
 
 

@@ -4,11 +4,15 @@ import { mockLangGraphAPI } from "./utils/mock-api";
 
 const PRODUCTION = {
   id: "video-production-1",
+  contract_version: "personal-ip-video-production-v2",
   thread_id: "video-thread-1",
+  content_work_id: "content-work-1",
+  script_version_id: "script-1",
   title: "Agent 回执验收片",
   status: "awaiting_review",
   current_stage: "selection",
   event_count: 10,
+  final_artifact: null,
   source_kind: "script",
   source: { script: "让每一步执行都有可核验回执。" },
   delivery_spec: { aspect_ratio: "9:16", duration_seconds: 2 },
@@ -16,6 +20,18 @@ const PRODUCTION = {
   budget: { paid_calls_require_explicit_approval: true },
   created_at: "2026-07-22T05:00:00+00:00",
   updated_at: "2026-07-22T05:10:00+00:00",
+};
+
+const FINAL_ARTIFACT = {
+  id: "final-artifact-1",
+  contract_version: "personal-ip-final-artifact-v1",
+  production_id: PRODUCTION.id,
+  content_sha256: "d".repeat(64),
+  size_bytes: 2_621_440,
+  mime_type: "video/mp4",
+  artifact_digest: "e".repeat(64),
+  content_available: true,
+  created_at: "2026-07-22T05:12:00+00:00",
 };
 
 const FAILED_TASK = {
@@ -74,9 +90,20 @@ const makeWorkbench = (
   confirmed = false,
   timelineSaved = false,
   finalEditLocked = false,
+  finalArtifact = FINAL_ARTIFACT,
 ) => ({
   contract_version: "personal-ip-video-workbench-v1",
-  production: confirmed ? { ...PRODUCTION, status: "running" } : PRODUCTION,
+  production: finalEditLocked
+    ? {
+        ...PRODUCTION,
+        status: "completed",
+        current_stage: "delivery",
+        event_count: 12,
+        final_artifact: finalArtifact,
+      }
+    : confirmed
+      ? { ...PRODUCTION, status: "running" }
+      : PRODUCTION,
   source: { kind: "script", content: PRODUCTION.source },
   domain_contracts: {},
   stage_summary: [
@@ -290,11 +317,18 @@ const makeWorkbench = (
           contract_version: "personal-ip-delivery-qa-v1",
           passed: true,
           checks: { duration: { passed: true }, audio: { passed: true } },
+          provider_payload: "provider-payload-must-not-render",
+          artifact: {
+            ref: "file:///private/qa-preview-must-not-render.mp4",
+            sha256: "f".repeat(64),
+            mime_type: "video/mp4",
+          },
         },
       },
     ],
     delivery_events: [],
     qa_passed: true,
+    qa_stale: !finalEditLocked,
     artifacts: [
       {
         ref: "file:///tmp/video-e2e/final.mp4",
@@ -425,14 +459,12 @@ test("video workbench keeps internal evidence hidden while preserving creative c
     page.getByText("Agent 回执验收片", { exact: true }).first(),
   ).toBeVisible();
   await expect(page.getByLabel("选择制作项目")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "返回历史对话" })).toHaveAttribute(
-    "href",
-    "/workspace/chats",
-  );
-  await expect(page.getByRole("link", { name: "新建视频任务" })).toHaveAttribute(
-    "href",
-    "/workspace/chats/new",
-  );
+  await expect(
+    page.getByRole("link", { name: "返回历史对话" }),
+  ).toHaveAttribute("href", "/workspace/chats");
+  await expect(
+    page.getByRole("link", { name: "新建视频任务" }),
+  ).toHaveAttribute("href", "/workspace/chats/new");
   await expect(page.getByText("一句话创作 · 随时人工接管")).toBeVisible();
   await expect(page.getByLabel("视频制作阶段")).toBeVisible();
   await expect(
@@ -447,6 +479,16 @@ test("video workbench keeps internal evidence hidden while preserving creative c
   await expect(page.getByRole("button", { name: "剪辑阶段" })).toBeVisible();
   await expect(page.getByRole("button", { name: "成片阶段" })).toBeVisible();
   await expect(page.getByText("当前目标 · 镜头 01")).toBeVisible();
+
+  await page.getByRole("button", { name: "成片阶段" }).click();
+  await expect(page.getByLabel("最终成片播放器")).toHaveCount(0);
+  await expect(page.getByText("正式成片未完成")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(
+    "qa-preview-must-not-render",
+  );
+  await expect(page.locator("body")).not.toContainText(
+    "provider-payload-must-not-render",
+  );
 
   await page.getByRole("button", { name: "设定阶段" }).click();
   const modelPicker = page.getByRole("button", {
@@ -666,10 +708,19 @@ test("video workbench keeps internal evidence hidden while preserving creative c
     page.getByRole("button", { name: "批准真实发布" }),
   ).not.toBeVisible();
   await expect(page.getByLabel("最终成片播放器")).toBeVisible();
+  await expect(page.getByLabel("最终成片播放器")).toHaveAttribute(
+    "src",
+    /\/api\/personal-ip\/artifacts\/final-artifact-1\/content$/,
+  );
+  await expect(page.getByText("交付 QA 已通过")).toBeVisible();
   await expect(page.getByText("交付检查")).not.toBeVisible();
   await expect(page.getByText("声音正常")).not.toBeVisible();
   await expect(page.getByText("时长正确")).not.toBeVisible();
   await expect(page.getByRole("link", { name: "保存到本地" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "保存到本地" })).toHaveAttribute(
+    "href",
+    /\/api\/personal-ip\/artifacts\/final-artifact-1\/content$/,
+  );
   await expect(page.getByRole("button", { name: "返回剪辑" })).toHaveCount(0);
   await expect(page.getByLabel("制作时间线")).toHaveCount(0);
   await expect(
@@ -682,6 +733,9 @@ test("video workbench keeps internal evidence hidden while preserving creative c
     "personal-ip-delivery-qa-v1",
   );
   await expect(page.locator("body")).not.toContainText("d".repeat(64));
+  await expect(page.locator("body")).not.toContainText(
+    "provider-payload-must-not-render",
+  );
 
   if (screenshotDirectory) {
     await page.screenshot({
@@ -699,5 +753,104 @@ test("video workbench keeps internal evidence hidden while preserving creative c
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "视频生产工作台" }),
+  ).toHaveCount(0);
+});
+
+test("video workbench restores a missing formal final file before exposing playback", async ({
+  page,
+}) => {
+  mockLangGraphAPI(page);
+  let contentAvailable = false;
+  let uploadCount = 0;
+  let uploadedContentType: string | undefined;
+  let uploadedBytes: Buffer | null = null;
+  const restoredReceipt = {
+    ...FINAL_ARTIFACT,
+    size_bytes: 4,
+    content_available: false,
+  };
+  const currentReceipt = () => ({
+    ...restoredReceipt,
+    content_available: contentAvailable,
+  });
+
+  await page.route(/\/api\/personal-ip\/video-productions(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      json: [
+        {
+          ...PRODUCTION,
+          status: "completed",
+          current_stage: "delivery",
+          final_artifact: currentReceipt(),
+        },
+      ],
+    }),
+  );
+  await page.route("**/api/personal-ip/video-productions/models", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        source: "live",
+        default_image_model: null,
+        default_video_model: null,
+        image_models: [],
+        video_models: [],
+      },
+    }),
+  );
+  await page.route(
+    "**/api/personal-ip/video-productions/video-production-1/workbench",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: makeWorkbench(true, true, true, currentReceipt()),
+      }),
+  );
+  await page.route(
+    "**/api/personal-ip/artifacts/final-artifact-1/content",
+    async (route) => {
+      if (route.request().method() !== "PUT") {
+        await route.fulfill({
+          status: 200,
+          contentType: "video/mp4",
+          body: Buffer.from([1, 2, 3, 4]),
+        });
+        return;
+      }
+      uploadCount += 1;
+      uploadedContentType = route.request().headers()["content-type"];
+      uploadedBytes = route.request().postDataBuffer();
+      contentAvailable = true;
+      await route.fulfill({
+        status: 200,
+        json: currentReceipt(),
+      });
+    },
+  );
+
+  await page.goto("/workspace/chats/video-thread-1");
+  await page.getByRole("button", { name: "成片阶段" }).click();
+
+  await expect(
+    page.getByText("成片回执已恢复，文件待重新导入", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("最终成片播放器")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "保存到本地" })).toHaveCount(0);
+
+  const fileInput = page.getByTestId("final-artifact-content-file-input");
+  await fileInput.setInputFiles({
+    name: "restored-final.mp4",
+    mimeType: "video/mp4",
+    buffer: Buffer.from([1, 2, 3, 4]),
+  });
+
+  await expect.poll(() => uploadCount).toBe(1);
+  expect(uploadedContentType).toBe("video/mp4");
+  expect(uploadedBytes).toEqual(Buffer.from([1, 2, 3, 4]));
+  await expect(page.getByLabel("最终成片播放器")).toBeVisible();
+  await expect(page.getByRole("link", { name: "保存到本地" })).toBeVisible();
+  await expect(
+    page.getByText("成片回执已恢复，文件待重新导入", { exact: true }),
   ).toHaveCount(0);
 });

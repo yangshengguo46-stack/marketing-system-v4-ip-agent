@@ -4,12 +4,14 @@ import {
   ArrowRightIcon,
   BookOpenTextIcon,
   ClapperboardIcon,
+  DownloadIcon,
   FileSearchIcon,
   Layers3Icon,
   LoaderCircleIcon,
   MessageSquareTextIcon,
   PenLineIcon,
   RefreshCcwIcon,
+  ShieldCheckIcon,
   SparklesIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +26,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { FinalArtifactContentImport } from "@/components/workspace/personal-ip/final-artifact-content-import";
 import {
   WorkspaceBody,
   WorkspaceContainer,
@@ -37,8 +40,12 @@ import {
   type PersonalIPVideoProduction,
   type VideoProductionStage,
   type VideoProductionStatus,
+  formatPersonalIPFinalArtifactSize,
   personalIPContentTaskHref,
+  personalIPFinalArtifactContentURL,
   personalIPProductionTaskHref,
+  selectPersonalIPFinalArtifact,
+  selectPersonalIPFinalArtifactReceipt,
   usePersonalIPContentLineage,
   usePersonalIPContentWorks,
   usePersonalIPVideoProductions,
@@ -411,6 +418,106 @@ type LinkedProduction = PersonalIPVideoProduction & {
   script_version_id: string;
 };
 
+function FinalArtifactProjection({
+  production,
+}: {
+  production: LinkedProduction;
+}) {
+  const artifactReceipt = selectPersonalIPFinalArtifactReceipt(production);
+  const artifact = selectPersonalIPFinalArtifact(production);
+  if (!artifactReceipt) {
+    return (
+      <div
+        className="text-muted-foreground rounded-lg border border-dashed p-3 text-xs leading-5"
+        data-testid="final-artifact-unavailable"
+      >
+        <p className="text-foreground font-medium">正式成片未完成</p>
+        <p className="mt-1">
+          只有交付阶段完成、QA 通过并返回可核验正式实体后，这里才会显示成片。
+        </p>
+      </div>
+    );
+  }
+
+  if (!artifact) {
+    return (
+      <div
+        className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3"
+        data-testid="final-artifact-receipt"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium">最终成片回执</p>
+          <Badge
+            className="border-emerald-600/30 bg-emerald-50 text-emerald-800"
+            variant="outline"
+          >
+            <ShieldCheckIcon /> 交付 QA 已通过
+          </Badge>
+        </div>
+        <div className="text-muted-foreground space-y-1 text-[11px]">
+          <p
+            data-testid="final-artifact-hash"
+            title={artifactReceipt.content_sha256}
+          >
+            SHA-256 {artifactReceipt.content_sha256.slice(0, 12)}…
+          </p>
+          <p data-testid="final-artifact-size">
+            {artifactReceipt.mime_type} ·{" "}
+            {formatPersonalIPFinalArtifactSize(artifactReceipt.size_bytes)} ·
+            交付于 {formatTimestamp(artifactReceipt.created_at)}
+          </p>
+        </div>
+        <FinalArtifactContentImport artifact={artifactReceipt} />
+      </div>
+    );
+  }
+
+  const artifactUrl = personalIPFinalArtifactContentURL(artifact.id);
+  return (
+    <div
+      className="space-y-3 rounded-xl border border-emerald-600/25 bg-emerald-500/5 p-3"
+      data-testid="final-artifact"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium">最终成片</p>
+        <Badge
+          className="border-emerald-600/30 bg-emerald-50 text-emerald-800"
+          variant="outline"
+        >
+          <ShieldCheckIcon /> 交付 QA 已通过
+        </Badge>
+      </div>
+      <div className="overflow-hidden rounded-lg bg-black">
+        <video
+          aria-label={`${production.title} 最终成片播放器`}
+          className="max-h-72 w-full"
+          controls
+          crossOrigin="use-credentials"
+          data-testid="final-artifact-player"
+          playsInline
+          preload="metadata"
+          src={artifactUrl}
+        />
+      </div>
+      <div className="text-muted-foreground space-y-1 text-[11px]">
+        <p data-testid="final-artifact-hash" title={artifact.content_sha256}>
+          SHA-256 {artifact.content_sha256.slice(0, 12)}…
+        </p>
+        <p data-testid="final-artifact-size">
+          {artifact.mime_type} ·{" "}
+          {formatPersonalIPFinalArtifactSize(artifact.size_bytes)} · 交付于{" "}
+          {formatTimestamp(artifact.created_at)}
+        </p>
+      </div>
+      <Button asChild size="sm" variant="outline">
+        <a data-testid="final-artifact-download" download href={artifactUrl}>
+          <DownloadIcon /> 下载成片
+        </a>
+      </Button>
+    </div>
+  );
+}
+
 function ProductionPanel({
   lineage,
   productions,
@@ -533,6 +640,12 @@ function ProductionPanel({
                         正式剧本 v{scriptVersion?.version_number} · 更新于{" "}
                         {formatTimestamp(production.updated_at)}
                       </p>
+                      <p
+                        className="text-muted-foreground mt-1 text-[11px]"
+                        data-testid="production-event-count"
+                      >
+                        {production.event_count} 条不可变制作回执
+                      </p>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       <Badge variant="secondary">
@@ -543,6 +656,7 @@ function ProductionPanel({
                       </Badge>
                     </div>
                   </div>
+                  <FinalArtifactProjection production={production} />
                   {production.thread_id ? (
                     <Button asChild size="sm" variant="outline">
                       <Link

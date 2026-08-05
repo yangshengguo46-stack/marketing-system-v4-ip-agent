@@ -49,6 +49,18 @@ export type VideoArtifact = {
   downloaded_at?: string;
 };
 
+export type PersonalIPFinalArtifact = {
+  id: string;
+  contract_version: "personal-ip-final-artifact-v1";
+  production_id: string;
+  content_sha256: string;
+  size_bytes: number;
+  mime_type: string;
+  artifact_digest: string;
+  content_available: boolean;
+  created_at: string;
+};
+
 export type VideoCost = {
   status?: "known" | "estimated" | "unknown";
   amount?: number;
@@ -88,6 +100,7 @@ export type PersonalIPVideoProduction = {
   status: VideoProductionStatus;
   current_stage: VideoProductionStage;
   event_count: number;
+  final_artifact: PersonalIPFinalArtifact | null;
   source_kind: "idea" | "script";
   production_mode?: VideoProductionMode | null;
   source: Record<string, unknown>;
@@ -99,6 +112,57 @@ export type PersonalIPVideoProduction = {
   created_at: string;
   updated_at: string;
 };
+
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+
+export function selectPersonalIPFinalArtifactReceipt(
+  production: PersonalIPVideoProduction,
+): PersonalIPFinalArtifact | null {
+  const artifact =
+    production.final_artifact as Partial<PersonalIPFinalArtifact> | null;
+  if (
+    production.status !== "completed" ||
+    production.current_stage !== "delivery" ||
+    !artifact
+  ) {
+    return null;
+  }
+  if (
+    artifact.contract_version !== "personal-ip-final-artifact-v1" ||
+    artifact.production_id !== production.id ||
+    typeof artifact.id !== "string" ||
+    !artifact.id.trim() ||
+    typeof artifact.content_sha256 !== "string" ||
+    !SHA256_PATTERN.test(artifact.content_sha256) ||
+    typeof artifact.artifact_digest !== "string" ||
+    !SHA256_PATTERN.test(artifact.artifact_digest) ||
+    typeof artifact.content_available !== "boolean" ||
+    typeof artifact.size_bytes !== "number" ||
+    !Number.isSafeInteger(artifact.size_bytes) ||
+    artifact.size_bytes <= 0 ||
+    typeof artifact.mime_type !== "string" ||
+    !/^video\/[a-z0-9.+-]+$/i.test(artifact.mime_type) ||
+    typeof artifact.created_at !== "string" ||
+    !Number.isFinite(new Date(artifact.created_at).getTime())
+  ) {
+    return null;
+  }
+  return artifact as PersonalIPFinalArtifact;
+}
+
+export function selectPersonalIPFinalArtifact(
+  production: PersonalIPVideoProduction,
+): PersonalIPFinalArtifact | null {
+  const artifact = selectPersonalIPFinalArtifactReceipt(production);
+  return artifact?.content_available === true ? artifact : null;
+}
+
+export function formatPersonalIPFinalArtifactSize(sizeBytes: number) {
+  if (sizeBytes >= 1024 * 1024) {
+    return `${(sizeBytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+  return `${Math.max(1, Math.round(sizeBytes / 1024))} KB`;
+}
 
 export type VideoWorkbenchTask = {
   id: string;
@@ -355,6 +419,70 @@ export function personalIPVideoArtifactURL(
   artifactSha256: string,
 ) {
   return `${getBackendBaseURL()}${personalIPVideoArtifactPath(productionId, artifactSha256)}`;
+}
+
+export function personalIPFinalArtifactContentPath(artifactId: string) {
+  return `/api/personal-ip/artifacts/${encodeURIComponent(artifactId)}/content`;
+}
+
+export function personalIPFinalArtifactContentURL(artifactId: string) {
+  return `${getBackendBaseURL()}${personalIPFinalArtifactContentPath(artifactId)}`;
+}
+
+export function personalIPFinalArtifactContentFileError(
+  artifact: PersonalIPFinalArtifact,
+  file: Pick<File, "size" | "type">,
+): string | null {
+  if (!file.type.startsWith("video/")) {
+    return "请选择视频文件（video/*）";
+  }
+  if (file.type !== artifact.mime_type) {
+    return `文件类型不匹配：请选择 ${artifact.mime_type} 视频文件`;
+  }
+  if (file.size <= 0) {
+    return "不能导入空的视频文件";
+  }
+  if (file.size !== artifact.size_bytes) {
+    return `文件大小不匹配：成片回执记录为 ${formatPersonalIPFinalArtifactSize(artifact.size_bytes)}`;
+  }
+  return null;
+}
+
+export function uploadPersonalIPFinalArtifactContent(
+  artifact: PersonalIPFinalArtifact,
+  file: File,
+) {
+  const validationError = personalIPFinalArtifactContentFileError(
+    artifact,
+    file,
+  );
+  if (validationError) throw new Error(validationError);
+  return requestJSON<PersonalIPFinalArtifact>(
+    personalIPFinalArtifactContentPath(artifact.id),
+    {
+      method: "PUT",
+      headers: { "Content-Type": artifact.mime_type },
+      body: file,
+    },
+  );
+}
+
+export function useUploadPersonalIPFinalArtifactContent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      artifact,
+      file,
+    }: {
+      artifact: PersonalIPFinalArtifact;
+      file: File;
+    }) => uploadPersonalIPFinalArtifactContent(artifact, file),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
+      });
+    },
+  });
 }
 
 export function isMeaningfulVideoConfirmation(kind: string) {

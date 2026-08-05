@@ -1104,7 +1104,11 @@ async def test_paid_call_ledger_is_deletion_only_and_never_restored_from_owner_b
     repository = await _repository(tmp_path)
     session_factory = get_session_factory()
     assert session_factory is not None
-    lifecycle = PersonalIPDataLifecycleService(session_factory, minecontext=_FakeMineContext())
+    lifecycle = PersonalIPDataLifecycleService(
+        session_factory,
+        minecontext=_FakeMineContext(),
+        backup_signing_key="personal-ip-paid-call-lifecycle-test-key-v1",
+    )
     try:
         requested = await _request(repository)
         backup = await lifecycle.export_backup("owner-1", now=NOW)
@@ -1133,6 +1137,7 @@ async def test_paid_call_ledger_is_deletion_only_and_never_restored_from_owner_b
                 "state_digest": preview["state_digest"],
                 "confirmation_phrase": DELETE_CONFIRMATION_PHRASE,
                 "backup_acknowledged": True,
+                "artifact_files_acknowledged": True,
                 "delete_local_context": True,
             },
             now=NOW,

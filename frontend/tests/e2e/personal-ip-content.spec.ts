@@ -114,11 +114,16 @@ const linkedProduction: PersonalIPVideoProduction = {
   content_work_id: work.id,
   script_version_id: "script-1",
   title: "正式剧本制作",
-  status: "running",
-  current_stage: "storyboard",
-  event_count: 3,
+  status: "awaiting_review",
+  current_stage: "finishing",
+  event_count: 11,
+  final_artifact: null,
   source_kind: "script",
-  source: { raw_secret: "must-not-render-production-source" },
+  source: {
+    raw_secret: "must-not-render-production-source",
+    preview_ref: "file:///private/preview-must-not-render.mp4",
+    provider_payload: "provider-payload-must-not-render",
+  },
   delivery_spec: {},
   provider_policy: {},
   budget: {},
@@ -126,6 +131,24 @@ const linkedProduction: PersonalIPVideoProduction = {
   target_account_ids: [],
   created_at: "2026-08-05T01:40:00Z",
   updated_at: "2026-08-05T02:10:00Z",
+};
+
+const completedProduction: PersonalIPVideoProduction = {
+  ...linkedProduction,
+  status: "completed",
+  current_stage: "delivery",
+  event_count: 13,
+  final_artifact: {
+    id: "final-artifact-1",
+    contract_version: "personal-ip-final-artifact-v1",
+    production_id: linkedProduction.id,
+    content_sha256: "d".repeat(64),
+    size_bytes: 2_621_440,
+    mime_type: "video/mp4",
+    artifact_digest: "e".repeat(64),
+    content_available: true,
+    created_at: "2026-08-05T02:09:00Z",
+  },
 };
 
 const legacyUnboundProduction: PersonalIPVideoProduction = {
@@ -141,7 +164,9 @@ const legacyUnboundProduction: PersonalIPVideoProduction = {
 
 async function mockContentAPIs(
   page: Page,
-  productions: PersonalIPVideoProduction[],
+  productions:
+    | PersonalIPVideoProduction[]
+    | (() => PersonalIPVideoProduction[]),
 ) {
   let requestedProductionWorkId: string | null = null;
   await page.route("**/api/personal-ip/content-works**", async (route) => {
@@ -160,7 +185,10 @@ async function mockContentAPIs(
     requestedProductionWorkId = new URL(route.request().url()).searchParams.get(
       "content_work_id",
     );
-    await route.fulfill({ status: 200, json: productions });
+    await route.fulfill({
+      status: 200,
+      json: typeof productions === "function" ? productions() : productions,
+    });
   });
   return () => requestedProductionWorkId;
 }
@@ -203,8 +231,15 @@ test("content page renders authoritative lineage and official Production binding
   await expect(page.getByTestId("linked-production")).toContainText(
     "正式剧本制作",
   );
-  await expect(page.getByTestId("linked-production")).toContainText("制作中");
-  await expect(page.getByTestId("linked-production")).toContainText("分镜");
+  await expect(page.getByTestId("linked-production")).toContainText("待审核");
+  await expect(page.getByTestId("linked-production")).toContainText("后期");
+  await expect(page.getByTestId("production-event-count")).toHaveText(
+    "11 条不可变制作回执",
+  );
+  await expect(page.getByTestId("final-artifact-unavailable")).toContainText(
+    "正式成片未完成",
+  );
+  await expect(page.getByTestId("final-artifact-player")).toHaveCount(0);
   await expect(page.getByTestId("linked-production-task")).toHaveAttribute(
     "href",
     "/workspace/chats/production-thread-1",
@@ -219,12 +254,140 @@ test("content page renders authoritative lineage and official Production binding
   await expect(page.getByText("must-not-render-production-source")).toHaveCount(
     0,
   );
+  await expect(page.getByText("preview-must-not-render")).toHaveCount(0);
+  await expect(page.getByText("provider-payload-must-not-render")).toHaveCount(
+    0,
+  );
 
   await page.getByRole("link", { name: "开始任务" }).first().click();
   await page.waitForURL("**/workspace/chats/new?content_entry=zero_start");
   await expect(page.getByRole("textbox").first()).toHaveValue(
     /我要从零起盘一条原创内容/,
   );
+});
+
+test("a completed delivery renders only its formal final Artifact", async ({
+  page,
+}) => {
+  mockLangGraphAPI(page);
+  await mockContentAPIs(page, [completedProduction]);
+
+  await page.goto("/workspace/content");
+
+  const production = page.getByTestId("linked-production");
+  await expect(production.getByTestId("final-artifact")).toContainText(
+    "交付 QA 已通过",
+  );
+  await expect(production.getByTestId("final-artifact-hash")).toHaveText(
+    `SHA-256 ${"d".repeat(12)}…`,
+  );
+  await expect(production.getByTestId("final-artifact-size")).toContainText(
+    "video/mp4 · 2.5 MB",
+  );
+  await expect(production.getByTestId("final-artifact-player")).toHaveAttribute(
+    "src",
+    /\/api\/personal-ip\/artifacts\/final-artifact-1\/content$/,
+  );
+  await expect(
+    production.getByTestId("final-artifact-download"),
+  ).toHaveAttribute(
+    "href",
+    /\/api\/personal-ip\/artifacts\/final-artifact-1\/content$/,
+  );
+  await expect(page.getByText("preview-must-not-render")).toHaveCount(0);
+  await expect(page.getByText("provider-payload-must-not-render")).toHaveCount(
+    0,
+  );
+});
+
+test("a restored final Artifact receipt requires verified file re-import before playback", async ({
+  page,
+}) => {
+  mockLangGraphAPI(page);
+  let contentAvailable = false;
+  let uploadAttempts = 0;
+  let uploadedContentType: string | undefined;
+  let uploadedBytes: Buffer | null = null;
+  const restoredProduction: PersonalIPVideoProduction = {
+    ...completedProduction,
+    final_artifact: {
+      ...completedProduction.final_artifact!,
+      size_bytes: 4,
+      content_available: false,
+    },
+  };
+  await mockContentAPIs(page, () => [
+    {
+      ...restoredProduction,
+      final_artifact: {
+        ...restoredProduction.final_artifact!,
+        content_available: contentAvailable,
+      },
+    },
+  ]);
+  await page.route(
+    "**/api/personal-ip/artifacts/final-artifact-1/content",
+    async (route) => {
+      uploadAttempts += 1;
+      uploadedContentType = route.request().headers()["content-type"];
+      uploadedBytes = route.request().postDataBuffer();
+      if (uploadAttempts === 1) {
+        await route.fulfill({
+          status: 422,
+          json: { detail: "文件 SHA-256 与成片回执不匹配" },
+        });
+        return;
+      }
+      contentAvailable = true;
+      await route.fulfill({
+        status: 200,
+        json: {
+          ...restoredProduction.final_artifact,
+          content_available: true,
+        },
+      });
+    },
+  );
+
+  await page.goto("/workspace/content");
+
+  const production = page.getByTestId("linked-production");
+  await expect(production).toContainText("成片回执已恢复，文件待重新导入");
+  await expect(production.getByTestId("final-artifact-player")).toHaveCount(0);
+  await expect(production.getByTestId("final-artifact-download")).toHaveCount(
+    0,
+  );
+
+  const fileInput = production.getByTestId("final-artifact-content-file-input");
+  await fileInput.setInputFiles({
+    name: "not-a-video.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("nope"),
+  });
+  await expect(
+    production.getByTestId("final-artifact-content-error"),
+  ).toHaveText("请选择视频文件（video/*）");
+  expect(uploadAttempts).toBe(0);
+
+  const replacement = {
+    name: "restored-final.mp4",
+    mimeType: "video/mp4",
+    buffer: Buffer.from([1, 2, 3, 4]),
+  };
+  await fileInput.setInputFiles(replacement);
+  await expect(
+    production.getByTestId("final-artifact-content-error"),
+  ).toHaveText("文件 SHA-256 与成片回执不匹配");
+  await fileInput.setInputFiles(replacement);
+
+  await expect.poll(() => uploadAttempts).toBe(2);
+  expect(uploadedContentType).toBe("video/mp4");
+  expect(uploadedBytes).toEqual(Buffer.from([1, 2, 3, 4]));
+  await expect(production.getByTestId("final-artifact-player")).toBeVisible();
+  await expect(production.getByTestId("final-artifact-download")).toBeVisible();
+  await expect(
+    production.getByTestId("final-artifact-content-missing"),
+  ).toHaveCount(0);
 });
 
 test("an unbound formal script starts a bounded Production task", async ({

@@ -147,7 +147,7 @@ async def test_0028_preserves_legacy_rows_and_downgrade_fails_closed_for_links(
         await _insert_legacy_production(engine)
 
         await asyncio.to_thread(_upgrade, config, "head")
-        assert await _version(engine) == "0028_personal_ip_script_production_binding"
+        assert await _version(engine) == "0029_personal_ip_final_artifacts"
         assert {"content_work_id", "script_version_id"} <= await _columns(
             engine,
             "personal_ip_video_productions",

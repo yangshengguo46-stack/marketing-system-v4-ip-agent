@@ -1639,7 +1639,7 @@ async def execute_canary(
         await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(database_dir)))
         engine_initialized = True
         _secure_database_files(database_dir)
-        if await _schema_head() != "0028_personal_ip_script_production_binding":
+        if await _schema_head() != "0029_personal_ip_final_artifacts":
             raise CanaryError("RECOVERY_DATABASE_REVISION_MISMATCH")
         session_factory = get_session_factory()
         if session_factory is None:

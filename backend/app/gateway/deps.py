@@ -364,6 +364,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.personal_ip_data_lifecycle_service = PersonalIPDataLifecycleService(
                 sf,
                 minecontext=app.state.minecontext_service,
+                backup_signing_key=(f"personal-ip-owner-backup:v1:{credential_key}"),
             )
 
             configure_personal_ip_runtime(
