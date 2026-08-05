@@ -1,7 +1,7 @@
 # IP Agent product contract
 
 This file is the sole product contract for IP Agent. The active product has one
-shared content lineage and three customer boards: breakdown, a two-layer writer
+shared content lineage and three customer boards: breakdown, a two-part writer
 brain and production. Delivery status and real-sample evidence remain separate
 in the product ledger; a schema or mocked test is never a completion claim.
 
@@ -17,6 +17,15 @@ ledgers on the first turn, diagnose accounts, predict virality or manufacture
 an incubation workflow. It exposes two active creation entries: a zero-start
 original and an exact benchmark link/upload. Account history remains a future
 entry and must not appear as an active route.
+
+The writer board has one decision authority and one bounded specialist. The
+total-editor controller decides the ordered conversion/recognition/trust
+mission, time horizon, audience uncertainty, attribution carrier,
+differentiation hypothesis and work route. The semantic-causal core is optional
+and has no persistence or routing authority: direct offer, proof, demonstration
+and explanation work skips it; semantic-story and hybrid work binds its exact
+route into the causal seed and script receipt. The two parts never converse as
+independent autonomous Agents.
 
 ## System constitution
 
@@ -47,11 +56,20 @@ states are `user_asserted`, `source_observed`, `derived`, `hypothesized`,
 The active content lineage is:
 
 ```text
-Owner -> Subject -> Objective -> ContentWork
+Owner -> Subject -> EditorialProgramVersion -> ContentWork(Objective)
   -> BreakdownVersion -> DirectionVersion -> ScriptVersion
   -> VideoProduction -> Artifact -> Publication
   -> Observation -> LearningDecision
 ```
+
+`EditorialProgramVersion` is the small cross-work total-editor decision. It
+holds only an ordered mission and time window, audience hypothesis, explicit
+person/product/brand/organization attribution, one still-unvalidated
+differentiation hypothesis and an optional recurring human theme. It may govern
+one urgent work or many continuing works. It is not the retired global strategy
+layer: it has no onboarding sequence, maturity ladder, operating cockpit or
+automatic publication gate. A Work binds one exact immutable program version
+and never silently rebinds.
 
 `BreakdownVersion` is required for the benchmark entry and optional for
 zero-start work. Objective, Work and every immutable version have stable server
@@ -245,14 +263,25 @@ The installed `ip-agent` uses:
 An external video Breakdown can be saved only when the same task contains the
 exact typed Evidence MCP ToolMessage. The server derives source identity,
 contract version, item index and payload hashes and stores the complete typed
-evidence snapshot separately from model interpretation. A formal ScriptVersion
-can be written only by the bounded writer brain after its fail-closed truth
-boundary verifier succeeds. REST clients cannot bypass either receipt.
+evidence snapshot separately from model interpretation. A formal v2
+EditorialProgramVersion and DirectionVersion can be committed only with the
+total-editor service's exact decision digests. A formal ScriptVersion can be
+written only by the bounded writer brain after its fail-closed truth and
+semantic-route verifier succeeds; the structured verifier receipt, its digest,
+the Direction decision digest and the Program/route digests remain replayable
+with the Script. Server-bound Breakdown and Direction ids are validated
+separately from those decision-body digests. REST clients cannot bypass these
+receipts.
 
-Fiction uses a context-free story seed and locks one causal story before
-production constraints are applied. Factual and hybrid scripts use explicit
-claim bases; unsupported facts reject the entire commit, leaving no partial
-Work, Direction or Script.
+Direct offer, proof, demonstration and explanation routes do not invoke the
+semantic-causal story engine and are factual. `semantic_story` uses the
+fictional truth boundary; `hybrid` uses the hybrid truth boundary. Both store an exact
+association path from the source concept to a selected human theme. Fiction
+then uses only an industry-neutral seed whose causal pattern and route digest
+match that decision, and locks one causal story before production constraints
+are applied. Factual and hybrid scripts use explicit claim bases; unsupported
+facts or a semantic mismatch reject the entire transaction, leaving no partial
+Program, Work, Direction or Script.
 
 Production starts from an exact immutable ScriptVersion. The existing video
 production/event ledger remains the only production truth: one script may drive
@@ -322,8 +351,9 @@ rights, paid-call approval and reservation, immutable receipts, paths, hashes,
 candidate consistency, QA and idempotency. Owner data export, same-owner
 empty-scope restore and confirmed deletion remain enforced.
 
-Current Owner backups use a server-keyed HMAC manifest and `key_id`; legacy
-v1-v3 backups retain their historical unkeyed digest contract only. Formal video
+Current Owner backups use the v5 server-keyed HMAC manifest and `key_id`; v4
+backups retain their original HMAC contract and are promoted in memory, while
+legacy v1-v3 backups retain their historical unkeyed digest contract only. Formal video
 bytes are downloaded separately. Destructive deletion requires an independent
 Artifact-file acknowledgement, verifies each recorded file identity, moves the
 exact file to Owner-local quarantine before database commit, restores it on a
@@ -346,6 +376,11 @@ can recreate only empty compatibility schemas; it cannot restore deleted data.
 The matching repositories, routes, tools, dependency injection and customer UI
 are removed. Retired endpoints return 404 and a fresh database does not create
 the retired tables.
+
+The route-specific `DifferentiationHypothesis` embedded in an immutable
+EditorialProgramVersion is not a restoration of that layer. It is always
+labelled hypothesized, has no independent repository, validation status,
+observation ladder or promotion workflow, and cannot claim market proof.
 
 ## Research quarantine
 

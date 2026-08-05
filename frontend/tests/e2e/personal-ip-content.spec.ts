@@ -18,6 +18,7 @@ const objective = {
 const work: PersonalIPContentWork = {
   id: "content-work-1",
   objective_id: "objective-server-1",
+  editorial_program_version_id: "editorial-version-1",
   thread_id: "thread-server-1",
   subject_id: null,
   title: "第一次客户访谈",
@@ -31,6 +32,65 @@ const work: PersonalIPContentWork = {
 
 const lineage: PersonalIPContentLineage = {
   content_work: work,
+  editorial_program_version: {
+    id: "editorial-version-1",
+    program_id: "editorial-program-must-not-render",
+    subject_id: null,
+    version_number: 1,
+    parent_program_version_id: null,
+    title: "首次客户访谈任务判断",
+    decision: {
+      contract_version: "personal-ip-editorial-program-v1",
+      mission: {
+        goal_priority: ["trust"],
+        time_horizon: "near_term",
+        deadline_or_window: "本周内",
+        desired_action: "让初次创业者完成第一次客户访谈",
+        success_signal: "真实完成一次访谈并记录原话",
+        cost_of_delay: "继续停留在未经验证的业务想法上",
+        non_goals: ["不承诺一次访谈就能证明需求"],
+        rationale: "当前先建立可执行方法的信任。",
+      },
+      audience: {
+        situation: "有业务想法但不知如何开始验证",
+        state: "user_asserted",
+        uncertainties: [],
+      },
+      attribution: {
+        primary_carrier: {
+          kind: "organization",
+          identity: "客户访谈工作坊",
+        },
+        supporting_carriers: [],
+        desired_association: "让第一次真实行动变得可执行",
+        attribution_guard: "不将组织方法归因为某位讲师的人设。",
+        rationale: "工作坊需要累积可执行方法的联想。",
+      },
+      differentiation: {
+        statement: "不先教完整理论，先完成一个可核验动作",
+        contrast: "与先掌握全套访谈方法的课程不同",
+        basis: [
+          {
+            claim: "受众当前不知如何开始验证",
+            state: "user_asserted",
+          },
+        ],
+        reason_to_choose: "初次创业者当前卡在开始而非理论不足",
+        reason_to_believe: "可展示真实的第一次访谈动作",
+        sacrifice: "暂不展开完整调研体系",
+        test_signal: "观众能说出并执行下一步",
+        uncertainties: [],
+        state: "hypothesized",
+      },
+      editorial_spine: {
+        source_concepts: ["真实行动", "不确定"],
+        human_theme: "人如何在不确定中开始真实行动",
+        recurring_question: "今天哪一步可以被真正完成？",
+        boundary: "不把单次行动包装为已验证成果。",
+      },
+    },
+    created_at: "2026-08-05T01:15:00Z",
+  },
   breakdown_versions: [
     {
       id: "breakdown-1",
@@ -65,6 +125,10 @@ const lineage: PersonalIPContentLineage = {
       breakdown_version_ids: ["breakdown-1"],
       objective_snapshot: objective,
       direction: {
+        contract_version: "personal-ip-direction-v2",
+        route_kind: "demonstration",
+        semantic_route: null,
+        editorial_program_digest: "editorial-digest-must-not-render",
         premise: "第一次访谈不需要先成为研究专家。",
         audience_situation: objective.audience_situation,
         core_tension: "想验证，又怕问错问题。",
@@ -167,6 +231,7 @@ async function mockContentAPIs(
   productions:
     | PersonalIPVideoProduction[]
     | (() => PersonalIPVideoProduction[]),
+  contentLineage: PersonalIPContentLineage = lineage,
 ) {
   let requestedProductionWorkId: string | null = null;
   await page.route("**/api/personal-ip/content-works**", async (route) => {
@@ -176,7 +241,7 @@ async function mockContentAPIs(
       return;
     }
     if (pathname === `/api/personal-ip/content-works/${work.id}`) {
-      await route.fulfill({ status: 200, json: lineage });
+      await route.fulfill({ status: 200, json: contentLineage });
       return;
     }
     await route.fallback();
@@ -225,6 +290,32 @@ test("content page renders authoritative lineage and official Production binding
   await expect(page.getByTestId("content-writer-brain-board")).toContainText(
     "别等问题完美才开始",
   );
+  const editorialProjection = page.getByTestId("editorial-program-projection");
+  await expect(editorialProjection).toContainText("当前任务 / 优先结果");
+  await expect(editorialProjection).toContainText(
+    "让初次创业者完成第一次客户访谈",
+  );
+  await expect(
+    editorialProjection.getByTestId("editorial-goal-priority"),
+  ).toHaveText("信任");
+  await expect(editorialProjection).toContainText("当前受众判断");
+  await expect(
+    editorialProjection.getByTestId("editorial-audience-state"),
+  ).toHaveText("用户明确");
+  await expect(editorialProjection).toContainText(
+    "有业务想法但不知如何开始验证",
+  );
+  await expect(
+    editorialProjection.getByTestId("editorial-carrier-kind"),
+  ).toHaveText("组织");
+  await expect(editorialProjection).toContainText("差异化假设");
+  await expect(editorialProjection).toContainText("待验证");
+  await expect(
+    editorialProjection.getByTestId("editorial-route-kind"),
+  ).toHaveText("现场示范");
+  await expect(
+    editorialProjection.getByTestId("editorial-spine"),
+  ).toContainText("人如何在不确定中开始真实行动");
   await expect(page.getByTestId("production-binding-status")).toHaveText(
     "已绑定 Production",
   );
@@ -258,12 +349,57 @@ test("content page renders authoritative lineage and official Production binding
   await expect(page.getByText("provider-payload-must-not-render")).toHaveCount(
     0,
   );
+  await expect(page.getByText("editorial-program-must-not-render")).toHaveCount(
+    0,
+  );
+  await expect(page.getByText("editorial-digest-must-not-render")).toHaveCount(
+    0,
+  );
 
   await page.getByRole("link", { name: "开始任务" }).first().click();
   await page.waitForURL("**/workspace/chats/new?content_entry=zero_start");
   await expect(page.getByRole("textbox").first()).toHaveValue(
     /我要从零起盘一条原创内容/,
   );
+});
+
+test("historical v1 lineage keeps the original Writer Brain card", async ({
+  page,
+}) => {
+  mockLangGraphAPI(page);
+  const historicalLineage: PersonalIPContentLineage = {
+    ...lineage,
+    content_work: {
+      ...lineage.content_work,
+      editorial_program_version_id: undefined,
+    },
+    editorial_program_version: undefined,
+    direction_versions: [
+      {
+        ...lineage.direction_versions[0]!,
+        direction: {
+          premise: "历史方向前提",
+          audience_situation: objective.audience_situation,
+          core_tension: "历史方向核心张力",
+          content_promise: "历史方向内容承诺",
+          creative_route: "行动示范",
+          rationale: "用真实可执行动作降低开始门槛。",
+          truth_mode: "factual",
+          business_relevance: "连接工作坊课程",
+          claim_basis: [],
+        },
+      },
+    ],
+  };
+  await mockContentAPIs(page, [], historicalLineage);
+
+  await page.goto("/workspace/content");
+
+  const writerBrain = page.getByTestId("content-writer-brain-board");
+  await expect(writerBrain).toContainText("历史方向前提");
+  await expect(writerBrain).toContainText("历史方向核心张力");
+  await expect(writerBrain).toContainText("历史方向内容承诺");
+  await expect(page.getByTestId("editorial-program-projection")).toHaveCount(0);
 });
 
 test("a completed delivery renders only its formal final Artifact", async ({
@@ -328,6 +464,14 @@ test("a restored final Artifact receipt requires verified file re-import before 
   await page.route(
     "**/api/personal-ip/artifacts/final-artifact-1/content",
     async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "video/mp4",
+          body: Buffer.from([1, 2, 3, 4]),
+        });
+        return;
+      }
       uploadAttempts += 1;
       uploadedContentType = route.request().headers()["content-type"];
       uploadedBytes = route.request().postDataBuffer();

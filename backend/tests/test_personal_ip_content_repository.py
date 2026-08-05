@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import json
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy.dialects import postgresql
 
 from deerflow.config.database_config import DatabaseConfig
 from deerflow.persistence.engine import close_engine, get_session_factory, init_engine_from_config
 from deerflow.persistence.personal_ip_content import PersonalIPContentRepository
 from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
-from deerflow.personal_ip.content_contracts import ContentWorkAppend, ContentWorkCreate, ScriptDraft
+from deerflow.personal_ip.content_contracts import (
+    ContentWorkAppend,
+    ContentWorkCreate,
+    ScriptDraft,
+    script_decision_digest,
+)
 
 
 def _seed() -> dict:
@@ -79,13 +83,31 @@ def _create_request(subject_id: str) -> ContentWorkCreate:
 def _verified_script_digests(script: ScriptDraft | None) -> frozenset[str]:
     if script is None:
         return frozenset()
-    payload = json.dumps(
-        script.model_dump(mode="json", exclude_none=False),
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    return frozenset({hashlib.sha256(payload).hexdigest()})
+    return frozenset({script_decision_digest(script)})
+
+
+@pytest.mark.asyncio
+async def test_postgres_content_mutation_uses_owner_lifecycle_lock() -> None:
+    operations: list[tuple[object, object | None]] = []
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.bind = type("Bind", (), {"dialect": postgresql.dialect()})()
+
+        def get_bind(self):
+            return self.bind
+
+        async def execute(self, statement, params=None):
+            operations.append((statement, params))
+
+    await PersonalIPContentRepository._lock_owner_lifecycle(  # noqa: SLF001
+        FakeSession(),  # type: ignore[arg-type]
+        "owner-lock-test",
+    )
+
+    assert len(operations) == 1
+    assert operations[0][1] == {"lock_key": "personal-ip-data-lifecycle:owner-lock-test"}
+    assert "pg_advisory_xact_lock(hashtext" in str(operations[0][0])
 
 
 @pytest.mark.asyncio

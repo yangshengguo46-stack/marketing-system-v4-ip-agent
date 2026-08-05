@@ -146,7 +146,11 @@ async def test_0028_preserves_legacy_rows_and_downgrade_fails_closed_for_links(
         await asyncio.to_thread(_upgrade, config, "0027_personal_ip_content_lineage")
         await _insert_legacy_production(engine)
 
-        await asyncio.to_thread(_upgrade, config, "head")
+        await asyncio.to_thread(
+            _upgrade,
+            config,
+            "0029_personal_ip_final_artifacts",
+        )
         assert await _version(engine) == "0029_personal_ip_final_artifacts"
         assert {"content_work_id", "script_version_id"} <= await _columns(
             engine,
@@ -166,7 +170,11 @@ async def test_0028_preserves_legacy_rows_and_downgrade_fails_closed_for_links(
         )
         assert {"content_work_id", "script_version_id"}.isdisjoint(await _columns(engine, "personal_ip_video_productions"))
 
-        await asyncio.to_thread(_upgrade, config, "head")
+        await asyncio.to_thread(
+            _upgrade,
+            config,
+            "0029_personal_ip_final_artifacts",
+        )
         await _link_legacy_production(engine)
         with pytest.raises(RuntimeError, match="linked Owner data exists"):
             await asyncio.to_thread(

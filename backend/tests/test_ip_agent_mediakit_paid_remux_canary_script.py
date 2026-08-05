@@ -142,7 +142,7 @@ def test_resume_never_creates_a_missing_scope(
     with sqlite3.connect(db_path) as connection:
         revision = connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
         count = connection.execute("SELECT COUNT(*) FROM personal_ip_paid_call_scopes").fetchone()[0]
-    assert revision == "0029_personal_ip_final_artifacts"
+    assert revision == "0030_personal_ip_editorial_program_versions"
     assert count == 0
     assert _mode(db_path) == 0o600
 

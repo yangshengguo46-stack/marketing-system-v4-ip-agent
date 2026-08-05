@@ -672,7 +672,7 @@ async def run_paid_canary(
     if database_path.exists():
         os.chmod(database_path, 0o600)
     try:
-        if await _schema_head() != "0029_personal_ip_final_artifacts":
+        if await _schema_head() != "0030_personal_ip_editorial_program_versions":
             raise CanaryError("CANARY_DATABASE_REVISION_MISMATCH")
         session_factory = get_session_factory()
         if session_factory is None:

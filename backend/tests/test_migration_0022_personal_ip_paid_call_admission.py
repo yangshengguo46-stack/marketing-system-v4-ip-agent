@@ -10,6 +10,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 import deerflow.persistence.models  # noqa: F401
 from deerflow.persistence.bootstrap import _get_alembic_config, _upgrade
 
+PAID_CALL_FINAL_REVISION = "0026_personal_ip_paid_call_submission_recovery"
+OPERATOR_CAP_REVISION = "0024_personal_ip_paid_call_operator_cap"
+
 
 async def _tables(engine) -> set[str]:
     async with engine.connect() as connection:
@@ -66,8 +69,8 @@ async def test_0022_through_0026_upgrade_paid_call_schema(tmp_path) -> None:
         assert "origin_run_id" not in await _columns(engine, "personal_ip_paid_call_scopes")
         assert "execution_run_id" not in await _columns(engine, "personal_ip_paid_call_events")
 
-        await asyncio.to_thread(_upgrade, config, "head")
-        assert await _version(engine) == "0029_personal_ip_final_artifacts"
+        await asyncio.to_thread(_upgrade, config, PAID_CALL_FINAL_REVISION)
+        assert await _version(engine) == PAID_CALL_FINAL_REVISION
         assert {
             "request_digest",
             "origin_run_id",
@@ -229,7 +232,7 @@ async def test_0025_preserves_rows_and_0026_refuses_active_provider_tasks(
                 {"token_sha256": "f" * 64},
             )
         with pytest.raises(RuntimeError, match="export and retire those task records"):
-            await asyncio.to_thread(_upgrade, config, "head")
+            await asyncio.to_thread(_upgrade, config, PAID_CALL_FINAL_REVISION)
         assert await _version(engine) == "0025_personal_ip_paid_call_recovery"
 
         async with engine.begin() as connection:
@@ -244,8 +247,8 @@ async def test_0025_preserves_rows_and_0026_refuses_active_provider_tasks(
                     """
                 )
             )
-        await asyncio.to_thread(_upgrade, config, "head")
-        assert await _version(engine) == ("0029_personal_ip_final_artifacts")
+        await asyncio.to_thread(_upgrade, config, PAID_CALL_FINAL_REVISION)
+        assert await _version(engine) == PAID_CALL_FINAL_REVISION
         async with engine.connect() as connection:
             row = (
                 await connection.execute(
@@ -270,9 +273,9 @@ async def test_0024_upgrades_empty_legacy_test_profile_without_reset(tmp_path) -
     try:
         await _install_legacy_0023_scope(engine)
         config = _get_alembic_config(engine)
-        await asyncio.to_thread(_upgrade, config, "head")
+        await asyncio.to_thread(_upgrade, config, OPERATOR_CAP_REVISION)
 
-        assert await _version(engine) == "0029_personal_ip_final_artifacts"
+        assert await _version(engine) == OPERATOR_CAP_REVISION
         assert {
             "server_name",
             "tool_name",
@@ -294,7 +297,7 @@ async def test_0024_refuses_to_guess_missing_immutable_fields_for_legacy_rows(
         await _install_legacy_0023_scope(engine, with_row=True)
         config = _get_alembic_config(engine)
         with pytest.raises(RuntimeError, match="Owner backup"):
-            await asyncio.to_thread(_upgrade, config, "head")
+            await asyncio.to_thread(_upgrade, config, OPERATOR_CAP_REVISION)
 
         assert await _version(engine) == "0023_personal_ip_paid_call_execution_run"
     finally:

@@ -34,12 +34,41 @@ depend on generated console-script shebangs from another checkout.
 `IP_AGENT.md` is the only current product contract. The default IP Agent has no
 Skills or memory and exposes eight read-only baseline tools, the two
 MediaKit-backed Evidence MCP tools and four bounded `ip_content_*` tools. A
-configured `MEDIAKIT_API_KEY` authorizes
-those evidence tools to run ASR/OCR/scene/storyline analysis directly; do not
+configured `MEDIAKIT_API_KEY` authorizes those evidence tools to run
+ASR/OCR/scene/storyline analysis directly; do not
 restore the retired per-call approval gate. It does not mount retired
 Personal-IP portfolio context orchestration. Do not reintroduce strategy,
 differentiation, preflight, retrospective, evidence-promotion, startup-cockpit
 or narrative-interview semantics outside a new approved architecture.
+
+The customer product remains exactly three boards: Breakdown, Writer Brain and
+Production. Writer Brain has one total-editor/operations controller with the
+only decision and persistence authority, plus an optional bounded
+semantic-causal core for story and hybrid routes. They are tightly bound by
+typed inputs and exact digests, not independent peer Agents. Direct offer,
+proof, demonstration and explanation routes skip the semantic core.
+
+`EditorialProgramVersion` is the approved small, immutable cross-work decision
+inside Writer Brain. It binds an ordered outcome goal, time horizon, audience
+hypothesis, attribution carrier, route-specific differentiation hypothesis and
+optional recurring human theme. Outcome (`conversion | recognition | trust`),
+time (`urgent | near_term | long_term`), carrier
+(`person | product | brand | organization`) and per-work route
+(`offer | proof | demonstration | explanation | semantic_story | hybrid`) are
+orthogonal decisions. Its `DifferentiationHypothesis` is always
+`hypothesized`; it has no independent repository, validation state, maturity
+ladder or promotion workflow and must never recreate the retired
+differentiation/strategy layer.
+
+The immutable creative lineage is:
+
+```text
+EditorialProgramVersion -> ContentWork -> DirectionVersion -> ScriptVersion -> VideoProduction
+```
+
+Current Owner backups are v5 server-keyed HMAC manifests; v4 remains
+HMAC-verified and is promoted only in memory, while v1-v3 retain their
+historical unkeyed-digest compatibility contract.
 
 Dedicated Owner surfaces retain subject/account facts, credential-isolated
 platform connections, publishing receipts, metrics/observations and video
@@ -52,9 +81,9 @@ secrecy, OAuth state, rights and disclosure, deletion,
 path/hash/candidate consistency, immutable receipts and idempotency. Never
 weaken one of these as “semantic cleanup.”
 
-Research in `product/research/`, the cinematic Skill catalog and
-`third_party/` is not active product capability. Production Python packages,
-routes and tools must not import the research quarantine.
+Research in `product/research/`, quarantined method catalogs and `third_party/`
+is not active product capability. Production Python packages, routes and tools
+must not import the research quarantine.
 
 Migration `0021_personal_ip_semantic_layer_retirement` fails closed if a table
 scheduled for retirement is non-empty. Require a verified Owner backup rather

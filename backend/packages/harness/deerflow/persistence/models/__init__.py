@@ -28,6 +28,7 @@ from deerflow.persistence.personal_ip_content.model import (
     PersonalIPBreakdownVersionRow,
     PersonalIPContentWorkRow,
     PersonalIPDirectionVersionRow,
+    PersonalIPEditorialProgramVersionRow,
     PersonalIPScriptVersionRow,
 )
 from deerflow.persistence.personal_ip_metrics.model import PersonalIPMetricObservationRow
@@ -64,6 +65,7 @@ __all__ = [
     "PersonalIPBreakdownVersionRow",
     "PersonalIPContentWorkRow",
     "PersonalIPDirectionVersionRow",
+    "PersonalIPEditorialProgramVersionRow",
     "PersonalIPMetricObservationRow",
     "PersonalIPPaidCallEventRow",
     "PersonalIPPaidCallScopeRow",

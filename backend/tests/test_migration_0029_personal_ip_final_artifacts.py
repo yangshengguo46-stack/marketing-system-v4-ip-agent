@@ -220,7 +220,7 @@ async def test_0029_adds_registered_artifact_table_and_nonempty_downgrade_fails_
         assert await _version(engine) == PREVIOUS_REVISION
         assert TABLE not in await _tables(engine)
 
-        await asyncio.to_thread(_upgrade, config, "head")
+        await asyncio.to_thread(_upgrade, config, REVISION)
         assert await _version(engine) == REVISION
         assert {
             "id",
@@ -281,7 +281,7 @@ async def test_0029_upgrade_fails_closed_for_completed_linked_production_without
         await _seed_completed_linked_production_without_artifact(engine)
 
         with pytest.raises(RuntimeError, match="completed linked Owner productions"):
-            await asyncio.to_thread(_upgrade, config, "head")
+            await asyncio.to_thread(_upgrade, config, REVISION)
         assert await _version(engine) == PREVIOUS_REVISION
         assert TABLE not in await _tables(engine)
     finally:

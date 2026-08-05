@@ -62,6 +62,27 @@ observation, preflight/HLLM-Lite prediction, retrospective, evidence promotion,
 startup/operating cockpit and narrative interview. Do not register its models,
 repositories, routes, dependencies or tools. Old endpoints must remain 404.
 
+The three customer boards remain Breakdown, Writer Brain and Production. Inside
+Writer Brain, one total-editor/operations controller alone chooses and persists
+the ordered outcome goal, time horizon, attribution carrier and per-work route.
+An optional bounded semantic-causal core may serve `semantic_story` and
+`hybrid`; it has no independent routing or persistence authority. `offer`,
+`proof`, `demonstration` and `explanation` must bypass it. The two parts exchange
+typed immutable receipts and exact digests, never free-form peer-Agent chat.
+
+`EditorialProgramVersion` is an immutable, Owner-scoped cross-work decision.
+One Work binds one exact Program version, then immutable Direction and Script
+versions; production binds the exact Script. Program reuse and revision must
+preserve Owner/Subject authority, parent-version continuity, idempotency and
+digest consistency. The four axes stay independent: outcome
+(`conversion | recognition | trust`), time horizon
+(`urgent | near_term | long_term`), carrier
+(`person | product | brand | organization`) and content route
+(`offer | proof | demonstration | explanation | semantic_story | hybrid`).
+The embedded route-specific differentiation value is always a hypothesis. It
+has no standalone lifecycle or proof status and is not the retired strategy or
+differentiation layer.
+
 Retained Personal-IP domains are:
 
 - subjects and accounts;
@@ -69,7 +90,8 @@ Retained Personal-IP domains are:
 - publish receipts and attempts;
 - metrics and credential-free platform observations;
 - video productions and append-only events;
-- content works and immutable breakdown, direction and script versions;
+- editorial program versions, content works and immutable breakdown, direction
+  and script versions;
 - whole-domain backup/restore/delete.
 
 Publishing continues to enforce rights, moderation, commercial/AI disclosure
@@ -81,6 +103,12 @@ must never export credentials.
 `0021_personal_ip_semantic_layer_retirement` must refuse a non-empty retired
 table and require a verified Owner backup. Never weaken this guard in tests or
 production. Its downgrade recreates empty compatibility schemas only.
+
+Current backups are v5 server-keyed HMAC manifests. Restore must verify v4 with
+its original HMAC contract before in-memory promotion; only v1-v3 use the
+historical unkeyed digest. Lifecycle classification must include every live
+Editorial Program table and preserve the exact
+`Program -> Work -> Direction -> Script -> Production` references.
 
 Research adapters under `../product/research/ip-agent/` are non-runtime. No
 module under `deerflow`, Gateway route or production tool may import them.

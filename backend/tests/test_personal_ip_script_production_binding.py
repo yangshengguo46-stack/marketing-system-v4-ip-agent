@@ -14,7 +14,11 @@ from deerflow.persistence.engine import close_engine, get_session_factory, init_
 from deerflow.persistence.personal_ip_content import PersonalIPContentRepository
 from deerflow.persistence.personal_ip_subjects import PersonalIPSubjectRepository
 from deerflow.persistence.personal_ip_video_productions import PersonalIPVideoProductionRepository
-from deerflow.personal_ip.content_contracts import ContentWorkCreate, ScriptDraft
+from deerflow.personal_ip.content_contracts import (
+    ContentWorkCreate,
+    ScriptDraft,
+    script_decision_digest,
+)
 
 
 def _content_request(*, key: str, subject_id: str | None, title: str) -> ContentWorkCreate:
@@ -60,13 +64,7 @@ def _content_request(*, key: str, subject_id: str | None, title: str) -> Content
 
 def _verified_script(script: ScriptDraft | None) -> frozenset[str]:
     assert script is not None
-    payload = json.dumps(
-        script.model_dump(mode="json", exclude_none=False),
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    return frozenset({hashlib.sha256(payload).hexdigest()})
+    return frozenset({script_decision_digest(script)})
 
 
 async def _create_content(

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from datetime import UTC, datetime
 
@@ -13,7 +12,11 @@ from deerflow.persistence.engine import close_engine, get_session_factory, init_
 from deerflow.persistence.personal_ip_artifacts import PersonalIPArtifactRow
 from deerflow.persistence.personal_ip_content import PersonalIPContentRepository
 from deerflow.persistence.personal_ip_video_productions import PersonalIPVideoProductionRepository
-from deerflow.personal_ip.content_contracts import ContentWorkCreate, ScriptDraft
+from deerflow.personal_ip.content_contracts import (
+    ContentWorkCreate,
+    ScriptDraft,
+    script_decision_digest,
+)
 from deerflow.personal_ip.video_contracts import compile_final_edit_lock, compile_timeline_revision
 
 OWNER = "owner-1"
@@ -67,13 +70,7 @@ def _content_request() -> ContentWorkCreate:
 
 def _verified_script(script: ScriptDraft | None) -> frozenset[str]:
     assert script is not None
-    serialized = json.dumps(
-        script.model_dump(mode="json", exclude_none=False),
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    return frozenset({hashlib.sha256(serialized).hexdigest()})
+    return frozenset({script_decision_digest(script)})
 
 
 async def _linked_production(

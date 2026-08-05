@@ -35,6 +35,7 @@ import {
 import {
   type ContentEntryRoute,
   type ContentTruthMode,
+  type EditorialProgramProjection,
   type PersonalIPContentLineage,
   type PersonalIPContentWork,
   type PersonalIPVideoProduction,
@@ -44,6 +45,7 @@ import {
   personalIPContentTaskHref,
   personalIPFinalArtifactContentURL,
   personalIPProductionTaskHref,
+  projectPersonalIPEditorialProgram,
   selectPersonalIPFinalArtifact,
   selectPersonalIPFinalArtifactReceipt,
   usePersonalIPContentLineage,
@@ -319,26 +321,192 @@ function BreakdownPanel({ lineage }: { lineage: PersonalIPContentLineage }) {
   );
 }
 
+function EditorialProgramProjectionCard({
+  projection,
+}: {
+  projection: EditorialProgramProjection;
+}) {
+  return (
+    <section
+      className="border-primary/25 bg-primary/5 space-y-4 rounded-xl border p-3"
+      data-testid="editorial-program-projection"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium">当前创作判断</p>
+        <Badge variant="secondary">已归纳</Badge>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+        <div className="bg-background/80 space-y-2 rounded-lg border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-muted-foreground text-[11px]">
+              当前任务 / 优先结果
+            </p>
+            <Badge data-testid="editorial-goal-priority" variant="outline">
+              {projection.mission.priorityResult}
+            </Badge>
+          </div>
+          <p className="text-sm leading-6 break-words">
+            {projection.mission.currentTask}
+          </p>
+          <div className="text-muted-foreground space-y-1 text-xs leading-5">
+            <p>时间窗口·{projection.mission.timeWindow}</p>
+            <p>成功信号·{projection.mission.successSignal}</p>
+          </div>
+          {projection.mission.nonGoals.length > 0 && (
+            <div>
+              <p className="text-muted-foreground text-[11px]">本次不做</p>
+              <p className="mt-1 text-xs leading-5 break-words">
+                {projection.mission.nonGoals.join("、")}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-background/80 space-y-2 rounded-lg border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-muted-foreground text-[11px]">当前受众判断</p>
+            <Badge data-testid="editorial-audience-state" variant="outline">
+              {projection.audience.state}
+            </Badge>
+          </div>
+          <p className="text-sm leading-6 break-words">
+            {projection.audience.situation}
+          </p>
+          {projection.audience.uncertainties.length > 0 && (
+            <div>
+              <p className="text-muted-foreground text-[11px]">仍待确认</p>
+              <p className="mt-1 text-xs leading-5 break-words">
+                {projection.audience.uncertainties.join("、")}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-background/80 space-y-2 rounded-lg border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-muted-foreground text-[11px]">归因主体</p>
+            <Badge data-testid="editorial-carrier-kind" variant="outline">
+              {projection.attribution.carrierKind}
+            </Badge>
+          </div>
+          <p className="text-sm leading-6 font-medium break-words">
+            {projection.attribution.identity}
+          </p>
+          <div>
+            <p className="text-muted-foreground text-[11px]">希望建立的联想</p>
+            <p className="mt-1 text-xs leading-5 break-words">
+              {projection.attribution.desiredAssociation}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-background/80 space-y-3 rounded-lg border p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-muted-foreground text-[11px]">差异化假设</p>
+          <Badge variant="outline">{projection.differentiation.state}</Badge>
+        </div>
+        <p className="text-sm leading-6 font-medium break-words">
+          {projection.differentiation.statement}
+        </p>
+        <div className="grid gap-x-4 gap-y-2 text-xs leading-5 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+          <div>
+            <p className="text-muted-foreground text-[11px]">相对区别</p>
+            <p className="break-words">{projection.differentiation.contrast}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-[11px]">选择理由</p>
+            <p className="break-words">
+              {projection.differentiation.reasonToChoose}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-[11px]">可信理由</p>
+            <p className="break-words">
+              {projection.differentiation.reasonToBelieve}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-[11px]">主动舍弃</p>
+            <p className="break-words">
+              {projection.differentiation.sacrifice}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-[11px]">验证信号</p>
+            <p className="break-words">
+              {projection.differentiation.testSignal}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-background/80 space-y-2 rounded-lg border p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-muted-foreground text-[11px]">内容路线</p>
+          <Badge data-testid="editorial-route-kind" variant="outline">
+            {projection.contentRoute.kind}
+          </Badge>
+        </div>
+        <p className="text-sm leading-6 break-words">
+          {projection.contentRoute.description}
+        </p>
+      </div>
+
+      {projection.editorialSpine && (
+        <div
+          className="bg-background/80 space-y-2 rounded-lg border p-3"
+          data-testid="editorial-spine"
+        >
+          <p className="text-muted-foreground text-[11px]">长期人类议题</p>
+          <p className="text-sm leading-6 font-medium break-words">
+            {projection.editorialSpine.humanTheme}
+          </p>
+          <div>
+            <p className="text-muted-foreground text-[11px]">反复追问</p>
+            <p className="mt-1 text-xs leading-5 break-words">
+              {projection.editorialSpine.recurringQuestion}
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function WriterBrainPanel({ lineage }: { lineage: PersonalIPContentLineage }) {
   const latestDirection = latestVersion(lineage.direction_versions);
   const latestScript = latestVersion(lineage.script_versions);
+  const editorialProgramProjection = projectPersonalIPEditorialProgram(
+    lineage.editorial_program_version,
+    latestDirection?.direction,
+  );
   const totalVersions =
-    lineage.direction_versions.length + lineage.script_versions.length;
+    lineage.direction_versions.length +
+    lineage.script_versions.length +
+    (lineage.editorial_program_version ? 1 : 0);
 
   return (
     <StagePanel
       title="Writer Brain"
-      subtitle="已保存的方向与完整剧本，不用聊天内容代替版本。"
+      subtitle="已保存的任务判断、方向与完整剧本，不用聊天内容代替版本。"
       count={totalVersions}
       icon={BookOpenTextIcon}
       testId="content-writer-brain-board"
     >
-      {!latestDirection && !latestScript ? (
+      {!editorialProgramProjection && !latestDirection && !latestScript ? (
         <MissingVersion>
           服务端当前没有返回已保存的方向或剧本版本。
         </MissingVersion>
       ) : (
         <>
+          {editorialProgramProjection && (
+            <EditorialProgramProjectionCard
+              projection={editorialProgramProjection}
+            />
+          )}
+
           {latestDirection ? (
             <section className="space-y-3 rounded-xl border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">

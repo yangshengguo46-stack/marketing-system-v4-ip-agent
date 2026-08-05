@@ -11,9 +11,16 @@ from deerflow.config.app_config import AppConfig, reset_app_config, set_app_conf
 
 
 @pytest.fixture
-def _stub_app_config():
-    """Keep run-context tests independent from a developer-local config.yaml."""
+def _stub_app_config(monkeypatch):
+    """Keep generic run-context tests independent from local product state."""
+    from app.gateway import services
+
     set_app_config(AppConfig.model_validate({"sandbox": {"use": "deerflow.sandbox.local:LocalSandboxProvider"}}))
+    monkeypatch.setattr(
+        services,
+        "resolve_product_runtime_binding",
+        lambda *args, **kwargs: None,
+    )
     yield
     reset_app_config()
 

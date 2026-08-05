@@ -2,7 +2,7 @@ schema_version: ip-agent-runtime-profile-v1
 enabled: true
 product_id: ip-agent
 assistant_id: ip-agent
-agent_artifact_sha256: 988b3ebe5af040d9799991a5c43b75f6943a63abfae7c2d76cc990a87e51e44a
+agent_artifact_sha256: 5c2043a420dd2f5eeb59a919e09dd646f25fc24b16d76cee7505a7ddc2a31470
 capability_contract:
   tool_allowlist:
     - web_search

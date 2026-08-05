@@ -32,6 +32,7 @@ from deerflow.persistence.personal_ip_content.model import (
     PersonalIPBreakdownVersionRow,
     PersonalIPContentWorkRow,
     PersonalIPDirectionVersionRow,
+    PersonalIPEditorialProgramVersionRow,
     PersonalIPScriptVersionRow,
 )
 from deerflow.persistence.personal_ip_metrics.model import PersonalIPMetricObservationRow
@@ -62,7 +63,12 @@ from deerflow.personal_ip.content_contracts import (
     BreakdownDraft,
     ContentObjective,
     DirectionDraft,
+    EditorialProgramDraft,
     ScriptDraft,
+    editorial_program_decision_digest,
+    editorial_program_decision_payload,
+    validate_direction_program_binding,
+    validate_script_direction_binding,
 )
 from deerflow.personal_ip.evidence_binding import reference_evidence_refs
 from deerflow.personal_ip.final_artifacts import (
@@ -80,7 +86,8 @@ from deerflow.personal_ip.video_contracts import (
 LEGACY_BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v1"
 CONTENT_BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v2"
 PRODUCTION_BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v3"
-BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v4"
+ARTIFACT_BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v4"
+BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v5"
 RESTORE_RECEIPT_VERSION = "personal-ip-owner-restore-receipt-v1"
 DELETE_PREVIEW_VERSION = "personal-ip-destructive-delete-preview-v1"
 DELETE_CONFIRMATION_VERSION = "personal-ip-destructive-delete-confirmation-v1"
@@ -88,6 +95,13 @@ DELETE_RECEIPT_VERSION = "personal-ip-destructive-delete-receipt-v1"
 DELETE_CONFIRMATION_PHRASE = "永久删除我的全部个人IP数据"
 LEGACY_BACKUP_VERIFICATION_ALGORITHM = "sha256-canonical-json-v1"
 BACKUP_VERIFICATION_ALGORITHM = "hmac-sha256-canonical-json-v1"
+
+_SIGNED_BACKUP_SCHEMA_VERSIONS = frozenset(
+    {
+        ARTIFACT_BACKUP_SCHEMA_VERSION,
+        BACKUP_SCHEMA_VERSION,
+    }
+)
 
 _CREDENTIAL_POLICY = {
     "credentials_included": False,
@@ -125,6 +139,7 @@ class _Dataset:
 # Restore order is dependency order; deletion uses the reverse.
 _DATASETS: tuple[_Dataset, ...] = (
     _Dataset("subjects", PersonalIPSubjectRow),
+    _Dataset("editorial_program_versions", PersonalIPEditorialProgramVersionRow),
     _Dataset("content_works", PersonalIPContentWorkRow),
     _Dataset("breakdown_versions", PersonalIPBreakdownVersionRow),
     _Dataset("direction_versions", PersonalIPDirectionVersionRow),
@@ -138,7 +153,8 @@ _DATASETS: tuple[_Dataset, ...] = (
     _Dataset("video_production_events", PersonalIPVideoProductionEventRow),
     _Dataset("artifacts", PersonalIPArtifactRow),
 )
-_PRE_ARTIFACT_DATASETS: tuple[_Dataset, ...] = tuple(item for item in _DATASETS if item.name != "artifacts")
+_V4_DATASETS: tuple[_Dataset, ...] = tuple(item for item in _DATASETS if item.name != "editorial_program_versions")
+_PRE_ARTIFACT_DATASETS: tuple[_Dataset, ...] = tuple(item for item in _V4_DATASETS if item.name != "artifacts")
 _LEGACY_DATASETS: tuple[_Dataset, ...] = tuple(
     item
     for item in _PRE_ARTIFACT_DATASETS
@@ -151,6 +167,7 @@ _LEGACY_DATASETS: tuple[_Dataset, ...] = tuple(
     }
 )
 _LEGACY_VIDEO_PRODUCTION_COLUMNS = frozenset({"content_work_id", "script_version_id"})
+_LEGACY_CONTENT_WORK_COLUMNS = frozenset({"editorial_program_version_id"})
 EXPORT_DATASET_NAMES: tuple[str, ...] = tuple(item.name for item in _DATASETS)
 PERSONAL_IP_EXPORT_TABLES: frozenset[str] = frozenset(item.model.__tablename__ for item in _DATASETS)
 PERSONAL_IP_SECRET_TABLES: frozenset[str] = frozenset(
@@ -256,6 +273,10 @@ def _validate_content_restore_datasets(
 
     records_by_name = {str(dataset["name"]): dataset["records"] for dataset in datasets}
     subject_ids = set(_record_index("subjects", records_by_name["subjects"]))
+    editorial_program_versions = _record_index(
+        "editorial_program_versions",
+        records_by_name["editorial_program_versions"],
+    )
     works = _record_index("content_works", records_by_name["content_works"])
     breakdowns = _record_index(
         "breakdown_versions",
@@ -267,11 +288,86 @@ def _validate_content_restore_datasets(
     )
     scripts = _record_index("script_versions", records_by_name["script_versions"])
 
+    program_version_numbers: dict[str, set[int]] = {}
+    program_subjects: dict[str, str | None] = {}
+    program_operation_keys: set[str] = set()
+    editorial_program_models: dict[str, EditorialProgramDraft] = {}
+    for program_version_id, record in editorial_program_versions.items():
+        program_id = record.get("program_id")
+        if not isinstance(program_id, str) or not program_id or len(program_id) > 64:
+            raise ValueError("backup EditorialProgramVersion program_id is invalid")
+        version_number = record.get("version_number")
+        if not isinstance(version_number, int) or isinstance(version_number, bool) or version_number < 1:
+            raise ValueError("backup EditorialProgramVersion version number is invalid")
+        numbers = program_version_numbers.setdefault(program_id, set())
+        if version_number in numbers:
+            raise ValueError("backup EditorialProgramVersion contains a duplicate program version")
+        numbers.add(version_number)
+
+        subject_id = record.get("subject_id")
+        if subject_id is not None and (not isinstance(subject_id, str) or not subject_id or subject_id not in subject_ids):
+            raise ValueError("backup EditorialProgramVersion subject does not belong to this Owner backup")
+        if program_id in program_subjects and program_subjects[program_id] != subject_id:
+            raise ValueError("backup EditorialProgramVersion program subject is inconsistent")
+        program_subjects[program_id] = subject_id
+
+        operation_key = record.get("operation_key")
+        if not isinstance(operation_key, str) or not operation_key or len(operation_key) > 256:
+            raise ValueError("backup EditorialProgramVersion operation_key is invalid")
+        if operation_key in program_operation_keys:
+            raise ValueError("backup EditorialProgramVersion operation_key must be unique")
+        program_operation_keys.add(operation_key)
+        operation_digest = _require_sha256(
+            record.get("operation_digest"),
+            field="EditorialProgramVersion operation_digest",
+        )
+        if not isinstance(record.get("title"), str) or not record["title"] or len(record["title"]) > 1_000:
+            raise ValueError("backup EditorialProgramVersion title is invalid")
+        decision_json = record.get("decision_json")
+        if not isinstance(decision_json, Mapping):
+            raise ValueError("backup EditorialProgramVersion decision is invalid")
+        try:
+            editorial_program = EditorialProgramDraft.model_validate(
+                {
+                    **dict(decision_json),
+                    "title": record["title"],
+                    "parent_program_version_id": record.get("parent_program_version_id"),
+                }
+            )
+        except ValueError as exc:
+            raise ValueError("backup EditorialProgramVersion decision contract is invalid") from exc
+        if editorial_program_decision_payload(editorial_program) != decision_json:
+            raise ValueError("backup EditorialProgramVersion decision is not canonical")
+        if editorial_program_decision_digest(editorial_program) != operation_digest:
+            raise ValueError("backup EditorialProgramVersion operation digest does not match its decision")
+        editorial_program_models[program_version_id] = editorial_program
+
+    for record in editorial_program_versions.values():
+        parent_id = record.get("parent_program_version_id")
+        if parent_id is None:
+            continue
+        if not isinstance(parent_id, str) or not parent_id:
+            raise ValueError("backup EditorialProgramVersion parent is invalid")
+        parent = editorial_program_versions.get(parent_id)
+        if parent is None or parent.get("program_id") != record.get("program_id") or parent.get("subject_id") != record.get("subject_id") or parent.get("version_number", 0) >= record.get("version_number", 0):
+            raise ValueError("backup EditorialProgramVersion parent is invalid")
+
+    for program_id, numbers in program_version_numbers.items():
+        if sorted(numbers) != list(range(1, len(numbers) + 1)):
+            raise ValueError(f"backup EditorialProgramVersion versions for program {program_id} are not contiguous")
+
     objective_ids: set[str] = set()
     for work in works.values():
         subject_id = work.get("subject_id")
         if subject_id is not None and subject_id not in subject_ids:
             raise ValueError("backup content work subject does not belong to this Owner backup")
+        editorial_program_version_id = work.get("editorial_program_version_id")
+        if editorial_program_version_id is not None:
+            if not isinstance(editorial_program_version_id, str) or not editorial_program_version_id:
+                raise ValueError("backup content work EditorialProgramVersion reference is invalid")
+            editorial_program_version = editorial_program_versions.get(editorial_program_version_id)
+            if editorial_program_version is None or editorial_program_version.get("subject_id") != subject_id:
+                raise ValueError("backup content work does not reference an exact same-subject EditorialProgramVersion")
         objective_id = work.get("objective_id")
         if not isinstance(objective_id, str) or not objective_id:
             raise ValueError("backup content work objective_id is required")
@@ -414,15 +510,34 @@ def _validate_content_restore_datasets(
 
     direction_models: dict[str, DirectionDraft] = {}
     direction_allowed_refs: dict[str, set[str]] = {}
+    direction_contracts_by_work: dict[str, list[tuple[int, str]]] = {}
     for direction_id, record in directions.items():
         work_id = validate_version_base("direction_versions", record)
+        direction_json = record.get("direction_json")
         try:
             objective_snapshot = ContentObjective.model_validate(record.get("objective_snapshot_json"))
-            direction = DirectionDraft.model_validate(record.get("direction_json"))
+            direction = DirectionDraft.model_validate(direction_json)
         except ValueError as exc:
             raise ValueError("backup DirectionVersion contract is invalid") from exc
+        if direction.contract_version == "personal-ip-direction-v2" and direction.model_dump(mode="json") != direction_json:
+            raise ValueError("backup v2 DirectionVersion decision is not canonical")
         if objective_snapshot.model_dump(mode="json") != works[work_id].get("objective_json"):
             raise ValueError("backup DirectionVersion objective snapshot does not match its work")
+        direction_contracts_by_work.setdefault(work_id, []).append((int(record["version_number"]), direction.contract_version))
+        program_version_id = works[work_id].get("editorial_program_version_id")
+        if direction.contract_version == "personal-ip-direction-v2":
+            if program_version_id is None:
+                raise ValueError("backup v2 DirectionVersion requires an exact EditorialProgramVersion")
+            program_version = editorial_program_versions[program_version_id]
+            if direction.editorial_program_digest != program_version.get("operation_digest"):
+                raise ValueError("backup v2 DirectionVersion does not bind the exact EditorialProgramVersion decision digest")
+            try:
+                validate_direction_program_binding(
+                    editorial_program_models[program_version_id],
+                    direction,
+                )
+            except ValueError as exc:
+                raise ValueError("backup v2 DirectionVersion does not preserve its EditorialProgramVersion semantic route") from exc
         breakdown_ids = record.get("breakdown_version_ids_json")
         if not isinstance(breakdown_ids, list) or len(breakdown_ids) != len(set(breakdown_ids)):
             raise ValueError("backup DirectionVersion breakdown references are invalid")
@@ -447,32 +562,48 @@ def _validate_content_restore_datasets(
         direction_models[direction_id] = direction
         direction_allowed_refs[direction_id] = allowed_refs
 
+    for work_id, work in works.items():
+        contracts = sorted(direction_contracts_by_work.get(work_id, []))
+        if work.get("editorial_program_version_id") is None:
+            continue
+        first_v2 = next(
+            (version_number for version_number, contract in contracts if contract == "personal-ip-direction-v2"),
+            None,
+        )
+        if first_v2 is None:
+            raise ValueError("backup program-bound content work requires at least one v2 DirectionVersion")
+        if any(contract == "personal-ip-direction-v1" and version_number > first_v2 for version_number, contract in contracts):
+            raise ValueError("backup content work cannot return to a v1 DirectionVersion after program binding")
+
     for _script_id, record in scripts.items():
         work_id = validate_version_base("script_versions", record)
         direction_id = record.get("direction_version_id")
         direction_record = directions.get(direction_id)
         if direction_record is None or direction_record.get("content_work_id") != work_id:
             raise ValueError("backup ScriptVersion direction does not belong to the same work")
+        script_contract = {
+            "title": record.get("title"),
+            "story_mode": record.get("story_mode"),
+            "script_text": record.get("script_text"),
+            "claim_basis": record.get("claim_basis_json"),
+            "creative_elements": record.get("creative_elements_json"),
+            "story_engine_seed": record.get("story_engine_seed_json"),
+            "locked_story": record.get("locked_story"),
+            "production_notes": record.get("production_notes_json"),
+            "direction_version_id": direction_id,
+            "parent_script_version_id": record.get("parent_script_version_id"),
+        }
         try:
-            script = ScriptDraft.model_validate(
-                {
-                    "title": record.get("title"),
-                    "story_mode": record.get("story_mode"),
-                    "script_text": record.get("script_text"),
-                    "claim_basis": record.get("claim_basis_json"),
-                    "creative_elements": record.get("creative_elements_json"),
-                    "story_engine_seed": record.get("story_engine_seed_json"),
-                    "locked_story": record.get("locked_story"),
-                    "production_notes": record.get("production_notes_json"),
-                    "direction_version_id": direction_id,
-                    "parent_script_version_id": record.get("parent_script_version_id"),
-                }
-            )
+            script = ScriptDraft.model_validate(script_contract)
         except ValueError as exc:
             raise ValueError("backup ScriptVersion contract is invalid") from exc
         direction = direction_models[direction_id]
-        if script.story_mode != direction.truth_mode:
-            raise ValueError("backup ScriptVersion truth mode does not match its direction")
+        if direction.contract_version == "personal-ip-direction-v2" and script.model_dump(mode="json") != script_contract:
+            raise ValueError("backup v2 ScriptVersion contract is not canonical")
+        try:
+            validate_script_direction_binding(direction, script)
+        except ValueError as exc:
+            raise ValueError("backup ScriptVersion does not preserve its Direction receipts") from exc
         direction_claims = {_canonical(claim.model_dump(mode="json")) for claim in direction.claim_basis}
         if any(_canonical(claim.model_dump(mode="json")) not in direction_claims for claim in script.claim_basis):
             raise ValueError("backup ScriptVersion claim basis is absent from its direction")
@@ -1136,7 +1267,7 @@ class PersonalIPDataLifecycleService:
             ],
             "data_digest": data_digest,
         }
-        if schema_version == BACKUP_SCHEMA_VERSION:
+        if schema_version in _SIGNED_BACKUP_SCHEMA_VERSIONS:
             manifest.update(
                 {
                     "credential_policy": _CREDENTIAL_POLICY,
@@ -1147,7 +1278,7 @@ class PersonalIPDataLifecycleService:
             )
             return hmac.new(
                 self._backup_signing_key,
-                b"personal-ip-owner-backup-v4\0" + _canonical(manifest),
+                schema_version.encode("utf-8") + b"\0" + _canonical(manifest),
                 hashlib.sha256,
             ).hexdigest()
         return _digest(manifest)
@@ -1162,8 +1293,9 @@ class PersonalIPDataLifecycleService:
             raise ValueError("owner_user_id is required")
         exported_at = _iso(now or datetime.now(UTC))
         async with self._sf() as session:
-            # A v4 manifest spans productions, events and Artifacts.  Share the
-            # same Owner lifecycle lock as seal/reattach/delete so PostgreSQL's
+            # A current manifest spans programs, works, productions, events and
+            # Artifacts. Share the same Owner lifecycle lock as
+            # seal/reattach/delete so PostgreSQL's
             # statement-level READ COMMITTED snapshots cannot produce a validly
             # signed but internally torn backup.
             await self._lock_owner(session, owner_user_id)
@@ -1200,6 +1332,7 @@ class PersonalIPDataLifecycleService:
         schema_version = backup.get("schema_version")
         if schema_version not in {
             BACKUP_SCHEMA_VERSION,
+            ARTIFACT_BACKUP_SCHEMA_VERSION,
             PRODUCTION_BACKUP_SCHEMA_VERSION,
             CONTENT_BACKUP_SCHEMA_VERSION,
             LEGACY_BACKUP_SCHEMA_VERSION,
@@ -1207,7 +1340,7 @@ class PersonalIPDataLifecycleService:
             raise ValueError("unsupported Personal-IP backup schema version")
         if backup.get("owner_user_id") != owner_user_id:
             raise ValueError("backup owner does not match the authenticated owner")
-        if schema_version == BACKUP_SCHEMA_VERSION:
+        if schema_version in _SIGNED_BACKUP_SCHEMA_VERSIONS:
             if backup.get("credential_policy") != _CREDENTIAL_POLICY:
                 raise ValueError("backup credential policy is invalid")
             if backup.get("artifact_policy") != _ARTIFACT_POLICY:
@@ -1222,6 +1355,8 @@ class PersonalIPDataLifecycleService:
             PRODUCTION_BACKUP_SCHEMA_VERSION,
         }:
             specifications = _PRE_ARTIFACT_DATASETS
+        elif schema_version == ARTIFACT_BACKUP_SCHEMA_VERSION:
+            specifications = _V4_DATASETS
         else:
             specifications = _DATASETS
         expected_names = [item.name for item in specifications]
@@ -1249,6 +1384,8 @@ class PersonalIPDataLifecycleService:
                 and specification.name == "video_productions"
             ):
                 allowed_columns.difference_update(_LEGACY_VIDEO_PRODUCTION_COLUMNS)
+            if schema_version != BACKUP_SCHEMA_VERSION and specification.name == "content_works":
+                allowed_columns.difference_update(_LEGACY_CONTENT_WORK_COLUMNS)
             if specification.name == "platform_connections":
                 allowed_columns.add("credential_state")
             normalized_records: list[dict[str, Any]] = []
@@ -1270,11 +1407,11 @@ class PersonalIPDataLifecycleService:
         verification = backup.get("verification")
         if not isinstance(verification, Mapping):
             raise ValueError("backup verification receipt is required")
-        if schema_version == BACKUP_SCHEMA_VERSION and verification.get("algorithm") != BACKUP_VERIFICATION_ALGORITHM:
+        if schema_version in _SIGNED_BACKUP_SCHEMA_VERSIONS and verification.get("algorithm") != BACKUP_VERIFICATION_ALGORITHM:
             raise ValueError("backup verification algorithm is invalid")
-        if schema_version != BACKUP_SCHEMA_VERSION and verification.get("algorithm") != LEGACY_BACKUP_VERIFICATION_ALGORITHM:
+        if schema_version not in _SIGNED_BACKUP_SCHEMA_VERSIONS and verification.get("algorithm") != LEGACY_BACKUP_VERIFICATION_ALGORITHM:
             raise ValueError("legacy backup verification algorithm is invalid")
-        if schema_version == BACKUP_SCHEMA_VERSION and verification.get("key_id") != self._backup_signing_key_id:
+        if schema_version in _SIGNED_BACKUP_SCHEMA_VERSIONS and verification.get("key_id") != self._backup_signing_key_id:
             raise ValueError("backup signing key is unavailable or does not match")
         data_digest = self._data_digest(normalized)
         if verification.get("data_digest") != data_digest:
@@ -1299,10 +1436,10 @@ class PersonalIPDataLifecycleService:
             promoted = normalized
         else:
             # V1 predates content lineage, V1/V2 predate the
-            # ScriptVersion-to-production columns, and V1-V3 predate the
-            # first-class Artifact entity. Verify each original inventory,
-            # shape and hash above, then upgrade only the in-memory restore
-            # representation.
+            # ScriptVersion-to-production columns, V1-V3 predate the
+            # first-class Artifact entity, and V1-V4 predate editorial program
+            # lineage. Verify each original inventory, shape and hash above,
+            # then upgrade only the in-memory restore representation.
             legacy_by_name = {item["name"]: item for item in normalized}
             promoted = []
             for specification in _DATASETS:
@@ -1315,6 +1452,9 @@ class PersonalIPDataLifecycleService:
                     for record in records:
                         record["content_work_id"] = None
                         record["script_version_id"] = None
+                if specification.name == "content_works":
+                    for record in records:
+                        record["editorial_program_version_id"] = None
                 promoted.append(
                     {
                         "name": specification.name,
@@ -1327,7 +1467,7 @@ class PersonalIPDataLifecycleService:
         _validate_production_restore_datasets(promoted)
         _validate_artifact_restore_datasets(
             promoted,
-            require_formal_artifacts=schema_version == BACKUP_SCHEMA_VERSION,
+            require_formal_artifacts=schema_version in _SIGNED_BACKUP_SCHEMA_VERSIONS,
         )
         # The JSON contract intentionally contains only immutable Artifact
         # identity and receipts. A restore must never turn that metadata into

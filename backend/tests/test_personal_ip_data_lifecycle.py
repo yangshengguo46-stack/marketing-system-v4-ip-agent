@@ -20,6 +20,12 @@ from deerflow.persistence.channel_connections.sql import ChannelCredentialCipher
 from deerflow.persistence.engine import close_engine, get_session_factory, init_engine_from_config
 from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
 from deerflow.persistence.personal_ip_content import PersonalIPContentRepository
+from deerflow.persistence.personal_ip_content.model import (
+    PersonalIPContentWorkRow,
+    PersonalIPDirectionVersionRow,
+    PersonalIPEditorialProgramVersionRow,
+    PersonalIPScriptVersionRow,
+)
 from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
 from deerflow.persistence.personal_ip_platform_connections.model import (
     PersonalIPPlatformConnectionRow,
@@ -31,7 +37,19 @@ from deerflow.persistence.personal_ip_subjects.model import PersonalIPSubjectRow
 from deerflow.persistence.personal_ip_video_productions import (
     PersonalIPVideoProductionRepository,
 )
-from deerflow.personal_ip.content_contracts import ContentWorkAppend, ContentWorkCreate
+from deerflow.personal_ip.content_contracts import (
+    SCRIPT_BOUNDARY_VERIFIER_VERSION,
+    ContentWorkAppend,
+    ContentWorkCreate,
+    DirectionDraft,
+    EditorialProgramDraft,
+    ScriptDraft,
+    direction_decision_digest,
+    editorial_program_decision_digest,
+    editorial_program_decision_payload,
+    script_boundary_verifier_input_digest,
+    script_decision_digest,
+)
 from deerflow.personal_ip.data_lifecycle import (
     DELETE_CONFIRMATION_PHRASE,
     EXPORT_DATASET_NAMES,
@@ -79,7 +97,10 @@ def _resign_backup(backup: dict) -> dict:
         ],
         "data_digest": data_digest,
     }
-    if backup["schema_version"] == "personal-ip-owner-backup-v4":
+    if backup["schema_version"] in {
+        "personal-ip-owner-backup-v4",
+        "personal-ip-owner-backup-v5",
+    }:
         manifest.update(
             {
                 "credential_policy": backup["credential_policy"],
@@ -91,7 +112,8 @@ def _resign_backup(backup: dict) -> dict:
         derived_key = hashlib.sha256(b"personal-ip-owner-backup-signing-v1\0" + BACKUP_SIGNING_KEY.encode("utf-8")).digest()
         backup["verification"]["manifest_digest"] = hmac.new(
             derived_key,
-            b"personal-ip-owner-backup-v4\0"
+            backup["schema_version"].encode("utf-8")
+            + b"\0"
             + json.dumps(
                 manifest,
                 ensure_ascii=False,
@@ -112,9 +134,13 @@ def _dataset(backup: dict, name: str) -> dict:
 def _legacy_backup(current: dict, schema_version: str) -> dict:
     legacy = copy.deepcopy(current)
     legacy["schema_version"] = schema_version
-    legacy["verification"]["algorithm"] = "sha256-canonical-json-v1"
-    legacy["verification"].pop("key_id", None)
-    legacy["datasets"] = [dataset for dataset in legacy["datasets"] if dataset["name"] != "artifacts"]
+    legacy["datasets"] = [dataset for dataset in legacy["datasets"] if dataset["name"] != "editorial_program_versions"]
+    for record in _dataset(legacy, "content_works")["records"]:
+        record.pop("editorial_program_version_id")
+    if schema_version != "personal-ip-owner-backup-v4":
+        legacy["verification"]["algorithm"] = "sha256-canonical-json-v1"
+        legacy["verification"].pop("key_id", None)
+        legacy["datasets"] = [dataset for dataset in legacy["datasets"] if dataset["name"] != "artifacts"]
     if schema_version in {
         "personal-ip-owner-backup-v1",
         "personal-ip-owner-backup-v2",
@@ -264,16 +290,10 @@ async def _seed_owner(sf, owner_user_id: str) -> tuple[dict, dict, PersonalIPPla
         }
     )
     assert content_request.script is not None
-    script_payload = json.dumps(
-        content_request.script.model_dump(mode="json", exclude_none=False),
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
     await PersonalIPContentRepository(sf).create(
         owner_user_id=owner_user_id,
         request=content_request,
-        verified_script_digests=frozenset({hashlib.sha256(script_payload).hexdigest()}),
+        verified_script_digests=frozenset({script_decision_digest(content_request.script)}),
     )
     connections = PersonalIPPlatformConnectionRepository(
         sf,
@@ -302,6 +322,180 @@ async def _seed_owner(sf, owner_user_id: str) -> tuple[dict, dict, PersonalIPPla
         now=NOW,
     )
     return subject, account, connections
+
+
+async def _bind_editorial_program_version(
+    sf,
+    *,
+    owner_user_id: str,
+    subject_id: str | None,
+) -> tuple[str, str]:
+    program_id = f"{owner_user_id}-editorial-program"
+    program_version_id = f"{program_id}-v1"
+    program = EditorialProgramDraft.model_validate(
+        {
+            "title": "生命周期总编导方案",
+            "mission": {
+                "goal_priority": ["recognition"],
+                "time_horizon": "long_term",
+                "deadline_or_window": "未来一个季度",
+                "desired_action": "记住并持续关注这个主体",
+                "success_signal": "后续内容仍能被准确归因",
+                "rationale": "验证不可变总编导方案可完整恢复。",
+            },
+            "audience": {
+                "situation": "需要确认数据完整的 Owner",
+                "state": "user_asserted",
+            },
+            "attribution": {
+                "primary_carrier": {
+                    "kind": "person",
+                    "identity": owner_user_id,
+                },
+                "desired_association": "可信的数据生命周期",
+                "attribution_guard": "不得归因给其他 Owner 或主体",
+                "rationale": "当前内容 Work 明确属于同一主体。",
+            },
+            "differentiation": {
+                "statement": "用可验证恢复证明完整性",
+                "contrast": "区别于仅有导出文件但不能恢复的流程",
+                "basis": [
+                    {
+                        "claim": "测试将执行完整删除与恢复",
+                        "state": "user_asserted",
+                    }
+                ],
+                "reason_to_choose": "恢复结果可核对",
+                "reason_to_believe": "有签名清单与精确引用",
+                "sacrifice": "不恢复平台凭证和 Artifact 二进制",
+                "test_signal": "恢复后方案与 Work 引用完全一致",
+            },
+            "editorial_spine": {
+                "source_concepts": ["数据恢复"],
+                "human_theme": "可靠承诺",
+                "recurring_question": "一个承诺如何经得起实际恢复的检验",
+                "boundary": "不把技术结果写成人物道德结论",
+            },
+        }
+    )
+    decision = editorial_program_decision_payload(program)
+    program_digest = editorial_program_decision_digest(program)
+    async with sf() as session:
+        work = (await session.execute(select(PersonalIPContentWorkRow).where(PersonalIPContentWorkRow.owner_user_id == owner_user_id))).scalars().one()
+        previous_direction = (
+            (await session.execute(select(PersonalIPDirectionVersionRow).where(PersonalIPDirectionVersionRow.content_work_id == work.id).order_by(PersonalIPDirectionVersionRow.version_number.desc()).limit(1))).scalars().one()
+        )
+        previous_script = (await session.execute(select(PersonalIPScriptVersionRow).where(PersonalIPScriptVersionRow.content_work_id == work.id).order_by(PersonalIPScriptVersionRow.version_number.desc()).limit(1))).scalars().one()
+        direction = DirectionDraft.model_validate(
+            {
+                "contract_version": "personal-ip-direction-v2",
+                "premise": "完整性必须通过删除后恢复来证明",
+                "audience_situation": "Owner 需要确认不可变方案仍可恢复",
+                "core_tension": "导出成功不等于恢复正确",
+                "content_promise": "展示精确方案引用的恢复结果",
+                "creative_route": "事实说明",
+                "rationale": "该测试只使用数据库中明确存在的记录。",
+                "truth_mode": "factual",
+                "route_kind": "explanation",
+                "editorial_program_digest": program_digest,
+                "claim_basis": [
+                    {
+                        "claim": "这是一条生命周期测试记录",
+                        "state": "user_asserted",
+                        "usage": "attributed_fact",
+                    }
+                ],
+                "parent_direction_version_id": previous_direction.id,
+            }
+        )
+        direction_json = direction.model_dump(mode="json")
+        direction_id = f"{owner_user_id}-program-direction-v2"
+        session.add(
+            PersonalIPEditorialProgramVersionRow(
+                id=program_version_id,
+                program_id=program_id,
+                owner_user_id=owner_user_id,
+                subject_id=subject_id,
+                version_number=1,
+                operation_key=f"{owner_user_id}:editorial-program:v1",
+                operation_digest=program_digest,
+                parent_program_version_id=None,
+                title=program.title,
+                decision_json=decision,
+                created_by_run_id="lifecycle-test-run",
+                created_at=NOW,
+            )
+        )
+        # The lifecycle mappings intentionally do not declare ORM
+        # relationships, so establish the exact parent before the Work update.
+        await session.flush()
+        work.editorial_program_version_id = program_version_id
+        session.add(
+            PersonalIPDirectionVersionRow(
+                id=direction_id,
+                owner_user_id=owner_user_id,
+                content_work_id=work.id,
+                version_number=previous_direction.version_number + 1,
+                commit_key=f"{owner_user_id}:editorial-program-direction:v2",
+                commit_digest=_canonical_digest(direction_json),
+                parent_direction_version_id=previous_direction.id,
+                breakdown_version_ids_json=[],
+                objective_snapshot_json=work.objective_json,
+                direction_json=direction_json,
+                created_by_run_id="lifecycle-test-run",
+                created_at=NOW,
+            )
+        )
+        work_id = work.id
+        previous_script_id = previous_script.id
+        await session.commit()
+    script_text = "这是一条生命周期测试记录。"
+    boundary_receipt = {
+        "supported": True,
+        "unsupported_spans": [],
+        "reason_codes": [],
+        "semantic_route_supported": True,
+        "semantic_route_digest": None,
+        "verifier_input_sha256": script_boundary_verifier_input_digest(
+            direction,
+            locked_story=None,
+            script_text=script_text,
+        ),
+    }
+    script = ScriptDraft.model_validate(
+        {
+            "title": "可验证的恢复说明",
+            "story_mode": "factual",
+            "script_text": script_text,
+            "claim_basis": [
+                {
+                    "claim": "这是一条生命周期测试记录",
+                    "state": "user_asserted",
+                    "usage": "attributed_fact",
+                }
+            ],
+            "production_notes": {
+                "boundary_verifier_version": SCRIPT_BOUNDARY_VERIFIER_VERSION,
+                "boundary_receipt": boundary_receipt,
+                "boundary_receipt_sha256": _canonical_digest(boundary_receipt),
+                "editorial_program_sha256": program_digest,
+                "direction_decision_sha256": direction_decision_digest(direction),
+            },
+            "direction_version_id": direction_id,
+            "parent_script_version_id": previous_script_id,
+        }
+    )
+    appended = await PersonalIPContentRepository(sf).append(
+        work_id,
+        owner_user_id=owner_user_id,
+        request=ContentWorkAppend(
+            idempotency_key=f"{owner_user_id}:editorial-program-script:v2",
+            script=script,
+        ),
+        verified_script_digests=frozenset({script_decision_digest(script)}),
+    )
+    assert appended is not None
+    return program_version_id, work_id
 
 
 async def _seed_final_artifact(sf, paths: Paths, owner_user_id: str) -> tuple[dict, object]:
@@ -509,13 +703,25 @@ async def test_export_is_complete_owner_scoped_credential_free_and_verified_rest
         backup_signing_key=BACKUP_SIGNING_KEY,
     )
     try:
-        await _seed_owner(sf, "user-1")
+        subject, _, _ = await _seed_owner(sf, "user-1")
+        program_version_id, work_id = await _bind_editorial_program_version(
+            sf,
+            owner_user_id="user-1",
+            subject_id=subject["id"],
+        )
         await _seed_owner(sf, "user-2")
 
         backup = await service.export_backup("user-1", now=NOW)
-        assert backup["schema_version"] == "personal-ip-owner-backup-v4"
+        assert backup["schema_version"] == "personal-ip-owner-backup-v5"
         assert backup["owner_user_id"] == "user-1"
         assert [dataset["name"] for dataset in backup["datasets"]] == list(EXPORT_DATASET_NAMES)
+        assert [dataset["name"] for dataset in backup["datasets"][:3]] == [
+            "subjects",
+            "editorial_program_versions",
+            "content_works",
+        ]
+        assert _dataset(backup, "editorial_program_versions")["records"][0]["id"] == program_version_id
+        assert _dataset(backup, "content_works")["records"][0]["editorial_program_version_id"] == program_version_id
         assert backup["verification"]["data_digest"]
         assert backup["verification"]["manifest_digest"]
 
@@ -573,8 +779,17 @@ async def test_export_is_complete_owner_scoped_credential_free_and_verified_rest
         async with sf() as session:
             connection = (await session.execute(select(PersonalIPPlatformConnectionRow).where(PersonalIPPlatformConnectionRow.owner_user_id == "user-1"))).scalar_one()
             credential_count = (await session.execute(select(func.count()).select_from(PersonalIPPlatformCredentialRow).where(PersonalIPPlatformCredentialRow.connection_id == connection.id))).scalar_one()
+            restored_program = await session.get(
+                PersonalIPEditorialProgramVersionRow,
+                program_version_id,
+            )
+            restored_work = await session.get(PersonalIPContentWorkRow, work_id)
         assert connection.status == "revoked"
         assert credential_count == 0
+        assert restored_program is not None
+        assert restored_program.owner_user_id == "user-1"
+        assert restored_work is not None
+        assert restored_work.editorial_program_version_id == program_version_id
         assert await PersonalIPSubjectRepository(sf).list("user-2")
     finally:
         await close_engine()
@@ -621,22 +836,31 @@ async def test_final_artifact_backup_restore_and_binary_deletion_are_fail_closed
         with pytest.raises(ValueError, match="algorithm"):
             await service.restore_backup("user-1", wrong_algorithm)
 
-        erased_formal_artifact = copy.deepcopy(backup)
-        _dataset(erased_formal_artifact, "artifacts")["records"] = []
-        delivery_event = next(
-            event
-            for event in _dataset(
-                erased_formal_artifact,
-                "video_production_events",
-            )["records"]
-            if event["event_type"] == "delivery_completed"
-        )
-        delivery_event["entity_type"] = "delivery"
-        delivery_event["entity_id"] = "legacy-looking-delivery"
-        delivery_event["event_digest"] = _production_event_digest(delivery_event)
-        _resign_backup(erased_formal_artifact)
-        with pytest.raises(ValueError, match="requires a formal final Artifact"):
-            await service.restore_backup("user-1", erased_formal_artifact)
+        v4_backup = _legacy_backup(backup, "personal-ip-owner-backup-v4")
+        assert v4_backup["artifact_policy"] == backup["artifact_policy"]
+        assert v4_backup["verification"]["algorithm"] == "hmac-sha256-canonical-json-v1"
+        misleading_v4_policy = copy.deepcopy(v4_backup)
+        misleading_v4_policy["artifact_policy"]["binary_files_included"] = True
+        _resign_backup(misleading_v4_policy)
+        with pytest.raises(ValueError, match="Artifact policy"):
+            await service.restore_backup("user-1", misleading_v4_policy)
+        for signed_backup in (backup, v4_backup):
+            erased_formal_artifact = copy.deepcopy(signed_backup)
+            _dataset(erased_formal_artifact, "artifacts")["records"] = []
+            delivery_event = next(
+                event
+                for event in _dataset(
+                    erased_formal_artifact,
+                    "video_production_events",
+                )["records"]
+                if event["event_type"] == "delivery_completed"
+            )
+            delivery_event["entity_type"] = "delivery"
+            delivery_event["entity_id"] = "legacy-looking-delivery"
+            delivery_event["event_digest"] = _production_event_digest(delivery_event)
+            _resign_backup(erased_formal_artifact)
+            with pytest.raises(ValueError, match="requires a formal final Artifact"):
+                await service.restore_backup("user-1", erased_formal_artifact)
 
         resigned_tamper = copy.deepcopy(backup)
         _dataset(resigned_tamper, "artifacts")["records"][0]["sha256"] = "b" * 64
@@ -722,6 +946,7 @@ async def test_final_artifact_backup_restore_and_binary_deletion_are_fail_closed
         ("personal-ip-owner-backup-v1", False, False),
         ("personal-ip-owner-backup-v2", True, False),
         ("personal-ip-owner-backup-v3", True, True),
+        ("personal-ip-owner-backup-v4", True, True),
     ],
 )
 @pytest.mark.asyncio
@@ -800,7 +1025,38 @@ async def test_restore_accepts_verified_legacy_backup_shapes(
         )
         current = await service.export_backup("user-1", now=NOW)
         legacy = _legacy_backup(current, schema_version)
-        if restores_links:
+        if schema_version == "personal-ip-owner-backup-v4":
+            assert legacy["verification"]["algorithm"] == "hmac-sha256-canonical-json-v1"
+            assert legacy["verification"]["key_id"]
+            wrong_key_service = PersonalIPDataLifecycleService(
+                sf,
+                minecontext=_FakeMineContext(),
+                backup_signing_key="wrong-personal-ip-backup-signing-key-v1",
+            )
+            with pytest.raises(ValueError, match="signing key"):
+                await wrong_key_service.restore_backup("user-1", legacy)
+
+            unsigned_v4 = copy.deepcopy(legacy)
+            unsigned_v4["verification"]["algorithm"] = "sha256-canonical-json-v1"
+            unsigned_v4["verification"].pop("key_id")
+            unsigned_manifest = {
+                "schema_version": unsigned_v4["schema_version"],
+                "owner_user_id": unsigned_v4["owner_user_id"],
+                "exported_at": unsigned_v4["exported_at"],
+                "dataset_digests": [
+                    {
+                        "name": dataset["name"],
+                        "count": dataset["count"],
+                        "digest": dataset["digest"],
+                    }
+                    for dataset in unsigned_v4["datasets"]
+                ],
+                "data_digest": unsigned_v4["verification"]["data_digest"],
+            }
+            unsigned_v4["verification"]["manifest_digest"] = _canonical_digest(unsigned_manifest)
+            with pytest.raises(ValueError, match="verification algorithm"):
+                await service.restore_backup("user-1", unsigned_v4)
+        if restores_links and schema_version != "personal-ip-owner-backup-v4":
             legacy_production = _dataset(legacy, "video_productions")["records"][0]
             legacy_production["status"] = "completed"
             legacy_production["current_stage"] = "delivery"
@@ -837,6 +1093,8 @@ async def test_restore_accepts_verified_legacy_backup_shapes(
             include_archived=True,
         )
         assert bool(content_works) is restores_content
+        if content_works:
+            assert content_works[0]["editorial_program_version_id"] is None
         productions = await PersonalIPVideoProductionRepository(sf).list("user-1")
         assert len(productions) == 1
         assert (productions[0]["content_work_id"] is not None) is restores_links
@@ -848,7 +1106,7 @@ async def test_restore_accepts_verified_legacy_backup_shapes(
         assert restored_production is not None
         assert len(restored_production["events"]) == 1
         assert restored_production["final_artifact"] is None
-        if restores_links:
+        if restores_links and schema_version != "personal-ip-owner-backup-v4":
             assert restored_production["status"] == "completed"
     finally:
         await close_engine()
@@ -867,8 +1125,13 @@ async def test_restore_rejects_resigned_cross_owner_and_corrupt_content_graphs(
         backup_signing_key=BACKUP_SIGNING_KEY,
     )
     try:
-        await _seed_owner(sf, "user-1")
-        await _seed_owner(sf, "user-2")
+        owner_subject, _, _ = await _seed_owner(sf, "user-1")
+        foreign_subject, _, _ = await _seed_owner(sf, "user-2")
+        program_version_id, _ = await _bind_editorial_program_version(
+            sf,
+            owner_user_id="user-1",
+            subject_id=owner_subject["id"],
+        )
         content = PersonalIPContentRepository(sf)
         owner_work = (await content.list("user-1"))[0]
         await content.append(
@@ -914,6 +1177,233 @@ async def test_restore_rejects_resigned_cross_owner_and_corrupt_content_graphs(
         )
         backup = await service.export_backup("user-1", now=NOW)
         foreign_work_id = (await PersonalIPContentRepository(sf).list("user-2"))[0]["id"]
+
+        bad_program_owner = copy.deepcopy(backup)
+        _dataset(bad_program_owner, "editorial_program_versions")["records"][0]["owner_user_id"] = "user-2"
+        _resign_backup(bad_program_owner)
+        with pytest.raises(ValueError, match="different owner"):
+            await service.restore_backup("user-1", bad_program_owner)
+
+        bad_program_id = copy.deepcopy(backup)
+        _dataset(bad_program_id, "editorial_program_versions")["records"][0]["program_id"] = ""
+        _resign_backup(bad_program_id)
+        with pytest.raises(ValueError, match="program_id is invalid"):
+            await service.restore_backup("user-1", bad_program_id)
+
+        bad_program_version = copy.deepcopy(backup)
+        _dataset(bad_program_version, "editorial_program_versions")["records"][0]["version_number"] = 0
+        _resign_backup(bad_program_version)
+        with pytest.raises(ValueError, match="version number is invalid"):
+            await service.restore_backup("user-1", bad_program_version)
+
+        bad_program_decision = copy.deepcopy(backup)
+        _dataset(bad_program_decision, "editorial_program_versions")["records"][0]["decision_json"]["mission"]["goal_priority"] = ["unknown-goal"]
+        _resign_backup(bad_program_decision)
+        with pytest.raises(ValueError, match="decision contract is invalid"):
+            await service.restore_backup("user-1", bad_program_decision)
+
+        noncanonical_program_decision = copy.deepcopy(backup)
+        _dataset(
+            noncanonical_program_decision,
+            "editorial_program_versions",
+        )["records"][0]["decision_json"]["mission"].pop("cost_of_delay")
+        _resign_backup(noncanonical_program_decision)
+        with pytest.raises(ValueError, match="decision is not canonical"):
+            await service.restore_backup("user-1", noncanonical_program_decision)
+
+        bad_program_digest = copy.deepcopy(backup)
+        _dataset(bad_program_digest, "editorial_program_versions")["records"][0]["operation_digest"] = "a" * 64
+        _resign_backup(bad_program_digest)
+        with pytest.raises(ValueError, match="operation digest does not match"):
+            await service.restore_backup("user-1", bad_program_digest)
+
+        bad_program_parent = copy.deepcopy(backup)
+        _dataset(bad_program_parent, "editorial_program_versions")["records"][0]["parent_program_version_id"] = "missing-program-version"
+        _resign_backup(bad_program_parent)
+        with pytest.raises(ValueError, match="parent is invalid"):
+            await service.restore_backup("user-1", bad_program_parent)
+
+        bad_program_subject = copy.deepcopy(backup)
+        _dataset(bad_program_subject, "editorial_program_versions")["records"][0]["subject_id"] = foreign_subject["id"]
+        _resign_backup(bad_program_subject)
+        with pytest.raises(ValueError, match="subject does not belong"):
+            await service.restore_backup("user-1", bad_program_subject)
+
+        mismatched_program_subject = copy.deepcopy(backup)
+        _dataset(
+            mismatched_program_subject,
+            "editorial_program_versions",
+        )["records"][0]["subject_id"] = None
+        _resign_backup(mismatched_program_subject)
+        with pytest.raises(ValueError, match="exact same-subject"):
+            await service.restore_backup("user-1", mismatched_program_subject)
+
+        bad_program_ref = copy.deepcopy(backup)
+        _dataset(bad_program_ref, "content_works")["records"][0]["editorial_program_version_id"] = f"{program_version_id}-missing"
+        _resign_backup(bad_program_ref)
+        with pytest.raises(ValueError, match="exact same-subject"):
+            await service.restore_backup("user-1", bad_program_ref)
+
+        bad_direction_program_digest = copy.deepcopy(backup)
+        v2_direction = next(
+            direction
+            for direction in _dataset(
+                bad_direction_program_digest,
+                "direction_versions",
+            )["records"]
+            if direction["direction_json"]["contract_version"] == "personal-ip-direction-v2"
+        )
+        v2_direction["direction_json"]["editorial_program_digest"] = "b" * 64
+        _resign_backup(bad_direction_program_digest)
+        with pytest.raises(ValueError, match="exact EditorialProgramVersion decision digest"):
+            await service.restore_backup("user-1", bad_direction_program_digest)
+
+        bad_direction_program_route = copy.deepcopy(backup)
+        bad_route_direction = next(
+            direction
+            for direction in _dataset(
+                bad_direction_program_route,
+                "direction_versions",
+            )["records"]
+            if direction["direction_json"]["contract_version"] == "personal-ip-direction-v2"
+        )
+        bad_route_direction["direction_json"].update(
+            {
+                "truth_mode": "fictional",
+                "route_kind": "semantic_story",
+                "semantic_route": {
+                    "association_path": ["无关起点", "可靠承诺"],
+                    "human_theme": "可靠承诺",
+                    "causal_pattern": "逃避一次承诺会让关系失去信任",
+                    "episode_tension": "眼前轻松与长期信任不能兼得",
+                    "mission_bridge": "让观众理解可靠承诺",
+                    "attribution_guard": "虚构事件不登记为 Owner 经历",
+                },
+            }
+        )
+        _resign_backup(bad_direction_program_route)
+        with pytest.raises(
+            ValueError,
+            match="does not preserve its EditorialProgramVersion semantic route",
+        ):
+            await service.restore_backup("user-1", bad_direction_program_route)
+
+        noncanonical_v2_direction = copy.deepcopy(backup)
+        padded_v2_direction = next(
+            direction
+            for direction in _dataset(
+                noncanonical_v2_direction,
+                "direction_versions",
+            )["records"]
+            if direction["direction_json"]["contract_version"] == "personal-ip-direction-v2"
+        )
+        padded_v2_direction["direction_json"]["premise"] = f"{padded_v2_direction['direction_json']['premise']} "
+        _resign_backup(noncanonical_v2_direction)
+        with pytest.raises(ValueError, match="v2 DirectionVersion decision is not canonical"):
+            await service.restore_backup("user-1", noncanonical_v2_direction)
+
+        broken_script_direction_receipt = copy.deepcopy(backup)
+        v2_direction_id = next(
+            direction["id"]
+            for direction in _dataset(
+                broken_script_direction_receipt,
+                "direction_versions",
+            )["records"]
+            if direction["direction_json"]["contract_version"] == "personal-ip-direction-v2"
+        )
+        v2_script = next(
+            script
+            for script in _dataset(
+                broken_script_direction_receipt,
+                "script_versions",
+            )["records"]
+            if script["direction_version_id"] == v2_direction_id
+        )
+        v2_script["production_notes_json"]["direction_decision_sha256"] = "c" * 64
+        _resign_backup(broken_script_direction_receipt)
+        with pytest.raises(ValueError, match="does not preserve its Direction receipts"):
+            await service.restore_backup("user-1", broken_script_direction_receipt)
+
+        noncanonical_boundary_receipt = copy.deepcopy(backup)
+        noncanonical_receipt_script = next(
+            script
+            for script in _dataset(
+                noncanonical_boundary_receipt,
+                "script_versions",
+            )["records"]
+            if script["direction_version_id"] == v2_direction_id
+        )
+        receipt_notes = noncanonical_receipt_script["production_notes_json"]
+        canonical_receipt = copy.deepcopy(receipt_notes["boundary_receipt"])
+        receipt_notes["boundary_receipt"].pop("reason_codes")
+        receipt_notes["boundary_receipt_sha256"] = _canonical_digest(canonical_receipt)
+        _resign_backup(noncanonical_boundary_receipt)
+        with pytest.raises(ValueError, match="does not preserve its Direction receipts"):
+            await service.restore_backup("user-1", noncanonical_boundary_receipt)
+
+        replaced_script_after_verification = copy.deepcopy(backup)
+        replaced_v2_script = next(
+            script
+            for script in _dataset(
+                replaced_script_after_verification,
+                "script_versions",
+            )["records"]
+            if script["direction_version_id"] == v2_direction_id
+        )
+        replaced_v2_script["script_text"] = "这是验证后被完全替换的未核验断言。"
+        _resign_backup(replaced_script_after_verification)
+        with pytest.raises(ValueError, match="does not preserve its Direction receipts"):
+            await service.restore_backup("user-1", replaced_script_after_verification)
+
+        noncanonical_v2_script = copy.deepcopy(backup)
+        padded_v2_script = next(
+            script
+            for script in _dataset(
+                noncanonical_v2_script,
+                "script_versions",
+            )["records"]
+            if script["direction_version_id"] == v2_direction_id
+        )
+        padded_v2_script["script_text"] = f"{padded_v2_script['script_text']} "
+        _resign_backup(noncanonical_v2_script)
+        with pytest.raises(ValueError, match="v2 ScriptVersion contract is not canonical"):
+            await service.restore_backup("user-1", noncanonical_v2_script)
+
+        unbound_v2_direction = copy.deepcopy(backup)
+        _dataset(unbound_v2_direction, "content_works")["records"][0]["editorial_program_version_id"] = None
+        _resign_backup(unbound_v2_direction)
+        with pytest.raises(ValueError, match="v2 DirectionVersion requires an exact"):
+            await service.restore_backup("user-1", unbound_v2_direction)
+
+        missing_v2_direction = copy.deepcopy(backup)
+        direction_dataset = _dataset(missing_v2_direction, "direction_versions")
+        direction_dataset["records"] = [direction for direction in direction_dataset["records"] if direction["direction_json"]["contract_version"] != "personal-ip-direction-v2"]
+        _resign_backup(missing_v2_direction)
+        with pytest.raises(ValueError, match="requires at least one v2"):
+            await service.restore_backup("user-1", missing_v2_direction)
+
+        reverted_v1_direction = copy.deepcopy(backup)
+        direction_records = _dataset(
+            reverted_v1_direction,
+            "direction_versions",
+        )["records"]
+        original_v1 = next(direction for direction in direction_records if direction["direction_json"]["contract_version"] == "personal-ip-direction-v1")
+        original_v2 = next(direction for direction in direction_records if direction["direction_json"]["contract_version"] == "personal-ip-direction-v2")
+        later_v1 = copy.deepcopy(original_v1)
+        later_v1.update(
+            {
+                "id": "reverted-v1-direction",
+                "version_number": 3,
+                "commit_key": "user-1:reverted-v1-direction",
+                "parent_direction_version_id": original_v2["id"],
+            }
+        )
+        later_v1["direction_json"]["parent_direction_version_id"] = original_v2["id"]
+        later_v1["commit_digest"] = _canonical_digest(later_v1["direction_json"])
+        direction_records.append(later_v1)
+        _resign_backup(reverted_v1_direction)
+        with pytest.raises(ValueError, match="cannot return to a v1"):
+            await service.restore_backup("user-1", reverted_v1_direction)
 
         cross_owner = copy.deepcopy(backup)
         _dataset(cross_owner, "direction_versions")["records"][0]["content_work_id"] = foreign_work_id
@@ -1103,7 +1593,7 @@ async def test_gateway_sqlite_final_artifact_backup_delete_restore_and_reattach_
 
             backup = exported.json()
             assert exported.status_code == 200
-            assert backup["schema_version"] == "personal-ip-owner-backup-v4"
+            assert backup["schema_version"] == "personal-ip-owner-backup-v5"
             assert backup["verification"]["algorithm"] == ("hmac-sha256-canonical-json-v1")
             assert backup["verification"]["key_id"]
             assert backup["artifact_policy"]["binary_files_included"] is False

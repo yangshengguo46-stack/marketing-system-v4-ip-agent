@@ -48,7 +48,7 @@ from deerflow.persistence.migrations._helpers import _normalize_default
 asyncio_test = pytest.mark.asyncio
 
 
-HEAD = "0029_personal_ip_final_artifacts"
+HEAD = "0030_personal_ip_editorial_program_versions"
 BASELINE = "0001_baseline"
 
 
@@ -867,7 +867,7 @@ class TestDecideState:
 # ---------------------------------------------------------------------------
 
 
-def test_head_revision_is_semantic_layer_retirement() -> None:
+def test_head_revision_is_editorial_program_versions() -> None:
     assert _get_head_revision() == HEAD
 
 

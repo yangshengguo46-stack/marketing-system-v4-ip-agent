@@ -44,15 +44,26 @@ def _bind_external_breakdown(
 async def _ip_content_write(runtime: Runtime, request: WriterBrainRequest) -> str:
     """Generate and save one complete, versioned content script.
 
-    Use this after the Owner and you have chosen a direction. For a new work,
-    provide entry_route and objective. A benchmark entry also requires a
-    source-bound breakdown. Factual and hybrid directions require explicit
-    claim_basis entries; fictional and hybrid directions require an abstract
-    Chinese-only story_engine_seed that contains an industry-neutral human conflict: no
-    Owner identity, profession, shop type, product, marketing, platform or
-    production facts. The tool locks fiction before applying production
-    translation and stores Work, BreakdownVersion, DirectionVersion and
-    ScriptVersion together.
+    Use this after the Owner and you have chosen a total-editor decision and a
+    work direction. For a new program, provide editorial_program with an
+    ordered conversion/recognition/trust mission, time horizon, explicit
+    person/product/brand/organization attribution, one still-hypothesized
+    difference and an optional continuing editorial spine. To continue an
+    existing program across another work, provide its exact immutable
+    editorial_program_version_id. Mission and attribution are independent.
+
+    Choose route_kind separately. offer, proof, demonstration and explanation
+    are factual and skip the semantic engine. semantic_story uses fictional
+    truth; hybrid uses hybrid truth; both require semantic_route and a Chinese-only
+    story_engine_seed whose causal_pattern exactly matches that route. The seed
+    contains only an industry-neutral human conflict: no Owner identity,
+    profession, shop type, product, marketing, platform or production facts.
+    The server binds program, route, direction and script digests, locks fiction
+    before production translation, and stores the complete lineage together.
+
+    For a new work, also provide entry_route and objective. A benchmark entry
+    requires a source-bound breakdown. Factual and hybrid directions require
+    explicit claim_basis entries.
 
     For an external breakdown, copy metadata.request_id from the exact Evidence
     MCP result and use item index 0 for its first item. Every observation ref

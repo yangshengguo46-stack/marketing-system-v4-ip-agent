@@ -10,7 +10,7 @@ export type ContentTruthMode = "factual" | "fictional" | "hybrid";
 
 const CONTENT_ENTRY_PROMPTS: Record<ContentEntryRoute, string> = {
   zero_start:
-    "我要从零起盘一条原创内容。请先和我确认希望促成的变化、受众处境、业务背景和约束；事实、推断与创作假设要分开，方向确认后再保存完整剧本版本。",
+    "我要从零起盘一条原创内容。请先判断当前更急的是促成成交、建立认知还是积累信任，以及对应的时间窗口；再决定这次内容应主要归因于个人、产品、品牌还是组织。信息足够时请直接推荐一个方向，不要把交流做成问卷；只追问真正影响判断的缺口。事实、推断与创作假设要分开，方向确认后再保存完整剧本版本。",
   benchmark:
     "我要从一个明确的对标作品开始做原创内容。请先让我提供精确作品链接或上传文件，完成来源绑定的拆解；将可观测事实、解读和创作假设分开，再由我确认方向并保存完整剧本版本。",
 };
@@ -61,9 +61,88 @@ export type ContentObjective = {
   constraints: string[];
 };
 
+export type EditorialGoalPriority = "conversion" | "recognition" | "trust";
+export type EditorialTimeHorizon = "urgent" | "near_term" | "long_term";
+export type EditorialCarrierKind =
+  | "person"
+  | "product"
+  | "brand"
+  | "organization";
+export type EditorialRouteKind =
+  | "offer"
+  | "proof"
+  | "demonstration"
+  | "explanation"
+  | "semantic_story"
+  | "hybrid";
+
+export type EditorialProgramDecision = {
+  contract_version: "personal-ip-editorial-program-v1";
+  mission: {
+    goal_priority: EditorialGoalPriority[];
+    time_horizon: EditorialTimeHorizon;
+    deadline_or_window: string;
+    desired_action: string;
+    success_signal: string;
+    cost_of_delay: string;
+    non_goals: string[];
+    rationale: string;
+  };
+  audience: {
+    situation: string;
+    state: "user_asserted" | "hypothesized" | "unknown";
+    uncertainties: string[];
+  };
+  attribution: {
+    primary_carrier: {
+      kind: EditorialCarrierKind;
+      identity: string;
+    };
+    supporting_carriers: Array<{
+      kind: EditorialCarrierKind;
+      identity: string;
+    }>;
+    desired_association: string;
+    attribution_guard: string;
+    rationale: string;
+  };
+  differentiation: {
+    statement: string;
+    contrast: string;
+    basis: Array<{
+      claim: string;
+      state: "user_asserted" | "derived" | "hypothesized";
+    }>;
+    reason_to_choose: string;
+    reason_to_believe: string;
+    sacrifice: string;
+    test_signal: string;
+    uncertainties: string[];
+    state: "hypothesized";
+  };
+  editorial_spine?: {
+    source_concepts: string[];
+    human_theme: string;
+    recurring_question: string;
+    boundary: string;
+  } | null;
+};
+
+export type EditorialProgramVersion = {
+  id: string;
+  program_id: string;
+  subject_id: string | null;
+  version_number: number;
+  parent_program_version_id: string | null;
+  title: string;
+  decision: EditorialProgramDecision;
+  created_at: string;
+};
+
 export type PersonalIPContentWork = {
   id: string;
   objective_id: string;
+  editorial_program_version_id?: string | null;
   thread_id: string | null;
   subject_id?: string | null;
   title: string;
@@ -106,7 +185,20 @@ export type ClaimBasis = {
   evidence_refs: string[];
 };
 
+export type SemanticCausalRoute = {
+  association_path: string[];
+  human_theme: string;
+  causal_pattern: string;
+  episode_tension: string;
+  mission_bridge: string;
+  attribution_guard: string;
+};
+
 export type DirectionSnapshot = {
+  contract_version?: "personal-ip-direction-v1" | "personal-ip-direction-v2";
+  route_kind?: EditorialRouteKind | null;
+  semantic_route?: SemanticCausalRoute | null;
+  editorial_program_digest?: string | null;
   premise: string;
   audience_situation: string;
   core_tension: string;
@@ -152,10 +244,175 @@ export type PersonalIPScriptVersion = {
 
 export type PersonalIPContentLineage = {
   content_work: PersonalIPContentWork;
+  editorial_program_version?: EditorialProgramVersion | null;
   breakdown_versions: PersonalIPBreakdownVersion[];
   direction_versions: PersonalIPDirectionVersion[];
   script_versions: PersonalIPScriptVersion[];
 };
+
+export type EditorialProgramProjection = {
+  mission: {
+    currentTask: string;
+    priorityResult: string;
+    timeWindow: string;
+    successSignal: string;
+    nonGoals: string[];
+  };
+  audience: {
+    situation: string;
+    state: "用户明确" | "待验证" | "未知";
+    uncertainties: string[];
+  };
+  attribution: {
+    carrierKind: string;
+    identity: string;
+    desiredAssociation: string;
+  };
+  differentiation: {
+    statement: string;
+    contrast: string;
+    reasonToChoose: string;
+    reasonToBelieve: string;
+    sacrifice: string;
+    testSignal: string;
+    state: "待验证";
+  };
+  contentRoute: {
+    kind: string;
+    description: string;
+  };
+  editorialSpine?: {
+    humanTheme: string;
+    recurringQuestion: string;
+  };
+};
+
+const EDITORIAL_GOAL_PRIORITY_LABELS: Record<EditorialGoalPriority, string> = {
+  conversion: "成交",
+  recognition: "认知",
+  trust: "信任",
+};
+
+const EDITORIAL_TIME_HORIZON_LABELS: Record<EditorialTimeHorizon, string> = {
+  urgent: "紧急窗口",
+  near_term: "近期",
+  long_term: "长期",
+};
+
+const EDITORIAL_CARRIER_KIND_LABELS: Record<EditorialCarrierKind, string> = {
+  person: "个人",
+  product: "产品",
+  brand: "品牌",
+  organization: "组织",
+};
+
+const EDITORIAL_AUDIENCE_STATE_LABELS: Record<
+  EditorialProgramDecision["audience"]["state"],
+  EditorialProgramProjection["audience"]["state"]
+> = {
+  user_asserted: "用户明确",
+  hypothesized: "待验证",
+  unknown: "未知",
+};
+
+const EDITORIAL_ROUTE_KIND_LABELS: Record<EditorialRouteKind, string> = {
+  offer: "直接提案",
+  proof: "证据建立",
+  demonstration: "现场示范",
+  explanation: "解释说明",
+  semantic_story: "意义故事",
+  hybrid: "混合路线",
+};
+
+function projectionText(value: string | null | undefined, fallback: string) {
+  const trimmed = value?.trim();
+  if (trimmed?.length) return trimmed;
+  return fallback;
+}
+
+export function projectPersonalIPEditorialProgram(
+  program: EditorialProgramVersion | null | undefined,
+  direction: DirectionSnapshot | null | undefined,
+): EditorialProgramProjection | undefined {
+  if (!program) return undefined;
+
+  const {
+    mission,
+    audience,
+    attribution,
+    differentiation,
+    editorial_spine: spine,
+  } = program.decision;
+  const timeWindow = projectionText(
+    mission.deadline_or_window,
+    EDITORIAL_TIME_HORIZON_LABELS[mission.time_horizon] ?? "待确认",
+  );
+  const contentRoute = projectionText(direction?.creative_route, "待方向确认");
+  const hasEditorialSpine = [
+    spine?.human_theme,
+    spine?.recurring_question,
+  ].some((item) => Boolean(item?.trim()));
+  const editorialSpine =
+    hasEditorialSpine && spine
+      ? {
+          humanTheme: projectionText(spine.human_theme, "未记录"),
+          recurringQuestion: projectionText(spine.recurring_question, "未记录"),
+        }
+      : undefined;
+
+  return {
+    mission: {
+      currentTask: projectionText(mission.desired_action, "待确认"),
+      priorityResult: mission.goal_priority
+        .map((goal) => EDITORIAL_GOAL_PRIORITY_LABELS[goal] ?? "待确认")
+        .join(" → "),
+      timeWindow,
+      successSignal: projectionText(mission.success_signal, "待确认"),
+      nonGoals: mission.non_goals
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0),
+    },
+    audience: {
+      situation: projectionText(audience.situation, "未知"),
+      state: EDITORIAL_AUDIENCE_STATE_LABELS[audience.state] ?? "未知",
+      uncertainties: audience.uncertainties
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0),
+    },
+    attribution: {
+      carrierKind:
+        EDITORIAL_CARRIER_KIND_LABELS[attribution.primary_carrier.kind] ??
+        "待确认",
+      identity: projectionText(attribution.primary_carrier.identity, "待确认"),
+      desiredAssociation: projectionText(
+        attribution.desired_association,
+        "待确认",
+      ),
+    },
+    differentiation: {
+      statement: projectionText(differentiation.statement, "待确认"),
+      contrast: projectionText(differentiation.contrast, "待确认"),
+      reasonToChoose: projectionText(
+        differentiation.reason_to_choose,
+        "待确认",
+      ),
+      reasonToBelieve: projectionText(
+        differentiation.reason_to_believe,
+        "待确认",
+      ),
+      sacrifice: projectionText(differentiation.sacrifice, "待确认"),
+      testSignal: projectionText(differentiation.test_signal, "待确认"),
+      state: "待验证",
+    },
+    contentRoute: {
+      kind: direction?.route_kind
+        ? (EDITORIAL_ROUTE_KIND_LABELS[direction.route_kind] ?? "待确认")
+        : "待确认",
+      description: contentRoute,
+    },
+    ...(editorialSpine ? { editorialSpine } : {}),
+  };
+}
 
 export const PERSONAL_IP_CONTENT_WORKS_QUERY_KEY = [
   "personal-ip",

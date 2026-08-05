@@ -14,6 +14,57 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+class PersonalIPEditorialProgramVersionRow(Base):
+    """One immutable total-editor decision that may govern many works."""
+
+    __tablename__ = "personal_ip_editorial_program_versions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    program_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    owner_user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    subject_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey(
+            "personal_ip_subjects.id",
+            ondelete="SET NULL",
+            name="fk_personal_ip_editorial_program_versions_subject",
+        ),
+        nullable=True,
+        index=True,
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    operation_key: Mapped[str] = mapped_column(String(256), nullable=False)
+    operation_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    parent_program_version_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    title: Mapped[str] = mapped_column(String(1_000), nullable=False)
+    decision_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_by_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=_utc_now,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "program_id",
+            "version_number",
+            name="uq_personal_ip_editorial_program_versions_program_version",
+        ),
+        UniqueConstraint(
+            "owner_user_id",
+            "operation_key",
+            name="uq_personal_ip_editorial_program_versions_owner_operation",
+        ),
+        Index(
+            "ix_personal_ip_editorial_program_versions_owner_program_version",
+            "owner_user_id",
+            "program_id",
+            "version_number",
+        ),
+    )
+
+
 class PersonalIPContentWorkRow(Base):
     """Stable identity for one original piece of content."""
 
@@ -26,6 +77,16 @@ class PersonalIPContentWorkRow(Base):
     subject_id: Mapped[str | None] = mapped_column(
         String(64),
         ForeignKey("personal_ip_subjects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    editorial_program_version_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey(
+            "personal_ip_editorial_program_versions.id",
+            ondelete="RESTRICT",
+            name="fk_personal_ip_content_works_editorial_program_version",
+        ),
         nullable=True,
         index=True,
     )
@@ -249,5 +310,6 @@ __all__ = [
     "PersonalIPBreakdownVersionRow",
     "PersonalIPContentWorkRow",
     "PersonalIPDirectionVersionRow",
+    "PersonalIPEditorialProgramVersionRow",
     "PersonalIPScriptVersionRow",
 ]

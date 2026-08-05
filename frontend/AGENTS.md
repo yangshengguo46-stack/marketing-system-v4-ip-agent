@@ -38,6 +38,26 @@ Personal-IP customer surfaces retain:
 - `/workspace/dashboard` for factual Owner-wide observations;
 - Settings for MineContext consent and data lifecycle.
 
+The content workspace remains exactly those three boards; do not add a strategy,
+semantic-core or operations board. Writer Brain presents the one
+total-editor/operations decision: current outcome priority, time horizon,
+audience hypothesis and uncertainty, attribution carrier, hypothesized
+differentiation and chosen content route. It may show an optional recurring human theme only when the bound Editorial
+Program contains one. The semantic-causal core is an internal bounded helper
+for `semantic_story`/`hybrid`, not a peer Agent or customer workflow.
+
+Frontend lineage types and projections must preserve this order:
+
+```text
+EditorialProgramVersion -> ContentWork -> DirectionVersion -> ScriptVersion -> VideoProduction
+```
+
+They must remain readable for historical v1 Directions that have no Program
+binding. Do not render internal Owner ids, operation keys, run ids or
+decision/route digests. Outcome, time horizon, carrier and route are independent
+values; do not infer one from another. Differentiation always renders as a
+hypothesis, never as validated positioning or market proof.
+
 The task-bound video workbench is a retained implementation projection over the
 immutable production ledger. It is customer-reachable only when the product
 runtime profile explicitly enables it; the default profile currently keeps that

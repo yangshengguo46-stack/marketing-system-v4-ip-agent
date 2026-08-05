@@ -17,10 +17,22 @@ from deerflow.persistence.personal_ip_content.model import (
     PersonalIPBreakdownVersionRow,
     PersonalIPContentWorkRow,
     PersonalIPDirectionVersionRow,
+    PersonalIPEditorialProgramVersionRow,
     PersonalIPScriptVersionRow,
 )
 from deerflow.persistence.personal_ip_subjects.model import PersonalIPSubjectRow
-from deerflow.personal_ip.content_contracts import ContentWorkAppend, ContentWorkCreate
+from deerflow.personal_ip.content_contracts import (
+    ContentWorkAppend,
+    ContentWorkCreate,
+    DirectionDraft,
+    EditorialProgramDraft,
+    direction_decision_digest,
+    editorial_program_decision_digest,
+    editorial_program_decision_payload,
+    script_decision_digest,
+    validate_direction_program_binding,
+    validate_script_direction_binding,
+)
 from deerflow.personal_ip.evidence_binding import reference_evidence_refs
 from deerflow.utils.time import coerce_iso
 
@@ -50,6 +62,18 @@ class PersonalIPContentRepository:
         self._sf = session_factory
 
     @staticmethod
+    async def _lock_owner_lifecycle(
+        session: AsyncSession,
+        owner_user_id: str,
+    ) -> None:
+        """Serialize content mutations with Owner export/restore/delete."""
+        if session.get_bind().dialect.name == "postgresql":
+            await session.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
+                {"lock_key": f"personal-ip-data-lifecycle:{owner_user_id}"},
+            )
+
+    @staticmethod
     def _iso_dict(row: Any) -> dict[str, Any]:
         data = row.to_dict()
         for key, value in data.items():
@@ -63,6 +87,34 @@ class PersonalIPContentRepository:
         data["objective"] = data.pop("objective_json")
         data.pop("operation_digest", None)
         return data
+
+    @classmethod
+    def _editorial_program_dict(
+        cls,
+        row: PersonalIPEditorialProgramVersionRow,
+    ) -> dict[str, Any]:
+        data = cls._iso_dict(row)
+        data["decision"] = data.pop("decision_json")
+        for internal_field in (
+            "owner_user_id",
+            "operation_key",
+            "operation_digest",
+            "created_by_run_id",
+        ):
+            data.pop(internal_field, None)
+        return data
+
+    @staticmethod
+    def _editorial_program_model(
+        row: PersonalIPEditorialProgramVersionRow,
+    ) -> EditorialProgramDraft:
+        return EditorialProgramDraft.model_validate(
+            {
+                **dict(row.decision_json),
+                "title": row.title,
+                "parent_program_version_id": row.parent_program_version_id,
+            }
+        )
 
     @classmethod
     def _breakdown_dict(cls, row: PersonalIPBreakdownVersionRow) -> dict[str, Any]:
@@ -105,6 +157,195 @@ class PersonalIPContentRepository:
         subject = await session.get(PersonalIPSubjectRow, subject_id)
         if subject is None or subject.owner_user_id != owner_user_id:
             raise ValueError("Personal-IP subject not found")
+
+    @staticmethod
+    async def _owned_editorial_program_version(
+        session: AsyncSession,
+        program_version_id: str,
+        owner_user_id: str,
+    ) -> PersonalIPEditorialProgramVersionRow:
+        statement = select(PersonalIPEditorialProgramVersionRow).where(
+            PersonalIPEditorialProgramVersionRow.id == program_version_id,
+            PersonalIPEditorialProgramVersionRow.owner_user_id == owner_user_id,
+        )
+        row = (await session.execute(statement)).scalar_one_or_none()
+        if row is None:
+            raise ValueError("EditorialProgramVersion not found")
+        return row
+
+    @staticmethod
+    async def _next_editorial_program_version(
+        session: AsyncSession,
+        program_id: str,
+    ) -> int:
+        current = (await session.execute(select(func.max(PersonalIPEditorialProgramVersionRow.version_number)).where(PersonalIPEditorialProgramVersionRow.program_id == program_id))).scalar_one()
+        return int(current or 0) + 1
+
+    async def _create_editorial_program_version(
+        self,
+        session: AsyncSession,
+        *,
+        work: PersonalIPContentWorkRow,
+        owner_user_id: str,
+        program: EditorialProgramDraft,
+        operation_key: str,
+        created_by_run_id: str | None,
+        verified_program_digests: frozenset[str],
+    ) -> PersonalIPEditorialProgramVersionRow:
+        program_digest = editorial_program_decision_digest(program)
+        if program_digest not in verified_program_digests:
+            raise ValueError("EditorialProgramVersion requires a verified writer-brain decision receipt")
+
+        existing_operation = (
+            await session.execute(
+                select(PersonalIPEditorialProgramVersionRow).where(
+                    PersonalIPEditorialProgramVersionRow.owner_user_id == owner_user_id,
+                    PersonalIPEditorialProgramVersionRow.operation_key == operation_key,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing_operation is not None:
+            if existing_operation.operation_digest != program_digest:
+                raise ValueError("idempotency_key already records a different EditorialProgramVersion")
+            raise RuntimeError("EditorialProgramVersion commit is partially present; manual integrity review is required")
+
+        parent_id = program.parent_program_version_id
+        if parent_id is None:
+            program_id = _id("editorial-program")
+            version_number = 1
+        else:
+            parent = await self._owned_editorial_program_version(
+                session,
+                parent_id,
+                owner_user_id,
+            )
+            if parent.subject_id != work.subject_id:
+                raise ValueError("EditorialProgramVersion parent subject does not match the content work")
+            program_id = parent.program_id
+            # Every child locks the same version-one anchor before allocating
+            # the next number. Locking arbitrary parents could deadlock when
+            # concurrent revisions branch from different prior versions.
+            # SQLite already owns a writer lock after the Work insert/update.
+            if session.get_bind().dialect.name != "sqlite":
+                anchor_id = (
+                    await session.execute(
+                        select(PersonalIPEditorialProgramVersionRow.id)
+                        .where(
+                            PersonalIPEditorialProgramVersionRow.program_id == program_id,
+                            PersonalIPEditorialProgramVersionRow.owner_user_id == owner_user_id,
+                            PersonalIPEditorialProgramVersionRow.version_number == 1,
+                        )
+                        .with_for_update()
+                    )
+                ).scalar_one_or_none()
+                if anchor_id is None:
+                    raise RuntimeError("EditorialProgramVersion lineage has no Owner-scoped version-one anchor")
+            version_number = await self._next_editorial_program_version(
+                session,
+                program_id,
+            )
+
+        now = datetime.now(UTC)
+        row = PersonalIPEditorialProgramVersionRow(
+            id=_id("editorial-program-version"),
+            program_id=program_id,
+            owner_user_id=owner_user_id,
+            subject_id=work.subject_id,
+            version_number=version_number,
+            operation_key=operation_key,
+            operation_digest=program_digest,
+            parent_program_version_id=parent_id,
+            title=program.title,
+            decision_json=editorial_program_decision_payload(program),
+            created_by_run_id=created_by_run_id,
+            created_at=now,
+        )
+        session.add(row)
+        await session.flush()
+        return row
+
+    async def _bind_editorial_program_for_direction(
+        self,
+        session: AsyncSession,
+        *,
+        work: PersonalIPContentWorkRow,
+        owner_user_id: str,
+        commit: ContentWorkAppend,
+        created_by_run_id: str | None,
+        verified_program_digests: frozenset[str],
+    ) -> PersonalIPEditorialProgramVersionRow | None:
+        program_draft = commit.editorial_program
+        requested_version_id = commit.editorial_program_version_id
+        direction = commit.direction
+
+        if direction is None:
+            if program_draft is not None or requested_version_id is not None:
+                raise ValueError("an EditorialProgramVersion binding requires a direction")
+            if work.editorial_program_version_id is None:
+                return None
+            return await self._owned_editorial_program_version(
+                session,
+                work.editorial_program_version_id,
+                owner_user_id,
+            )
+
+        existing_directions = (await session.execute(select(PersonalIPDirectionVersionRow).where(PersonalIPDirectionVersionRow.content_work_id == work.id))).scalars().all()
+        direction_contract_version = str(getattr(direction, "contract_version", "personal-ip-direction-v1"))
+
+        if work.editorial_program_version_id is not None:
+            if direction_contract_version != "personal-ip-direction-v2":
+                raise ValueError("a program-bound content work requires v2 total-editor directions")
+            if program_draft is not None:
+                raise ValueError("a content work cannot replace its bound EditorialProgramVersion")
+            if requested_version_id is not None and requested_version_id != work.editorial_program_version_id:
+                raise ValueError("a content work cannot rebind to another EditorialProgramVersion")
+            program_row = await self._owned_editorial_program_version(
+                session,
+                work.editorial_program_version_id,
+                owner_user_id,
+            )
+        else:
+            prior_contract_versions = {str((row.direction_json or {}).get("contract_version") or "personal-ip-direction-v1") for row in existing_directions}
+            if direction_contract_version == "personal-ip-direction-v2" and prior_contract_versions - {"personal-ip-direction-v1"}:
+                raise ValueError("an unbound content work may migrate only from v1 directions to its first v2 direction")
+            if program_draft is not None:
+                if direction_contract_version != "personal-ip-direction-v2":
+                    raise ValueError("EditorialProgramVersion requires a v2 total-editor direction")
+                program_row = await self._create_editorial_program_version(
+                    session,
+                    work=work,
+                    owner_user_id=owner_user_id,
+                    program=program_draft,
+                    operation_key=commit.idempotency_key,
+                    created_by_run_id=created_by_run_id,
+                    verified_program_digests=verified_program_digests,
+                )
+            elif requested_version_id is not None:
+                if direction_contract_version != "personal-ip-direction-v2":
+                    raise ValueError("EditorialProgramVersion requires a v2 total-editor direction")
+                program_row = await self._owned_editorial_program_version(
+                    session,
+                    requested_version_id,
+                    owner_user_id,
+                )
+            elif direction_contract_version == "personal-ip-direction-v2":
+                raise ValueError("a v2 direction requires an exact EditorialProgramVersion")
+            else:
+                return None
+
+            if program_row.subject_id != work.subject_id:
+                raise ValueError("EditorialProgramVersion subject does not match the content work")
+            work.editorial_program_version_id = program_row.id
+            await session.flush()
+
+        if direction_contract_version == "personal-ip-direction-v2":
+            if direction.editorial_program_digest != program_row.operation_digest:
+                raise ValueError("v2 direction does not bind the exact EditorialProgramVersion decision digest")
+            validate_direction_program_binding(
+                self._editorial_program_model(program_row),
+                direction,
+            )
+        return program_row
 
     @staticmethod
     async def _owned_work(
@@ -297,6 +538,8 @@ class PersonalIPContentRepository:
         commit_digest: str,
         created_by_run_id: str | None,
         verified_evidence_snapshots: Mapping[str, dict[str, Any]],
+        verified_program_digests: frozenset[str],
+        verified_direction_digests: frozenset[str],
         verified_script_digests: frozenset[str],
     ) -> dict[str, Any]:
         supplied = (commit.breakdown is not None, commit.direction is not None, commit.script is not None)
@@ -314,8 +557,16 @@ class PersonalIPContentRepository:
                 raise RuntimeError("content commit is partially present; manual integrity review is required")
             if any(row is not None and row.commit_digest != commit_digest for row in existing):
                 raise ValueError("idempotency_key already records a different content commit")
+            program_row = None
+            if work.editorial_program_version_id is not None:
+                program_row = await self._owned_editorial_program_version(
+                    session,
+                    work.editorial_program_version_id,
+                    owner_user_id,
+                )
             return {
                 "replayed": True,
+                "editorial_program_version": (self._editorial_program_dict(program_row) if program_row is not None else None),
                 "breakdown_version": self._breakdown_dict(existing[0]) if existing[0] else None,
                 "direction_version": self._direction_dict(existing[1]) if existing[1] else None,
                 "script_version": self._script_dict(existing[2]) if existing[2] else None,
@@ -323,6 +574,20 @@ class PersonalIPContentRepository:
 
         if work.status != "active":
             raise ValueError("archived Personal-IP content work cannot accept new versions")
+
+        if commit.direction is not None and commit.direction.contract_version == "personal-ip-direction-v2":
+            direction_digest = direction_decision_digest(commit.direction)
+            if direction_digest not in verified_direction_digests:
+                raise ValueError("v2 DirectionVersion requires a verified writer-brain total-editor receipt")
+
+        program_row = await self._bind_editorial_program_for_direction(
+            session,
+            work=work,
+            owner_user_id=owner_user_id,
+            commit=commit,
+            created_by_run_id=created_by_run_id,
+            verified_program_digests=verified_program_digests,
+        )
 
         now = datetime.now(UTC)
         breakdown_row: PersonalIPBreakdownVersionRow | None = None
@@ -410,7 +675,7 @@ class PersonalIPContentRepository:
             await session.flush()
 
         if commit.script is not None:
-            script_digest = _digest(_version_payload(commit.script))
+            script_digest = script_decision_digest(commit.script)
             if script_digest not in verified_script_digests:
                 raise ValueError("ScriptVersion requires a verified writer-brain truth-boundary receipt")
             await self._require_parent_script(
@@ -435,6 +700,11 @@ class PersonalIPContentRepository:
             direction_truth_mode = str((script_direction.direction_json or {}).get("truth_mode") or "")
             if direction_truth_mode != commit.script.story_mode:
                 raise ValueError("script story_mode must match its direction truth_mode")
+            try:
+                direction_model = DirectionDraft.model_validate(script_direction.direction_json)
+            except ValueError as exc:
+                raise ValueError("script direction contract is invalid") from exc
+            validate_script_direction_binding(direction_model, commit.script)
             script_row = PersonalIPScriptVersionRow(
                 id=_id("script"),
                 owner_user_id=owner_user_id,
@@ -462,6 +732,7 @@ class PersonalIPContentRepository:
         work.updated_at = now
         return {
             "replayed": False,
+            "editorial_program_version": (self._editorial_program_dict(program_row) if program_row is not None else None),
             "breakdown_version": self._breakdown_dict(breakdown_row) if breakdown_row else None,
             "direction_version": self._direction_dict(direction_row) if direction_row else None,
             "script_version": self._script_dict(script_row) if script_row else None,
@@ -476,6 +747,8 @@ class PersonalIPContentRepository:
         thread_id: str | None = None,
         operation_digest_override: str | None = None,
         verified_evidence_snapshots: Mapping[str, dict[str, Any]] | None = None,
+        verified_program_digests: frozenset[str] = frozenset(),
+        verified_direction_digests: frozenset[str] = frozenset(),
         verified_script_digests: frozenset[str] = frozenset(),
     ) -> dict[str, Any]:
         payload = request.model_dump(mode="json", exclude={"idempotency_key"})
@@ -485,6 +758,7 @@ class PersonalIPContentRepository:
             raise ValueError("thread_id exceeds the content work identity limit")
         try:
             async with self._sf() as session, session.begin():
+                await self._lock_owner_lifecycle(session, owner_user_id)
                 existing = (
                     await session.execute(
                         select(PersonalIPContentWorkRow).where(
@@ -509,6 +783,7 @@ class PersonalIPContentRepository:
                     objective_id=_id("objective"),
                     thread_id=normalized_thread_id,
                     subject_id=request.subject_id,
+                    editorial_program_version_id=None,
                     operation_key=request.idempotency_key,
                     operation_digest=operation_digest,
                     title=request.title,
@@ -521,9 +796,11 @@ class PersonalIPContentRepository:
                 )
                 session.add(work)
                 await session.flush()
-                if request.breakdown is not None or request.direction is not None or request.script is not None:
+                if request.editorial_program is not None or request.editorial_program_version_id is not None or request.breakdown is not None or request.direction is not None or request.script is not None:
                     commit = ContentWorkAppend(
                         idempotency_key=request.idempotency_key,
+                        editorial_program_version_id=(request.editorial_program_version_id),
+                        editorial_program=request.editorial_program,
                         breakdown=request.breakdown,
                         direction=request.direction,
                         script=request.script,
@@ -536,6 +813,8 @@ class PersonalIPContentRepository:
                         commit_digest=operation_digest,
                         created_by_run_id=created_by_run_id,
                         verified_evidence_snapshots=verified_evidence_snapshots or {},
+                        verified_program_digests=verified_program_digests,
+                        verified_direction_digests=verified_direction_digests,
                         verified_script_digests=verified_script_digests,
                     )
                 lineage = await self._lineage_in_session(session, work)
@@ -568,10 +847,13 @@ class PersonalIPContentRepository:
         created_by_run_id: str | None = None,
         commit_digest_override: str | None = None,
         verified_evidence_snapshots: Mapping[str, dict[str, Any]] | None = None,
+        verified_program_digests: frozenset[str] = frozenset(),
+        verified_direction_digests: frozenset[str] = frozenset(),
         verified_script_digests: frozenset[str] = frozenset(),
     ) -> dict[str, Any] | None:
         commit_digest = commit_digest_override or _digest(request.model_dump(mode="json", exclude={"idempotency_key"}))
         async with self._sf() as session, session.begin():
+            await self._lock_owner_lifecycle(session, owner_user_id)
             work = await self._owned_work(session, content_work_id, owner_user_id, lock=True)
             if work is None:
                 return None
@@ -583,6 +865,8 @@ class PersonalIPContentRepository:
                 commit_digest=commit_digest,
                 created_by_run_id=created_by_run_id,
                 verified_evidence_snapshots=verified_evidence_snapshots or {},
+                verified_program_digests=verified_program_digests,
+                verified_direction_digests=verified_direction_digests,
                 verified_script_digests=verified_script_digests,
             )
             return {"content_work_id": work.id, **result}
@@ -630,13 +914,42 @@ class PersonalIPContentRepository:
                 return None
             if any(row.commit_digest != expected_digest for row in rows):
                 raise ValueError("idempotency_key already records a different content commit")
+            program_row = None
+            if work.editorial_program_version_id is not None:
+                program_row = await self._owned_editorial_program_version(
+                    session,
+                    work.editorial_program_version_id,
+                    owner_user_id,
+                )
             return {
                 "content_work_id": content_work_id,
                 "replayed": True,
+                "editorial_program_version": (self._editorial_program_dict(program_row) if program_row is not None else None),
                 "breakdown_version": self._breakdown_dict(breakdown) if breakdown else None,
                 "direction_version": self._direction_dict(direction) if direction else None,
                 "script_version": self._script_dict(script) if script else None,
             }
+
+    async def get_editorial_program_version(
+        self,
+        program_version_id: str,
+        *,
+        owner_user_id: str,
+    ) -> dict[str, Any] | None:
+        """Return one exact immutable Owner-scoped editorial decision."""
+
+        async with self._sf() as session:
+            row = (
+                await session.execute(
+                    select(PersonalIPEditorialProgramVersionRow).where(
+                        PersonalIPEditorialProgramVersionRow.id == program_version_id,
+                        PersonalIPEditorialProgramVersionRow.owner_user_id == owner_user_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            return self._editorial_program_dict(row)
 
     async def list(
         self,
@@ -688,11 +1001,19 @@ class PersonalIPContentRepository:
         session: AsyncSession,
         work: PersonalIPContentWorkRow,
     ) -> dict[str, Any]:
+        editorial_program = None
+        if work.editorial_program_version_id is not None:
+            editorial_program = await self._owned_editorial_program_version(
+                session,
+                work.editorial_program_version_id,
+                work.owner_user_id,
+            )
         breakdowns = (await session.execute(select(PersonalIPBreakdownVersionRow).where(PersonalIPBreakdownVersionRow.content_work_id == work.id).order_by(PersonalIPBreakdownVersionRow.version_number.asc()))).scalars().all()
         directions = (await session.execute(select(PersonalIPDirectionVersionRow).where(PersonalIPDirectionVersionRow.content_work_id == work.id).order_by(PersonalIPDirectionVersionRow.version_number.asc()))).scalars().all()
         scripts = (await session.execute(select(PersonalIPScriptVersionRow).where(PersonalIPScriptVersionRow.content_work_id == work.id).order_by(PersonalIPScriptVersionRow.version_number.asc()))).scalars().all()
         return {
             "content_work": self._work_dict(work),
+            "editorial_program_version": (self._editorial_program_dict(editorial_program) if editorial_program is not None else None),
             "breakdown_versions": [self._breakdown_dict(row) for row in breakdowns],
             "direction_versions": [self._direction_dict(row) for row in directions],
             "script_versions": [self._script_dict(row) for row in scripts],
@@ -717,6 +1038,7 @@ class PersonalIPContentRepository:
         owner_user_id: str,
     ) -> dict[str, Any] | None:
         async with self._sf() as session, session.begin():
+            await self._lock_owner_lifecycle(session, owner_user_id)
             work = await self._owned_work(session, content_work_id, owner_user_id, lock=True)
             if work is None:
                 return None

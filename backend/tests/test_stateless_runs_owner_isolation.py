@@ -48,10 +48,22 @@ THREAD_SHARED = "thread-shared-null-owner"
 
 
 @pytest.fixture(autouse=True)
-def _stub_app_config():
+def _stub_app_config(monkeypatch):
     """Inject a minimal AppConfig so the allowed path (which builds a
-    RunContext via ``get_config()``) never reads config.yaml from disk."""
+    RunContext via ``get_config()``) never reads config.yaml from disk.
+
+    Product-runtime binding is orthogonal to this suite's thread-owner check,
+    so an optional developer-local profile must not provision Agents or mask
+    the expected 404/409 boundary with a 503.
+    """
+    from app.gateway import services
+
     set_app_config(AppConfig.model_validate({"sandbox": {"use": "deerflow.sandbox.local:LocalSandboxProvider"}}))
+    monkeypatch.setattr(
+        services,
+        "resolve_product_runtime_binding",
+        lambda *args, **kwargs: None,
+    )
     yield
     reset_app_config()
 
