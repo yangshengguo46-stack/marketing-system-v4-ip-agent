@@ -49,11 +49,13 @@ corresponding capability is unavailable.
 ## IP Agent
 
 Follow `../IP_AGENT.md`. The IP Agent has an empty Skill list, disabled memory,
-eight read-only baseline tools and two MediaKit-backed Evidence MCP tools.
+eight read-only baseline tools, two MediaKit-backed Evidence MCP tools and four
+bounded `ip_content_*` tools for read, breakdown, writer brain and linked
+production start.
 When `MEDIAKIT_API_KEY` is configured, video evidence runs directly without a
-per-call paid approval interceptor. Because it has no Personal-IP business
-tools, do not attach the Personal-IP context middleware or make startup ledger
-reads.
+per-call paid approval interceptor. These content tools use explicit injected
+repositories; do not attach the retired Personal-IP portfolio context
+middleware or make startup ledger reads.
 
 The retired semantic layer includes strategy, differentiation, asset
 observation, preflight/HLLM-Lite prediction, retrospective, evidence promotion,
@@ -67,6 +69,7 @@ Retained Personal-IP domains are:
 - publish receipts and attempts;
 - metrics and credential-free platform observations;
 - video productions and append-only events;
+- content works and immutable breakdown, direction and script versions;
 - whole-domain backup/restore/delete.
 
 Publishing continues to enforce rights, moderation, commercial/AI disclosure

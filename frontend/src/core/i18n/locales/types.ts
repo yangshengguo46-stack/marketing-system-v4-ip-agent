@@ -186,6 +186,7 @@ export interface Translations {
     demoChats: string;
     agents: string;
     personalIP: string;
+    content: string;
     videoWorkbench: string;
     scheduledTasks: string;
     agentsDisabledTooltip: string;
@@ -482,6 +483,12 @@ export interface Translations {
     personalIpAggregating: string;
     personalIpPreparingOperation: string;
     personalIpProducingVideo: string;
+    personalIpAnalyzingVideo: string;
+    personalIpCollectingBenchmark: string;
+    personalIpSavingBreakdown: string;
+    personalIpWritingContent: string;
+    personalIpReadingContent: string;
+    personalIpStartingProduction: string;
   };
 
   humanInput: {

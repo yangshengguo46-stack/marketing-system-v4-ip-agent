@@ -18,6 +18,7 @@ test.describe("Sidebar navigation", () => {
     await expect(sidebar.locator("a[href='/workspace/chats']")).toBeVisible({
       timeout: 15_000,
     });
+    await expect(sidebar.locator("a[href='/workspace/content']")).toBeVisible();
     await expect(
       sidebar.locator("a[href='/workspace/personal-ip']"),
     ).toBeVisible();
@@ -65,7 +66,9 @@ test.describe("Sidebar navigation", () => {
     await expect(
       page.getByRole("heading", { name: "账号、发布、数据和视频任务" }),
     ).toBeVisible();
-    await expect(page.getByText("未采集", { exact: true }).first()).toBeVisible();
+    await expect(
+      page.getByText("未采集", { exact: true }).first(),
+    ).toBeVisible();
   });
 
   test("local context lives in Settings instead of the portfolio", async ({
@@ -90,7 +93,10 @@ test.describe("Sidebar navigation", () => {
       }),
     );
     await page.route("**/api/personal-ip/minecontext/enable", async (route) => {
-      expect(route.request().postDataJSON()).toEqual({ retention_days: 30 });
+      expect(route.request().postDataJSON()).toEqual({
+        retention_days: 30,
+        continuous_screen_capture_confirmed: true,
+      });
       enableCalled = true;
       await route.fulfill({
         status: 200,
@@ -108,7 +114,13 @@ test.describe("Sidebar navigation", () => {
     await expect(dialog.getByText("本地上下文", { exact: true })).toBeVisible();
     await expect(dialog.getByText("允许读取的范围")).toHaveCount(0);
     await expect(dialog.getByText("允许使用的目的")).toHaveCount(0);
-    await dialog.getByRole("button", { name: "开启本地上下文" }).click();
+    await Promise.all([
+      page.waitForEvent("dialog").then(async (confirmation) => {
+        expect(confirmation.message()).toContain("所有显示器");
+        await confirmation.accept();
+      }),
+      dialog.getByRole("button", { name: "开启本地上下文" }).click(),
+    ]);
     await expect.poll(() => enableCalled).toBe(true);
   });
 
@@ -166,6 +178,9 @@ test.describe("Sidebar navigation", () => {
     await expect(mobileSidebar).toBeVisible();
     await expect(
       mobileSidebar.locator("a[href='/workspace/chats']"),
+    ).toBeVisible();
+    await expect(
+      mobileSidebar.locator("a[href='/workspace/content']"),
     ).toBeVisible();
     await expect(
       mobileSidebar.locator("a[href='/workspace/agents']"),

@@ -78,7 +78,12 @@ export type VideoProductionEvent = {
 
 export type PersonalIPVideoProduction = {
   id: string;
+  contract_version:
+    | "personal-ip-video-production-v1"
+    | "personal-ip-video-production-v2";
   thread_id?: string | null;
+  content_work_id: string | null;
+  script_version_id: string | null;
   title: string;
   status: VideoProductionStatus;
   current_stage: VideoProductionStage;
@@ -395,7 +400,7 @@ async function requestJSON<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-function normalizeOptionalThreadId(value: string | null | undefined) {
+function normalizeOptionalIdentifier(value: string | null | undefined) {
   const normalized = value?.trim();
   if (!normalized) return null;
   return normalized;
@@ -403,16 +408,25 @@ function normalizeOptionalThreadId(value: string | null | undefined) {
 
 export function usePersonalIPVideoProductions(options?: {
   threadId?: string | null;
+  contentWorkId?: string | null;
   enabled?: boolean;
 }) {
-  const threadId = normalizeOptionalThreadId(options?.threadId);
+  const threadId = normalizeOptionalIdentifier(options?.threadId);
+  const contentWorkId = normalizeOptionalIdentifier(options?.contentWorkId);
   return useQuery({
-    queryKey: [...PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY, { threadId }],
+    queryKey: [
+      ...PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
+      { threadId, contentWorkId },
+    ],
     enabled: options?.enabled ?? true,
     queryFn: () =>
       requestJSON<PersonalIPVideoProduction[]>(
         `/api/personal-ip/video-productions?limit=200${
           threadId ? `&thread_id=${encodeURIComponent(threadId)}` : ""
+        }${
+          contentWorkId
+            ? `&content_work_id=${encodeURIComponent(contentWorkId)}`
+            : ""
         }`,
       ),
   });

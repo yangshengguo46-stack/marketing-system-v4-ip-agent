@@ -22,8 +22,15 @@ from typing import Any
 from sqlalchemy import DateTime, delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from deerflow.ip_agent.evidence_contracts import ReferenceVideoEvidence
 from deerflow.persistence.base import Base
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
+from deerflow.persistence.personal_ip_content.model import (
+    PersonalIPBreakdownVersionRow,
+    PersonalIPContentWorkRow,
+    PersonalIPDirectionVersionRow,
+    PersonalIPScriptVersionRow,
+)
 from deerflow.persistence.personal_ip_metrics.model import PersonalIPMetricObservationRow
 from deerflow.persistence.personal_ip_paid_calls.model import (
     PersonalIPPaidCallEventRow,
@@ -41,8 +48,23 @@ from deerflow.persistence.personal_ip_video_productions.model import (
     PersonalIPVideoProductionEventRow,
     PersonalIPVideoProductionRow,
 )
+from deerflow.persistence.personal_ip_video_productions.sql import (
+    LINKED_VIDEO_PRODUCTION_CONTRACT_VERSION,
+    SCRIPT_SOURCE_SNAPSHOT_CONTRACT_VERSION,
+    VIDEO_PRODUCTION_CONTRACT_VERSION,
+)
+from deerflow.personal_ip.content_contracts import (
+    BreakdownDraft,
+    ContentObjective,
+    DirectionDraft,
+    ScriptDraft,
+)
+from deerflow.personal_ip.evidence_binding import reference_evidence_refs
+from deerflow.personal_ip.video_contracts import VIDEO_PRODUCTION_MODES
 
-BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v1"
+LEGACY_BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v1"
+CONTENT_BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v2"
+BACKUP_SCHEMA_VERSION = "personal-ip-owner-backup-v3"
 RESTORE_RECEIPT_VERSION = "personal-ip-owner-restore-receipt-v1"
 DELETE_PREVIEW_VERSION = "personal-ip-destructive-delete-preview-v1"
 DELETE_CONFIRMATION_VERSION = "personal-ip-destructive-delete-confirmation-v1"
@@ -72,6 +94,10 @@ class _Dataset:
 # Restore order is dependency order; deletion uses the reverse.
 _DATASETS: tuple[_Dataset, ...] = (
     _Dataset("subjects", PersonalIPSubjectRow),
+    _Dataset("content_works", PersonalIPContentWorkRow),
+    _Dataset("breakdown_versions", PersonalIPBreakdownVersionRow),
+    _Dataset("direction_versions", PersonalIPDirectionVersionRow),
+    _Dataset("script_versions", PersonalIPScriptVersionRow),
     _Dataset("accounts", PersonalIPAccountRow),
     _Dataset("publish_receipts", PersonalIPPublishReceiptRow),
     _Dataset("metric_observations", PersonalIPMetricObservationRow),
@@ -80,6 +106,18 @@ _DATASETS: tuple[_Dataset, ...] = (
     _Dataset("video_productions", PersonalIPVideoProductionRow),
     _Dataset("video_production_events", PersonalIPVideoProductionEventRow),
 )
+_LEGACY_DATASETS: tuple[_Dataset, ...] = tuple(
+    item
+    for item in _DATASETS
+    if item.name
+    not in {
+        "content_works",
+        "breakdown_versions",
+        "direction_versions",
+        "script_versions",
+    }
+)
+_LEGACY_VIDEO_PRODUCTION_COLUMNS = frozenset({"content_work_id", "script_version_id"})
 EXPORT_DATASET_NAMES: tuple[str, ...] = tuple(item.name for item in _DATASETS)
 PERSONAL_IP_EXPORT_TABLES: frozenset[str] = frozenset(item.model.__tablename__ for item in _DATASETS)
 PERSONAL_IP_SECRET_TABLES: frozenset[str] = frozenset(
@@ -92,9 +130,7 @@ _DELETION_ONLY_DATASETS: tuple[_Dataset, ...] = (
     _Dataset("paid_call_scopes", PersonalIPPaidCallScopeRow),
     _Dataset("paid_call_events", PersonalIPPaidCallEventRow),
 )
-PERSONAL_IP_DELETION_ONLY_TABLES: frozenset[str] = frozenset(
-    item.model.__tablename__ for item in _DELETION_ONLY_DATASETS
-)
+PERSONAL_IP_DELETION_ONLY_TABLES: frozenset[str] = frozenset(item.model.__tablename__ for item in _DELETION_ONLY_DATASETS)
 
 
 def _iso(value: datetime) -> str:
@@ -157,6 +193,479 @@ def _safe_connection_record(record: dict[str, Any]) -> dict[str, Any]:
 
 def _dataset_digest(name: str, records: Sequence[Mapping[str, Any]]) -> str:
     return _digest({"name": name, "records": records})
+
+
+def _record_index(
+    dataset_name: str,
+    records: Sequence[Mapping[str, Any]],
+) -> dict[str, Mapping[str, Any]]:
+    indexed: dict[str, Mapping[str, Any]] = {}
+    for record in records:
+        record_id = record.get("id")
+        if not isinstance(record_id, str) or not record_id:
+            raise ValueError(f"backup dataset {dataset_name} contains an invalid id")
+        if record_id in indexed:
+            raise ValueError(f"backup dataset {dataset_name} contains a duplicate id")
+        indexed[record_id] = record
+    return indexed
+
+
+def _require_sha256(value: Any, *, field: str) -> str:
+    if not isinstance(value, str) or len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+        raise ValueError(f"backup content lineage has an invalid {field}")
+    return value
+
+
+def _validate_content_restore_datasets(
+    datasets: Sequence[Mapping[str, Any]],
+) -> None:
+    """Validate the complete content graph before any backup row is restored."""
+
+    records_by_name = {str(dataset["name"]): dataset["records"] for dataset in datasets}
+    subject_ids = set(_record_index("subjects", records_by_name["subjects"]))
+    works = _record_index("content_works", records_by_name["content_works"])
+    breakdowns = _record_index(
+        "breakdown_versions",
+        records_by_name["breakdown_versions"],
+    )
+    directions = _record_index(
+        "direction_versions",
+        records_by_name["direction_versions"],
+    )
+    scripts = _record_index("script_versions", records_by_name["script_versions"])
+
+    objective_ids: set[str] = set()
+    for work in works.values():
+        subject_id = work.get("subject_id")
+        if subject_id is not None and subject_id not in subject_ids:
+            raise ValueError("backup content work subject does not belong to this Owner backup")
+        objective_id = work.get("objective_id")
+        if not isinstance(objective_id, str) or not objective_id:
+            raise ValueError("backup content work objective_id is required")
+        if objective_id in objective_ids:
+            raise ValueError("backup content work objective_id must be unique")
+        objective_ids.add(objective_id)
+        thread_id = work.get("thread_id")
+        if thread_id is not None and (not isinstance(thread_id, str) or not thread_id.strip() or len(thread_id) > 128):
+            raise ValueError("backup content work thread_id is invalid")
+        if work.get("entry_route") not in {"zero_start", "benchmark"}:
+            raise ValueError("backup content work entry_route is invalid")
+        if work.get("status") not in {"active", "archived"}:
+            raise ValueError("backup content work status is invalid")
+        _require_sha256(work.get("operation_digest"), field="operation_digest")
+        try:
+            objective = ContentObjective.model_validate(work.get("objective_json"))
+        except ValueError as exc:
+            raise ValueError("backup content work objective is invalid") from exc
+        if objective.model_dump(mode="json") != work.get("objective_json"):
+            raise ValueError("backup content work objective is not canonical")
+
+    version_numbers: dict[tuple[str, str], set[int]] = {}
+    commit_digests: dict[tuple[str, str], str] = {}
+
+    def validate_version_base(
+        dataset_name: str,
+        record: Mapping[str, Any],
+    ) -> str:
+        work_id = record.get("content_work_id")
+        if not isinstance(work_id, str) or work_id not in works:
+            raise ValueError(f"backup {dataset_name} content work does not belong to this Owner backup")
+        version_number = record.get("version_number")
+        if not isinstance(version_number, int) or isinstance(version_number, bool) or version_number < 1:
+            raise ValueError(f"backup {dataset_name} version number is invalid")
+        numbers = version_numbers.setdefault((dataset_name, work_id), set())
+        if version_number in numbers:
+            raise ValueError(f"backup {dataset_name} contains a duplicate version number")
+        numbers.add(version_number)
+        commit_key = record.get("commit_key")
+        if not isinstance(commit_key, str) or not commit_key:
+            raise ValueError(f"backup {dataset_name} commit key is invalid")
+        commit_digest = _require_sha256(
+            record.get("commit_digest"),
+            field=f"{dataset_name} commit_digest",
+        )
+        digest_key = (work_id, commit_key)
+        existing_digest = commit_digests.setdefault(digest_key, commit_digest)
+        if existing_digest != commit_digest:
+            raise ValueError("backup content commit has inconsistent digests")
+        return work_id
+
+    breakdown_models: dict[str, BreakdownDraft] = {}
+    breakdown_refs: dict[str, set[str]] = {}
+    for breakdown_id, record in breakdowns.items():
+        work_id = validate_version_base("breakdown_versions", record)
+        try:
+            breakdown = BreakdownDraft.model_validate(
+                {
+                    "source_kind": record.get("source_kind"),
+                    "source_identity": record.get("source_identity_json"),
+                    "source_digest": record.get("source_digest"),
+                    "evidence_request_id": record.get("evidence_request_id"),
+                    "evidence_item_index": record.get("evidence_item_index"),
+                    "evidence_contract_version": record.get("evidence_contract_version"),
+                    "evidence_payload_digest": record.get("evidence_payload_digest"),
+                    "observations": record.get("observations_json"),
+                    "interpretations": record.get("interpretations_json"),
+                    "limitations": record.get("limitations_json"),
+                }
+            )
+        except ValueError as exc:
+            raise ValueError("backup BreakdownVersion contract is invalid") from exc
+        breakdown_models[breakdown_id] = breakdown
+
+        if breakdown.source_kind == "owner_material":
+            if record.get("evidence_snapshot_json") is not None:
+                raise ValueError("owner material cannot contain an Evidence MCP snapshot")
+            breakdown_refs[breakdown_id] = {ref for observation in breakdown.observations for ref in observation.evidence_refs}
+            continue
+
+        snapshot = record.get("evidence_snapshot_json")
+        if not isinstance(snapshot, Mapping):
+            raise ValueError("external BreakdownVersion requires an evidence snapshot")
+        try:
+            evidence = ReferenceVideoEvidence.model_validate(snapshot)
+        except ValueError as exc:
+            raise ValueError("backup BreakdownVersion evidence snapshot is invalid") from exc
+        canonical_snapshot = evidence.model_dump(mode="json", exclude_none=True)
+        if canonical_snapshot != snapshot:
+            raise ValueError("backup BreakdownVersion evidence snapshot is not canonical")
+        request_id = str(breakdown.evidence_request_id or "")
+        item_index = breakdown.evidence_item_index
+        if evidence.metadata.request_id != request_id:
+            raise ValueError("backup BreakdownVersion evidence request id does not match")
+        if evidence.contract_version != breakdown.evidence_contract_version:
+            raise ValueError("backup BreakdownVersion evidence contract does not match")
+        if _digest(canonical_snapshot) != breakdown.evidence_payload_digest:
+            raise ValueError("backup BreakdownVersion evidence digest does not match")
+        if item_index is None or item_index >= len(canonical_snapshot["items"]):
+            raise ValueError("backup BreakdownVersion evidence item is out of range")
+        item = canonical_snapshot["items"][item_index]
+        if item.get("status") == "failed":
+            raise ValueError("failed evidence cannot be restored as a BreakdownVersion")
+        source = item.get("source")
+        if not isinstance(source, Mapping):
+            raise ValueError("backup BreakdownVersion evidence source is invalid")
+        source_digest = _require_sha256(
+            source.get("content_sha256"),
+            field="evidence source digest",
+        )
+        if breakdown.source_digest != source_digest:
+            raise ValueError("backup BreakdownVersion source digest does not match evidence")
+        source_ref = str(source.get("ref") or "").strip()
+        expected_source_kind = "uploaded_file" if source_ref.startswith("/mnt/user-data/uploads/") else "platform_content"
+        if breakdown.source_kind != expected_source_kind:
+            raise ValueError("backup BreakdownVersion source kind does not match evidence")
+        expected_identity = {
+            "ref": source_ref,
+            "observed_at": source.get("observed_at"),
+            "trust": source.get("trust"),
+            "evidence_request_id": request_id,
+            "evidence_item_index": item_index,
+            "analysis_receipt_sha256": _digest(item.get("analysis_receipt") or {}),
+        }
+        if breakdown.source_identity != expected_identity:
+            raise ValueError("backup BreakdownVersion source identity does not match evidence")
+        allowed_refs = reference_evidence_refs(
+            request_id=request_id,
+            item_index=item_index,
+            item=item,
+        )
+        if any(ref not in allowed_refs for observation in breakdown.observations for ref in observation.evidence_refs):
+            raise ValueError("backup BreakdownVersion contains an unknown evidence ref")
+        breakdown_refs[breakdown_id] = allowed_refs
+
+        if works[work_id].get("entry_route") == "zero_start":
+            # Zero-start may acquire evidence later; the route does not weaken
+            # any binding checks, so this remains valid lineage.
+            continue
+
+    direction_models: dict[str, DirectionDraft] = {}
+    direction_allowed_refs: dict[str, set[str]] = {}
+    for direction_id, record in directions.items():
+        work_id = validate_version_base("direction_versions", record)
+        try:
+            objective_snapshot = ContentObjective.model_validate(record.get("objective_snapshot_json"))
+            direction = DirectionDraft.model_validate(record.get("direction_json"))
+        except ValueError as exc:
+            raise ValueError("backup DirectionVersion contract is invalid") from exc
+        if objective_snapshot.model_dump(mode="json") != works[work_id].get("objective_json"):
+            raise ValueError("backup DirectionVersion objective snapshot does not match its work")
+        breakdown_ids = record.get("breakdown_version_ids_json")
+        if not isinstance(breakdown_ids, list) or len(breakdown_ids) != len(set(breakdown_ids)):
+            raise ValueError("backup DirectionVersion breakdown references are invalid")
+        if direction.breakdown_version_ids != breakdown_ids:
+            raise ValueError("backup DirectionVersion breakdown snapshot does not match")
+        allowed_refs: set[str] = set()
+        for breakdown_id in breakdown_ids:
+            breakdown_record = breakdowns.get(breakdown_id)
+            if breakdown_record is None or breakdown_record.get("content_work_id") != work_id:
+                raise ValueError("backup DirectionVersion breakdown does not belong to the same work")
+            allowed_refs.update(breakdown_refs[breakdown_id])
+        parent_id = record.get("parent_direction_version_id")
+        if direction.parent_direction_version_id != parent_id:
+            raise ValueError("backup DirectionVersion parent snapshot does not match")
+        if parent_id is not None:
+            parent = directions.get(parent_id)
+            if parent is None or parent.get("content_work_id") != work_id or parent.get("version_number", 0) >= record.get("version_number", 0):
+                raise ValueError("backup DirectionVersion parent is invalid")
+        for claim in direction.claim_basis:
+            if claim.state == "source_observed" and any(ref not in allowed_refs for ref in claim.evidence_refs):
+                raise ValueError("backup DirectionVersion claim evidence is not in its breakdowns")
+        direction_models[direction_id] = direction
+        direction_allowed_refs[direction_id] = allowed_refs
+
+    for _script_id, record in scripts.items():
+        work_id = validate_version_base("script_versions", record)
+        direction_id = record.get("direction_version_id")
+        direction_record = directions.get(direction_id)
+        if direction_record is None or direction_record.get("content_work_id") != work_id:
+            raise ValueError("backup ScriptVersion direction does not belong to the same work")
+        try:
+            script = ScriptDraft.model_validate(
+                {
+                    "title": record.get("title"),
+                    "story_mode": record.get("story_mode"),
+                    "script_text": record.get("script_text"),
+                    "claim_basis": record.get("claim_basis_json"),
+                    "creative_elements": record.get("creative_elements_json"),
+                    "story_engine_seed": record.get("story_engine_seed_json"),
+                    "locked_story": record.get("locked_story"),
+                    "production_notes": record.get("production_notes_json"),
+                    "direction_version_id": direction_id,
+                    "parent_script_version_id": record.get("parent_script_version_id"),
+                }
+            )
+        except ValueError as exc:
+            raise ValueError("backup ScriptVersion contract is invalid") from exc
+        direction = direction_models[direction_id]
+        if script.story_mode != direction.truth_mode:
+            raise ValueError("backup ScriptVersion truth mode does not match its direction")
+        direction_claims = {_canonical(claim.model_dump(mode="json")) for claim in direction.claim_basis}
+        if any(_canonical(claim.model_dump(mode="json")) not in direction_claims for claim in script.claim_basis):
+            raise ValueError("backup ScriptVersion claim basis is absent from its direction")
+        for claim in script.claim_basis:
+            if claim.state == "source_observed" and any(ref not in direction_allowed_refs[direction_id] for ref in claim.evidence_refs):
+                raise ValueError("backup ScriptVersion claim evidence is not in its direction")
+        parent_id = record.get("parent_script_version_id")
+        if parent_id is not None:
+            parent = scripts.get(parent_id)
+            if parent is None or parent.get("content_work_id") != work_id or parent.get("version_number", 0) >= record.get("version_number", 0):
+                raise ValueError("backup ScriptVersion parent is invalid")
+        locked_story = record.get("locked_story")
+        locked_digest = record.get("locked_story_digest")
+        if not locked_story:
+            if locked_digest is not None:
+                raise ValueError("backup ScriptVersion has a digest without a locked story")
+        elif hashlib.sha256(str(locked_story).encode("utf-8")).hexdigest() != locked_digest:
+            raise ValueError("backup ScriptVersion locked story digest does not match")
+
+    for (dataset_name, work_id), numbers in version_numbers.items():
+        if sorted(numbers) != list(range(1, len(numbers) + 1)):
+            raise ValueError(f"backup {dataset_name} versions for work {work_id} are not contiguous")
+
+
+def _event_digest_timestamp(value: Any) -> str:
+    if not isinstance(value, str):
+        raise ValueError("backup video production event occurred_at is invalid")
+    try:
+        occurred_at = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("backup video production event occurred_at is invalid") from exc
+    if occurred_at.tzinfo is None:
+        occurred_at = occurred_at.replace(tzinfo=UTC)
+    return occurred_at.astimezone(UTC).isoformat()
+
+
+def _validate_production_restore_datasets(
+    datasets: Sequence[Mapping[str, Any]],
+) -> None:
+    """Validate production links and server-derived source snapshots."""
+
+    records_by_name = {str(dataset["name"]): dataset["records"] for dataset in datasets}
+    subjects = _record_index("subjects", records_by_name["subjects"])
+    accounts = _record_index("accounts", records_by_name["accounts"])
+    works = _record_index("content_works", records_by_name["content_works"])
+    scripts = _record_index(
+        "script_versions",
+        records_by_name["script_versions"],
+    )
+    productions = _record_index(
+        "video_productions",
+        records_by_name["video_productions"],
+    )
+    events = _record_index(
+        "video_production_events",
+        records_by_name["video_production_events"],
+    )
+
+    operation_keys: set[str] = set()
+    thread_ids: set[str] = set()
+    for production_id, record in productions.items():
+        operation_key = record.get("operation_key")
+        if not isinstance(operation_key, str) or not operation_key:
+            raise ValueError("backup video production operation_key is invalid")
+        if operation_key in operation_keys:
+            raise ValueError("backup video production operation_key must be unique")
+        operation_keys.add(operation_key)
+        thread_id = record.get("thread_id")
+        if thread_id is not None:
+            if not isinstance(thread_id, str) or not thread_id or len(thread_id) > 64:
+                raise ValueError("backup video production thread_id is invalid")
+            if thread_id in thread_ids:
+                raise ValueError("backup video production thread_id must be unique")
+            thread_ids.add(thread_id)
+
+        subject_id = record.get("subject_id")
+        if subject_id is not None and subject_id not in subjects:
+            raise ValueError("backup video production subject does not belong to this Owner backup")
+        target_account_ids = record.get("target_account_ids_json")
+        if not isinstance(target_account_ids, list) or any(not isinstance(account_id, str) or not account_id for account_id in target_account_ids) or len(target_account_ids) != len(set(target_account_ids)):
+            raise ValueError("backup video production target accounts are invalid")
+        for account_id in target_account_ids:
+            account = accounts.get(account_id)
+            if account is None:
+                raise ValueError("backup video production target account does not belong to this Owner backup")
+            if subject_id is not None and account.get("subject_id") not in {
+                None,
+                subject_id,
+            }:
+                raise ValueError("backup video production target account belongs to another subject")
+
+        source_kind = record.get("source_kind")
+        if source_kind not in {"idea", "script"}:
+            raise ValueError("backup video production source_kind is invalid")
+        source = record.get("source_json")
+        delivery_spec = record.get("delivery_spec_json")
+        provider_policy = record.get("provider_policy_json")
+        budget = record.get("budget_json")
+        if not all(isinstance(value, Mapping) for value in (source, delivery_spec, provider_policy, budget)):
+            raise ValueError("backup video production request snapshots are invalid")
+        production_mode = source.get("production_mode")
+        if production_mode is not None and production_mode not in (VIDEO_PRODUCTION_MODES):
+            raise ValueError("backup video production production_mode is invalid")
+        if not isinstance(record.get("title"), str) or not record.get("title"):
+            raise ValueError("backup video production title is invalid")
+
+        content_work_id = record.get("content_work_id")
+        script_version_id = record.get("script_version_id")
+        if (content_work_id is None) != (script_version_id is None):
+            raise ValueError("backup video production content and script links must be paired")
+        linked = content_work_id is not None
+        if linked:
+            if record.get("contract_version") != (LINKED_VIDEO_PRODUCTION_CONTRACT_VERSION):
+                raise ValueError("backup linked video production contract version is invalid")
+            if source_kind != "script":
+                raise ValueError("backup linked video production must use a script source")
+            work = works.get(str(content_work_id))
+            script = scripts.get(str(script_version_id))
+            if work is None or script is None:
+                raise ValueError("backup linked video production does not belong to this Owner backup")
+            if script.get("content_work_id") != content_work_id:
+                raise ValueError("backup linked video production script does not belong to its work")
+            work_subject_id = work.get("subject_id")
+            if work_subject_id is not None and subject_id != work_subject_id:
+                raise ValueError("backup linked video production subject does not match its work")
+
+            expected_source = {
+                "contract_version": SCRIPT_SOURCE_SNAPSHOT_CONTRACT_VERSION,
+                "content_work_id": content_work_id,
+                "objective_id": work.get("objective_id"),
+                "script_version_id": script_version_id,
+                "direction_version_id": script.get("direction_version_id"),
+                "script_version_number": script.get("version_number"),
+                "title": script.get("title"),
+                "story_mode": script.get("story_mode"),
+                "script_text": script.get("script_text"),
+                "claim_basis": script.get("claim_basis_json") or [],
+                "creative_elements": script.get("creative_elements_json") or [],
+                "story_engine_seed": script.get("story_engine_seed_json"),
+                "locked_story": script.get("locked_story"),
+                "locked_story_sha256": script.get("locked_story_digest"),
+                "production_notes": script.get("production_notes_json") or {},
+            }
+            source_payload = {key: value for key, value in source.items() if key not in {"production_mode", "snapshot_sha256"}}
+            if source_payload != expected_source:
+                raise ValueError("backup linked video production source snapshot does not match its ScriptVersion")
+            if source.get("snapshot_sha256") != _digest(expected_source):
+                raise ValueError("backup linked video production source snapshot digest does not match")
+        elif record.get("contract_version") != VIDEO_PRODUCTION_CONTRACT_VERSION:
+            raise ValueError("backup unlinked video production contract version is invalid")
+
+        request_payload: dict[str, Any] = {
+            "budget": dict(budget),
+            "delivery_spec": dict(delivery_spec),
+            "provider_policy": dict(provider_policy),
+            "source": dict(source),
+            "source_kind": source_kind,
+            "subject_id": subject_id,
+            "target_account_ids": target_account_ids,
+            "thread_id": thread_id,
+            "title": record.get("title"),
+        }
+        if linked:
+            request_payload.update(
+                {
+                    "content_work_id": content_work_id,
+                    "script_version_id": script_version_id,
+                }
+            )
+        request_digest = _require_sha256(
+            record.get("request_digest"),
+            field="video production request_digest",
+        )
+        if request_digest != _digest(request_payload):
+            raise ValueError("backup video production request digest does not match its snapshots")
+
+        event_count = record.get("event_count")
+        if not isinstance(event_count, int) or isinstance(event_count, bool) or event_count < 0:
+            raise ValueError("backup video production event_count is invalid")
+
+    events_by_production: dict[str, list[Mapping[str, Any]]] = {}
+    event_keys: dict[str, set[str]] = {}
+    for event in events.values():
+        production_id = event.get("production_id")
+        if not isinstance(production_id, str) or production_id not in productions:
+            raise ValueError("backup video production event does not belong to this Owner backup")
+        sequence = event.get("sequence")
+        if not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1:
+            raise ValueError("backup video production event sequence is invalid")
+        event_key = event.get("event_key")
+        if not isinstance(event_key, str) or not event_key:
+            raise ValueError("backup video production event_key is invalid")
+        keys = event_keys.setdefault(production_id, set())
+        if event_key in keys:
+            raise ValueError("backup video production event_key must be unique")
+        keys.add(event_key)
+        event_payload = {
+            "cost": event.get("cost_json"),
+            "entity_id": event.get("entity_id"),
+            "entity_type": event.get("entity_type"),
+            "event_type": event.get("event_type"),
+            "input_refs": event.get("input_refs_json"),
+            "model": event.get("model"),
+            "occurred_at": _event_digest_timestamp(event.get("occurred_at")),
+            "output_refs": event.get("output_refs_json"),
+            "payload": event.get("payload_json"),
+            "provider": event.get("provider"),
+            "provider_task_id": event.get("provider_task_id"),
+            "stage": event.get("stage"),
+            "status": event.get("status"),
+        }
+        event_digest = _require_sha256(
+            event.get("event_digest"),
+            field="video production event_digest",
+        )
+        if event_digest != _digest(event_payload):
+            raise ValueError("backup video production event digest does not match its snapshot")
+        events_by_production.setdefault(production_id, []).append(event)
+
+    for production_id, production in productions.items():
+        production_events = events_by_production.get(production_id, [])
+        sequences = sorted(int(event["sequence"]) for event in production_events)
+        if sequences != list(range(1, len(sequences) + 1)):
+            raise ValueError("backup video production event sequences are not contiguous")
+        if production.get("event_count") != len(production_events):
+            raise ValueError("backup video production event_count does not match its events")
 
 
 class PersonalIPDataLifecycleService:
@@ -228,13 +737,7 @@ class PersonalIPDataLifecycleService:
     ) -> dict[str, int]:
         counts: dict[str, int] = {}
         for dataset in _DELETION_ONLY_DATASETS:
-            count = (
-                await session.execute(
-                    select(func.count())
-                    .select_from(dataset.model)
-                    .where(dataset.model.owner_user_id == owner_user_id)
-                )
-            ).scalar_one()
+            count = (await session.execute(select(func.count()).select_from(dataset.model).where(dataset.model.owner_user_id == owner_user_id))).scalar_one()
             counts[dataset.name] = int(count)
         return counts
 
@@ -249,10 +752,11 @@ class PersonalIPDataLifecycleService:
         exported_at: str,
         datasets: Sequence[Mapping[str, Any]],
         data_digest: str,
+        schema_version: str = BACKUP_SCHEMA_VERSION,
     ) -> str:
         return _digest(
             {
-                "schema_version": BACKUP_SCHEMA_VERSION,
+                "schema_version": schema_version,
                 "owner_user_id": owner_user_id,
                 "exported_at": exported_at,
                 "dataset_digests": [{"name": item["name"], "count": item["count"], "digest": item["digest"]} for item in datasets],
@@ -301,17 +805,24 @@ class PersonalIPDataLifecycleService:
 
     @staticmethod
     def _verify_backup(owner_user_id: str, backup: Mapping[str, Any]) -> list[dict[str, Any]]:
-        if backup.get("schema_version") != BACKUP_SCHEMA_VERSION:
+        schema_version = backup.get("schema_version")
+        if schema_version not in {
+            BACKUP_SCHEMA_VERSION,
+            CONTENT_BACKUP_SCHEMA_VERSION,
+            LEGACY_BACKUP_SCHEMA_VERSION,
+        }:
             raise ValueError("unsupported Personal-IP backup schema version")
         if backup.get("owner_user_id") != owner_user_id:
             raise ValueError("backup owner does not match the authenticated owner")
         datasets = backup.get("datasets")
         if not isinstance(datasets, list):
             raise ValueError("backup datasets are required")
-        if [item.get("name") for item in datasets if isinstance(item, Mapping)] != list(EXPORT_DATASET_NAMES):
+        specifications = _LEGACY_DATASETS if schema_version == LEGACY_BACKUP_SCHEMA_VERSION else _DATASETS
+        expected_names = [item.name for item in specifications]
+        if [item.get("name") for item in datasets if isinstance(item, Mapping)] != expected_names:
             raise ValueError("backup dataset inventory is incomplete or out of order")
         normalized: list[dict[str, Any]] = []
-        for specification, raw_dataset in zip(_DATASETS, datasets, strict=True):
+        for specification, raw_dataset in zip(specifications, datasets, strict=True):
             if not isinstance(raw_dataset, Mapping):
                 raise ValueError("backup dataset must be an object")
             records = raw_dataset.get("records")
@@ -323,8 +834,18 @@ class PersonalIPDataLifecycleService:
                 raise ValueError(f"backup dataset {specification.name} digest mismatch")
             expected_columns = {column.name for column in specification.model.__table__.columns}
             allowed_columns = set(expected_columns)
+            if (
+                schema_version
+                in {
+                    LEGACY_BACKUP_SCHEMA_VERSION,
+                    CONTENT_BACKUP_SCHEMA_VERSION,
+                }
+                and specification.name == "video_productions"
+            ):
+                allowed_columns.difference_update(_LEGACY_VIDEO_PRODUCTION_COLUMNS)
             if specification.name == "platform_connections":
                 allowed_columns.add("credential_state")
+            normalized_records: list[dict[str, Any]] = []
             for record in records:
                 if not isinstance(record, Mapping) or set(record) != allowed_columns:
                     raise ValueError(f"backup dataset {specification.name} record shape mismatch")
@@ -332,7 +853,13 @@ class PersonalIPDataLifecycleService:
                     raise ValueError("backup contains a record for a different owner")
                 if specification.name == "platform_connections" and (record.get("status") != "revoked" or record.get("credential_state") != "omitted_reauthorization_required"):
                     raise ValueError("restored platform connections must require reauthorization")
-            normalized.append(dict(raw_dataset))
+                normalized_records.append(dict(record))
+            normalized.append(
+                {
+                    **dict(raw_dataset),
+                    "records": normalized_records,
+                }
+            )
         _assert_credential_free(normalized)
         verification = backup.get("verification")
         if not isinstance(verification, Mapping):
@@ -348,10 +875,37 @@ class PersonalIPDataLifecycleService:
             exported_at=exported_at,
             datasets=normalized,
             data_digest=data_digest,
+            schema_version=str(schema_version),
         )
         if verification.get("manifest_digest") != manifest_digest:
             raise ValueError("backup manifest digest mismatch")
-        return normalized
+        if schema_version == BACKUP_SCHEMA_VERSION:
+            promoted = normalized
+        else:
+            # V1 predates content lineage; both V1 and V2 predate the
+            # ScriptVersion-to-production columns.  Verify their original
+            # inventory, shapes and hashes above, then upgrade only the
+            # in-memory restore representation.
+            legacy_by_name = {item["name"]: item for item in normalized}
+            promoted = []
+            for specification in _DATASETS:
+                existing = legacy_by_name.get(specification.name)
+                records = [dict(record) for record in existing["records"]] if existing is not None else []
+                if specification.name == "video_productions":
+                    for record in records:
+                        record["content_work_id"] = None
+                        record["script_version_id"] = None
+                promoted.append(
+                    {
+                        "name": specification.name,
+                        "count": len(records),
+                        "digest": _dataset_digest(specification.name, records),
+                        "records": records,
+                    }
+                )
+        _validate_content_restore_datasets(promoted)
+        _validate_production_restore_datasets(promoted)
+        return promoted
 
     @staticmethod
     def _restore_values(dataset: _Dataset, record: Mapping[str, Any]) -> dict[str, Any]:
@@ -377,11 +931,7 @@ class PersonalIPDataLifecycleService:
                 existing = await self._export_datasets(session, owner_user_id)
                 secret_counts = await self._secret_counts(session, owner_user_id)
                 deletion_only_counts = await self._deletion_only_counts(session, owner_user_id)
-                if (
-                    any(item["count"] for item in existing)
-                    or any(secret_counts.values())
-                    or any(deletion_only_counts.values())
-                ):
+                if any(item["count"] for item in existing) or any(secret_counts.values()) or any(deletion_only_counts.values()):
                     raise ValueError("Personal-IP restore requires an empty owner scope; delete existing data first")
                 for specification, dataset in zip(_DATASETS, datasets, strict=True):
                     for record in dataset["records"]:
@@ -392,7 +942,7 @@ class PersonalIPDataLifecycleService:
                     await session.flush()
                 restored = await self._export_datasets(session, owner_user_id)
                 restored_digest = self._data_digest(restored)
-                expected_digest = str(backup["verification"]["data_digest"])
+                expected_digest = self._data_digest(datasets)
                 if restored_digest != expected_digest:
                     raise ValueError("restored data digest does not match the backup")
                 await session.commit()

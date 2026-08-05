@@ -1,5 +1,11 @@
 from .clarification_tool import ask_clarification_tool
 from .minecontext_tools import personal_ip_minecontext_evidence_tool, personal_ip_minecontext_sync_tool
+from .personal_ip_content_tools import (
+    ip_content_read_tool,
+    ip_content_save_breakdown_tool,
+    ip_content_start_production_tool,
+    ip_content_write_tool,
+)
 from .personal_ip_tools import (
     personal_ip_begin_video_production_tool,
     personal_ip_collect_browser_page_tool,
@@ -55,6 +61,10 @@ __all__ = [
     "setup_agent",
     "update_agent",
     "present_file_tool",
+    "ip_content_read_tool",
+    "ip_content_save_breakdown_tool",
+    "ip_content_start_production_tool",
+    "ip_content_write_tool",
     "personal_ip_begin_publish_receipt_tool",
     "personal_ip_begin_video_production_tool",
     "personal_ip_collect_browser_page_tool",

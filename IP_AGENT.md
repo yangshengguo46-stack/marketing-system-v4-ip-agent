@@ -1,9 +1,9 @@
 # IP Agent product contract
 
-This file is the sole product contract for IP Agent. It separates shipped
-runtime behavior from an approved target architecture that is still behind
-verification gates. A target design is never a claim that the capability is
-already live.
+This file is the sole product contract for IP Agent. The active product has one
+shared content lineage and three customer boards: breakdown, a two-layer writer
+brain and production. Delivery status and real-sample evidence remain separate
+in the product ledger; a schema or mocked test is never a completion claim.
 
 ## Product boundary
 
@@ -14,9 +14,9 @@ creative hypotheses.
 
 The default Agent does not run a fixed onboarding interview, inspect operating
 ledgers on the first turn, diagnose accounts, predict virality or manufacture
-an incubation workflow. The four-lens system architecture below is approved,
-but it is not enabled in the default runtime until each vertical slice passes
-the product ledger's unit, integration and real-sample gates.
+an incubation workflow. It exposes two active creation entries: a zero-start
+original and an exact benchmark link/upload. Account history remains a future
+entry and must not appear as an active route.
 
 ## System constitution
 
@@ -44,15 +44,20 @@ presenting it as a user fact or source observation is not. The shared epistemic
 states are `user_asserted`, `source_observed`, `derived`, `hypothesized`,
 `creative`, `unknown` and `contradicted`.
 
-The target business lineage is:
+The active content lineage is:
 
 ```text
-Owner -> Subject -> IPObjective -> IPDirectionVersion
-EvidenceItem -> Claim -> Interpretation -> MechanismHypothesis
-IPDirectionVersion + MechanismHypothesis
-  -> Work -> WorkVersion -> Artifact -> Publication
-  -> Observation -> OutcomeAssessment -> LearningDecision
+Owner -> Subject -> Objective -> ContentWork
+  -> BreakdownVersion -> DirectionVersion -> ScriptVersion
+  -> VideoProduction -> Artifact -> Publication
+  -> Observation -> LearningDecision
 ```
+
+`BreakdownVersion` is required for the benchmark entry and optional for
+zero-start work. Objective, Work and every immutable version have stable server
+identities. Agent-created works record their originating task id, but a task id
+never grants Owner authority. The feedback tail remains a later vertical slice;
+missing observations stay missing.
 
 Agent runtime, models, MCP and Skills orchestrate or transform these objects;
 they do not become the authority for business facts. MCP Sensors obtain external
@@ -231,15 +236,37 @@ The installed `ip-agent` uses:
 - the MediaKit-backed Evidence MCP tools
   `ip_evidence_collect_douyin_benchmark_account` and
   `ip_evidence_inspect_reference_videos`;
+- the bounded content tools `ip_content_read`,
+  `ip_content_save_breakdown`, `ip_content_write` and
+  `ip_content_start_production`;
 - the compact product prompt in
   `product/defaults/agents/ip-agent/SOUL.md`.
+
+An external video Breakdown can be saved only when the same task contains the
+exact typed Evidence MCP ToolMessage. The server derives source identity,
+contract version, item index and payload hashes and stores the complete typed
+evidence snapshot separately from model interpretation. A formal ScriptVersion
+can be written only by the bounded writer brain after its fail-closed truth
+boundary verifier succeeds. REST clients cannot bypass either receipt.
+
+Fiction uses a context-free story seed and locks one causal story before
+production constraints are applied. Factual and hybrid scripts use explicit
+claim bases; unsupported facts reject the entire commit, leaving no partial
+Work, Direction or Script.
+
+Production starts from an exact immutable ScriptVersion. The existing video
+production/event ledger remains the only production truth: one script may drive
+many productions, while each production seals its source snapshot and never
+rebinds when a later script version appears.
 
 An empty Skill list removes Skill discovery/evolution instructions. Disabled
 memory removes memory loading and updates. The allowlist is applied after all
 configured, built-in, MCP, ACP, sub-Agent and self-modification tools are
 assembled, so an excluded tool cannot leak in through another source.
 
-The Personal-IP context middleware is not mounted for this clean Agent. Simple
+The retired Personal-IP portfolio context middleware is not mounted for this
+Agent. The four bounded content tools receive only authenticated, injected
+repositories and do not perform startup scans. Simple
 conversation therefore goes directly to one model call and makes no tool call.
 Search is used only when the answer depends on current or externally verified
 facts. Search citations are ordinary Markdown links placed next to the claim.
@@ -249,7 +276,8 @@ instead of web search or a repeated upload request.
 ## Retained execution products
 
 The following owner-scoped product surfaces remain available through dedicated
-UI and/or explicit APIs, but are not tools of the default Agent:
+UI and/or explicit APIs. Except for the bounded ScriptVersion-to-production
+entry above, they are not tools of the default Agent:
 
 - subjects, accounts, platform connections and OAuth;
 - publish requests and append-only attempts;
@@ -257,9 +285,10 @@ UI and/or explicit APIs, but are not tools of the default Agent:
 - video productions and their append-only event ledger;
 - the factual workspace dashboard.
 
-The production APIs/ledger being retained does not make the video workbench an
-active customer path. Its default runtime entry is off; reachability and
-end-to-end status are recorded only in `docs/IP_AGENT_PRODUCT_LEDGER.md`.
+The general video workbench runtime entry remains off. The content board may
+start and display a linked production without exposing the legacy production
+tool catalog; reachability and end-to-end execution status are recorded only in
+`docs/IP_AGENT_PRODUCT_LEDGER.md`.
 
 The dashboard displays observations and their timestamps. Missing data stays
 `未采集`; it does not infer high potential, paid-traffic suitability, or a

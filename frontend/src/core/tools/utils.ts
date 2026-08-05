@@ -24,6 +24,18 @@ export function explainToolCall(
     )
   ) {
     return t.common.thinking;
+  } else if (toolCall.name === "ip_evidence_inspect_reference_videos") {
+    return t.toolCalls.personalIpAnalyzingVideo;
+  } else if (toolCall.name === "ip_evidence_collect_douyin_benchmark_account") {
+    return t.toolCalls.personalIpCollectingBenchmark;
+  } else if (toolCall.name === "ip_content_save_breakdown") {
+    return t.toolCalls.personalIpSavingBreakdown;
+  } else if (toolCall.name === "ip_content_write") {
+    return t.toolCalls.personalIpWritingContent;
+  } else if (toolCall.name === "ip_content_read") {
+    return t.toolCalls.personalIpReadingContent;
+  } else if (toolCall.name === "ip_content_start_production") {
+    return t.toolCalls.personalIpStartingProduction;
   } else if (
     toolCall.name === "personal_ip_collect_browser_page" ||
     toolCall.name === "personal_ip_collect_douyin_browser_page"

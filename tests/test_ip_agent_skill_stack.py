@@ -94,47 +94,36 @@ def test_private_operating_intelligence_is_retained_but_runtime_isolated() -> No
 
 def test_clean_first_use_contract_has_no_fixed_orientation_or_skill_flow() -> None:
     config = _agent_config()
-    soul = (
-        ROOT / "product" / "defaults" / "agents" / "ip-agent" / "SOUL.md"
-    ).read_text(encoding="utf-8")
+    soul = (ROOT / "product" / "defaults" / "agents" / "ip-agent" / "SOUL.md").read_text(encoding="utf-8")
     assert config["skills"] == []
     assert config["memory_enabled"] is False
-    assert len(soul.splitlines()) <= 40
+    assert len(soul.splitlines()) <= 60
     assert "不要擅自启动固定访谈" in soul
     assert "用户事实" in soul
     assert "来源事实" in soul
-    assert "创作假设" in soul
+    assert "推导与假设" in soul
+    assert "完整脚本版本" in soul
 
 
 def test_capability_inventory_covers_exact_runtime_allowlist_and_every_public_skill() -> None:
     from deerflow.tools.tools import BUILTIN_TOOLS
 
-    ledger = (
-        ROOT / "docs" / "IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md"
-    ).read_text(encoding="utf-8")
+    ledger = (ROOT / "docs" / "IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md").read_text(encoding="utf-8")
 
-    active_tools = ledger.split("<!-- BEGIN ACTIVE IP AGENT TOOLS -->", 1)[1].split(
-        "<!-- END ACTIVE IP AGENT TOOLS -->", 1
-    )[0]
+    active_tools = ledger.split("<!-- BEGIN ACTIVE IP AGENT TOOLS -->", 1)[1].split("<!-- END ACTIVE IP AGENT TOOLS -->", 1)[0]
     listed_tools = set(re.findall(r"^\| `([^`]+)` \|", active_tools, re.MULTILINE))
     assert listed_tools == set(_agent_config()["tool_allowlist"])
 
-    isolated_builtins = ledger.split(
-        "<!-- BEGIN ISOLATED NATIVE BUILTIN TOOLS -->", 1
-    )[1].split("<!-- END ISOLATED NATIVE BUILTIN TOOLS -->", 1)[0]
-    listed_builtins = set(
-        re.findall(r"^\| `([^`]+)` \|", isolated_builtins, re.MULTILINE)
-    )
+    isolated_builtins = ledger.split("<!-- BEGIN ISOLATED NATIVE BUILTIN TOOLS -->", 1)[1].split("<!-- END ISOLATED NATIVE BUILTIN TOOLS -->", 1)[0]
+    listed_builtins = set(re.findall(r"^\| `([^`]+)` \|", isolated_builtins, re.MULTILINE))
     runtime_builtins = {tool.name for tool in BUILTIN_TOOLS}
-    assert listed_builtins | {"ask_clarification"} == runtime_builtins
+    active_builtins = listed_tools & runtime_builtins
+    assert listed_builtins.isdisjoint(active_builtins)
+    assert listed_builtins | active_builtins | {"ask_clarification"} == runtime_builtins
 
-    public_inventory = ledger.split("<!-- BEGIN PUBLIC SKILL INVENTORY -->", 1)[1].split(
-        "<!-- END PUBLIC SKILL INVENTORY -->", 1
-    )[0]
+    public_inventory = ledger.split("<!-- BEGIN PUBLIC SKILL INVENTORY -->", 1)[1].split("<!-- END PUBLIC SKILL INVENTORY -->", 1)[0]
     listed_skills = set(re.findall(r"^\| `([^`]+)` \|", public_inventory, re.MULTILINE))
-    public_skills = {
-        path.parent.name for path in (ROOT / "skills" / "public").glob("*/SKILL.md")
-    }
+    public_skills = {path.parent.name for path in (ROOT / "skills" / "public").glob("*/SKILL.md")}
     assert len(public_skills) == 97
     assert listed_skills == public_skills
 
@@ -146,9 +135,7 @@ def test_upstream_media_skills_keep_hidden_evaluations() -> None:
 
 def test_skill_lab_is_isolated_from_customer_agent() -> None:
     configured = set(_agent_config()["skills"])
-    assert (
-        not {"skillhone", "skillhone-evaluation", "skillhone-optimization"} & configured
-    )
+    assert not {"skillhone", "skillhone-evaluation", "skillhone-optimization"} & configured
 
     lab = ROOT / "product" / "skill-lab"
     policy = yaml.safe_load((lab / "policy.yaml").read_text(encoding="utf-8"))
@@ -172,61 +159,31 @@ def test_cangjie_methodology_is_attributed_without_vendoring_runtime() -> None:
 
 
 def test_cinematic_ip_matrix_and_assets_are_complete() -> None:
-    matrix = yaml.safe_load(
-        (ROOT / "product" / "cinematic-ip" / "matrix.yaml").read_text(encoding="utf-8")
-    )
+    matrix = yaml.safe_load((ROOT / "product" / "cinematic-ip" / "matrix.yaml").read_text(encoding="utf-8"))
     assert matrix["version"] == "4.0.0"
     assert matrix["architecture"]["total_skills"] == 35
     assert {item["name"] for item in matrix["skills"]} == CINEMATIC_IP_SKILLS
-    assert {
-        name for names in matrix["skill_groups"].values() for name in names
-    } == CINEMATIC_IP_SKILLS
+    assert {name for names in matrix["skill_groups"].values() for name in names} == CINEMATIC_IP_SKILLS
 
     for name in CINEMATIC_IP_SKILLS:
         root = ROOT / "skills" / "public" / name
         assert (root / "SKILL.md").is_file(), name
         assert (root / "agents" / "openai.yaml").is_file(), name
 
-    database = (
-        ROOT
-        / "skills"
-        / "public"
-        / "query-cinematic-library"
-        / "assets"
-        / "cinema_library.sqlite"
-    )
+    database = ROOT / "skills" / "public" / "query-cinematic-library" / "assets" / "cinema_library.sqlite"
     with sqlite3.connect(database) as connection:
         assert connection.execute("SELECT COUNT(*) FROM films").fetchone()[0] == 358
         assert connection.execute("SELECT COUNT(*) FROM creators").fetchone()[0] == 393
-        assert (
-            connection.execute("SELECT COUNT(*) FROM mechanism_cards").fetchone()[0]
-            == 304
-        )
+        assert connection.execute("SELECT COUNT(*) FROM mechanism_cards").fetchone()[0] == 304
 
-    curriculum = json.loads(
-        (
-            ROOT
-            / "skills"
-            / "public"
-            / "run-cinematic-curriculum"
-            / "references"
-            / "curriculum.json"
-        ).read_text(encoding="utf-8")
-    )
+    curriculum = json.loads((ROOT / "skills" / "public" / "run-cinematic-curriculum" / "references" / "curriculum.json").read_text(encoding="utf-8"))
     assert len(curriculum["tracks"]) == 8
     assert sum(len(track["modules"]) for track in curriculum["tracks"]) == 96
 
-    source_manifest = json.loads(
-        (ROOT / "product" / "cinematic-ip" / "source_manifest.json").read_text(
-            encoding="utf-8"
-        )
-    )
+    source_manifest = json.loads((ROOT / "product" / "cinematic-ip" / "source_manifest.json").read_text(encoding="utf-8"))
     for source in source_manifest:
         if path := source.get("path"):
-            assert (
-                hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
-                == source["sha256"]
-            )
+            assert hashlib.sha256((ROOT / path).read_bytes()).hexdigest() == source["sha256"]
 
 
 def test_cinematic_ip_stack_is_research_only() -> None:
@@ -238,21 +195,15 @@ def test_cinematic_ip_stack_is_research_only() -> None:
     assert not (calibrate / "scripts" / "ip_os.py").exists()
     assert (ingest / "SKILL.md").is_file()
     assert (calibrate / "SKILL.md").is_file()
-    quarantine = (ROOT / "product" / "research" / "ip-agent" / "README.md").read_text(
-        encoding="utf-8"
-    )
+    quarantine = (ROOT / "product" / "research" / "ip-agent" / "README.md").read_text(encoding="utf-8")
     assert "not registered as production tools" in quarantine
     assert "described as active product capability" in quarantine
 
-    curriculum_cli = (curriculum / "scripts" / "curriculum_cli.py").read_text(
-        encoding="utf-8"
-    )
+    curriculum_cli = (curriculum / "scripts" / "curriculum_cli.py").read_text(encoding="utf-8")
     assert "completion-ledger" not in curriculum_cli
     assert 'add_parser("record")' not in curriculum_cli
 
-    orchestration = (
-        ROOT / "skills" / "public" / "build-cinematic-ip-system" / "SKILL.md"
-    ).read_text(encoding="utf-8")
+    orchestration = (ROOT / "skills" / "public" / "build-cinematic-ip-system" / "SKILL.md").read_text(encoding="utf-8")
     assert "客户输出不得出现 Skill 名" in orchestration
 
 
@@ -263,15 +214,9 @@ def test_differentiation_research_assets_remain_available_for_review() -> None:
     assert (differentiation / "references" / "thesis-contract.md").is_file()
     assert (differentiation / "references" / "decision-judgment.md").is_file()
 
-    strategy = (
-        ROOT / "skills" / "public" / "ip-strategy-director" / "SKILL.md"
-    ).read_text(encoding="utf-8")
-    series = (
-        ROOT / "skills" / "public" / "design-ip-series-bible" / "SKILL.md"
-    ).read_text(encoding="utf-8")
-    direction = (
-        ROOT / "skills" / "public" / "direct-ip-visual-language" / "SKILL.md"
-    ).read_text(encoding="utf-8")
+    strategy = (ROOT / "skills" / "public" / "ip-strategy-director" / "SKILL.md").read_text(encoding="utf-8")
+    series = (ROOT / "skills" / "public" / "design-ip-series-bible" / "SKILL.md").read_text(encoding="utf-8")
+    direction = (ROOT / "skills" / "public" / "direct-ip-visual-language" / "SKILL.md").read_text(encoding="utf-8")
     assert "creative_hypothesis" in strategy
     assert "personal_ip_record_strategy" not in strategy
     assert "差异化版本" in series
@@ -300,16 +245,10 @@ def test_benchmark_to_script_skills_have_one_clean_semantic_contract() -> None:
     }
     for name in selected:
         package = ROOT / "skills" / "public" / name
-        texts = [
-            path.read_text(encoding="utf-8")
-            for path in package.rglob("*")
-            if path.is_file() and path.suffix in {".md", ".yaml", ".py"}
-        ]
+        texts = [path.read_text(encoding="utf-8") for path in package.rglob("*") if path.is_file() and path.suffix in {".md", ".yaml", ".py"}]
         joined = "\n".join(texts)
         for term in retired_runtime_terms:
             assert term not in joined, f"{name} retains retired term: {term}"
 
-    episode = (ROOT / "skills" / "public" / "write-ip-episode" / "SKILL.md").read_text(
-        encoding="utf-8"
-    )
+    episode = (ROOT / "skills" / "public" / "write-ip-episode" / "SKILL.md").read_text(encoding="utf-8")
     assert "不机械拼接多份方法报告" in episode

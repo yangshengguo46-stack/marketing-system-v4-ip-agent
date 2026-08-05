@@ -2,7 +2,10 @@ import { fetch } from "@/core/api/fetcher";
 import { getBackendBaseURL } from "@/core/config";
 
 export type PersonalIPBackup = {
-  schema_version: "personal-ip-owner-backup-v1";
+  schema_version:
+    | "personal-ip-owner-backup-v1"
+    | "personal-ip-owner-backup-v2"
+    | "personal-ip-owner-backup-v3";
   owner_user_id: string;
   exported_at: string;
   credential_policy?: {
@@ -22,6 +25,19 @@ export type PersonalIPBackup = {
     manifest_digest: string;
   };
 };
+
+export function isPersonalIPBackup(value: unknown): value is PersonalIPBackup {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<PersonalIPBackup>;
+  return (
+    (candidate.schema_version === "personal-ip-owner-backup-v1" ||
+      candidate.schema_version === "personal-ip-owner-backup-v2" ||
+      candidate.schema_version === "personal-ip-owner-backup-v3") &&
+    Array.isArray(candidate.datasets) &&
+    typeof candidate.verification?.data_digest === "string" &&
+    typeof candidate.verification?.manifest_digest === "string"
+  );
+}
 
 export type PersonalIPDeletePreview = {
   schema_version: "personal-ip-destructive-delete-preview-v1";

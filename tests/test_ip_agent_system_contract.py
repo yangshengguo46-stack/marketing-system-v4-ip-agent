@@ -6,28 +6,11 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "IP_AGENT.md"
 LEDGER = ROOT / "docs" / "IP_AGENT_PRODUCT_LEDGER.md"
 AUDIT_CLOSEOUT = ROOT / "docs" / "IP_AGENT_AUDIT_REMEDIATION_LEDGER.md"
-CAPABILITY_INVENTORY = (
-    ROOT / "docs" / "IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md"
-)
-LEDGER_HISTORY = (
-    ROOT
-    / "product"
-    / "research"
-    / "ip-agent"
-    / "IP_AGENT_PRODUCT_LEDGER_HISTORY_2026-08-04.md"
-)
-VIDEO_MIGRATION_HISTORY = (
-    ROOT / "docs" / "handoffs" / "VIDEO_PIPELINE_MIGRATION_HISTORY.md"
-)
+CAPABILITY_INVENTORY = ROOT / "docs" / "IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md"
+LEDGER_HISTORY = ROOT / "product" / "research" / "ip-agent" / "IP_AGENT_PRODUCT_LEDGER_HISTORY_2026-08-04.md"
+VIDEO_MIGRATION_HISTORY = ROOT / "docs" / "handoffs" / "VIDEO_PIPELINE_MIGRATION_HISTORY.md"
 VOLCENGINE_CAPABILITIES = ROOT / "product" / "volcengine" / "capabilities.yaml"
-MEDIAKIT_CANARIES = (
-    ROOT
-    / "product"
-    / "research"
-    / "ip-agent"
-    / "mediakit"
-    / "2026-08-03-capability-canaries.yaml"
-)
+MEDIAKIT_CANARIES = ROOT / "product" / "research" / "ip-agent" / "mediakit" / "2026-08-03-capability-canaries.yaml"
 
 RESEARCH_DOCUMENTS = {
     "IP_AGENT_NARRATIVE_INTERVIEW_RESEARCH.md",
@@ -55,14 +38,16 @@ def _markdown_table_rows(section: str, header: str) -> list[list[str]]:
     return rows
 
 
-def test_contract_separates_shipped_runtime_from_approved_target() -> None:
+def test_contract_defines_the_shipped_three_board_runtime() -> None:
     text = CONTRACT.read_text(encoding="utf-8")
 
-    assert "approved target architecture" in text
-    assert "it is not enabled in the default runtime" in text
     assert "skills: []" in text
     assert "memory_enabled: false" in text
-    assert "Owner -> Subject -> IPObjective -> IPDirectionVersion" in text
+    assert "Owner -> Subject -> Objective -> ContentWork" in text
+    assert "BreakdownVersion -> DirectionVersion -> ScriptVersion" in text
+    assert "ip_content_start_production" in text
+    assert "exact typed Evidence MCP ToolMessage" in text
+    assert "Production starts from an exact immutable ScriptVersion" in text
     assert "all 97 quarantined public Skills" not in text
 
 
@@ -76,17 +61,12 @@ def test_product_ledger_is_the_only_current_status_source_and_has_three_boards()
     assert all(len(row) == 5 for row in rows)
     assert [row[0] for row in rows] == ["拆解", "编剧脑", "制作"]
     assert [row[2] for row in rows] == [
-        "局部可用",
-        "研究验证中，产品不可达",
-        "底盘存在，客户链未接通",
+        "现役",
+        "现役",
+        "有界接通",
     ]
 
-    competing_claims = [
-        path.relative_to(ROOT).as_posix()
-        for path in (ROOT / "docs").rglob("*.md")
-        if path != LEDGER
-        and "唯一当前产品状态记录" in path.read_text(encoding="utf-8")
-    ]
+    competing_claims = [path.relative_to(ROOT).as_posix() for path in (ROOT / "docs").rglob("*.md") if path != LEDGER and "唯一当前产品状态记录" in path.read_text(encoding="utf-8")]
     assert competing_claims == []
 
 
@@ -97,9 +77,10 @@ def test_product_ledger_has_exactly_one_active_delivery_slice() -> None:
 
     assert len(rows) == 1
     assert rows[0][0] == "V1 内容纵切"
-    assert rows[0][2] == "当前唯一主线"
-    assert "BreakdownVersion → DirectionVersion → 完整 ScriptVersion" in rows[0][1]
-    assert "V1 明确不包含视频生成" in text
+    assert rows[0][2] == "最终版"
+    assert "零起盘 / 精确链接或上传" in rows[0][1]
+    assert "完整 ScriptVersion → 绑定 Production" in rows[0][1]
+    assert "V1 不把供应商成片、自动发布、账号历史诊断" in text
 
 
 def test_product_ledger_separates_active_exact_media_analysis_from_isolated_suites() -> None:
@@ -150,9 +131,7 @@ def test_old_ledgers_and_research_are_quarantined_as_history() -> None:
     assert not (ROOT / "docs" / "VIDEO_PIPELINE_MIGRATION_LEDGER.md").exists()
     assert "Historical handoff frozen" in video_history
     assert "not current customer-reachability" in video_history
-    assert "Current product state is owned only by `docs/IP_AGENT_PRODUCT_LEDGER.md`" in (
-        video_history
-    )
+    assert "Current product state is owned only by `docs/IP_AGENT_PRODUCT_LEDGER.md`" in (video_history)
 
     for filename in RESEARCH_DOCUMENTS:
         assert not (ROOT / "docs" / filename).exists()

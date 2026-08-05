@@ -2,119 +2,124 @@
 
 最后复核：2026-08-05。
 
-本文件是唯一当前产品状态记录，只回答四个问题：三个核心板块现在能不能用、已经用什么真实样本验证、断点在哪里、下一步是什么。`IP_AGENT.md` 是运行合同；历史实验、长篇 Run 记录和失败细节保存在 `product/research/ip-agent/`，不得反向冒充现役能力。
+本文件是唯一当前产品状态记录。`IP_AGENT.md` 规定运行边界；历史实验、失败样本和研究材料只保存在 `product/research/ip-agent/`，不能反向冒充现役能力。
 
-## 产品闭环
+## 最终产品定义
 
-IP Agent 只有三个客户核心板块：
+IP Agent 是一套面向人物、品牌、产品和组织的内容生产系统，不是“写几句文案”的聊天机器人。客户只看到三个核心板块：
 
 ```text
-链接 / 上传素材
-      ↓
-拆解 ──> 编剧脑 ──> 制作 ──> 成片 / 发布结果
-  ↑                              │
-  └──────── 真实观测与制作反馈 ────┘
+零起盘 ───────────────────────────┐
+                                  ├─> 编剧脑 ─> 制作 ─> 成片 / 发布结果
+精确链接或上传 ─> 拆解 ───────────┘                    │
+        ↑                                              │
+        └──────── 真实观测与制作反馈（后续控制回路） ───┘
 ```
 
-账号、凭证、成本、回执、运行日志和数据备份是共享底盘，不是第四个业务板块。反馈是连接三个板块的控制回路，也不是独立产品中心。
+编剧脑固定为两层：起盘决策脑理解人物、业务、产品、目标、资源和限制并选择方向；内容创作脑把方向变成故事与完整可拍剧本。反馈连接三块，但不是第四个产品板块。
 
 ## 三大核心板块
 
-| 核心板块 | 系统角色 | 当前状态 | 已经真实成立 | 当前断点 |
+| 核心板块 | 系统角色 | 当前状态 | 已经成立 | 明确边界 |
 | --- | --- | --- | --- | --- |
-| 拆解 | 传感器：把指定外部内容变成可引用证据 | 局部可用 | 精确抖音作品或上传视频可运行固定 `full + 12` 分析，包含本地身份/哈希/元数据/抽帧以及 MediaKit ASR、OCR、场景切分和故事线 | 结果主要停留在一次 ToolMessage，没有沉淀为 Owner 范围内的 `BreakdownVersion`；账号主页采集仍依赖登录态和平台稳定性 |
-| 编剧脑 | 控制器：把事实、目标和创作假设编译成方向与可拍剧本 | 研究验证中，产品不可达 | 隔离研究中的方向阶段真实盲审达到 85/100；最新故事结果已有行动、反馈、代价和制作翻译 | 仍在研究隔离区；最新故事合同机械校验未通过；只到方向/一句话故事，没有正式 `ScriptVersion`、持久化或默认 Agent 入口 |
-| 制作 | 执行器：把确定剧本编译为资产、镜头、时间线和成片 | 底盘存在，客户链未接通 | Owner 范围内的视频 production/event 账本、预算事件、时间线修订、最终锁定、本地 FFmpeg 渲染和机械 QA 已有实现与局部验收 | 默认 IP Agent 没有制作工具，`video_workbench` 产品入口为 `off`，普通 UI 不能完整创建并执行一条真实供应商制作任务；现有 production 也不绑定正式剧本版本 |
+| 拆解 | 传感器：把指定外部内容变成可引用证据 | 现役 | 精确作品链接或上传视频可执行固定 `full + 12` 分析；同任务 Evidence 回执可保存为不可变 `BreakdownVersion` | 账号主页仍受登录态和平台稳定性影响；视觉估计不能冒充精确光学参数 |
+| 编剧脑 | 决策器与创作器：先定方向，再写完整剧本 | 现役 | 零起盘与对标路线汇入同一 `ContentWork`；正式 `DirectionVersion`、`ScriptVersion` 可保存、读取和派生 | 模型输出仍须经过事实/虚构边界闸门；质量判断不等于传播效果保证 |
+| 制作 | 执行器：从确定剧本建立制作任务 | 有界接通 | 内容板可从精确 `ScriptVersion` 启动一个或多个绑定 production，并读取真实账本状态 | 当前纵切只保证无损交接与账本绑定；通用视频工作台及真实供应商成片链未因此自动启用 |
 
 ### 拆解的准确口径
 
-- 精确视频拆解：现役。默认 Agent 可以对明确作品链接或上传文件调用一次固定深度分析。
-- 对标账号采集：局部可用。能在已绑定且登录有效时取得作者归属可验证的作品清单，但平台登录态与覆盖仍是外部条件。
-- 景别、机位、运动和剪辑关系可以做视觉观察；精确光学焦段只有源文件确实带有可读元数据时才能确认，否则只能给近似视觉判断，不能把估计写成毫米数事实。
-- MediaKit Smart Strategy、Video Understanding Chat、Remux 和 Vibe 是独立能力，不因 MediaKit Evidence 已接通而自动成为现役产品能力；当前保持隔离。
-- 拆解输出是来源观测，不自动成为可迁移机制、IP 方向或因果结论。
+- 精确视频拆解：现役。默认 Agent 对明确作品链接或上传文件调用一次完整视频证据分析。
+- 外部素材只有在同一任务里存在精确匹配的 Evidence MCP 调用与 ToolMessage 时才能入账。服务端校验 request、item、来源、哈希和完整 typed snapshot，REST 或模型不能伪造。
+- `BreakdownVersion` 分开保存可观察内容、解释假设和限制；来源观测不会自动升级为可迁移因果机制。
+- 景别、机位、运动、剪辑和声音可作为视觉/听觉观察；精确焦段只有源文件元数据或足够标定条件时才可确认。
+- MediaKit Smart Strategy、Video Understanding Chat、Remux 和 Vibe 是不同合同，当前保持隔离，不因 Evidence 已接通而自动成为现役产品能力。
 
 ### 编剧脑的准确口径
 
-- 可保留的核心方法是“事实收敛 → 语义内核 → 近/中/远联想 → 关系冲突 → 行动、反馈、换招、选择与代价 → 可拍翻译”。
-- 方向研究通过不等于完整编剧脑通过。完整产品至少要形成可版本化方向、完整单集剧本和制作交接合同。
-- 旧六段 Skill 拼接实验没有证明净增益，不恢复为默认编排。
-- 当前默认 Agent 仍为 `skills: []`、`memory_enabled: false`；研究文件不能被运行时直接导入。
+- 起盘决策脑由 Lead Agent 负责：结合目标、观众情境、真实材料与限制，形成前提、张力、承诺、路线、理由和 truth mode。
+- 内容创作脑由有界 Writer Brain 负责：事实型只读取显式 claim basis；纯虚构先让隔离故事发动机锁定一条因果故事，再做制作翻译；混合型同时保留事实依据和创作披露。
+- 纯虚构故事发动机看不到 Owner 身份、履历、商业目标、品牌、产品、账号或拍摄条件。正式脚本还要经过第二个 fail-closed 边界审查；失败时 Work、Direction、Script 均不部分提交。
+- 修改稿派生新版本，不覆盖旧稿。正式 Script 不能通过通用 REST 绕过 Writer Brain。
 
 ### 制作的准确口径
 
-- 现有视频账本是制作分账，可以继续复用，不建立第二套制作数据库。
-- “合同可编译”“局部工具存在”“模拟 E2E 通过”和“客户可以从正常入口完成真实制作”是四种不同状态；只有最后一种可称完整产品可用。
-- 视频生成管线不是当前首条纵切的完成条件。先把确定的 `ScriptVersion` 无损交给 production，再继续供应商执行与完整 Timeline IR 渲染。
+- 复用唯一的 `personal_ip_video_productions` 与 event 账本，不建立第二套制作数据库。
+- production 的来源由服务端从精确 ScriptVersion 重建并封存；调用方不能粘贴或覆盖来源。后来出现的新 ScriptVersion 不会改绑旧 production。
+- 同一 ScriptVersion 可以因比例、平台或制作模式分叉为多个 production；归档 Work 只允许精确幂等重放，不允许新任务。
+- “已建立绑定制作任务”不等于“供应商已生成资产或交付成片”。后者必须由 production events、最终 artifact 和 QA 回执证明。
+
+## 两个现役入口
+
+| 入口 | 用户提供 | 系统最小产物 | Breakdown 要求 |
+| --- | --- | --- | --- |
+| 零起盘 `zero_start` | 人物/品牌/产品、目标、观众情境、真实材料和硬限制中的最少必要信息 | 推荐方向、完整正式脚本、可选制作任务 | 可选；不得为了走流程强迫用户先找对标 |
+| 对标 `benchmark` | 精确作品链接或上传文件 | Evidence、拆解版本、方向、完整正式脚本、可选制作任务 | 必须绑定同任务的精确 Evidence 回执 |
+
+“已有账号历史”保留为未来入口，不出现在当前路由或 UI 中。两条现役路线共享同一编剧脑、版本账本和制作账本，不是两套系统。
 
 ## 共同内容主线
 
-当前三个板块缺少同一个内部作品身份。证据合同中的 `work_id` 目前表示抖音等平台的外部作品号；产品本体中的 `Work` 表示我们自己准备创作、制作和发布的内容。两者必须停止同名。
+```text
+Owner → Subject → Objective → ContentWork
+  → BreakdownVersion → DirectionVersion → ScriptVersion
+  → VideoProduction → Artifact → Publication
+  → Observation → LearningDecision
+```
 
-| 对象 | 含义 | 当前状态 |
+| 对象 | 当前状态 | 权威含义 |
 | --- | --- | --- |
-| `platform_content_id` | 外部平台作品号，例如抖音 aweme id | 已有数据，待从含混的 `work_id` 明确迁移命名 |
-| `content_work_id` | 系统内部一条原创内容的稳定主键 | 缺失 |
-| `breakdown_version_id` | 一次可复放的拆解结果及其来源、覆盖、哈希 | 缺失 |
-| `direction_version_id` | 编剧脑选定方向及其事实引用和创作假设 | 缺失 |
-| `script_version_id` | 一份不可变、可派生、可进入制作的剧本版本 | 缺失 |
-| `production_id` | 制作任务 | 已有，但未绑定 `script_version_id` |
-| `artifact_id` | 成片或其他交付物及其内容哈希 | 部分存在于制作事件 JSON，缺少统一业务对象 |
-| `publication_id` | 一次发布及外部帖子身份 | 现有 publish receipt 可承载，但未绑定内容/成片主键 |
-| `observation_id` | 发布后指标、评论或制作反馈 | 已有局部分账，但没有贯穿内容主线 |
-| `learning_decision_id` | 基于成熟观测决定下一版本只改什么 | 缺失 |
+| `objective_id` | 已实现 | 一次作品目标的服务端稳定身份 |
+| `content_work_id` | 已实现 | 系统内部一条原创内容的稳定主键；不同于外部平台作品号 |
+| `breakdown_version_id` | 已实现 | 绑定来源、覆盖、Evidence snapshot 与哈希的不可变拆解版本 |
+| `direction_version_id` | 已实现 | 方向判断、事实引用、创作假设和父版本 |
+| `script_version_id` | 已实现 | 经 Writer Brain 与边界闸门生成的完整不可变剧本 |
+| `production_id` | 已绑定 | 绑定精确 Work/Script 的制作任务；兼容历史未绑定记录 |
+| `artifact_id` | 后续纵切 | 成片或资产及内容哈希；当前仍主要存在于制作事件中 |
+| `publication_id` | 后续纵切 | 发布回执将来绑定 Work、Script 与 Artifact |
+| `observation_id` | 后续纵切 | 发布后指标、评论和制作反馈；缺失保持缺失 |
+| `learning_decision_id` | 后续纵切 | 基于成熟观测决定下一版本只改什么 |
 
-聊天记录、提示词、Skill、ToolMessage、Run Event 和供应商任务都不能替代这条内容主线。它们是交互、方法、传输或执行证据，不是业务总账。
+任务、聊天、Prompt、Skill、ToolMessage、Run Event 和供应商任务都不能替代这条业务主线。任务只记录来源，不授予 Owner 权限。
 
 ## 当前唯一交付主线
 
 | 编号 | 目标 | 状态 | 完成条件 |
 | --- | --- | --- | --- |
-| V1 内容纵切 | `精确抖音链接/上传文件 → BreakdownVersion → DirectionVersion → 完整 ScriptVersion` | 当前唯一主线 | 同一 Owner、同一 `content_work_id` 贯穿三版对象；来源事实与创作假设可回指；用户可保存、读取和派生新剧本版本；刷新页面后仍存在；至少一条真实样本由默认产品入口完成 |
+| V1 内容纵切 | `零起盘 / 精确链接或上传 → BreakdownVersion（按入口）→ DirectionVersion → 完整 ScriptVersion → 绑定 Production` | 最终版 | 同一 Owner/Work 谱系可从正常 UI 与默认 Agent 入口创建、刷新读取、派生和归档；事实、证据、假设、虚构与制作回执分层；旧备份可恢复，跨 Owner/错版本绑定拒绝 |
 
-V1 明确不包含视频生成、自动发布、八平台诊断、长期记忆或方法自动升级。它先证明拆解与编剧脑已经组成一辆能跑的车，再把确定剧本交给已有制作分账。
+V1 不把供应商成片、自动发布、账号历史诊断、长期记忆或方法自动学习冒充已完成。它们只能沿现有主线逐段解冻，不再重构三板与核心身份。
 
 ## 后续顺序
 
 | 顺序 | 纵切 | 解冻条件 |
 | ---: | --- | --- |
-| 1 | V1 拆解到完整剧本 | 当前执行 |
-| 2 | V2 `ScriptVersion → production → final artifact` | V1 真实样本通过；production 强绑定剧本版本 |
-| 3 | V3 `artifact → publication → observation` | V2 真实成片通过；发布回执绑定成片哈希与内容主键 |
-| 4 | V4 `observation → LearningDecision → next ScriptVersion` | 有成熟观测窗口；缺失值不当零，相关性不冒充因果 |
+| 1 | `Production → final Artifact` | 新内容绑定任务完成一次真实供应商执行、QA 与成片哈希回执 |
+| 2 | `Artifact → Publication → Observation` | 发布回执绑定 Work/Script/Artifact，成熟观察窗口保持缺失值语义 |
+| 3 | `Observation → LearningDecision → next ScriptVersion` | 有足够真实样本；相关性不冒充因果，变更保持可追踪 |
 
 ## 当前可达运行面
 
-- 默认 `ip-agent`：八个只读基线工具，加两个 Evidence MCP 工具；无 Skill、无长期记忆、无 Personal-IP 制作/发布/指标工具。
-- 拆解：精确链接或上传文件可以进入 MediaKit Evidence 路径；云分析由 `MEDIAKIT_API_KEY` 直接启用，不做逐次付费批准。
-- Owner 专用 API/UI：主体、账号、平台连接、发布回执、指标、平台观察和视频制作分账继续存在，但默认 Agent 不自动拥有这些能力。
-- 视频工作台：已有 projection 和局部编辑能力；Agent 产品入口关闭，因此不能描述为端到端可用。
+- `/workspace/content` 是三板主界面，提供零起盘、对标拆解、版本读取和正式剧本启动制作入口。
+- 默认 `ip-agent` 为八个基线工具、两个 Evidence 工具和四个有界内容工具，共 14 个；`skills: []`、`memory_enabled: false`。
+- `/api/personal-ip/content-works` 提供 Owner-scoped 读取、版本追加与归档；外部 Breakdown 和正式 Script 的安全门不能由 REST 绕过。
+- Production 板只把 v2、当前 Work、谱系内正式 Script 三者匹配的记录显示为已绑定；legacy 或错配数据不会被猜成绑定。
+- Owner 备份现行为 v3；真实 v1/v2 先按旧字段形状和原摘要验证，再只在内存中升级。Subject 仍有 active 或 archived 内容时拒绝删除。
 
 ## 验证证据
 
-- 2026-08-04：干净线程只调用一次 `ip_evidence_inspect_reference_videos`，176.104 秒完成固定 `full`、12/12 帧、ASR、OCR、场景切分和故事线，`operation_status=ok`。
-- 2026-08-05：当前工作树的拆解、制作账本和产品运行身份定向回归共 75 项通过。
-- 编剧脑方向研究的最新独立盲审为 85/100；最新故事输出仍因缺少 `counterforce` 且 `chosen` 表达不符合合同而机械失败，质量盲审未完成，所以不是产品能力。
-- 制作底盘的历史局部真实执行、模拟 E2E 和一镜时间线验收只证明对应局部路径；默认 Agent 入口关闭，不能据此声明完整制作链已交付。
+- 2026-08-04：干净任务真实调用一次 `ip_evidence_inspect_reference_videos`，176.104 秒完成固定 `full + 12`、ASR、OCR、场景切分和故事线，`operation_status=ok`。
+- 2026-08-05：最终后端回归 Personal-IP 335 项、IP-Agent 400 项、配置与产品运行时 302 项、迁移与 Bootstrap 77 项全部通过；新增内容/证据/Writer Brain/Production 绑定均包含绕过、并发、归档和跨 Owner 反例。
+- 2026-08-05：前端单测 737 项通过，生产构建完成 81/81 静态页且包含 `/workspace/content`；内容三板、正式绑定、legacy fail-closed、桌面和移动导航的 7/7 定向 Playwright 通过。
+- 2026-08-05：Owner backup 的真实 v1/v2 production+event、合法 linked v3 roundtrip 均通过；跨 Owner、错 Work/Script、篡改脚本后重签全部被拒，合法 snapshot/request digest 可独立重算一致。
+- 2026-08-05：默认 Agent 的正常零起盘 run `22c2da70-bb25-4364-8163-39fbc0de8f34` 为 `success`，生成 Work `content-work-763ecd4ed5a14bd7b6656ce9104ba807`、Direction v1、正式 Script v1，且 Breakdown 数量为 0；随后正常 run `6ff594ae-bd10-4aec-a097-1329ba6b1a5d` 为 `success`，建立精确绑定该 Work/Script 的 production v2。两次均未人为缩小递归预算。
+- 2026-08-05：真实上传视频由 MediaKit 用 196.368 秒完成 `full + 12`，12/12 帧、ASR、OCR、场景切分和故事线均完成；谱系 `content-work-b145962a99bb49ce9c1b6717653f183a → breakdown-ec0d7eb6e12e483c8281b8d6564d2e0a → direction-b6d690e760954a8098e3fa68cca2991a → script-40c09e618a1347148e2fc899b4e0ef00 → video-production-b8300d8038f0408eb87964cbc6fd6fad` 经 API、SQLite 和摘要重算一致。
+- 2026-08-05：同一 benchmark 的纠偏 run `32959327-06be-46ec-8a92-1c9036a2e75b` 为 `success`，Evidence 调用为 0、Breakdown 数量保持 2，精确复用上述 v2 并派生 Direction v2 / Script v2；ASR 只表述为“两条口语转写、未返回其他口语转写”，音乐、环境声和音效保持未知，机制判断均保留为假设。
+- 默认 Agent 产品文件当前摘要为 `988b3ebe5af040d9799991a5c43b75f6943a63abfae7c2d76cc990a87e51e44a`。
 
-## 保留的执行底盘
+## 固定边界
 
-Owner 隔离、凭证不进入模型、OAuth 状态、版权与披露、删除、路径/哈希/候选一致性、不可变回执和幂等性继续保留。它们只保证执行正确，不参与选题、创作强度或经营判断。
+Owner 隔离、凭证保密、OAuth state、权利与披露、删除、路径/哈希/候选一致性、不可变回执和幂等性继续保留。外部证据、用户事实、推导假设、创作虚构和执行回执必须分开。
 
-付费调用账本是执行分账。默认 MediaKit Evidence 路径配置 Key 后直接运行；兼容性 paid-call admission 不得重新变成默认创作流程的逐次批准门。
+旧 strategy、differentiation、preflight、retrospective、evidence promotion、startup cockpit 和固定叙事访谈运行层保持退役。电影化 Skill 与 `product/research/` 只做研究库存；生产包不得导入研究隔离区。
 
-## 已退役或隔离
-
-- 旧 strategy、differentiation、preflight、HLLM-Lite prediction、retrospective、evidence promotion、cockpit 和固定叙事访谈运行层保持退役。
-- 电影化 Skill、平台诊断、Cangjie、HLLM 和 director-core 均为研究库存，只有经过真实纵切验收的最小方法才可提升。
-- 研究文档、旧迁移状态、源码存在、Schema、Mock、模拟 E2E 和供应商宣传都不是客户可达能力证明。
-
-## 历史与库存
-
-- 旧产品总台账原文：`product/research/ip-agent/IP_AGENT_PRODUCT_LEDGER_HISTORY_2026-08-04.md`。
-- 净化整改结案：`docs/IP_AGENT_AUDIT_REMEDIATION_LEDGER.md`，只保存历史整改证据，不再发布当前产品状态。
-- 工具与 Skill 库存：`docs/IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md`，只做机器核对的能力清单。
-- 视频迁移历史：`docs/handoffs/VIDEO_PIPELINE_MIGRATION_HISTORY.md`，其旧状态词只描述当时迁移检查，不代表今天客户可达。
-- 真实原始实验、Canary 和长篇模型输出位于 `product/research/ip-agent/`。
-
-除本文件外，不得新建平行的当前产品状态台账。任何“已完成”必须同时给出客户可达入口、真实样本、实际终态和对应版本/哈希；只有代码、测试或研究结果时必须写成局部证据。
+除本文件外，不得新建平行的当前产品状态台账。只有客户入口、真实终态和对应版本/哈希同时存在时才可写“完成”。

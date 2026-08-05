@@ -31,13 +31,7 @@ def _install_binding_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("IP_AGENT_EVIDENCE_BINDING_ACTIVE_KID", "test-a")
     monkeypatch.setenv(
         "IP_AGENT_EVIDENCE_BINDING_KEYS_JSON",
-        json.dumps(
-            {
-                "test-a": base64.urlsafe_b64encode(b"a" * 32)
-                .decode("ascii")
-                .rstrip("=")
-            }
-        ),
+        json.dumps({"test-a": base64.urlsafe_b64encode(b"a" * 32).decode("ascii").rstrip("=")}),
     )
 
 
@@ -110,6 +104,23 @@ def test_binding_rejects_tampered_kid_payload_or_signature(segment: int) -> None
     parts[segment] = parts[segment][:-1] + ("A" if parts[segment][-1] != "A" else "B")
 
     with pytest.raises(ValueError, match="binding"):
+        verify_account_binding(".".join(parts), keyring=_keyring(), now=1_785_680_100)
+
+
+def test_binding_rejects_noncanonical_equivalent_signature_segment() -> None:
+    issued = issue_account_binding(
+        _account_observation(),
+        keyring=_keyring(),
+        now=1_785_680_000,
+    )
+    parts = issued.receipt.split(".")
+    signature = parts[3]
+    decoded = base64.urlsafe_b64decode(signature + "=" * (-len(signature) % 4))
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+    equivalent = next(candidate for character in alphabet if (candidate := signature[:-1] + character) != signature and base64.urlsafe_b64decode(candidate + "=" * (-len(candidate) % 4)) == decoded)
+    parts[3] = equivalent
+
+    with pytest.raises(ValueError, match="invalid encoded segment"):
         verify_account_binding(".".join(parts), keyring=_keyring(), now=1_785_680_100)
 
 
@@ -398,9 +409,7 @@ async def test_mcp_inspect_handler_derives_account_constraint_from_signed_receip
                 "bound_account_sec_uid": _ACCOUNT_UID,
                 "account_binding_verification": "hmac_account_work_binding_v1",
                 "account_binding_id": captured["binding"].binding_id,
-                "account_identity_claims_sha256": captured[
-                    "binding"
-                ].identity_claims_sha256,
+                "account_identity_claims_sha256": captured["binding"].identity_claims_sha256,
                 "identity_verification": "api_work_and_author_match",
                 "observed_at": "2026-08-02T00:00:00+00:00",
                 "trust": "untrusted_source_data",

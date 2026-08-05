@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
+from deerflow.persistence.personal_ip_content import PersonalIPContentRepository
 from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
 from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
 from deerflow.persistence.personal_ip_platform_observations import PersonalIPPlatformObservationRepository
@@ -23,6 +24,7 @@ class PersonalIPRuntimeServices:
     metrics: PersonalIPMetricRepository
     publish_receipts: PersonalIPPublishReceiptRepository
     accounts: PersonalIPAccountRepository | None = None
+    content: PersonalIPContentRepository | None = None
     platform_observations: PersonalIPPlatformObservationRepository | None = None
     subjects: PersonalIPSubjectRepository | None = None
     video_productions: PersonalIPVideoProductionRepository | None = None

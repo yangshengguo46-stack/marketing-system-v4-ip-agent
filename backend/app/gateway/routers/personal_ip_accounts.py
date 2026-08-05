@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.gateway.deps import (
     get_current_user_from_request,
     get_personal_ip_account_repo,
+    get_personal_ip_content_repo,
     get_personal_ip_subject_repo,
 )
 from deerflow.community.browser_automation import get_browser_session_manager
@@ -154,6 +155,14 @@ async def delete_personal_ip_subject(
         raise HTTPException(
             status_code=409,
             detail="Detach or reassign this subject's accounts before deleting it",
+        )
+    if await get_personal_ip_content_repo(request).has_subject_content(
+        subject_id,
+        owner_user_id=user_id,
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Archive this subject instead; its immutable content lineage must be retained",
         )
     await subject_repo.delete(subject_id, owner_user_id=user_id)
     return {"success": True}

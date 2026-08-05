@@ -3,6 +3,7 @@
 import {
   BriefcaseBusinessIcon,
   CalendarClock,
+  Layers3Icon,
   MessagesSquare,
 } from "lucide-react";
 import Link from "next/link";
@@ -22,6 +23,17 @@ export function WorkspaceNavChatList() {
   return (
     <SidebarGroup className="pt-1">
       <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            isActive={pathname.startsWith("/workspace/content")}
+            asChild
+          >
+            <Link className="text-muted-foreground" href="/workspace/content">
+              <Layers3Icon />
+              <span>{t.sidebar.content}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
         <SidebarMenuItem>
           <SidebarMenuButton
             isActive={pathname === "/workspace/personal-ip"}

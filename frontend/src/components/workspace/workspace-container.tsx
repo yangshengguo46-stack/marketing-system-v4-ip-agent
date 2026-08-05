@@ -119,6 +119,7 @@ function nameOfSegment(
   if (segment === "workspace") return t.breadcrumb.workspace;
   if (segment === "chats") return t.breadcrumb.chats;
   if (segment === "dashboard") return t.sidebar.dashboard;
+  if (segment === "content") return t.sidebar.content;
   if (segment === "personal-ip") return t.sidebar.personalIP;
   if (segment === "scheduled-tasks") return t.sidebar.scheduledTasks;
   return segment[0]?.toUpperCase() + segment.slice(1);

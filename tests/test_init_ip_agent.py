@@ -17,11 +17,7 @@ from scripts.init_ip_agent import (  # noqa: E402
 
 def _env_value(path: Path, name: str) -> str:
     prefix = f"{name}="
-    line = next(
-        line
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.startswith(prefix)
-    )
+    line = next(line for line in path.read_text(encoding="utf-8").splitlines() if line.startswith(prefix))
     value = line[len(prefix) :]
     if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
         return value[1:-1]
@@ -66,10 +62,12 @@ def test_install_writes_a_complete_default_agent(tmp_path: Path) -> None:
         "ask_clarification",
         "ip_evidence_collect_douyin_benchmark_account",
         "ip_evidence_inspect_reference_videos",
+        "ip_content_read",
+        "ip_content_save_breakdown",
+        "ip_content_write",
+        "ip_content_start_production",
     }
-    runtime_profile = yaml.safe_load(
-        (state_dir / "product-runtime-profile.yaml").read_text()
-    )
+    runtime_profile = yaml.safe_load((state_dir / "product-runtime-profile.yaml").read_text())
     assert runtime_profile["enabled"] is True
     assert runtime_profile["assistant_id"] == "ip-agent"
     assert runtime_profile["agent_artifact_sha256"] == agent_artifact_sha256(agent_dir)
@@ -113,15 +111,9 @@ def test_refresh_product_agent_preserves_user_profile(tmp_path: Path) -> None:
     )
 
     assert user_profile.read_text() == "customer-owned profile"
-    assert (agent_dir / "SOUL.md").read_text() == (
-        root / "product" / "defaults" / "agents" / "ip-agent" / "SOUL.md"
-    ).read_text()
-    assert (agent_dir / "config.yaml").read_text() == (
-        root / "product" / "defaults" / "agents" / "ip-agent" / "config.yaml"
-    ).read_text()
-    assert (state_dir / "product-runtime-profile.yaml").read_text() == (
-        root / "product" / "defaults" / "product-runtime-profile.yaml"
-    ).read_text()
+    assert (agent_dir / "SOUL.md").read_text() == (root / "product" / "defaults" / "agents" / "ip-agent" / "SOUL.md").read_text()
+    assert (agent_dir / "config.yaml").read_text() == (root / "product" / "defaults" / "agents" / "ip-agent" / "config.yaml").read_text()
+    assert (state_dir / "product-runtime-profile.yaml").read_text() == (root / "product" / "defaults" / "product-runtime-profile.yaml").read_text()
 
 
 def test_account_binding_environment_is_generated_once_and_kept_private(
@@ -149,9 +141,7 @@ def test_account_binding_environment_preserves_unrelated_values_and_comments(
     tmp_path: Path,
 ) -> None:
     env_path = tmp_path / ".env"
-    env_path.write_text(
-        "# keep this comment\nMEDIAKIT_API_KEY=existing-key\n", encoding="utf-8"
-    )
+    env_path.write_text("# keep this comment\nMEDIAKIT_API_KEY=existing-key\n", encoding="utf-8")
 
     ensure_account_binding_environment(env_path)
 

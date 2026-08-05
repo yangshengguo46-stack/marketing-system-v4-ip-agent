@@ -252,6 +252,7 @@ export const enUS: Translations = {
     demoChats: "Demo chats",
     agents: "Agents",
     personalIP: "Platform management",
+    content: "Content lineage",
     videoWorkbench: "Video workbench",
     scheduledTasks: "Scheduled tasks",
     agentsDisabledTooltip: "Feature not enabled",
@@ -592,6 +593,15 @@ export const enUS: Translations = {
     personalIpAggregating: "Summarizing data across platforms…",
     personalIpPreparingOperation: "Preparing the account operation…",
     personalIpProducingVideo: "Advancing video production…",
+    personalIpAnalyzingVideo:
+      "Running the complete video breakdown; transcript, on-screen text, scenes, and storyline may take several minutes…",
+    personalIpCollectingBenchmark:
+      "Verifying and collecting the specified benchmark account…",
+    personalIpSavingBreakdown: "Saving this breakdown version…",
+    personalIpWritingContent:
+      "Generating and saving the complete script version…",
+    personalIpReadingContent: "Reading saved content versions…",
+    personalIpStartingProduction: "Starting production from the formal script…",
   },
 
   humanInput: {

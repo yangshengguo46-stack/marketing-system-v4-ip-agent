@@ -30,6 +30,7 @@ from app.gateway.routers import (
     memory,
     models,
     personal_ip_accounts,
+    personal_ip_content,
     personal_ip_data_lifecycle,
     personal_ip_metrics,
     personal_ip_minecontext,
@@ -502,6 +503,7 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
     # Personal-IP portfolio, evidence, publishing and metrics are mounted at /api/personal-ip
     app.include_router(personal_ip_accounts.router)
     app.include_router(personal_ip_data_lifecycle.router)
+    app.include_router(personal_ip_content.router)
     app.include_router(personal_ip_metrics.router)
     app.include_router(personal_ip_minecontext.router)
     app.include_router(personal_ip_platform_connections.router)

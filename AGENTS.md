@@ -32,11 +32,12 @@ depend on generated console-script shebangs from another checkout.
 ## IP Agent boundary
 
 `IP_AGENT.md` is the only current product contract. The default IP Agent has no
-Skills or memory and exposes eight read-only baseline tools plus the two
-MediaKit-backed Evidence MCP tools. A configured `MEDIAKIT_API_KEY` authorizes
+Skills or memory and exposes eight read-only baseline tools, the two
+MediaKit-backed Evidence MCP tools and four bounded `ip_content_*` tools. A
+configured `MEDIAKIT_API_KEY` authorizes
 those evidence tools to run ASR/OCR/scene/storyline analysis directly; do not
-restore the retired per-call approval gate. It does not mount Personal-IP
-context orchestration. Do not reintroduce strategy,
+restore the retired per-call approval gate. It does not mount retired
+Personal-IP portfolio context orchestration. Do not reintroduce strategy,
 differentiation, preflight, retrospective, evidence-promotion, startup-cockpit
 or narrative-interview semantics outside a new approved architecture.
 

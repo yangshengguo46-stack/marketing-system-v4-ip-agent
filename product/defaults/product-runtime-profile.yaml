@@ -2,7 +2,7 @@ schema_version: ip-agent-runtime-profile-v1
 enabled: true
 product_id: ip-agent
 assistant_id: ip-agent
-agent_artifact_sha256: 54d265b6c13c128cfabda71b31e32829306976cbd5d0e3915a8ac9e382e6723b
+agent_artifact_sha256: 988b3ebe5af040d9799991a5c43b75f6943a63abfae7c2d76cc990a87e51e44a
 capability_contract:
   tool_allowlist:
     - web_search
@@ -15,6 +15,10 @@ capability_contract:
     - ask_clarification
     - ip_evidence_collect_douyin_benchmark_account
     - ip_evidence_inspect_reference_videos
+    - ip_content_read
+    - ip_content_save_breakdown
+    - ip_content_write
+    - ip_content_start_production
   skills: []
   memory_enabled: false
 entrypoints:

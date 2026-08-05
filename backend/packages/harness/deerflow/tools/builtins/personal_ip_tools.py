@@ -149,6 +149,8 @@ async def _personal_ip_begin_video_production(
     provider_policy: dict,
     budget: dict,
     production_mode: str,
+    content_work_id: str = "",
+    script_version_id: str = "",
 ) -> str:
     """Create one immutable Personal-IP video production request.
 
@@ -162,8 +164,10 @@ async def _personal_ip_begin_video_production(
         title: Customer-facing production title.
         subject_id: Optional Personal-IP subject id; pass an empty string when absent.
         target_account_ids: Platform account ids targeted by the final delivery.
-        source_kind: Either idea or script.
-        source: Immutable source snapshot, such as an idea, brief or full script.
+        source_kind: Either idea or script. Use script for a linked ScriptVersion.
+        source: Immutable legacy idea/script snapshot. Pass an empty object when
+            content_work_id and script_version_id are provided; the server then
+            seals the immutable ScriptVersion as the source.
         delivery_spec: Aspect ratios, durations, languages and target deliverables.
         provider_policy: Preferred models/providers and allowed fallbacks.
         budget: Immutable currency and hard_limit. Paid-call approval is a
@@ -171,6 +175,10 @@ async def _personal_ip_begin_video_production(
             may be empty only for a free-only production; paid provider
             submission requires an enforceable hard_limit.
         production_mode: faceless_material for Personal-IP material videos, or generative_cinematic for films and ads.
+        content_work_id: Stable content work id for the production-ready path;
+            pass an empty string only for a legacy standalone production.
+        script_version_id: Immutable ScriptVersion id belonging to content_work_id;
+            pass an empty string only for a legacy standalone production.
 
     Returns:
         JSON production id, immutable request, current stage and ordered events.
@@ -192,6 +200,8 @@ async def _personal_ip_begin_video_production(
             provider_policy=provider_policy,
             budget=budget,
             production_mode=production_mode,
+            content_work_id=str(content_work_id or "").strip() or None,
+            script_version_id=str(script_version_id or "").strip() or None,
         )
         return _json({"operation_status": "ok", **result})
     except (RuntimeError, TypeError, ValueError) as exc:

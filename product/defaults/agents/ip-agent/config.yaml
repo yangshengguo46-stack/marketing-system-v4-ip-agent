@@ -1,5 +1,5 @@
 name: ip-agent
-description: An IP strategy and creation agent for people, brands, products and organizations.
+description: A versioned IP content operating agent for people, brands, products and organizations.
 skills: []
 tool_allowlist:
   - web_search
@@ -12,4 +12,8 @@ tool_allowlist:
   - ask_clarification
   - ip_evidence_collect_douyin_benchmark_account
   - ip_evidence_inspect_reference_videos
+  - ip_content_read
+  - ip_content_save_breakdown
+  - ip_content_write
+  - ip_content_start_production
 memory_enabled: false

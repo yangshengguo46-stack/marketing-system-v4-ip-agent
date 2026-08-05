@@ -25,6 +25,26 @@ class PersonalIPVideoProductionRow(Base):
     operation_key: Mapped[str] = mapped_column(String(256), nullable=False)
     contract_version: Mapped[str] = mapped_column(String(64), nullable=False)
     title: Mapped[str] = mapped_column(String(256), nullable=False)
+    content_work_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey(
+            "personal_ip_content_works.id",
+            ondelete="RESTRICT",
+            name="fk_personal_ip_video_productions_content_work",
+        ),
+        nullable=True,
+        index=True,
+    )
+    script_version_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey(
+            "personal_ip_script_versions.id",
+            ondelete="RESTRICT",
+            name="fk_personal_ip_video_productions_script_version",
+        ),
+        nullable=True,
+        index=True,
+    )
     subject_id: Mapped[str | None] = mapped_column(
         String(64),
         ForeignKey("personal_ip_subjects.id", ondelete="SET NULL"),
@@ -62,6 +82,10 @@ class PersonalIPVideoProductionRow(Base):
         ),
         CheckConstraint("source_kind IN ('idea','script')", name="ck_personal_ip_video_productions_source_kind"),
         CheckConstraint(
+            "(content_work_id IS NULL AND script_version_id IS NULL) OR (content_work_id IS NOT NULL AND script_version_id IS NOT NULL AND source_kind = 'script')",
+            name="ck_personal_ip_video_productions_content_source",
+        ),
+        CheckConstraint(
             "status IN ('draft','running','awaiting_review','blocked','completed','cancelled')",
             name="ck_personal_ip_video_productions_status",
         ),
@@ -71,6 +95,16 @@ class PersonalIPVideoProductionRow(Base):
         ),
         Index("ix_personal_ip_video_productions_owner_updated", "owner_user_id", "updated_at"),
         Index("ix_personal_ip_video_productions_owner_thread", "owner_user_id", "thread_id"),
+        Index(
+            "ix_personal_ip_video_productions_owner_content_work",
+            "owner_user_id",
+            "content_work_id",
+        ),
+        Index(
+            "ix_personal_ip_video_productions_owner_script_version",
+            "owner_user_id",
+            "script_version_id",
+        ),
     )
 
 

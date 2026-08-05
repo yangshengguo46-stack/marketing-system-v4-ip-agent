@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { type PromptInputMessage } from "@/components/ai-elements/prompt-input";
@@ -39,7 +39,10 @@ import {
 } from "@/core/messages/human-input";
 import { useNotification } from "@/core/notification/hooks";
 import {
+  PERSONAL_IP_CONTENT_WORKS_QUERY_KEY,
   PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
+  personalIPContentEntryPrompt,
+  personalIPProductionEntryPrompt,
   usePersonalIPVideoProductions,
 } from "@/core/personal-ip";
 import { useThreadSettings } from "@/core/settings";
@@ -82,9 +85,32 @@ export default function ChatPage() {
 function StandardChatPage() {
   const { t } = useI18n();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { threadId, setThreadId, isNewThread, setIsNewThread, isMock } =
     useThreadChat();
+  const contentEntryRoute = searchParams.get("content_entry");
+  const contentEntryPrompt = isNewThread
+    ? personalIPContentEntryPrompt(contentEntryRoute)
+    : undefined;
+  const productionScriptVersionId = searchParams.get(
+    "production_script_version_id",
+  );
+  const productionContentWorkId = searchParams.get(
+    "production_content_work_id",
+  );
+  const productionEntryPrompt = isNewThread
+    ? personalIPProductionEntryPrompt(
+        productionContentWorkId,
+        productionScriptVersionId,
+      )
+    : undefined;
+  const taskEntryPrompt = contentEntryPrompt ?? productionEntryPrompt;
+  const taskDraftKey = contentEntryPrompt
+    ? `content:${contentEntryRoute}`
+    : productionEntryPrompt
+      ? `production:${productionContentWorkId}:${productionScriptVersionId}`
+      : null;
   // `isNewThread` tracks whether the backend has the thread yet — gates the
   // SDK's history fetch (see issue #2746).  `isWelcomeMode` is the visual
   // welcome layout (centered input, hero, quick actions); we flip it to false
@@ -146,9 +172,14 @@ function StandardChatPage() {
       setIsNewThread(false);
     },
     onFinish: (state) => {
-      void queryClient.invalidateQueries({
-        queryKey: PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
-      });
+      void Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: PERSONAL_IP_CONTENT_WORKS_QUERY_KEY,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: PERSONAL_IP_VIDEO_PRODUCTIONS_QUERY_KEY,
+        }),
+      ]);
       if (document.hidden || !document.hasFocus()) {
         let body = "Conversation finished";
         const lastMessage = state.messages.at(-1);
@@ -346,7 +377,14 @@ function StandardChatPage() {
                       )}
                       isWelcomeMode={isWelcomeMode}
                       threadId={threadId}
-                      draftThreadId={isNewThread ? "new" : threadId}
+                      draftThreadId={
+                        isNewThread && taskDraftKey
+                          ? `new:${taskDraftKey}`
+                          : isNewThread
+                            ? "new"
+                            : threadId
+                      }
+                      initialValue={taskEntryPrompt}
                       autoFocus={isWelcomeMode}
                       status={
                         thread.error

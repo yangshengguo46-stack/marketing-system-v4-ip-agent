@@ -24,22 +24,11 @@ import { Input } from "@/components/ui/input";
 import {
   deleteAllPersonalIPData,
   exportPersonalIPBackup,
-  type PersonalIPBackup,
+  isPersonalIPBackup,
   type PersonalIPDeletePreview,
   previewPersonalIPDelete,
   restorePersonalIPBackup,
 } from "@/core/personal-ip";
-
-function isBackup(value: unknown): value is PersonalIPBackup {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<PersonalIPBackup>;
-  return (
-    candidate.schema_version === "personal-ip-owner-backup-v1" &&
-    Array.isArray(candidate.datasets) &&
-    typeof candidate.verification?.data_digest === "string" &&
-    typeof candidate.verification?.manifest_digest === "string"
-  );
-}
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : "操作没有完成，请稍后重试";
@@ -84,7 +73,7 @@ export function PersonalIPDataSettingsPage() {
     setBusy("restore");
     try {
       const parsed: unknown = JSON.parse(await file.text());
-      if (!isBackup(parsed)) {
+      if (!isPersonalIPBackup(parsed)) {
         throw new Error("请选择有效的 Personal‑IP 备份文件");
       }
       const receipt = await restorePersonalIPBackup(parsed);

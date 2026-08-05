@@ -29,13 +29,13 @@
 
 当前数量：
 
-- 默认 IP Agent：10 个精确白名单工具，0 个 Skill；
-- 当前全局配置：16 个配置工具，其中 6 个进入白名单，10 个被隔离；
-- DeerFlow 原生固定工具：43 个，其中 `ask_clarification` 进入白名单，其余 42 个隔离；
+- 默认 IP Agent：14 个精确白名单工具，0 个 Skill；
+- 当前全局配置：16 个配置工具，其中 7 个进入白名单，9 个被隔离；
+- DeerFlow 原生固定工具：47 个，其中 `ask_clarification` 与 4 个 `ip_content_*` 进入白名单，其余 42 个隔离；
 - 公共 Skill 包：97 个，全部研究隔离；
 - Evidence MCP 的 2 个 MediaKit 证据工具进入默认 IP Agent；其余 MCP、ACP、记忆、自修改、子 Agent、Skill 管理和 Plan Mode 工具不进入默认 IP Agent。
 
-## 一、默认 IP Agent 的 10 个现役工具
+## 一、默认 IP Agent 的 14 个现役工具
 
 来源：`product/defaults/agents/ip-agent/config.yaml`。过滤发生在配置工具、内置工具、
 MCP、ACP、子 Agent、Skill 和记忆工具全部组装之后；Plan Mode 注入的
@@ -54,6 +54,10 @@ MCP、ACP、子 Agent、Skill 和记忆工具全部组装之后；Plan Mode 注�
 | `ask_clarification` | 缺少决定性材料时向用户索取一个必要信息 | 不把可自行回答的问题变成固定访谈；账号无法确认时索要平台或主页/视频链接 |
 | `ip_evidence_collect_douyin_benchmark_account` | 读取用户指定的抖音主页和作品清单 | 只观察指定公开账号；不修改平台内容 |
 | `ip_evidence_inspect_reference_videos` | 用本地工具链和 MediaKit 分析指定作品链接或上传视频的台词、字幕、场景和故事线 | 配置 `MEDIAKIT_API_KEY` 后直接执行云分析；返回观察结果，不把分析结果伪装成用户事实 |
+| `ip_content_save_breakdown` | 将指定素材的可观察内容、解释与限制保存为 Owner 范围内的不可变拆解版本 | 不强迫进入写稿；来源观察必须绑定证据引用，推导保持标签 |
+| `ip_content_write` | 在已选方向下隔离生成完整脚本，并原子保存作品、方向与脚本版本 | 虚构故事先经脱敏种子锁定；事实稿只能使用显式 claim basis；旧版本不覆盖 |
+| `ip_content_read` | 读取 Owner 最近作品或一条作品的完整版本谱系 | 只读当前 Owner 数据；不扫描平台账号、凭证或研究库存 |
+| `ip_content_start_production` | 从 Owner 选定的不可变 ScriptVersion 启动一个制作任务 | 服务端校验 Work/Script 同 Owner 且封存脚本来源；不允许从聊天文本重建正式脚本 |
 <!-- END ACTIVE IP AGENT TOOLS -->
 
 ## 二、当前配置存在但被默认 IP Agent 隔离的 10 个工具

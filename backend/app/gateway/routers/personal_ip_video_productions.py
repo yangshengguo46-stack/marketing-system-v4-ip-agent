@@ -13,7 +13,7 @@ from urllib.parse import quote, unquote, urlsplit
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.gateway.deps import get_current_user_from_request, get_personal_ip_video_production_repo
 from deerflow.config.paths import VIRTUAL_PATH_PREFIX, get_paths, make_safe_user_id
@@ -106,10 +106,12 @@ class PersonalIPVideoProductionBeginRequest(BaseModel):
     operation_key: str = Field(min_length=1, max_length=256)
     title: str = Field(min_length=1, max_length=256)
     subject_id: str | None = Field(default=None, max_length=64)
+    content_work_id: str | None = Field(default=None, min_length=1, max_length=64)
+    script_version_id: str | None = Field(default=None, min_length=1, max_length=64)
     target_account_ids: list[str] = Field(default_factory=list, max_length=200)
     production_mode: Literal["faceless_material", "generative_cinematic"]
     source_kind: Literal["idea", "script"]
-    source: dict[str, Any]
+    source: dict[str, Any] = Field(default_factory=dict)
     delivery_spec: dict[str, Any]
     provider_policy: dict[str, Any] = Field(default_factory=dict)
     budget: dict[str, Any] = Field(default_factory=dict)
@@ -118,6 +120,27 @@ class PersonalIPVideoProductionBeginRequest(BaseModel):
     @classmethod
     def strip_required_text(cls, value: str) -> str:
         return value.strip()
+
+    @field_validator("content_work_id", "script_version_id")
+    @classmethod
+    def strip_link_ids(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("linked content ids cannot be blank")
+        return stripped
+
+    @model_validator(mode="after")
+    def validate_linked_script_source(self):
+        linked = self.content_work_id is not None or self.script_version_id is not None
+        if (self.content_work_id is None) != (self.script_version_id is None):
+            raise ValueError("content_work_id and script_version_id must be provided together")
+        if linked and self.source_kind != "script":
+            raise ValueError("linked ScriptVersion production requires source_kind=script")
+        if linked and self.source:
+            raise ValueError("linked ScriptVersion production source is server-derived and must be empty")
+        return self
 
 
 class PersonalIPVideoProductionEventRequest(BaseModel):
@@ -471,12 +494,14 @@ async def list_personal_ip_video_productions(
     request: Request,
     status: Literal["draft", "running", "awaiting_review", "blocked", "completed", "cancelled"] | None = Query(default=None),
     thread_id: str | None = Query(default=None, min_length=1, max_length=64),
+    content_work_id: str | None = Query(default=None, min_length=1, max_length=64),
     limit: int = Query(default=100, ge=1, le=500),
 ) -> list[dict[str, Any]]:
     return await get_personal_ip_video_production_repo(request).list(
         await _current_user_id(request),
         status=status,
         thread_id=thread_id,
+        content_work_id=content_work_id,
         limit=limit,
     )
 

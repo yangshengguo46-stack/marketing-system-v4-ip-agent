@@ -11,6 +11,7 @@ import { fetch as fetcher } from "@/core/api/fetcher";
 import {
   deleteAllPersonalIPData,
   exportPersonalIPBackup,
+  isPersonalIPBackup,
   previewPersonalIPDelete,
   restorePersonalIPBackup,
 } from "@/core/personal-ip/data-lifecycle";
@@ -31,7 +32,7 @@ beforeEach(() => {
 describe("Personal-IP data lifecycle API", () => {
   it("exports and restores the credential-free owner backup contract", async () => {
     const backup = {
-      schema_version: "personal-ip-owner-backup-v1" as const,
+      schema_version: "personal-ip-owner-backup-v3" as const,
       owner_user_id: "user-1",
       exported_at: "2026-07-30T12:00:00Z",
       datasets: [],
@@ -66,6 +67,45 @@ describe("Personal-IP data lifecycle API", () => {
         body: JSON.stringify({ backup }),
       },
     );
+  });
+
+  it("accepts v1, v2 and v3 backup uploads and rejects unknown contracts", () => {
+    const candidate = {
+      owner_user_id: "user-1",
+      exported_at: "2026-08-05T00:00:00Z",
+      datasets: [],
+      verification: {
+        algorithm: "sha256-canonical-json-v1",
+        data_digest: "a".repeat(64),
+        manifest_digest: "b".repeat(64),
+      },
+    };
+
+    for (const schemaVersion of [
+      "personal-ip-owner-backup-v1",
+      "personal-ip-owner-backup-v2",
+      "personal-ip-owner-backup-v3",
+    ]) {
+      expect(
+        isPersonalIPBackup({
+          ...candidate,
+          schema_version: schemaVersion,
+        }),
+      ).toBe(true);
+    }
+    expect(
+      isPersonalIPBackup({
+        ...candidate,
+        schema_version: "personal-ip-owner-backup-v4",
+      }),
+    ).toBe(false);
+    expect(
+      isPersonalIPBackup({
+        ...candidate,
+        schema_version: "personal-ip-owner-backup-v3",
+        datasets: null,
+      }),
+    ).toBe(false);
   });
 
   it("binds destructive deletion to the preview digest and exact acknowledgement", async () => {

@@ -32,6 +32,8 @@ immediately above `新对话` in the workspace sidebar.
 
 Personal-IP customer surfaces retain:
 
+- `/workspace/content` for the shared Breakdown, Writer Brain and Production
+  content lineage;
 - `/workspace/personal-ip` for subjects, accounts and platform login;
 - `/workspace/dashboard` for factual Owner-wide observations;
 - Settings for MineContext consent and data lifecycle.
@@ -47,9 +49,10 @@ status and observation time. Missing values render `未采集`, never zero. Do n
 restore cockpit stages, Agent to-do queues, high-potential/boost labels,
 paid-traffic judgments or continue/adjust/restart verdicts.
 
-The default IP Agent does not expose Skills, Personal-IP business tools or
-internal orchestration. Customer UI must not show Skill names, paths, internal
-tool routing or research assets as shipped capability.
+The default IP Agent exposes no Skills or retired portfolio orchestration. Its
+bounded content tools operate the shared lineage without exposing their names
+or internal steps. Customer UI must not show Skill names, paths, internal tool
+routing or research assets as shipped capability.
 
 Platform login is user-completed in an Owner/account-isolated browser session;
 never render raw credentials, profile paths, cookies or tokens. Publish and

@@ -168,6 +168,7 @@ if TYPE_CHECKING:
     from app.gateway.auth.local_provider import LocalAuthProvider
     from app.gateway.auth.repositories.sqlite import SQLiteUserRepository
     from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
+    from deerflow.persistence.personal_ip_content import PersonalIPContentRepository
     from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
     from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
     from deerflow.persistence.personal_ip_platform_observations import PersonalIPPlatformObservationRepository
@@ -315,6 +316,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
         app.state.thread_store = make_thread_store(sf, app.state.store)
         if sf is not None:
             from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
+            from deerflow.persistence.personal_ip_content import PersonalIPContentRepository
             from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
             from deerflow.persistence.personal_ip_paid_calls import PersonalIPPaidCallRepository
             from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
@@ -330,6 +332,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.scheduled_task_repo = ScheduledTaskRepository(sf)
             app.state.scheduled_task_run_repo = ScheduledTaskRunRepository(sf)
             app.state.personal_ip_account_repo = PersonalIPAccountRepository(sf)
+            app.state.personal_ip_content_repo = PersonalIPContentRepository(sf)
             app.state.personal_ip_metric_repo = PersonalIPMetricRepository(sf)
             app.state.personal_ip_platform_observation_repo = PersonalIPPlatformObservationRepository(sf)
             from app.gateway.auth.config import get_auth_config
@@ -366,6 +369,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             configure_personal_ip_runtime(
                 PersonalIPRuntimeServices(
                     accounts=app.state.personal_ip_account_repo,
+                    content=app.state.personal_ip_content_repo,
                     connections=app.state.personal_ip_platform_connection_repo,
                     metrics=app.state.personal_ip_metric_repo,
                     publish_receipts=app.state.personal_ip_publish_receipt_repo,
@@ -379,6 +383,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.scheduled_task_repo = None
             app.state.scheduled_task_run_repo = None
             app.state.personal_ip_account_repo = None
+            app.state.personal_ip_content_repo = None
             app.state.personal_ip_metric_repo = None
             app.state.personal_ip_paid_call_repo = None
             app.state.personal_ip_platform_observation_repo = None
@@ -525,6 +530,13 @@ def get_personal_ip_data_lifecycle_service(
             status_code=503,
             detail="Personal-IP data lifecycle service not available",
         )
+    return val
+
+
+def get_personal_ip_content_repo(request: Request) -> PersonalIPContentRepository:
+    val = getattr(request.app.state, "personal_ip_content_repo", None)
+    if val is None:
+        raise HTTPException(status_code=503, detail="Personal-IP content repository not available")
     return val
 
 

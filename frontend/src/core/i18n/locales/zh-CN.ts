@@ -234,6 +234,7 @@ export const zhCN: Translations = {
     demoChats: "演示对话",
     agents: "智能体",
     personalIP: "平台管理",
+    content: "内容主线",
     videoWorkbench: "视频工作台",
     scheduledTasks: "定时任务",
     agentsDisabledTooltip: "功能未启用",
@@ -562,6 +563,13 @@ export const zhCN: Translations = {
     personalIpAggregating: "正在汇总各平台数据…",
     personalIpPreparingOperation: "正在准备本次账号操作…",
     personalIpProducingVideo: "正在推进视频生产…",
+    personalIpAnalyzingVideo:
+      "正在完整拆解视频：转写、画面文字、场景与故事线可能需要数分钟…",
+    personalIpCollectingBenchmark: "正在核验并采集指定对标账号…",
+    personalIpSavingBreakdown: "正在保存这次拆解版本…",
+    personalIpWritingContent: "正在生成并保存完整脚本版本…",
+    personalIpReadingContent: "正在读取已有内容版本…",
+    personalIpStartingProduction: "正在从正式剧本启动制作…",
   },
 
   humanInput: {

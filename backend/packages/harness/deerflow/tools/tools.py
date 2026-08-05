@@ -8,6 +8,10 @@ from deerflow.reflection import resolve_variable
 from deerflow.sandbox.security import is_host_bash_allowed
 from deerflow.tools.builtins import (
     ask_clarification_tool,
+    ip_content_read_tool,
+    ip_content_save_breakdown_tool,
+    ip_content_start_production_tool,
+    ip_content_write_tool,
     personal_ip_begin_publish_receipt_tool,
     personal_ip_begin_video_production_tool,
     personal_ip_collect_browser_page_tool,
@@ -62,6 +66,10 @@ logger = logging.getLogger(__name__)
 BUILTIN_TOOLS = [
     present_file_tool,
     ask_clarification_tool,
+    ip_content_read_tool,
+    ip_content_save_breakdown_tool,
+    ip_content_start_production_tool,
+    ip_content_write_tool,
     review_skill_package,
     personal_ip_begin_publish_receipt_tool,
     personal_ip_prepare_browser_publish_tool,

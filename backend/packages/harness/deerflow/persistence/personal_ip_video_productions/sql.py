@@ -13,6 +13,10 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
+from deerflow.persistence.personal_ip_content.model import (
+    PersonalIPContentWorkRow,
+    PersonalIPScriptVersionRow,
+)
 from deerflow.persistence.personal_ip_platform_observations.sql import validate_credential_free_payload
 from deerflow.persistence.personal_ip_subjects.model import PersonalIPSubjectRow
 from deerflow.persistence.personal_ip_video_productions.model import (
@@ -35,6 +39,8 @@ from deerflow.personal_ip.video_contracts import normalize_production_mode, vali
 from deerflow.utils.time import coerce_iso
 
 VIDEO_PRODUCTION_CONTRACT_VERSION = "personal-ip-video-production-v1"
+LINKED_VIDEO_PRODUCTION_CONTRACT_VERSION = "personal-ip-video-production-v2"
+SCRIPT_SOURCE_SNAPSHOT_CONTRACT_VERSION = "personal-ip-script-source-snapshot-v1"
 
 VIDEO_EVENT_STAGES: dict[str, str] = {
     "video_plan_compiled": "blueprint",
@@ -269,6 +275,46 @@ class PersonalIPVideoProductionRepository:
             if subject_id is not None and any(account.subject_id not in {None, subject_id} for account in accounts):
                 raise ValueError("Personal-IP video production target account belongs to another subject")
 
+    @staticmethod
+    async def _linked_script_source(
+        session: AsyncSession,
+        *,
+        owner_user_id: str,
+        content_work_id: str,
+        script_version_id: str,
+    ) -> tuple[PersonalIPContentWorkRow, dict[str, Any]]:
+        if session.get_bind().dialect.name == "sqlite":
+            await session.execute(text("BEGIN IMMEDIATE"))
+        work_statement = select(PersonalIPContentWorkRow).where(
+            PersonalIPContentWorkRow.id == content_work_id,
+            PersonalIPContentWorkRow.owner_user_id == owner_user_id,
+        )
+        if session.get_bind().dialect.name != "sqlite":
+            work_statement = work_statement.with_for_update()
+        work = (await session.execute(work_statement)).scalar_one_or_none()
+        script = await session.get(PersonalIPScriptVersionRow, script_version_id)
+        if work is None or script is None or work.owner_user_id != owner_user_id or script.owner_user_id != owner_user_id or script.content_work_id != work.id:
+            raise ValueError("Personal-IP linked content script not found")
+        payload = {
+            "contract_version": SCRIPT_SOURCE_SNAPSHOT_CONTRACT_VERSION,
+            "content_work_id": work.id,
+            "objective_id": work.objective_id,
+            "script_version_id": script.id,
+            "direction_version_id": script.direction_version_id,
+            "script_version_number": script.version_number,
+            "title": script.title,
+            "story_mode": script.story_mode,
+            "script_text": script.script_text,
+            "claim_basis": script.claim_basis_json or [],
+            "creative_elements": script.creative_elements_json or [],
+            "story_engine_seed": script.story_engine_seed_json,
+            "locked_story": script.locked_story,
+            "locked_story_sha256": script.locked_story_digest,
+            "production_notes": script.production_notes_json or {},
+        }
+        snapshot = {**payload, "snapshot_sha256": _digest(payload)}
+        return work, _json_snapshot(snapshot, field="linked_script_source", expected=dict)
+
     async def begin(
         self,
         *,
@@ -284,44 +330,80 @@ class PersonalIPVideoProductionRepository:
         budget: dict[str, Any],
         production_mode: str | None = None,
         thread_id: str | None = None,
+        content_work_id: str | None = None,
+        script_version_id: str | None = None,
     ) -> dict[str, Any]:
         owner = _clean_required(owner_user_id, field="owner_user_id", limit=64)
         thread_key = _clean_optional(thread_id, field="thread_id", limit=64)
         operation = _clean_required(operation_key, field="operation_key", limit=256)
         title_key = _clean_required(title, field="title", limit=256)
         subject_key = _clean_optional(subject_id, field="subject_id", limit=64)
+        content_work_key = _clean_optional(
+            content_work_id,
+            field="content_work_id",
+            limit=64,
+        )
+        script_version_key = _clean_optional(
+            script_version_id,
+            field="script_version_id",
+            limit=64,
+        )
+        if (content_work_key is None) != (script_version_key is None):
+            raise ValueError("content_work_id and script_version_id must be provided together")
+        linked_script = content_work_key is not None
         source_kind_key = str(source_kind or "").strip()
         if source_kind_key not in {"idea", "script"}:
             raise ValueError("source_kind must be idea or script")
+        if linked_script and source_kind_key != "script":
+            raise ValueError("linked ScriptVersion production requires source_kind=script")
         target_ids = _normalized_ids(target_account_ids, field="target_account_ids", limit=200)
         source_snapshot = _json_snapshot(source, field="source", expected=dict)
+        if linked_script and source_snapshot:
+            raise ValueError("linked ScriptVersion production source is server-derived and must be empty")
         if "production_mode" in source_snapshot:
             raise ValueError("source.production_mode is reserved; use the production_mode argument")
-        if production_mode is not None:
-            source_snapshot["production_mode"] = normalize_production_mode(production_mode)
+        normalized_mode = normalize_production_mode(production_mode) if production_mode is not None else None
         delivery_snapshot = _json_snapshot(delivery_spec, field="delivery_spec", expected=dict)
         provider_snapshot = _json_snapshot(provider_policy, field="provider_policy", expected=dict)
         budget_snapshot = _json_snapshot(budget, field="budget", expected=dict)
-        caller_attempted_to_disable_approval = (
-            "paid_calls_require_explicit_approval" in budget_snapshot
-            and budget_snapshot["paid_calls_require_explicit_approval"] is not True
-        )
+        caller_attempted_to_disable_approval = "paid_calls_require_explicit_approval" in budget_snapshot and budget_snapshot["paid_calls_require_explicit_approval"] is not True
         if budget_snapshot and not caller_attempted_to_disable_approval:
             budget_snapshot["paid_calls_require_explicit_approval"] = True
-        request_payload = {
-            "budget": budget_snapshot,
-            "delivery_spec": delivery_snapshot,
-            "provider_policy": provider_snapshot,
-            "source": source_snapshot,
-            "source_kind": source_kind_key,
-            "subject_id": subject_key,
-            "target_account_ids": target_ids,
-            "thread_id": thread_key,
-            "title": title_key,
-        }
-        request_digest = _digest(request_payload)
-
         async with self._sf() as session:
+            linked_work: PersonalIPContentWorkRow | None = None
+            if linked_script:
+                assert content_work_key is not None and script_version_key is not None
+                linked_work, source_snapshot = await self._linked_script_source(
+                    session,
+                    owner_user_id=owner,
+                    content_work_id=content_work_key,
+                    script_version_id=script_version_key,
+                )
+                if linked_work.subject_id is not None:
+                    if subject_key is not None and subject_key != linked_work.subject_id:
+                        raise ValueError("Personal-IP linked content subject does not match the production subject")
+                    subject_key = linked_work.subject_id
+            if normalized_mode is not None:
+                source_snapshot["production_mode"] = normalized_mode
+            request_payload = {
+                "budget": budget_snapshot,
+                "delivery_spec": delivery_snapshot,
+                "provider_policy": provider_snapshot,
+                "source": source_snapshot,
+                "source_kind": source_kind_key,
+                "subject_id": subject_key,
+                "target_account_ids": target_ids,
+                "thread_id": thread_key,
+                "title": title_key,
+            }
+            if linked_script:
+                request_payload.update(
+                    {
+                        "content_work_id": content_work_key,
+                        "script_version_id": script_version_key,
+                    }
+                )
+            request_digest = _digest(request_payload)
             statement = select(PersonalIPVideoProductionRow).where(
                 PersonalIPVideoProductionRow.owner_user_id == owner,
                 PersonalIPVideoProductionRow.operation_key == operation,
@@ -330,18 +412,16 @@ class PersonalIPVideoProductionRepository:
             if existing is not None:
                 if existing.request_digest != request_digest:
                     if caller_attempted_to_disable_approval:
-                        raise ValueError(
-                            "video paid-call approval is server-controlled and cannot be disabled"
-                        )
+                        raise ValueError("video paid-call approval is server-controlled and cannot be disabled")
                     raise ValueError("operation_key already records a different video production")
                 result = self._production_dict(existing)
                 result["events"] = await self._events(session, existing.id)
                 self._attach_budget_state(result, result["events"])
                 return result
+            if linked_work is not None and linked_work.status != "active":
+                raise ValueError("Personal-IP linked content work is archived")
             if caller_attempted_to_disable_approval:
-                raise ValueError(
-                    "video paid-call approval is server-controlled and cannot be disabled"
-                )
+                raise ValueError("video paid-call approval is server-controlled and cannot be disabled")
             await self._validate_targets(
                 session,
                 owner_user_id=owner,
@@ -354,8 +434,10 @@ class PersonalIPVideoProductionRepository:
                 owner_user_id=owner,
                 thread_id=thread_key,
                 operation_key=operation,
-                contract_version=VIDEO_PRODUCTION_CONTRACT_VERSION,
+                contract_version=(LINKED_VIDEO_PRODUCTION_CONTRACT_VERSION if linked_script else VIDEO_PRODUCTION_CONTRACT_VERSION),
                 title=title_key,
+                content_work_id=content_work_key,
+                script_version_id=script_version_key,
                 subject_id=subject_key,
                 target_account_ids_json=target_ids,
                 source_kind=source_kind_key,
@@ -399,6 +481,7 @@ class PersonalIPVideoProductionRepository:
         *,
         status: str | None = None,
         thread_id: str | None = None,
+        content_work_id: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         statement = select(PersonalIPVideoProductionRow).where(PersonalIPVideoProductionRow.owner_user_id == owner_user_id)
@@ -406,6 +489,15 @@ class PersonalIPVideoProductionRepository:
             statement = statement.where(PersonalIPVideoProductionRow.status == status)
         if thread_id is not None:
             statement = statement.where(PersonalIPVideoProductionRow.thread_id == _clean_required(thread_id, field="thread_id", limit=64))
+        if content_work_id is not None:
+            statement = statement.where(
+                PersonalIPVideoProductionRow.content_work_id
+                == _clean_required(
+                    content_work_id,
+                    field="content_work_id",
+                    limit=64,
+                )
+            )
         statement = statement.order_by(
             PersonalIPVideoProductionRow.updated_at.desc(),
             PersonalIPVideoProductionRow.id.desc(),
@@ -601,9 +693,7 @@ class PersonalIPVideoProductionRepository:
         cost_currency = str(cost.get("currency") or "").strip().upper()
         if billing_mode == "free":
             if provider_requires_paid_admission(provider, capability):
-                raise ValueError(
-                    "server classifies this provider call as paid; a budget reservation is required"
-                )
+                raise ValueError("server classifies this provider call as paid; a budget reservation is required")
             if (
                 cost_status != "known"
                 or amount_to_micros(
@@ -638,9 +728,7 @@ class PersonalIPVideoProductionRepository:
             raise ValueError("paid provider budget reservation is invalid")
         PersonalIPVideoProductionRepository._validate_paid_approval(
             events=events,
-            approval_event_key=(reservation.get("payload") or {}).get(
-                "approval_event_key"
-            ),
+            approval_event_key=(reservation.get("payload") or {}).get("approval_event_key"),
             expected_request=request,
         )
         if request.get("capability") != capability or request.get("provider") != provider or request.get("entity_type") != entity_type or request.get("entity_id") != entity_id:

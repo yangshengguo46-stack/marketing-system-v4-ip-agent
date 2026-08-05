@@ -114,13 +114,16 @@ def _b64url_decode(value: str) -> bytes:
     if not value or _SEGMENT.fullmatch(value) is None:
         raise ValueError("account binding contains an invalid encoded segment")
     try:
-        return base64.b64decode(
+        decoded = base64.b64decode(
             value + "=" * (-len(value) % 4),
             altchars=b"-_",
             validate=True,
         )
     except (ValueError, UnicodeError) as exc:
         raise ValueError("account binding contains an invalid encoded segment") from exc
+    if not hmac.compare_digest(_b64url_encode(decoded), value):
+        raise ValueError("account binding contains an invalid encoded segment")
+    return decoded
 
 
 def _canonical_json(value: Any) -> bytes:
@@ -261,15 +264,8 @@ def issue_account_binding(
             **projection,
         }
     )
-    payload_segment = _b64url_encode(
-        _canonical_json(claims.model_dump(mode="json", by_alias=True))
-    )
-    signing_input = (
-        _SIGNING_DOMAIN
-        + keyring.active_kid.encode("ascii")
-        + b"."
-        + payload_segment.encode("ascii")
-    )
+    payload_segment = _b64url_encode(_canonical_json(claims.model_dump(mode="json", by_alias=True)))
+    signing_input = _SIGNING_DOMAIN + keyring.active_kid.encode("ascii") + b"." + payload_segment.encode("ascii")
     signature = hmac.new(
         keyring.keys[keyring.active_kid],
         signing_input,
@@ -350,4 +346,3 @@ def verify_video_against_binding(
     if observed_author_sec_uid != binding.account_sec_uid:
         raise ValueError("account binding observed author does not match")
     return work
-
