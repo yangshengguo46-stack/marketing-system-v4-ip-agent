@@ -972,6 +972,27 @@ def test_live_gate_accepts_one_known_case_only() -> None:
     assert selected == FROZEN_CASE_IDS[2]
 
 
+def test_loopback_gateway_client_ignores_system_proxy_settings() -> None:
+    acceptance = _load_acceptance_module()
+    captured: dict[str, Any] = {}
+
+    def client_factory(**kwargs: Any) -> object:
+        captured.update(kwargs)
+        return object()
+
+    client = acceptance._new_loopback_gateway_client(
+        base_url="http://127.0.0.1:8001",
+        client_factory=client_factory,
+    )
+
+    assert type(client) is object
+    assert captured == {
+        "base_url": "http://127.0.0.1:8001",
+        "timeout": httpx.Timeout(600.0, connect=10.0),
+        "trust_env": False,
+    }
+
+
 def test_invalid_live_gate_fails_before_gateway_construction(tmp_path: Path) -> None:
     acceptance = _load_acceptance_module()
     gateway_constructions = 0

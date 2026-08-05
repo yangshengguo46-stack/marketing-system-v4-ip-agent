@@ -1615,6 +1615,16 @@ def _gateway_auth_receipt(client: httpx.Client) -> dict[str, Any]:
     }
 
 
+def _new_loopback_gateway_client(*, base_url: str, client_factory: Any) -> Any:
+    """Build the local evidence client without consulting host proxy settings."""
+
+    return client_factory(
+        base_url=base_url,
+        timeout=httpx.Timeout(600.0, connect=10.0),
+        trust_env=False,
+    )
+
+
 def _iter_sse(lines: Iterable[str]) -> Iterable[tuple[str, Any]]:
     event_name = "message"
     data_lines: list[str] = []
@@ -2150,9 +2160,9 @@ def run_live(
     }
 
     try:
-        client = client_factory(
+        client = _new_loopback_gateway_client(
             base_url=base_url,
-            timeout=httpx.Timeout(600.0, connect=10.0),
+            client_factory=client_factory,
         )
         manager = client if hasattr(client, "__enter__") else nullcontext(client)
         with manager as active_client:
