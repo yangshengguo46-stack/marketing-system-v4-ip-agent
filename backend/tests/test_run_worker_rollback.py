@@ -7,11 +7,24 @@ from typing import Any
 from unittest.mock import AsyncMock, call
 
 import pytest
+from langchain.agents import create_agent
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.tools import tool
 from langgraph.checkpoint.base import empty_checkpoint
 from langgraph.checkpoint.memory import InMemorySaver
 
-from deerflow.runtime.context_keys import CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY
+from deerflow.agents.middlewares.llm_error_handling_middleware import LLMErrorHandlingMiddleware
+from deerflow.agents.middlewares.terminal_response_middleware import TerminalResponseMiddleware
+from deerflow.config.app_config import AppConfig, LlmCallConfig
+from deerflow.config.sandbox_config import SandboxConfig
+from deerflow.runtime.context_keys import (
+    CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY,
+    TERMINAL_RESPONSE_FAILURE_KEY,
+    terminal_response_failure_payload,
+)
+from deerflow.runtime.events.store.memory import MemoryRunEventStore
 from deerflow.runtime.runs.manager import ConflictError, RunManager
 from deerflow.runtime.runs.schemas import RunStatus
 from deerflow.runtime.runs.store.memory import MemoryRunStore
@@ -86,6 +99,21 @@ def test_install_runtime_context_overrides_internal_pre_existing_message_ids():
     )
 
     assert config["context"][CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY] == frozenset({"old-ai"})
+
+
+def test_runtime_context_drops_caller_spoofed_terminal_failure_signal():
+    spoofed = terminal_response_failure_payload("invalid_tool_call")
+
+    built = _build_runtime_context(
+        "record-thread",
+        "record-run",
+        {TERMINAL_RESPONSE_FAILURE_KEY: spoofed},
+    )
+    config = {"context": {TERMINAL_RESPONSE_FAILURE_KEY: spoofed}}
+    _install_runtime_context(config, built)
+
+    assert TERMINAL_RESPONSE_FAILURE_KEY not in built
+    assert TERMINAL_RESPONSE_FAILURE_KEY not in config["context"]
 
 
 @pytest.mark.anyio
@@ -267,6 +295,309 @@ async def test_run_agent_marks_llm_error_fallback_as_error_status():
     ):
         assert forbidden not in externally_visible
     bridge.publish_end.assert_awaited_once_with(record.run_id)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("stream_modes", [["values"], ["messages-tuple"]])
+@pytest.mark.parametrize("failure_reason", ["invalid_tool_call", "empty_terminal_response"])
+async def test_run_agent_terminal_signal_is_error_for_values_and_messages_streams(stream_modes, failure_reason):
+    run_manager = RunManager()
+    record = await run_manager.create("thread-terminal-signal")
+    bridge = SimpleNamespace(
+        publish=AsyncMock(),
+        publish_end=AsyncMock(),
+        cleanup=AsyncMock(),
+    )
+    failure = terminal_response_failure_payload(failure_reason)
+
+    class DummyAgent:
+        async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            runtime = config["configurable"]["__pregel_runtime"]
+            runtime.context[TERMINAL_RESPONSE_FAILURE_KEY] = dict(failure)
+            if stream_mode == "messages":
+                yield (AIMessage(content="ordinary message without fallback marker"), {})
+            else:
+                yield {"messages": []}
+
+    def factory(*, config):
+        return DummyAgent()
+
+    await run_agent(
+        bridge,
+        run_manager,
+        record,
+        ctx=RunContext(checkpointer=None),
+        agent_factory=factory,
+        graph_input={},
+        config={},
+        stream_modes=stream_modes,
+    )
+
+    fetched = await run_manager.get(record.run_id)
+    assert fetched is not None
+    assert fetched.status == RunStatus.error
+    assert fetched.error == failure["message"]
+    assert fetched.stop_reason == failure_reason
+    error_payloads = [item.args[2] for item in bridge.publish.await_args_list if len(item.args) >= 3 and item.args[1] == "error"]
+    assert error_payloads == [
+        {
+            "message": failure["message"],
+            "name": failure["error_type"],
+            "reason": failure_reason,
+        }
+    ]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("stream_modes", "event_name"),
+    [
+        (["values"], "values"),
+        (["messages-tuple"], "messages"),
+    ],
+)
+async def test_run_agent_sse_sanitizes_invalid_tool_args_and_error_but_keeps_valid_calls(
+    stream_modes,
+    event_name,
+):
+    run_manager = RunManager()
+    record = await run_manager.create("thread-invalid-sse")
+    bridge = SimpleNamespace(
+        publish=AsyncMock(),
+        publish_end=AsyncMock(),
+        cleanup=AsyncMock(),
+    )
+    secret = "Bearer sse-provider-secret"
+    raw_body = "raw_body=/private/provider/request"
+    private_argument = "OWNER_SECRET=private-fruit-demand"
+    malformed_args = '{"request":{"owner_note":"' + private_argument
+    malformed = AIMessage.model_construct(
+        content="",
+        type="ai",
+        tool_calls=[
+            {
+                "id": "valid-1",
+                "name": "lookup_status",
+                "args": {"safe_valid_argument": "keep-me"},
+                "type": "tool_call",
+            }
+        ],
+        invalid_tool_calls=[
+            {
+                "type": "invalid_tool_call",
+                "id": "invalid-1",
+                "name": "ip_content_write",
+                "args": malformed_args,
+                "error": f"Failed to parse: {secret}; {raw_body}",
+            }
+        ],
+        additional_kwargs={
+            "tool_calls": [
+                {
+                    "id": "invalid-1",
+                    "type": "function",
+                    "function": {"name": "ip_content_write", "arguments": malformed_args},
+                }
+            ]
+        },
+        response_metadata={"finish_reason": "tool_calls"},
+    )
+
+    class DummyAgent:
+        async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            if stream_mode == "messages":
+                yield (malformed, {"langgraph_node": "model"})
+            else:
+                yield {"messages": [malformed]}
+
+    def factory(*, config):
+        return DummyAgent()
+
+    await run_agent(
+        bridge,
+        run_manager,
+        record,
+        ctx=RunContext(checkpointer=None),
+        agent_factory=factory,
+        graph_input={},
+        config={},
+        stream_modes=stream_modes,
+    )
+
+    payload = next(item.args[2] for item in bridge.publish.await_args_list if item.args[1] == event_name)
+    serialized = repr(payload)
+    assert "invalid_tool_arguments" in serialized
+    assert "keep-me" in serialized
+    for forbidden in (secret, raw_body, private_argument, "sse-provider-secret"):
+        assert forbidden not in serialized
+
+
+@pytest.mark.anyio
+async def test_real_llm_fallback_custom_stream_is_error_and_journal_never_records_success():
+    event_store = MemoryRunEventStore()
+    run_manager = RunManager()
+    record = await run_manager.create("thread-custom-fallback")
+    bridge = SimpleNamespace(
+        publish=AsyncMock(),
+        publish_end=AsyncMock(),
+        cleanup=AsyncMock(),
+    )
+    secret = "provider-secret-custom-stream"
+
+    class ProviderAuthError(RuntimeError):
+        pass
+
+    class RaisingModel(BaseChatModel):
+        @property
+        def _llm_type(self) -> str:
+            return "raising-provider-model"
+
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+            raise ProviderAuthError(f"401 invalid api key Authorization: Bearer {secret}")
+
+        async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+            return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    app_config = AppConfig(
+        sandbox=SandboxConfig(use="test"),
+        llm_call=LlmCallConfig(retry_max_attempts=1),
+    )
+
+    def factory(*, config):
+        return create_agent(
+            model=RaisingModel(),
+            tools=[],
+            middleware=[
+                LLMErrorHandlingMiddleware(app_config=app_config),
+                TerminalResponseMiddleware(),
+            ],
+        )
+
+    await run_agent(
+        bridge,
+        run_manager,
+        record,
+        ctx=RunContext(checkpointer=None, event_store=event_store, app_config=app_config),
+        agent_factory=factory,
+        graph_input={"messages": [{"role": "user", "content": "hello"}]},
+        config={},
+        stream_modes=["custom"],
+    )
+
+    failure = terminal_response_failure_payload("auth")
+    fetched = await run_manager.get(record.run_id)
+    assert fetched is not None
+    assert fetched.status == RunStatus.error
+    assert fetched.error == failure["message"]
+    externally_visible = repr({"record": fetched, "sse": bridge.publish.await_args_list})
+    assert secret not in externally_visible
+    assert "Bearer" not in externally_visible
+    events = await event_store.list_events(record.thread_id, record.run_id)
+    assert any(event["event_type"] == "run.error" for event in events)
+    assert not any(event["event_type"] == "run.end" and event["metadata"].get("status") == "success" for event in events)
+
+
+@pytest.mark.anyio
+async def test_real_messages_stream_repair_no_call_has_authoritative_safe_error_terminal():
+    event_store = MemoryRunEventStore()
+    checkpointer = InMemorySaver()
+    run_manager = RunManager()
+    record = await run_manager.create("thread-repair-no-call")
+    bridge = SimpleNamespace(
+        publish=AsyncMock(),
+        publish_end=AsyncMock(),
+        cleanup=AsyncMock(),
+    )
+    executions: list[dict[str, Any]] = []
+    secret = "Bearer repair-stream-secret"
+
+    @tool
+    def ip_content_write(request: dict[str, Any]) -> str:
+        """Record an execution that must never happen in this test."""
+        executions.append(request)
+        return "saved"
+
+    class RepairNoCallModel(BaseChatModel):
+        call_count: int = 0
+
+        @property
+        def _llm_type(self) -> str:
+            return "repair-no-call"
+
+        def bind_tools(self, tools, **kwargs):
+            return self
+
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+            self.call_count += 1
+            if self.call_count == 1:
+                message = AIMessage(
+                    content="",
+                    invalid_tool_calls=[
+                        {
+                            "type": "invalid_tool_call",
+                            "id": "invalid-write-1",
+                            "name": "ip_content_write",
+                            "args": '{"request":{"owner_note":"OWNER_SECRET',
+                            "error": f"Failed to parse {secret}",
+                        }
+                    ],
+                    response_metadata={"finish_reason": "tool_calls"},
+                )
+            else:
+                message = AIMessage(content="The script was saved.")
+            return ChatResult(generations=[ChatGeneration(message=message)])
+
+        async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+            return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    model = RepairNoCallModel()
+
+    def factory(*, config):
+        return create_agent(
+            model=model,
+            tools=[ip_content_write],
+            middleware=[TerminalResponseMiddleware()],
+        )
+
+    await run_agent(
+        bridge,
+        run_manager,
+        record,
+        ctx=RunContext(checkpointer=checkpointer, event_store=event_store),
+        agent_factory=factory,
+        graph_input={"messages": [{"role": "user", "content": "save it"}]},
+        config={"configurable": {"thread_id": record.thread_id}},
+        stream_modes=["messages-tuple"],
+    )
+
+    failure = terminal_response_failure_payload("invalid_tool_call")
+    fetched = await run_manager.get(record.run_id)
+    assert fetched is not None
+    assert fetched.status == RunStatus.error
+    assert fetched.error == failure["message"]
+    assert fetched.last_ai_message == failure["message"]
+    assert model.call_count == 2
+    assert executions == []
+    messages_sse = [item.args[2] for item in bridge.publish.await_args_list if item.args[1] == "messages"]
+    serialized_sse = repr(messages_sse)
+    assert failure["message"] in serialized_sse
+    assert secret not in serialized_sse
+    error_payloads = [item.args[2] for item in bridge.publish.await_args_list if item.args[1] == "error"]
+    assert error_payloads == [
+        {
+            "message": failure["message"],
+            "name": failure["error_type"],
+            "reason": "invalid_tool_call",
+        }
+    ]
+    latest = await checkpointer.aget_tuple({"configurable": {"thread_id": record.thread_id}})
+    assert latest is not None
+    final_messages = latest.checkpoint["channel_values"]["messages"]
+    assert final_messages[-1].content == failure["message"]
+    assert "The script was saved." not in repr(final_messages[-1])
+    events = await event_store.list_events(record.thread_id, record.run_id)
+    assert any(event["event_type"] == "run.error" for event in events)
+    assert not any(event["event_type"] == "run.end" and event["metadata"].get("status") == "success" for event in events)
 
 
 @pytest.mark.anyio

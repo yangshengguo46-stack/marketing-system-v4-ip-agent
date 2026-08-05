@@ -31,10 +31,6 @@ from langchain_core.messages import ToolMessage
 
 logger = logging.getLogger(__name__)
 
-# Workaround for issue #2894: malformed write_file calls can carry huge Markdown
-# payloads in invalid tool-call args. Keep recovery error details short so the
-# synthetic ToolMessage does not echo large or malformed content back to the model.
-_MAX_RECOVERY_ERROR_DETAIL_LEN = 500
 _UNKNOWN_TOOL_NAME = "unknown_tool"
 _EMPTY_TOOL_NAME_ERROR = "Tool call could not be executed because its name was missing or empty."
 _SYNTHETIC_TOOL_CALL_ID_PREFIX = "deerflow_synthetic_tool_call_"
@@ -242,25 +238,21 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
             return f"[{_EMPTY_TOOL_NAME_ERROR} Use one of the available tool names when retrying.]"
         if tool_call.get("invalid"):
             name = tool_call.get("name")
-            error = tool_call.get("error")
-            error_text = error[:_MAX_RECOVERY_ERROR_DETAIL_LEN] if isinstance(error, str) and error else ""
             # Workaround for issue #2894: malformed write_file calls can carry huge Markdown
-            # payloads in invalid tool-call args. Keep recovery guidance actionable without
-            # echoing large or malformed content back to the model.
+            # payloads and provider parse errors can contain credentials or raw request
+            # bodies. Use fixed guidance: neither source is safe to echo into the next
+            # model request.
             if name == "write_file":
-                details = f" Parser error: {error_text}" if error_text else ""
                 return (
-                    "[write_file failed before execution: the tool-call arguments were not valid JSON, "
+                    "[write_file was not executed: the tool-call arguments were not valid JSON, "
                     "so no file was written. This often happens when the model tries to write a very "
                     "large Markdown file in a single tool call, especially when `content` contains "
                     "unescaped quotes, inline JSON, backslashes, or code fences. Do not retry the same "
                     "large `write_file` payload for this artifact; provide the report/content directly "
                     "as normal assistant text in your next response. If a file write is still needed "
-                    f"later, split the file into smaller sections instead of one large payload.{details}]"
+                    "later, split the file into smaller sections instead of one large payload.]"
                 )
-            if error_text:
-                return f"[Tool call could not be executed because its arguments were invalid: {error_text}]"
-            return "[Tool call could not be executed because its arguments were invalid.]"
+            return "[Tool call was not executed because its arguments were invalid.]"
         return "[Tool call was interrupted and did not return a result.]"
 
     @staticmethod

@@ -10,6 +10,7 @@ evidence packet; it never retries a model call.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -106,6 +107,7 @@ HEX_64 = re.compile(r"^[0-9a-f]{64}$")
 HEX_40 = re.compile(r"^[0-9a-f]{40}$")
 HEX_16 = re.compile(r"^[0-9a-f]{16}$")
 FORBIDDEN_MODEL_MARKERS = ("mock", "test", "fixture", "replay", "fake")
+MALFORMED_TOOL_CLASSIFICATION = "malformed_tool_arguments"
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,6 +190,155 @@ def _sha256_bytes(value: bytes) -> str:
 
 def _sha256_json(value: Any) -> str:
     return _sha256_bytes(_canonical_json_bytes(value))
+
+
+def _validated_invalid_tool_receipts(value: Any) -> list[dict[str, str]]:
+    raw_receipts = _sequence(value)
+    if raw_receipts is None:
+        _fail("LEAD_MODEL_RECOVERY_INVALID")
+    receipts: list[dict[str, str]] = []
+    for raw in raw_receipts:
+        receipt = _mapping(raw)
+        if receipt is None or set(receipt) != {"name", "classification"} or not isinstance(receipt.get("name"), str) or not receipt.get("name") or receipt.get("classification") != MALFORMED_TOOL_CLASSIFICATION:
+            _fail("LEAD_MODEL_RECOVERY_INVALID")
+        receipts.append(
+            {
+                "name": str(receipt["name"]),
+                "classification": MALFORMED_TOOL_CLASSIFICATION,
+            }
+        )
+    return receipts
+
+
+def _seal_invalid_tool_payloads(value: Any) -> Any:
+    if isinstance(value, Sequence) and not isinstance(
+        value,
+        (str, bytes, bytearray),
+    ):
+        return [_seal_invalid_tool_payloads(item) for item in value]
+    message = _mapping(value)
+    if message is None:
+        return copy.deepcopy(value)
+    raw_invalid_value = message.get("invalid_tool_calls", [])
+    raw_invalid = _sequence(raw_invalid_value)
+    if raw_invalid is None:
+        _fail("LEAD_MODEL_RECOVERY_INVALID")
+    already_sealed = message.get("acceptance_invalid_tool_calls")
+    if raw_invalid and already_sealed is not None:
+        _fail("LEAD_MODEL_RECOVERY_INVALID")
+    sealed: dict[str, Any] = {}
+    for key, item in message.items():
+        if key in {
+            "invalid_tool_calls",
+            "acceptance_invalid_tool_calls",
+        }:
+            continue
+        if key == "additional_kwargs" and ("tool_calls" in message or "invalid_tool_calls" in message):
+            additional = _mapping(item)
+            if additional is None:
+                _fail("LEAD_MODEL_RECOVERY_INVALID")
+            item = {additional_key: additional_value for additional_key, additional_value in additional.items() if additional_key not in {"tool_calls", "function_call"}}
+        sealed[str(key)] = _seal_invalid_tool_payloads(item)
+    if "invalid_tool_calls" in message:
+        sealed["invalid_tool_calls"] = []
+    if raw_invalid:
+        receipts: list[dict[str, str]] = []
+        for raw in raw_invalid:
+            invalid = _mapping(raw)
+            name = invalid.get("name") if invalid is not None else None
+            if not isinstance(name, str) or not name:
+                _fail("LEAD_MODEL_RECOVERY_INVALID")
+            receipts.append(
+                {
+                    "name": name,
+                    "classification": MALFORMED_TOOL_CLASSIFICATION,
+                }
+            )
+        sealed["acceptance_invalid_tool_calls"] = receipts
+    elif already_sealed is not None:
+        sealed["acceptance_invalid_tool_calls"] = _validated_invalid_tool_receipts(
+            already_sealed,
+        )
+    return sealed
+
+
+def _seal_invalid_tool_calls(message: Mapping[str, Any]) -> dict[str, Any]:
+    sealed = _seal_invalid_tool_payloads(message)
+    if not isinstance(sealed, dict):
+        _fail("LEAD_MODEL_RECOVERY_INVALID")
+    return sealed
+
+
+def _lead_tool_receipt_from_content(content: Mapping[str, Any]) -> dict[str, Any]:
+    raw_valid = _sequence(content.get("tool_calls", []))
+    raw_invalid = _sequence(content.get("invalid_tool_calls", []))
+    if raw_valid is None or raw_invalid is None or raw_invalid:
+        _fail("LEAD_MODEL_RECOVERY_INVALID")
+    valid_names: list[str] = []
+    for raw in raw_valid:
+        call = _mapping(raw)
+        name = call.get("name") if call is not None else None
+        if not isinstance(name, str) or not name:
+            _fail("LEAD_MODEL_RECOVERY_INVALID")
+        valid_names.append(name)
+    sealed_invalid_value = content.get("acceptance_invalid_tool_calls", [])
+    invalid_receipts = _validated_invalid_tool_receipts(sealed_invalid_value)
+    response_metadata = _mapping(content.get("response_metadata")) or {}
+    additional = _mapping(content.get("additional_kwargs")) or {}
+    finish_reason = response_metadata.get("finish_reason")
+    if not isinstance(finish_reason, str) or not finish_reason:
+        _fail("LEAD_MODEL_RECOVERY_INVALID")
+    return {
+        "finish_reason": finish_reason,
+        "valid_tool_call_names": valid_names,
+        "invalid_tool_calls": invalid_receipts,
+        "fallback": additional.get("deerflow_error_fallback") is True,
+    }
+
+
+def _validated_lead_tool_receipt(value: Any) -> dict[str, Any]:
+    receipt = _mapping(value)
+    if receipt is None or set(receipt) != {
+        "finish_reason",
+        "valid_tool_call_names",
+        "invalid_tool_calls",
+        "fallback",
+    }:
+        _fail("LEAD_MODEL_RECOVERY_INVALID")
+    valid_names = _sequence(receipt.get("valid_tool_call_names"))
+    if not isinstance(receipt.get("finish_reason"), str) or not receipt.get("finish_reason") or valid_names is None or any(not isinstance(name, str) or not name for name in valid_names) or type(receipt.get("fallback")) is not bool:
+        _fail("LEAD_MODEL_RECOVERY_INVALID")
+    return {
+        "finish_reason": str(receipt["finish_reason"]),
+        "valid_tool_call_names": list(valid_names),
+        "invalid_tool_calls": _validated_invalid_tool_receipts(
+            receipt.get("invalid_tool_calls"),
+        ),
+        "fallback": bool(receipt["fallback"]),
+    }
+
+
+def _seal_gateway_events(
+    events: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    sealed_events: list[dict[str, Any]] = []
+    for raw_event in events:
+        event = _seal_invalid_tool_calls(raw_event)
+        if event.get("event_type") == "llm.ai.response" and _mapping(event.get("content")) is None:
+            _fail("GATEWAY_EVENT_RECEIPT_INVALID")
+        sealed_events.append(event)
+    return sealed_events
+
+
+def _seal_checkpoint_state(state: Mapping[str, Any]) -> dict[str, Any]:
+    sealed = _seal_invalid_tool_calls(state)
+    values = _mapping(sealed.get("values"))
+    messages = _sequence(values.get("messages")) if values else None
+    if values is None or messages is None:
+        _fail("CHECKPOINT_RECEIPT_INVALID")
+    if any(_mapping(raw_message) is None for raw_message in messages):
+        _fail("CHECKPOINT_RECEIPT_INVALID")
+    return sealed
 
 
 def _load_yaml_mapping(path: Path, code: str) -> dict[str, Any]:
@@ -617,22 +768,27 @@ def _validate_embedded_gateway_receipts(
         response_metadata = _mapping(content.get("response_metadata")) or {}
         additional = _mapping(content.get("additional_kwargs")) or {}
         usage = _mapping(metadata.get("usage")) or {}
-        source_calls.append(
-            {
-                "llm_call_index": metadata.get("llm_call_index"),
-                "caller": metadata.get("caller"),
-                "model_name": response_metadata.get("model_name") or response_metadata.get("model"),
-                "status": ("error" if additional.get("deerflow_error_fallback") is True else "success"),
-                "event_seq": event_sequence,
-                "usage": {
-                    "input_tokens": int(usage.get("input_tokens") or 0),
-                    "output_tokens": int(usage.get("output_tokens") or 0),
-                    "total_tokens": int(usage.get("total_tokens") or 0),
-                },
-            }
-        )
-    receipt_projection = [
-        {
+        caller = metadata.get("caller")
+        source_call = {
+            "llm_call_index": metadata.get("llm_call_index"),
+            "caller": caller,
+            "model_name": response_metadata.get("model_name") or response_metadata.get("model"),
+            "status": ("error" if additional.get("deerflow_error_fallback") is True else "success"),
+            "event_seq": event_sequence,
+            "usage": {
+                "input_tokens": int(usage.get("input_tokens") or 0),
+                "output_tokens": int(usage.get("output_tokens") or 0),
+                "total_tokens": int(usage.get("total_tokens") or 0),
+            },
+        }
+        if caller == "lead_agent":
+            source_call["lead_tool_receipt"] = _lead_tool_receipt_from_content(
+                content,
+            )
+        source_calls.append(source_call)
+    receipt_projection: list[dict[str, Any]] = []
+    for call in calls:
+        projection = {
             key: call.get(key)
             for key in (
                 "llm_call_index",
@@ -643,8 +799,9 @@ def _validate_embedded_gateway_receipts(
                 "usage",
             )
         }
-        for call in calls
-    ]
+        if call.get("caller") == "lead_agent":
+            projection["lead_tool_receipt"] = call.get("lead_tool_receipt")
+        receipt_projection.append(projection)
     if source_calls != receipt_projection:
         _fail("PROVIDER_MODEL_RECEIPT_INVALID")
 
@@ -710,6 +867,63 @@ def _provider_model_is_real(model: Mapping[str, Any]) -> bool:
     return not any(marker in normalized for marker in FORBIDDEN_MODEL_MARKERS) and bool(HEX_64.fullmatch(str(model.get("effective_config_sha256") or "")))
 
 
+def _derive_lead_recovery_count(
+    calls: Sequence[Mapping[str, Any]],
+    *,
+    internal_calls: Sequence[Mapping[str, Any]],
+) -> int:
+    lead_calls = [call for call in calls if call.get("caller") == "lead_agent"]
+    if len(lead_calls) < 2:
+        _fail("LEAD_MODEL_RECEIPT_MISSING")
+    if len(lead_calls) not in {2, 3}:
+        _fail("LEAD_MODEL_RECOVERY_INVALID")
+    valid_receipt = {
+        "finish_reason": "tool_calls",
+        "valid_tool_call_names": ["ip_content_write"],
+        "invalid_tool_calls": [],
+        "fallback": False,
+    }
+    invalid_receipt = {
+        "finish_reason": "tool_calls",
+        "valid_tool_call_names": [],
+        "invalid_tool_calls": [
+            {
+                "name": "ip_content_write",
+                "classification": MALFORMED_TOOL_CLASSIFICATION,
+            }
+        ],
+        "fallback": False,
+    }
+    final_receipt = {
+        "finish_reason": "stop",
+        "valid_tool_call_names": [],
+        "invalid_tool_calls": [],
+        "fallback": False,
+    }
+    recovery_count = len(lead_calls) - 2
+    expected_lead_receipts = [valid_receipt, final_receipt] if recovery_count == 0 else [invalid_receipt, valid_receipt, final_receipt]
+    if any(
+        call.get("status") != "success" or call.get("lead_tool_receipt") != expected
+        for call, expected in zip(
+            lead_calls,
+            expected_lead_receipts,
+            strict=True,
+        )
+    ):
+        _fail("LEAD_MODEL_RECOVERY_INVALID")
+    if not internal_calls:
+        _fail("WRITER_MODEL_RECEIPT_MISMATCH")
+    relevant = [call for call in calls if call.get("caller") == "lead_agent" or call in internal_calls]
+    expected_relevant = [
+        *lead_calls[: 1 + recovery_count],
+        *internal_calls,
+        lead_calls[-1],
+    ]
+    if relevant != expected_relevant:
+        _fail("LEAD_MODEL_RECOVERY_INVALID")
+    return recovery_count
+
+
 def validate_live_run_receipt(
     run_receipt: Mapping[str, Any],
     *,
@@ -749,6 +963,8 @@ def validate_live_run_receipt(
         index = call.get("llm_call_index")
         event_sequence = call.get("event_seq")
         usage = _positive_usage(call.get("usage"))
+        caller = call.get("caller")
+        status = call.get("status")
         if (
             type(index) is not int
             or index < 1
@@ -756,28 +972,32 @@ def validate_live_run_receipt(
             or type(event_sequence) is not int
             or event_sequence < 1
             or event_sequence in seen_event_sequences
-            or call.get("status") != "success"
+            or status not in {"success", "error"}
+            or (status == "error" and caller != "lead_agent")
             or call.get("model_name") != effective_model.get("provider_model")
             or usage is None
         ):
             _fail("PROVIDER_MODEL_RECEIPT_INVALID")
+        normalized = {**dict(call), "usage": usage}
+        if caller == "lead_agent":
+            normalized["lead_tool_receipt"] = _validated_lead_tool_receipt(
+                call.get("lead_tool_receipt"),
+            )
+        elif call.get("lead_tool_receipt") is not None:
+            _fail("PROVIDER_MODEL_RECEIPT_INVALID")
         seen_indices.add(index)
         seen_event_sequences.add(event_sequence)
-        calls.append({**dict(call), "usage": usage})
+        calls.append(normalized)
     calls.sort(key=lambda item: item["event_seq"])
 
-    lead_calls = [call for call in calls if call.get("caller") == "lead_agent"]
-    if len(lead_calls) != 2:
-        _fail("LEAD_MODEL_RECEIPT_MISSING")
     internal_calls = [call for call in calls if isinstance(call.get("caller"), str) and call["caller"].startswith("middleware:ip-agent-")]
     actual_internal_names = [call["caller"].removeprefix("middleware:") for call in internal_calls]
     if actual_internal_names != list(expected_calls):
         _fail("WRITER_MODEL_RECEIPT_MISMATCH")
-    first_lead_position = calls.index(lead_calls[0])
-    final_lead_position = calls.index(lead_calls[1])
-    internal_positions = [calls.index(call) for call in internal_calls]
-    if not internal_positions or not (first_lead_position < min(internal_positions) and max(internal_positions) < final_lead_position):
-        _fail("WRITER_MODEL_RECEIPT_MISMATCH")
+    lead_recovery_count = _derive_lead_recovery_count(
+        calls,
+        internal_calls=internal_calls,
+    )
 
     usage_receipt = _mapping(run_receipt.get("usage"))
     expected_total = sum(call["usage"]["total_tokens"] for call in calls)
@@ -805,6 +1025,7 @@ def validate_live_run_receipt(
         "gateway_binding_verified": True,
         "provider_receipts_verified": True,
         "model_identity_sha256": _model_identity(effective_model),
+        "lead_recovery_count": lead_recovery_count,
         "writer_model_trace": writer_trace,
     }
 
@@ -1029,6 +1250,7 @@ def _derive_packet(
         provider_error = exc
         if enforce_success and manifest.get("execution_source") == LIVE_SOURCE:
             raise
+    lead_recovery_count = int(provider["lead_recovery_count"]) if provider is not None else 0
     writer_trace = provider["writer_model_trace"] if provider is not None else _writer_trace_without_provider_claim(run_receipt)
     tool_trace = _sequence(tool_receipt.get("tool_trace")) or []
     checkpoint_verified = False
@@ -1040,6 +1262,7 @@ def _derive_packet(
                 lineage=lineage,
                 tool_trace=tool_trace,
                 final_text=final_text,
+                lead_recovery_count=lead_recovery_count,
             )
             checkpoint_verified = True
         except AcceptanceError as exc:
@@ -1091,6 +1314,7 @@ def _derive_packet(
         "provider_receipts_verified": provider is not None,
         "checkpoint_receipts_verified": checkpoint_verified,
         "model_identity_sha256": (provider["model_identity_sha256"] if provider is not None else None),
+        "lead_recovery_count": lead_recovery_count,
         "writer_model_trace": writer_trace,
         "behavior_passed": behavior.passed,
         "behavior_failure_codes": list(behavior.failure_codes),
@@ -1115,6 +1339,7 @@ def _validate_manifest_claims(
         "provider_receipts_verified",
         "checkpoint_receipts_verified",
         "model_identity_sha256",
+        "lead_recovery_count",
         "behavior_passed",
         "owner_post_run_verified",
     )
@@ -1306,6 +1531,7 @@ def verify_matrix(packet_paths: Sequence[Path]) -> dict[str, Any]:
         "git_commit": next(iter(commits)),
         "agent_artifact_sha256": next(iter(artifacts)),
         "model_identity_sha256": next(iter(models)),
+        "lead_recovery_count_by_case": {case_id: by_case[case_id]["lead_recovery_count"] for case_id in expected_ids},
         "evidence_class": ("live_default_agent" if all_live else "synthetic_contract"),
         "ledger_eligible": all_live,
     }
@@ -1520,15 +1746,31 @@ def _checkpoint_tool_trace(
     lineage: Mapping[str, Any],
     run_id: str,
     thread_id: str,
+    expected_lead_recovery_count: int,
 ) -> list[dict[str, Any]]:
     calls: list[dict[str, Any]] = []
+    call_positions: list[int] = []
+    answer_positions: list[int] = []
     results: dict[str, Mapping[str, Any]] = {}
     result_status: dict[str, Any] = {}
     result_names: dict[str, Any] = {}
     tool_message_ids: list[Any] = []
-    for message in messages:
+    tool_message_positions: list[int] = []
+    for position, message in enumerate(messages):
         if message.get("type") in {"ai", "assistant"}:
-            raw_calls = _sequence(message.get("tool_calls")) or []
+            additional = _mapping(message.get("additional_kwargs")) or {}
+            raw_calls_value = message.get("tool_calls", [])
+            raw_calls = _sequence(raw_calls_value)
+            raw_invalid = _sequence(message.get("invalid_tool_calls", []))
+            if raw_calls is None or raw_invalid is None or raw_invalid or additional.get("deerflow_error_fallback") is True:
+                _fail("TOOL_RECEIPT_INVALID")
+            sealed_invalid = _validated_invalid_tool_receipts(
+                message.get("acceptance_invalid_tool_calls", []),
+            )
+            if sealed_invalid:
+                _fail("TOOL_RECEIPT_INVALID")
+            if _text_content(message.get("content")).strip():
+                answer_positions.append(position)
             for raw in raw_calls:
                 call = _mapping(raw)
                 if call is None:
@@ -1545,16 +1787,27 @@ def _checkpoint_tool_trace(
                         "arguments": dict(arguments),
                     }
                 )
+                call_positions.append(position)
         elif message.get("type") == "tool":
             call_id = message.get("tool_call_id")
             tool_message_ids.append(call_id)
+            tool_message_positions.append(position)
             if isinstance(call_id, str):
                 decoded = _decode_tool_result(message.get("content"))
                 if decoded is not None:
                     results[call_id] = decoded
                     result_status[call_id] = message.get("status")
                     result_names[call_id] = message.get("name")
-    if len(calls) != 1 or calls[0].get("name") != "ip_content_write" or tool_message_ids != [calls[0].get("call_id")]:
+    if (
+        expected_lead_recovery_count not in {0, 1}
+        or len(calls) != 1
+        or calls[0].get("name") != "ip_content_write"
+        or tool_message_ids != [calls[0].get("call_id")]
+        or len(call_positions) != 1
+        or len(tool_message_positions) != 1
+        or not answer_positions
+        or not (call_positions[0] < tool_message_positions[0] < answer_positions[-1])
+    ):
         _fail("TOOL_RECEIPT_INVALID")
     call = calls[0]
     result = results.get(call["call_id"])
@@ -1588,6 +1841,7 @@ def _validate_checkpoint_artifacts(
     lineage: Mapping[str, Any],
     tool_trace: Sequence[Mapping[str, Any]],
     final_text: str,
+    lead_recovery_count: int,
 ) -> None:
     try:
         embedded = _mapping(run_receipt.get("gateway_receipts"))
@@ -1602,6 +1856,7 @@ def _validate_checkpoint_artifacts(
             lineage=lineage,
             run_id=str(run_receipt.get("run_id") or ""),
             thread_id=str(run_receipt.get("thread_id") or ""),
+            expected_lead_recovery_count=lead_recovery_count,
         )
     except AcceptanceError:
         _fail("CHECKPOINT_RECEIPT_INVALID")
@@ -1705,28 +1960,32 @@ def _build_live_run_receipt(
         or product.get("declared_capability_digest") != _product_capability_digest(expected_agent_artifact_sha256)
     ):
         _fail("GATEWAY_PRODUCT_BINDING_MISMATCH")
+    sealed_events = _seal_gateway_events(events)
+    sealed_state = _seal_checkpoint_state(state)
     llm_calls: list[dict[str, Any]] = []
-    for event in events:
+    for event in sealed_events:
         if event.get("event_type") != "llm.ai.response":
             continue
         event_metadata = _mapping(event.get("metadata")) or {}
         usage = _mapping(event_metadata.get("usage")) or {}
         content = _mapping(event.get("content")) or {}
         additional = _mapping(content.get("additional_kwargs")) or {}
-        llm_calls.append(
-            {
-                "llm_call_index": event_metadata.get("llm_call_index"),
-                "caller": event_metadata.get("caller"),
-                "model_name": _event_model_name(event),
-                "status": ("error" if additional.get("deerflow_error_fallback") is True else "success"),
-                "usage": {
-                    "input_tokens": int(usage.get("input_tokens") or 0),
-                    "output_tokens": int(usage.get("output_tokens") or 0),
-                    "total_tokens": int(usage.get("total_tokens") or 0),
-                },
-                "event_seq": event.get("seq"),
-            }
-        )
+        caller = event_metadata.get("caller")
+        call = {
+            "llm_call_index": event_metadata.get("llm_call_index"),
+            "caller": caller,
+            "model_name": _event_model_name(event),
+            "status": ("error" if additional.get("deerflow_error_fallback") is True else "success"),
+            "usage": {
+                "input_tokens": int(usage.get("input_tokens") or 0),
+                "output_tokens": int(usage.get("output_tokens") or 0),
+                "total_tokens": int(usage.get("total_tokens") or 0),
+            },
+            "event_seq": event.get("seq"),
+        }
+        if caller == "lead_agent":
+            call["lead_tool_receipt"] = _lead_tool_receipt_from_content(content)
+        llm_calls.append(call)
     total_tokens = sum(call["usage"]["total_tokens"] for call in llm_calls)
     return {
         "schema_version": RUN_RECEIPT_SCHEMA,
@@ -1754,13 +2013,13 @@ def _build_live_run_receipt(
         "gateway_receipts": {
             "run": dict(run),
             "checkpoint": {
-                "state": dict(state),
-                "checkpoint": state.get("checkpoint"),
-                "checkpoint_id": state.get("checkpoint_id"),
-                "next": state.get("next"),
-                "values_sha256": _sha256_json(state.get("values")),
+                "state": sealed_state,
+                "checkpoint": sealed_state.get("checkpoint"),
+                "checkpoint_id": sealed_state.get("checkpoint_id"),
+                "next": sealed_state.get("next"),
+                "values_sha256": _sha256_json(sealed_state.get("values")),
             },
-            "events": [dict(event) for event in events],
+            "events": sealed_events,
             "token_usage": dict(token_usage),
             "model": dict(model_receipt),
             "owner_baseline": dict(owner_baseline),
@@ -1995,7 +2254,7 @@ def run_live(
                 owner_baseline=owner_baseline,
             )
             partial["run-receipt.json"] = run_receipt
-            validate_live_run_receipt(
+            provider_receipt = validate_live_run_receipt(
                 run_receipt,
                 case_id=case_id,
                 expected_agent_artifact_sha256=artifact_digest,
@@ -2014,18 +2273,26 @@ def run_live(
             if not isinstance(lineage, Mapping):
                 _fail("CONTENT_LINEAGE_RECEIPT_INVALID")
             partial["lineage.json"] = dict(lineage)
-            messages = _checkpoint_messages(state)
+            sealed_gateway_receipts = _mapping(run_receipt.get("gateway_receipts"))
+            sealed_checkpoint = _mapping(sealed_gateway_receipts.get("checkpoint")) if sealed_gateway_receipts else None
+            sealed_state = _mapping(sealed_checkpoint.get("state")) if sealed_checkpoint else None
+            if sealed_state is None:
+                _fail("CHECKPOINT_RECEIPT_INVALID")
+            messages = _checkpoint_messages(sealed_state)
             answer = _checkpoint_answer(messages)
             tool_trace = _checkpoint_tool_trace(
                 messages,
                 lineage=lineage,
                 run_id=run_id,
                 thread_id=thread_id,
+                expected_lead_recovery_count=int(
+                    provider_receipt["lead_recovery_count"],
+                ),
             )
             partial["answer.txt"] = answer
             partial["tool-receipt.json"] = {
                 "schema_version": "personal-ip-writer-v2-tool-receipt-v1",
-                "checkpoint_id": state.get("checkpoint_id"),
+                "checkpoint_id": sealed_state.get("checkpoint_id"),
                 "tool_trace": tool_trace,
             }
 

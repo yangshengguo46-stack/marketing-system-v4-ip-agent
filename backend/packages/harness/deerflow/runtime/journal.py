@@ -31,7 +31,9 @@ from langchain_core.messages import AIMessage, AnyMessage, BaseMessage, HumanMes
 from langgraph.types import Command
 
 from deerflow.agents.human_input import read_human_input_response
+from deerflow.runtime.context_keys import TERMINAL_RESPONSE_FAILURES, terminal_response_failure_payload
 from deerflow.utils.messages import message_to_text, restore_original_human_message
+from deerflow.utils.tool_call_safety import sanitize_invalid_tool_calls
 
 if TYPE_CHECKING:
     from deerflow.runtime.events.store.base import RunEventStore
@@ -49,6 +51,7 @@ _SAFE_LLM_FALLBACK_REASONS = frozenset(
         "circuit_open",
         "empty_terminal_response",
         "generic",
+        "invalid_tool_call",
         "quota",
         "transient",
     }
@@ -123,6 +126,8 @@ class RunJournal(BaseCallbackHandler):
         self._msg_count = 0
         self._had_llm_error_fallback = False
         self._llm_error_fallback_message: str | None = None
+        self._terminal_response_failure: dict[str, str] | None = None
+        self._current_run_ai_message_ids: set[str] = set()
 
         # Latency tracking
         self._llm_start_times: dict[str, float] = {}  # langchain run_id -> start time
@@ -135,6 +140,37 @@ class RunJournal(BaseCallbackHandler):
         self._persisted_tool_message_identities: set[str] = set()
 
     # -- Lifecycle callbacks --
+
+    def mark_terminal_response_failure(self, reason: str) -> None:
+        """Mark a closed middleware failure before the root chain ends."""
+        failure = terminal_response_failure_payload(reason)
+        self._terminal_response_failure = failure
+        self._had_llm_error_fallback = True
+        self._llm_error_fallback_message = failure["message"]
+        self._last_ai_msg = failure["message"]
+
+    def _mark_terminal_fallback_from_outputs(self, outputs: Any) -> None:
+        """Defensively classify only the root output's last AI fallback."""
+        if self._terminal_response_failure is not None or not isinstance(outputs, dict):
+            return
+        messages = outputs.get("messages")
+        if not isinstance(messages, (list, tuple)):
+            return
+        last_ai = next(
+            (message for message in reversed(messages) if isinstance(message, AIMessage) or (isinstance(message, dict) and message.get("type") == "ai")),
+            None,
+        )
+        if last_ai is None:
+            return
+        message_id = last_ai.id if isinstance(last_ai, AIMessage) else last_ai.get("id")
+        if not isinstance(message_id, str) or message_id not in self._current_run_ai_message_ids:
+            return
+        additional_kwargs = last_ai.additional_kwargs if isinstance(last_ai, AIMessage) else last_ai.get("additional_kwargs")
+        if not isinstance(additional_kwargs, dict) or additional_kwargs.get("deerflow_error_fallback") is not True:
+            return
+        reason = additional_kwargs.get("error_reason")
+        safe_reason = reason if isinstance(reason, str) and reason in TERMINAL_RESPONSE_FAILURES else "generic"
+        self.mark_terminal_response_failure(safe_reason)
 
     @staticmethod
     def _message_text(message: BaseMessage) -> str:
@@ -188,8 +224,21 @@ class RunJournal(BaseCallbackHandler):
         # represents the user-visible run lifecycle.
         if parent_run_id is not None:
             return
+        self._mark_terminal_fallback_from_outputs(outputs)
         self._reconcile_final_tool_messages(outputs)
-        self._put(event_type="run.end", category="outputs", content=outputs, metadata={"status": "success"})
+        if self._terminal_response_failure is not None:
+            failure = self._terminal_response_failure
+            self._put(
+                event_type="run.error",
+                category="error",
+                content={"error_category": "terminal_response_failed"},
+                metadata={
+                    "error_type": failure["error_type"],
+                    "error_reason": failure["error_reason"],
+                },
+            )
+        else:
+            self._put(event_type="run.end", category="outputs", content=outputs, metadata={"status": "success"})
         self._flush_sync()
 
     def on_chain_error(
@@ -280,6 +329,9 @@ class RunJournal(BaseCallbackHandler):
                     logger.warning(f"on_llm_end {run_id}: generation has no message attribute: {gen}")
 
         for message in messages:
+            message_id = getattr(message, "id", None)
+            if isinstance(message_id, str) and message_id:
+                self._current_run_ai_message_ids.add(message_id)
             caller = self._identify_caller(tags)
             self._remember_current_run_tool_calls(message, caller=caller)
 
@@ -294,13 +346,9 @@ class RunJournal(BaseCallbackHandler):
             additional_kwargs = getattr(message, "additional_kwargs", None) or {}
             is_error_fallback = isinstance(additional_kwargs, dict) and additional_kwargs.get("deerflow_error_fallback") is True
             if is_error_fallback:
-                self._had_llm_error_fallback = True
                 reason = additional_kwargs.get("error_reason")
-                fallback_text = self._message_text(message).strip()
-                if fallback_text:
-                    self._llm_error_fallback_message = fallback_text[:2000]
-                elif isinstance(reason, str) and reason.strip():
-                    self._llm_error_fallback_message = reason if reason in _SAFE_LLM_FALLBACK_REASONS else "generic"
+                safe_reason = reason if isinstance(reason, str) and reason in TERMINAL_RESPONSE_FAILURES else "generic"
+                self.mark_terminal_response_failure(safe_reason)
 
             # Resolve call index
             call_index = self._llm_call_index
@@ -311,7 +359,7 @@ class RunJournal(BaseCallbackHandler):
                 self._seen_llm_starts.add(rid)
 
             # Trace event: llm_response (OpenAI completion format)
-            event_content = message.model_dump()
+            event_content = sanitize_invalid_tool_calls(message.model_dump())
             if is_error_fallback and isinstance(event_content, dict):
                 event_content = {
                     **event_content,

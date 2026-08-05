@@ -673,13 +673,13 @@ class TestBuildPatchedMessagesPatching:
         assert patched[1].tool_call_id == "write_file:36"
         assert patched[1].name == "write_file"
         assert patched[1].status == "error"
-        assert "write_file failed before execution" in patched[1].content
+        assert "write_file was not executed" in patched[1].content
         assert "no file was written" in patched[1].content
         assert "very large Markdown file in a single tool call" in patched[1].content
         assert "Do not retry the same large `write_file` payload" in patched[1].content
         assert "split the file into smaller sections" in patched[1].content
         assert "normal assistant text" in patched[1].content
-        assert "Failed to parse tool arguments" in patched[1].content
+        assert "Failed to parse tool arguments" not in patched[1].content
         assert 'bad {"json"}' not in patched[1].content
 
     def test_non_write_file_invalid_tool_call_uses_generic_recovery_message(self):
@@ -692,8 +692,9 @@ class TestBuildPatchedMessagesPatching:
         assert patched[1].tool_call_id == "search:1"
         assert patched[1].name == "search"
         assert "arguments were invalid" in patched[1].content
-        assert "Failed to parse tool arguments" in patched[1].content
-        assert "write_file failed before execution" not in patched[1].content
+        assert "was not executed" in patched[1].content
+        assert "Failed to parse tool arguments" not in patched[1].content
+        assert "write_file was not executed" not in patched[1].content
 
     def test_valid_and_invalid_tool_calls_are_both_patched(self):
         mw = DanglingToolCallMiddleware()
@@ -709,6 +710,35 @@ class TestBuildPatchedMessagesPatching:
         tool_msgs = [m for m in patched if isinstance(m, ToolMessage)]
         assert len(tool_msgs) == 2
         assert {tm.tool_call_id for tm in tool_msgs} == {"call_1", "write_file:36"}
+
+    def test_mixed_invalid_tool_placeholder_never_echoes_provider_error_or_arguments(self):
+        secret = "Bearer provider-secret-from-parser"
+        raw_body = "raw_body=/private/provider/request"
+        private_argument = "OWNER_SECRET=private-fruit-demand"
+        message = AIMessage(
+            content="",
+            tool_calls=[_tc("bash", "call_1")],
+            invalid_tool_calls=[
+                _invalid_tc(
+                    name="ip_content_write",
+                    tc_id="invalid-write-1",
+                    error=f"Failed to parse: {secret}; {raw_body}; argument={private_argument}",
+                )
+            ],
+        )
+
+        patched = DanglingToolCallMiddleware()._build_patched_messages([message])
+
+        assert patched is not None
+        invalid_result = next(item for item in patched if isinstance(item, ToolMessage) and item.tool_call_id == "invalid-write-1")
+        assert invalid_result.status == "error"
+        assert "was not executed" in str(invalid_result.content)
+        model_request_wire = json.dumps(
+            [_convert_message_to_dict(item) for item in patched],
+            ensure_ascii=False,
+        )
+        for forbidden in (secret, raw_body, private_argument, "provider-secret"):
+            assert forbidden not in model_request_wire
 
     def test_invalid_tool_call_already_responded_is_sanitized_without_placeholder(self):
         mw = DanglingToolCallMiddleware()

@@ -34,7 +34,11 @@ from langgraph.checkpoint.base import empty_checkpoint
 
 from deerflow.agents.goal_state import GoalEvaluation, GoalState
 from deerflow.config.app_config import AppConfig
-from deerflow.runtime.context_keys import CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY
+from deerflow.runtime.context_keys import (
+    CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY,
+    TERMINAL_RESPONSE_FAILURE_KEY,
+    read_terminal_response_failure,
+)
 from deerflow.runtime.goal import (
     DEFAULT_MAX_GOAL_CONTINUATIONS,
     DEFAULT_MAX_NO_PROGRESS_CONTINUATIONS,
@@ -64,6 +68,7 @@ from deerflow.trace_context import (
 )
 from deerflow.tracing import inject_langfuse_metadata
 from deerflow.utils.messages import message_to_text
+from deerflow.utils.tool_call_safety import sanitize_invalid_tool_calls
 from deerflow.workspace_changes import capture_workspace_snapshot, record_workspace_changes
 from deerflow.workspace_changes.types import WorkspaceSnapshot
 
@@ -83,6 +88,7 @@ _SAFE_LLM_FALLBACK_REASONS = frozenset(
         "circuit_open",
         "empty_terminal_response",
         "generic",
+        "invalid_tool_call",
         "quota",
         "transient",
     }
@@ -143,7 +149,7 @@ def _build_runtime_context(
     runtime_ctx: dict[str, Any] = {"thread_id": thread_id, "run_id": run_id}
     if isinstance(caller_context, dict):
         for key, value in caller_context.items():
-            if key == CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY:
+            if key in {CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY, TERMINAL_RESPONSE_FAILURE_KEY}:
                 continue
             runtime_ctx.setdefault(key, value)
     if app_config is not None:
@@ -172,6 +178,7 @@ class RunContext:
 def _install_runtime_context(config: dict, runtime_context: dict[str, Any]) -> None:
     existing_context = config.get("context")
     if isinstance(existing_context, dict):
+        existing_context.pop(TERMINAL_RESPONSE_FAILURE_KEY, None)
         existing_context.setdefault("thread_id", runtime_context["thread_id"])
         existing_context.setdefault("run_id", runtime_context["run_id"])
         if DEERFLOW_TRACE_METADATA_KEY in runtime_context:
@@ -564,7 +571,7 @@ async def run_agent(
         if isinstance(runtime.context, dict):
             runtime.context.pop("stop_reason", None)
         await _stream_once(graph_input, initial_runnable_config)
-        while not record.abort_event.is_set() and not llm_error_fallback_message and (journal is None or not journal.had_llm_error_fallback):
+        while not record.abort_event.is_set() and not llm_error_fallback_message and (journal is None or not journal.had_llm_error_fallback) and read_terminal_response_failure(runtime.context) is None:
             continuation_input = await _prepare_goal_continuation_input(
                 bridge=bridge,
                 checkpointer=checkpointer,
@@ -601,6 +608,22 @@ async def run_agent(
                     logger.warning("Failed to rollback checkpoint for run %s", run_id, exc_info=True)
             else:
                 await run_manager.set_status(run_id, RunStatus.interrupted)
+        elif terminal_failure := read_terminal_response_failure(runtime.context):
+            await run_manager.set_status(
+                run_id,
+                RunStatus.error,
+                error=terminal_failure["message"],
+                stop_reason=terminal_failure["error_reason"],
+            )
+            await bridge.publish(
+                run_id,
+                "error",
+                {
+                    "message": terminal_failure["message"],
+                    "name": terminal_failure["error_type"],
+                    "reason": terminal_failure["error_reason"],
+                },
+            )
         elif llm_error_fallback_message or (journal is not None and journal.had_llm_error_fallback):
             error_msg = llm_error_fallback_message
             if error_msg is None and journal is not None:
@@ -1466,8 +1489,7 @@ def _error_fallback_message_from_metadata(metadata: dict[str, Any], content: Any
     return "LLM provider failed after retries"
 
 
-def _sanitize_llm_error_fallback_payload(value: Any) -> Any:
-    """Strip raw provider details from fallback messages before SSE export."""
+def _sanitize_fallback_metadata(value: Any) -> Any:
     if isinstance(value, dict):
         if value.get("deerflow_error_fallback") is True:
             raw_error_type = value.get("error_type")
@@ -1481,12 +1503,17 @@ def _sanitize_llm_error_fallback_payload(value: Any) -> Any:
                 "error_type": error_type,
                 "error_reason": reason,
             }
-        return {key: _sanitize_llm_error_fallback_payload(item) for key, item in value.items()}
+        return {key: _sanitize_fallback_metadata(item) for key, item in value.items()}
     if isinstance(value, list):
-        return [_sanitize_llm_error_fallback_payload(item) for item in value]
+        return [_sanitize_fallback_metadata(item) for item in value]
     if isinstance(value, tuple):
-        return tuple(_sanitize_llm_error_fallback_payload(item) for item in value)
+        return tuple(_sanitize_fallback_metadata(item) for item in value)
     return value
+
+
+def _sanitize_llm_error_fallback_payload(value: Any) -> Any:
+    """Strip malformed-call/provider details from SSE payloads."""
+    return _sanitize_fallback_metadata(sanitize_invalid_tool_calls(value))
 
 
 def _message_id(obj: Any) -> str | None:

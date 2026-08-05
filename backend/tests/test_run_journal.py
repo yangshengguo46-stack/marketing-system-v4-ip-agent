@@ -23,7 +23,13 @@ def journal_setup():
     return j, store
 
 
-def _make_llm_response(content="Hello", usage=None, tool_calls=None, additional_kwargs=None):
+def _make_llm_response(
+    content="Hello",
+    usage=None,
+    tool_calls=None,
+    additional_kwargs=None,
+    invalid_tool_calls=None,
+):
     """Create a mock LLM response with a message.
 
     model_dump() returns checkpoint-aligned format matching real AIMessage.
@@ -33,7 +39,7 @@ def _make_llm_response(content="Hello", usage=None, tool_calls=None, additional_
     msg.content = content
     msg.id = f"msg-{id(msg)}"
     msg.tool_calls = tool_calls or []
-    msg.invalid_tool_calls = []
+    msg.invalid_tool_calls = invalid_tool_calls or []
     msg.response_metadata = {"model_name": "test-model"}
     msg.usage_metadata = usage
     msg.additional_kwargs = additional_kwargs or {}
@@ -47,7 +53,7 @@ def _make_llm_response(content="Hello", usage=None, tool_calls=None, additional_
         "name": None,
         "id": msg.id,
         "tool_calls": tool_calls or [],
-        "invalid_tool_calls": [],
+        "invalid_tool_calls": invalid_tool_calls or [],
         "usage_metadata": usage,
     }
 
@@ -539,6 +545,73 @@ class TestLlmErrorCallback:
 
 class TestLlmFallbackRedaction:
     @pytest.mark.anyio
+    async def test_invalid_tool_call_event_keeps_classification_but_drops_raw_args_and_error(self, journal_setup):
+        journal, store = journal_setup
+        secret = "Bearer journal-provider-secret"
+        raw_body = "raw_body=/private/provider/request"
+        private_argument = "OWNER_SECRET=private-fruit-demand"
+        invalid_call = {
+            "type": "invalid_tool_call",
+            "id": "ip-write-invalid-1",
+            "name": "ip_content_write",
+            "args": '{"request":{"owner_note":"' + private_argument,
+            "error": f"Failed to parse: {secret}; {raw_body}",
+        }
+        raw_provider_view = {
+            "tool_calls": [
+                {
+                    "id": "ip-write-invalid-1",
+                    "type": "function",
+                    "function": {
+                        "name": "ip_content_write",
+                        "arguments": invalid_call["args"],
+                    },
+                }
+            ]
+        }
+
+        journal.on_llm_end(
+            _make_llm_response(
+                "",
+                tool_calls=[
+                    {
+                        "id": "valid-1",
+                        "name": "lookup_status",
+                        "args": {"safe_valid_argument": "keep-me"},
+                    }
+                ],
+                additional_kwargs=raw_provider_view,
+                invalid_tool_calls=[invalid_call],
+            ),
+            run_id=uuid4(),
+            parent_run_id=None,
+            tags=["lead_agent"],
+        )
+        await journal.flush()
+
+        events = await store.list_events("t1", "r1")
+        response = next(event for event in events if event["event_type"] == "llm.ai.response")
+        assert response["content"]["invalid_tool_calls"] == [
+            {
+                "type": "invalid_tool_call",
+                "id": "ip-write-invalid-1",
+                "name": "ip_content_write",
+                "classification": "invalid_tool_arguments",
+            }
+        ]
+        assert response["content"]["additional_kwargs"] == {}
+        assert response["content"]["tool_calls"] == [
+            {
+                "id": "valid-1",
+                "name": "lookup_status",
+                "args": {"safe_valid_argument": "keep-me"},
+            }
+        ]
+        serialized = json.dumps(response, ensure_ascii=False)
+        for forbidden in (secret, raw_body, private_argument, "journal-provider-secret"):
+            assert forbidden not in serialized
+
+    @pytest.mark.anyio
     async def test_fallback_message_drops_raw_provider_detail_from_journal(self, journal_setup):
         j, store = journal_setup
         raw_secret = "provider-secret-that-must-never-persist"
@@ -584,6 +657,66 @@ class TestLlmFallbackRedaction:
             private_path,
         ):
             assert forbidden not in externally_visible
+
+
+class TestTerminalResponseFailureLedger:
+    @pytest.mark.anyio
+    async def test_root_fallback_output_records_run_error_not_success_end(self, journal_setup):
+        journal, store = journal_setup
+        safe_message = "The configured LLM provider rejected the request because authentication or access is invalid. Please check the provider credentials and try again."
+        fallback = AIMessage(
+            content=safe_message,
+            additional_kwargs={
+                "deerflow_error_fallback": True,
+                "error_type": "ProviderSecretType",
+                "error_reason": "auth",
+            },
+        )
+
+        journal.mark_terminal_response_failure("auth")
+        journal.on_chain_end(
+            {"messages": [AIMessage(content="old history"), fallback]},
+            run_id=uuid4(),
+            parent_run_id=None,
+        )
+        await journal.flush()
+
+        assert journal.had_llm_error_fallback is True
+        assert journal.llm_error_fallback_message == safe_message
+        events = await store.list_events("t1", "r1")
+        assert not any(event["event_type"] == "run.end" and event["metadata"].get("status") == "success" for event in events)
+        error = next(event for event in events if event["event_type"] == "run.error")
+        assert error["content"] == {"error_category": "terminal_response_failed"}
+        assert error["metadata"] == {
+            "error_type": "LlmAuthenticationFailure",
+            "error_reason": "auth",
+        }
+
+    @pytest.mark.anyio
+    async def test_stale_history_fallback_does_not_reclassify_a_later_root_end(self, journal_setup):
+        journal, store = journal_setup
+        stale = AIMessage(
+            id="stale-fallback-from-prior-run",
+            content="Old failure",
+            additional_kwargs={
+                "deerflow_error_fallback": True,
+                "error_type": "OldFailure",
+                "error_reason": "auth",
+            },
+        )
+
+        journal.on_chain_end(
+            {"messages": [stale]},
+            run_id=uuid4(),
+            parent_run_id=None,
+        )
+        await journal.flush()
+
+        assert journal.had_llm_error_fallback is False
+        events = await store.list_events("t1", "r1")
+        end = next(event for event in events if event["event_type"] == "run.end")
+        assert end["metadata"] == {"status": "success"}
+        assert not any(event["event_type"] == "run.error" for event in events)
 
 
 class TestTokenTrackingDisabled:

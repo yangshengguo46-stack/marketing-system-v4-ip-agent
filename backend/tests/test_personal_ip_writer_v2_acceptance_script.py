@@ -54,6 +54,8 @@ SEMANTIC_WRITER_CALLS = (
     "ip-agent-story-engine-v2",
     *DIRECT_WRITER_CALLS,
 )
+MALFORMED_TOOL_ARGS = '{"direction":{"route_kind":"offer","script":"private-truncated-value'
+MALFORMED_TOOL_ERROR = "invalid JSON at private/provider/path: private-truncated-value"
 
 
 def _load_acceptance_module():
@@ -405,14 +407,41 @@ def _run_receipt(
     agent_artifact_sha256: str = "2" * 64,
     model_name: str = "doubao-seed-2-0-pro-260215",
     status: str = "passed",
+    lead_recovery: bool = False,
 ) -> dict[str, Any]:
     from _personal_ip_v2_behavior_fixtures import CASES
 
     behavior_case = next(item for item in CASES if item.scenario_id == case_id)
     model = _model_descriptor(model_name)
-    calls: list[dict[str, Any]] = [
+    calls: list[dict[str, Any]] = []
+    if lead_recovery:
+        calls.append(
+            {
+                "llm_call_index": 1,
+                "caller": "lead_agent",
+                "model_name": model["provider_model"],
+                "status": "success",
+                "usage": {
+                    "input_tokens": 20,
+                    "output_tokens": 7,
+                    "total_tokens": 27,
+                },
+                "lead_tool_receipt": {
+                    "finish_reason": "tool_calls",
+                    "valid_tool_call_names": [],
+                    "invalid_tool_calls": [
+                        {
+                            "name": "ip_content_write",
+                            "classification": "malformed_tool_arguments",
+                        }
+                    ],
+                    "fallback": False,
+                },
+            }
+        )
+    calls.append(
         {
-            "llm_call_index": 1,
+            "llm_call_index": len(calls) + 1,
             "caller": "lead_agent",
             "model_name": model["provider_model"],
             "status": "success",
@@ -421,11 +450,17 @@ def _run_receipt(
                 "output_tokens": 10,
                 "total_tokens": 30,
             },
+            "lead_tool_receipt": {
+                "finish_reason": "tool_calls",
+                "valid_tool_call_names": ["ip_content_write"],
+                "invalid_tool_calls": [],
+                "fallback": False,
+            },
         }
-    ]
+    )
     for llm_call_index, run_name in enumerate(
         _expected_writer_calls(case_id),
-        start=2,
+        start=len(calls) + 1,
     ):
         calls.append(
             {
@@ -450,6 +485,12 @@ def _run_receipt(
                 "input_tokens": 12,
                 "output_tokens": 8,
                 "total_tokens": 20,
+            },
+            "lead_tool_receipt": {
+                "finish_reason": "stop",
+                "valid_tool_call_names": [],
+                "invalid_tool_calls": [],
+                "fallback": False,
             },
         }
     )
@@ -500,25 +541,7 @@ def _run_receipt(
             "middleware_tokens": middleware_tokens,
             "stop_reason": None,
         },
-        "events": [
-            {
-                "seq": index,
-                "thread_id": thread_id,
-                "run_id": run_id,
-                "event_type": "llm.ai.response",
-                "content": {
-                    "type": "ai",
-                    "additional_kwargs": {},
-                    "response_metadata": {"model_name": model["provider_model"]},
-                },
-                "metadata": {
-                    "caller": call["caller"],
-                    "usage": call["usage"],
-                    "llm_call_index": call["llm_call_index"],
-                },
-            }
-            for index, call in enumerate(calls, start=1)
-        ],
+        "events": [],
         "checkpoint": {
             "state": {
                 "values": {
@@ -602,6 +625,47 @@ def _run_receipt(
             },
         },
     }
+    for index, call in enumerate(calls, start=1):
+        caller = call["caller"]
+        lead_receipt = call.get("lead_tool_receipt")
+        content: dict[str, Any] = {
+            "type": "ai",
+            "additional_kwargs": {},
+            "response_metadata": {
+                "model_name": model["provider_model"],
+            },
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+        }
+        if caller == "lead_agent":
+            content["response_metadata"]["finish_reason"] = lead_receipt["finish_reason"]
+            if lead_receipt["valid_tool_call_names"]:
+                content["tool_calls"] = [
+                    {
+                        "name": "ip_content_write",
+                        "args": behavior_case.tool_trace[0]["arguments"],
+                        "id": behavior_case.tool_trace[0]["call_id"],
+                        "type": "tool_call",
+                    }
+                ]
+            if lead_receipt["invalid_tool_calls"]:
+                content["acceptance_invalid_tool_calls"] = copy.deepcopy(
+                    lead_receipt["invalid_tool_calls"],
+                )
+        gateway_receipts["events"].append(
+            {
+                "seq": index,
+                "thread_id": thread_id,
+                "run_id": run_id,
+                "event_type": "llm.ai.response",
+                "content": content,
+                "metadata": {
+                    "caller": caller,
+                    "usage": call["usage"],
+                    "llm_call_index": call["llm_call_index"],
+                },
+            }
+        )
     return {
         "schema_version": "personal-ip-writer-v2-run-receipt-v1",
         "run_id": run_id,
@@ -629,6 +693,7 @@ def _business_artifacts(
     agent_artifact_sha256: str = "2" * 64,
     model_name: str = "doubao-seed-2-0-pro-260215",
     status: str = "passed",
+    lead_recovery: bool = False,
 ) -> dict[str, Any]:
     from _personal_ip_v2_behavior_fixtures import CASES
 
@@ -653,6 +718,7 @@ def _business_artifacts(
             agent_artifact_sha256=agent_artifact_sha256,
             model_name=model_name,
             status=status,
+            lead_recovery=lead_recovery,
         ),
         "tool-receipt.json": {"tool_trace": tool_trace},
         "lineage.json": lineage,
@@ -686,6 +752,7 @@ def _write_packet(
     case_id: str,
     *,
     model_name: str = "doubao-seed-2-0-pro-260215",
+    lead_recovery: bool = False,
     **manifest_overrides: Any,
 ) -> Path:
     manifest = _manifest(case_id, **manifest_overrides)
@@ -694,6 +761,7 @@ def _write_packet(
         agent_artifact_sha256=manifest["agent_artifact_sha256"],
         model_name=model_name,
         status=manifest["status"],
+        lead_recovery=lead_recovery,
     )
     return acceptance.write_result_packet(
         destination,
@@ -1254,9 +1322,186 @@ def test_live_run_receipt_derives_provider_binding_and_reindexes_writer_calls(
     assert result["gateway_binding_verified"] is True
     assert result["provider_receipts_verified"] is True
     assert result["model_identity_sha256"] == _model_identity_sha256("doubao-seed-2-0-pro-260215")
+    assert result["lead_recovery_count"] == 0
     assert [item["run_name"] for item in result["writer_model_trace"]] == list(expected_names)
     assert [item["call_index"] for item in result["writer_model_trace"]] == list(range(1, len(expected_names) + 1))
     assert [item["llm_call_index"] for item in result["writer_model_trace"]] == list(range(2, len(expected_names) + 2))
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    (FROZEN_CASE_IDS[0], FROZEN_CASE_IDS[1]),
+    ids=("direct-recovered-once", "semantic-recovered-once"),
+)
+def test_live_run_receipt_accepts_exactly_one_malformed_lead_tool_call_then_one_repair(
+    case_id: str,
+) -> None:
+    acceptance = _load_acceptance_module()
+    receipt = _run_receipt(case_id, lead_recovery=True)
+
+    result = acceptance.validate_live_run_receipt(
+        receipt,
+        case_id=case_id,
+        expected_agent_artifact_sha256="2" * 64,
+    )
+
+    expected_names = _expected_writer_calls(case_id)
+    assert result["lead_recovery_count"] == 1
+    assert [item["run_name"] for item in result["writer_model_trace"]] == list(expected_names)
+    assert [item["call_index"] for item in result["writer_model_trace"]] == list(
+        range(1, len(expected_names) + 1),
+    )
+    assert [item["llm_call_index"] for item in result["writer_model_trace"]] == list(
+        range(3, len(expected_names) + 3),
+    )
+    checkpoint_messages = receipt["gateway_receipts"]["checkpoint"]["state"]["values"]["messages"]
+    assert all(not message.get("acceptance_invalid_tool_calls") for message in checkpoint_messages)
+    assert all(not message.get("invalid_tool_calls") for message in checkpoint_messages)
+
+
+def test_live_run_receipt_builder_seals_malformed_args_and_error_before_persistence() -> None:
+    acceptance = _load_acceptance_module()
+    fixture = _run_receipt(FROZEN_CASE_IDS[0], lead_recovery=True)
+    embedded = fixture["gateway_receipts"]
+    raw_events = copy.deepcopy(embedded["events"])
+    raw_first_content = raw_events[0]["content"]
+    del raw_first_content["acceptance_invalid_tool_calls"]
+    raw_first_content["invalid_tool_calls"] = [
+        {
+            "name": "ip_content_write",
+            "args": MALFORMED_TOOL_ARGS,
+            "error": MALFORMED_TOOL_ERROR,
+            "type": "invalid_tool_call",
+        }
+    ]
+    raw_first_content["additional_kwargs"]["tool_calls"] = [
+        {
+            "id": "raw-provider-tool-call",
+            "type": "function",
+            "function": {
+                "name": "ip_content_write",
+                "arguments": MALFORMED_TOOL_ARGS,
+            },
+        }
+    ]
+    raw_state = copy.deepcopy(embedded["checkpoint"]["state"])
+    raw_events.append(
+        {
+            "seq": len(raw_events) + 1,
+            "thread_id": fixture["thread_id"],
+            "run_id": fixture["run_id"],
+            "event_type": "run.end",
+            "content": {
+                "messages": [
+                    {
+                        "type": "ai",
+                        "content": "",
+                        "additional_kwargs": copy.deepcopy(
+                            raw_first_content["additional_kwargs"],
+                        ),
+                        "tool_calls": [],
+                        "invalid_tool_calls": copy.deepcopy(
+                            raw_first_content["invalid_tool_calls"],
+                        ),
+                    }
+                ]
+            },
+            "metadata": {},
+        },
+    )
+
+    built = acceptance._build_live_run_receipt(
+        run=embedded["run"],
+        state=raw_state,
+        events=raw_events,
+        token_usage=embedded["token_usage"],
+        model_receipt=embedded["model"],
+        thread_id=fixture["thread_id"],
+        run_id=fixture["run_id"],
+        expected_agent_artifact_sha256="2" * 64,
+        owner_baseline=embedded["owner_baseline"],
+    )
+
+    sealed_json = json.dumps(built, ensure_ascii=False, sort_keys=True)
+    assert MALFORMED_TOOL_ARGS not in sealed_json
+    assert MALFORMED_TOOL_ERROR not in sealed_json
+    assert "private-truncated-value" not in sealed_json
+    first_call = built["llm_calls"][0]
+    assert first_call["lead_tool_receipt"] == {
+        "finish_reason": "tool_calls",
+        "valid_tool_call_names": [],
+        "invalid_tool_calls": [
+            {
+                "name": "ip_content_write",
+                "classification": "malformed_tool_arguments",
+            }
+        ],
+        "fallback": False,
+    }
+    assert (
+        acceptance.validate_live_run_receipt(
+            built,
+            case_id=FROZEN_CASE_IDS[0],
+            expected_agent_artifact_sha256="2" * 64,
+        )["lead_recovery_count"]
+        == 1
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "second_invalid",
+        "fallback",
+        "other_tool",
+        "duplicate_valid_tool",
+        "invalid_after_internal",
+    ),
+)
+def test_lead_tool_recovery_fails_closed_for_every_non_bounded_sequence(
+    mutation: str,
+) -> None:
+    acceptance = _load_acceptance_module()
+    receipt = _run_receipt(FROZEN_CASE_IDS[0], lead_recovery=True)
+    calls = receipt["llm_calls"]
+    events = receipt["gateway_receipts"]["events"]
+    if mutation == "second_invalid":
+        calls[1]["lead_tool_receipt"] = copy.deepcopy(calls[0]["lead_tool_receipt"])
+        events[1]["content"] = copy.deepcopy(events[0]["content"])
+    elif mutation == "fallback":
+        calls[0]["lead_tool_receipt"]["fallback"] = True
+        calls[0]["status"] = "error"
+        events[0]["content"]["additional_kwargs"]["deerflow_error_fallback"] = True
+    elif mutation == "other_tool":
+        calls[0]["lead_tool_receipt"]["invalid_tool_calls"][0]["name"] = "web_search"
+        events[0]["content"]["acceptance_invalid_tool_calls"][0]["name"] = "web_search"
+    elif mutation == "duplicate_valid_tool":
+        calls[1]["lead_tool_receipt"]["valid_tool_call_names"].append("ip_content_write")
+        events[1]["content"]["tool_calls"].append(
+            copy.deepcopy(events[1]["content"]["tool_calls"][0]),
+        )
+    else:
+        calls[1]["event_seq"], calls[2]["event_seq"] = (
+            calls[2]["event_seq"],
+            calls[1]["event_seq"],
+        )
+        events[1]["metadata"], events[2]["metadata"] = (
+            events[2]["metadata"],
+            events[1]["metadata"],
+        )
+        events[1]["content"], events[2]["content"] = (
+            events[2]["content"],
+            events[1]["content"],
+        )
+
+    with pytest.raises(acceptance.AcceptanceError) as error:
+        acceptance.validate_live_run_receipt(
+            receipt,
+            case_id=FROZEN_CASE_IDS[0],
+            expected_agent_artifact_sha256="2" * 64,
+        )
+
+    _assert_error_code(error, "LEAD_MODEL_RECOVERY_INVALID")
 
 
 @pytest.mark.parametrize(
@@ -1713,6 +1958,105 @@ def test_checkpoint_verification_is_sealed_as_a_rederived_claim(
     assert verified["checkpoint_receipts_verified"] is True
 
 
+def test_lead_recovery_count_is_rederived_and_sealed_instead_of_trusting_manifest(
+    tmp_path: Path,
+) -> None:
+    acceptance = _load_acceptance_module()
+    recovered = _write_packet(
+        acceptance,
+        tmp_path / "recovered-once",
+        FROZEN_CASE_IDS[0],
+        lead_recovery=True,
+    )
+
+    verified = acceptance.verify_result_packet(recovered)
+    assert verified["lead_recovery_count"] == 1
+
+    forged_manifest = _manifest(FROZEN_CASE_IDS[0])
+    forged_manifest["lead_recovery_count"] = 0
+    with pytest.raises(acceptance.AcceptanceError) as error:
+        acceptance.write_result_packet(
+            tmp_path / "forged-recovery-count",
+            manifest=forged_manifest,
+            artifacts=_business_artifacts(
+                FROZEN_CASE_IDS[0],
+                lead_recovery=True,
+            ),
+        )
+
+    _assert_error_code(error, "EVIDENCE_CLASSIFICATION_INVALID")
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "acceptance_invalid_marker",
+        "second_acceptance_invalid_marker",
+        "invalid_after_tool",
+        "fallback",
+        "other_tool",
+        "raw_invalid_payload",
+        "extra_tool_message",
+    ),
+)
+def test_recovered_run_checkpoint_allows_only_one_invalid_attempt_and_one_real_execution(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    acceptance = _load_acceptance_module()
+    artifacts = _business_artifacts(
+        FROZEN_CASE_IDS[0],
+        lead_recovery=True,
+    )
+    messages = artifacts["run-receipt.json"]["gateway_receipts"]["checkpoint"]["state"]["values"]["messages"]
+    invalid_message = {
+        "type": "ai",
+        "content": "",
+        "additional_kwargs": {},
+        "tool_calls": [],
+        "invalid_tool_calls": [],
+        "acceptance_invalid_tool_calls": [
+            {
+                "name": "ip_content_write",
+                "classification": "malformed_tool_arguments",
+            }
+        ],
+    }
+    if mutation == "acceptance_invalid_marker":
+        messages.insert(1, invalid_message)
+    elif mutation == "second_acceptance_invalid_marker":
+        messages.insert(1, invalid_message)
+        messages.insert(2, copy.deepcopy(invalid_message))
+    elif mutation == "invalid_after_tool":
+        messages.insert(3, invalid_message)
+    elif mutation == "fallback":
+        messages[1]["additional_kwargs"]["deerflow_error_fallback"] = True
+    elif mutation == "other_tool":
+        invalid_message["acceptance_invalid_tool_calls"][0]["name"] = "web_search"
+        messages.insert(1, invalid_message)
+    elif mutation == "raw_invalid_payload":
+        invalid_message["invalid_tool_calls"] = [
+            {
+                "name": "ip_content_write",
+                "args": MALFORMED_TOOL_ARGS,
+                "error": MALFORMED_TOOL_ERROR,
+            }
+        ]
+        del invalid_message["acceptance_invalid_tool_calls"]
+        messages.insert(1, invalid_message)
+    else:
+        messages.insert(3, copy.deepcopy(messages[2]))
+
+    with pytest.raises(acceptance.AcceptanceError) as error:
+        acceptance.write_result_packet(
+            tmp_path / f"recovery-checkpoint-{mutation}",
+            manifest=_manifest(FROZEN_CASE_IDS[0]),
+            artifacts=artifacts,
+        )
+
+    _assert_error_code(error, "CHECKPOINT_RECEIPT_INVALID")
+
+
 @pytest.mark.parametrize(
     "mutation",
     ("empty", "extra", "cross_owner", "cross_thread", "cross_id"),
@@ -1944,7 +2288,16 @@ def test_verify_matrix_accepts_exactly_four_bound_passing_live_packets(
     tmp_path: Path,
 ) -> None:
     acceptance = _load_acceptance_module()
-    packets = [_write_packet(acceptance, tmp_path / case_id, case_id) for case_id in reversed(FROZEN_CASE_IDS)]
+    recovered_case = FROZEN_CASE_IDS[1]
+    packets = [
+        _write_packet(
+            acceptance,
+            tmp_path / case_id,
+            case_id,
+            lead_recovery=case_id == recovered_case,
+        )
+        for case_id in reversed(FROZEN_CASE_IDS)
+    ]
 
     result = acceptance.verify_matrix(packets)
 
@@ -1953,6 +2306,8 @@ def test_verify_matrix_accepts_exactly_four_bound_passing_live_packets(
     assert result["git_commit"] == "1" * 40
     assert result["agent_artifact_sha256"] == "2" * 64
     assert result["model_identity_sha256"] == _model_identity_sha256("doubao-seed-2-0-pro-260215")
+    assert list(result["lead_recovery_count_by_case"]) == list(FROZEN_CASE_IDS)
+    assert result["lead_recovery_count_by_case"] == {case_id: int(case_id == recovered_case) for case_id in FROZEN_CASE_IDS}
     assert result["evidence_class"] == "live_default_agent"
     assert result["ledger_eligible"] is True
 
