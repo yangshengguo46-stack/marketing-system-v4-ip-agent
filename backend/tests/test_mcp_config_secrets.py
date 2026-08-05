@@ -483,6 +483,11 @@ async def test_update_mcp_configuration_preserves_omitted_routing_and_tools(monk
                             "priority": 50,
                             "keywords": ["订单", "SQL"],
                         },
+                        "result_policy": {
+                            "trust": "untrusted_external",
+                            "semantic_class": "evidence",
+                            "outcome_contract": "ip-evidence-operation-status-v1",
+                        },
                         "tools": {
                             "query": {
                                 "routing": {
@@ -528,7 +533,13 @@ async def test_update_mcp_configuration_preserves_omitted_routing_and_tools(monk
     assert postgres["enabled"] is False
     assert postgres["routing"]["keywords"] == ["订单", "SQL"]
     assert postgres["tools"]["query"]["routing"]["priority"] == 100
+    assert postgres["result_policy"] == {
+        "trust": "untrusted_external",
+        "semantic_class": "evidence",
+        "outcome_contract": "ip-evidence-operation-status-v1",
+    }
     assert response.mcp_servers["postgres"].routing.keywords == ["订单", "SQL"]
+    assert response.mcp_servers["postgres"].result_policy is not None
 
 
 @pytest.mark.asyncio

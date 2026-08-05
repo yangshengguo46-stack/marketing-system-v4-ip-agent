@@ -28,6 +28,10 @@ from app.gateway.internal_auth import (
     get_internal_user,
     get_trusted_internal_owner_user_id,
 )
+from app.gateway.product_runtime import (
+    PRODUCT_RUNTIME_RECEIPT_KEY,
+    resolve_product_runtime_binding,
+)
 from app.gateway.utils import sanitize_log_param
 from deerflow.agents.middlewares.dynamic_context_middleware import _DYNAMIC_CONTEXT_REMINDER_KEY, _REMINDER_DATE_KEY
 from deerflow.config.app_config import get_app_config
@@ -44,7 +48,6 @@ from deerflow.runtime import (
     run_agent,
 )
 from deerflow.runtime.goal import goal_thread_lock
-from deerflow.runtime.runs.naming import resolve_root_run_name
 from deerflow.runtime.secret_context import redact_config_secrets
 from deerflow.runtime.user_context import reset_current_user, set_current_user
 from deerflow.utils.messages import ORIGINAL_USER_CONTENT_KEY
@@ -64,6 +67,14 @@ _SERVER_OWNED_DYNAMIC_CONTEXT_KEYS = frozenset(
         _REMINDER_DATE_KEY,
     }
 )
+
+# ``product_entrypoint`` classifies one trusted server ingress.  It is consumed
+# before the run exists and must never become model/tool/checkpoint context.
+_SERVER_OWNED_TRANSIENT_CONTEXT_KEYS: frozenset[str] = frozenset({"product_entrypoint"})
+
+# Once a product profile binds the run, these client selectors are superseded
+# by the server-owned assistant identity and must not survive in Run history.
+_PRODUCT_REQUEST_IDENTITY_KEYS: frozenset[str] = frozenset({"agent_name", "is_bootstrap"})
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +195,118 @@ def normalize_input(raw_input: dict[str, Any] | None, *, trusted_internal: bool 
 _DEFAULT_ASSISTANT_ID = "lead_agent"
 
 
+def _normalize_assistant_id(raw_value: str) -> str:
+    """Return the canonical persisted/runtime identifier for one assistant."""
+    stripped = raw_value.strip()
+    if stripped == _DEFAULT_ASSISTANT_ID:
+        return _DEFAULT_ASSISTANT_ID
+    normalized = stripped.lower().replace("_", "-")
+    if not normalized or not re.fullmatch(r"[a-z0-9-]+", normalized):
+        raise ValueError(f"Invalid assistant_id {raw_value!r}: must contain only letters, digits, and hyphens after normalization.")
+    return normalized
+
+
+def _iter_request_agent_names(
+    request_config: Mapping[str, Any] | None,
+    request_context: Mapping[str, Any] | None,
+) -> list[str]:
+    values: list[str] = []
+    if isinstance(request_config, Mapping):
+        for container_name in ("configurable", "context"):
+            container = request_config.get(container_name)
+            if isinstance(container, Mapping):
+                value = container.get("agent_name")
+                if isinstance(value, str) and value.strip():
+                    values.append(value)
+    if isinstance(request_context, Mapping):
+        value = request_context.get("agent_name")
+        if isinstance(value, str) and value.strip():
+            values.append(value)
+    return values
+
+
+def _request_is_bootstrap(
+    request_config: Mapping[str, Any] | None,
+    request_context: Mapping[str, Any] | None,
+) -> bool:
+    if isinstance(request_context, Mapping) and request_context.get("is_bootstrap") is True:
+        return True
+    if isinstance(request_config, Mapping):
+        for container_name in ("configurable", "context"):
+            container = request_config.get(container_name)
+            if isinstance(container, Mapping) and container.get("is_bootstrap") is True:
+                return True
+    return False
+
+
+def resolve_effective_assistant_id(
+    assistant_id: str | None,
+    *,
+    request_config: Mapping[str, Any] | None,
+    request_context: Mapping[str, Any] | None,
+    is_bootstrap: bool | None = None,
+) -> str:
+    """Resolve one authoritative runtime identity before a Run is created.
+
+    ``assistant_id`` is authoritative when present.  The sole compatibility
+    path promotes one legacy ``agent_name`` only when ``assistant_id`` is
+    absent.  Conflicting aliases fail closed instead of making persistence and
+    execution disagree.  During Agent creation, ``agent_name`` is an operation
+    target and the bootstrap graph itself still runs as ``lead_agent``.
+    """
+    bootstrap = _request_is_bootstrap(request_config, request_context) if is_bootstrap is None else is_bootstrap
+    explicit = _normalize_assistant_id(assistant_id) if assistant_id is not None else None
+    aliases = {_normalize_assistant_id(value) for value in _iter_request_agent_names(request_config, request_context)}
+
+    if bootstrap:
+        if explicit not in (None, _DEFAULT_ASSISTANT_ID):
+            raise ValueError("Bootstrap runs must use lead_agent as their runtime identity.")
+        return _DEFAULT_ASSISTANT_ID
+
+    if explicit is not None:
+        conflicts = aliases - {explicit}
+        if conflicts:
+            raise ValueError(f"Conflicting agent identities: assistant_id {explicit!r} does not match agent_name {sorted(conflicts)!r}.")
+        return explicit
+
+    if len(aliases) > 1:
+        raise ValueError(f"Conflicting agent identities: multiple agent_name values {sorted(aliases)!r}.")
+    if aliases:
+        legacy_identity = next(iter(aliases))
+        logger.warning(
+            "Deprecated run identity path: promoting agent_name=%s because assistant_id was omitted",
+            legacy_identity,
+        )
+        return legacy_identity
+    return _DEFAULT_ASSISTANT_ID
+
+
+def _bind_run_agent_identity(
+    config: dict[str, Any],
+    effective_assistant_id: str,
+    *,
+    is_bootstrap: bool,
+) -> None:
+    """Derive both runtime option containers from one effective identity."""
+    if is_bootstrap:
+        return
+    if effective_assistant_id == _DEFAULT_ASSISTANT_ID:
+        configurable = config.get("configurable")
+        runtime_context = config.get("context")
+        if isinstance(configurable, dict):
+            configurable.pop("agent_name", None)
+        if isinstance(runtime_context, dict):
+            runtime_context.pop("agent_name", None)
+        return
+    configurable = config.setdefault("configurable", {})
+    runtime_context = config.setdefault("context", {})
+    if isinstance(configurable, dict):
+        configurable["agent_name"] = effective_assistant_id
+    if isinstance(runtime_context, dict):
+        runtime_context["agent_name"] = effective_assistant_id
+    config["run_name"] = effective_assistant_id
+
+
 # Whitelist of run-context keys that the langgraph-compat layer forwards from
 # ``body.context`` into the run config. ``config["context"]`` exists in
 # LangGraph >=0.6, but these values must be written to both ``configurable``
@@ -262,6 +385,44 @@ def strip_internal_context_keys(config: dict[str, Any]) -> None:
         if isinstance(value, dict):
             for key in _CONTEXT_INTERNAL_CALLER_KEYS | _SERVER_OWNED_PRODUCT_CONTEXT_KEYS:
                 value.pop(key, None)
+
+
+def strip_server_owned_transient_context(config: dict[str, Any]) -> None:
+    """Remove ingress-only routing markers from every live run config."""
+    for section in ("context", "configurable"):
+        value = config.get(section)
+        if isinstance(value, dict):
+            for key in _SERVER_OWNED_TRANSIENT_CONTEXT_KEYS:
+                value.pop(key, None)
+
+
+def _persistable_request_config(
+    request_config: Any,
+    *,
+    product_bound: bool,
+) -> Any:
+    """Return client config safe for the observable Run request snapshot.
+
+    Product identity selectors and server-transient routing markers describe
+    how the request arrived, not what actually ran.  The authoritative product
+    receipt lives in Run metadata instead.
+    """
+    redacted = redact_config_secrets(request_config)
+    if not isinstance(redacted, dict):
+        return redacted
+    persisted = dict(redacted)
+    stripped_keys = set(_SERVER_OWNED_TRANSIENT_CONTEXT_KEYS)
+    if product_bound:
+        stripped_keys.update(_PRODUCT_REQUEST_IDENTITY_KEYS)
+    for section in ("context", "configurable"):
+        value = persisted.get(section)
+        if not isinstance(value, Mapping):
+            continue
+        sanitized = dict(value)
+        for key in stripped_keys:
+            sanitized.pop(key, None)
+        persisted[section] = sanitized
+    return persisted
 
 
 async def inject_personal_ip_portfolio_context(
@@ -494,6 +655,8 @@ def build_run_config(
     metadata: dict[str, Any] | None,
     *,
     assistant_id: str | None = None,
+    is_bootstrap: bool = False,
+    identity_locked: bool = False,
 ) -> dict[str, Any]:
     """Build a RunnableConfig dict for the agent.
 
@@ -503,10 +666,10 @@ def build_run_config(
     configurable readers and to LangGraph ``ToolRuntime.context`` consumers
     (e.g. the ``setup_agent`` tool, which since LangGraph >=1.1.9 no longer
     falls back from ``context`` to ``configurable``).  An explicit
-    ``agent_name`` in either container takes precedence over the value
-    derived from ``assistant_id``.  ``make_lead_agent`` reads this key to
-    load the matching ``agents/<name>/SOUL.md`` and per-agent config —
-    without it the agent silently runs as the default lead agent.
+    The explicit ``assistant_id`` is authoritative. A conflicting
+    ``agent_name`` is rejected rather than silently selecting a different
+    runtime than the Run record. ``make_lead_agent`` reads the server-derived
+    alias to load the matching ``agents/<name>/SOUL.md`` and per-agent config.
 
     This mirrors the channel manager's ``_resolve_run_params`` logic so that
     the LangGraph Platform-compatible HTTP API and the IM channel path behave
@@ -579,25 +742,17 @@ def build_run_config(
     else:
         config["configurable"] = {"thread_id": thread_id}
 
-    # Inject custom agent name when the caller specified a non-default assistant.
-    # Honour an explicit agent_name in either runtime options container.
-    if assistant_id and assistant_id != _DEFAULT_ASSISTANT_ID:
-        normalized = assistant_id.strip().lower().replace("_", "-")
-        if not normalized or not re.fullmatch(r"[a-z0-9-]+", normalized):
-            raise ValueError(f"Invalid assistant_id {assistant_id!r}: must contain only letters, digits, and hyphens after normalization.")
-        configurable = config.setdefault("configurable", {})
-        runtime_context = config.setdefault("context", {})
-        explicit_agent_name: str | None = None
-        if isinstance(configurable, dict) and isinstance(configurable.get("agent_name"), str):
-            explicit_agent_name = configurable["agent_name"]
-        elif isinstance(runtime_context, dict) and isinstance(runtime_context.get("agent_name"), str):
-            explicit_agent_name = runtime_context["agent_name"]
-        effective_agent_name = explicit_agent_name or normalized
-        if isinstance(configurable, dict):
-            configurable["agent_name"] = effective_agent_name
-        if isinstance(runtime_context, dict):
-            runtime_context["agent_name"] = effective_agent_name
-        config.setdefault("run_name", resolve_root_run_name(config, normalized))
+    effective_assistant_id = resolve_effective_assistant_id(
+        assistant_id,
+        request_config=None if identity_locked else request_config,
+        request_context=None,
+        is_bootstrap=is_bootstrap,
+    )
+    _bind_run_agent_identity(
+        config,
+        effective_assistant_id,
+        is_bootstrap=is_bootstrap,
+    )
     if metadata:
         config.setdefault("metadata", {}).update(metadata)
     return config
@@ -691,6 +846,33 @@ async def start_run(
     disconnect = DisconnectMode.cancel if body.on_disconnect == "cancel" else DisconnectMode.continue_
 
     body_context = getattr(body, "context", None) or {}
+    product_binding = await asyncio.to_thread(
+        resolve_product_runtime_binding,
+        request,
+        body_context,
+        requested_assistant_id=getattr(body, "assistant_id", None),
+        request_config=getattr(body, "config", None),
+    )
+    is_bootstrap = _request_is_bootstrap(getattr(body, "config", None), body_context)
+    if product_binding is not None:
+        effective_assistant_id = product_binding.assistant_id
+        is_bootstrap = False
+    else:
+        try:
+            effective_assistant_id = resolve_effective_assistant_id(
+                getattr(body, "assistant_id", None),
+                request_config=getattr(body, "config", None),
+                request_context=body_context,
+                is_bootstrap=is_bootstrap,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    run_metadata = dict(getattr(body, "metadata", None) or {})
+    run_metadata.pop(PRODUCT_RUNTIME_RECEIPT_KEY, None)
+    thread_metadata = dict(getattr(body, "metadata", None) or {})
+    thread_metadata.pop(PRODUCT_RUNTIME_RECEIPT_KEY, None)
+    if product_binding is not None:
+        run_metadata[PRODUCT_RUNTIME_RECEIPT_KEY] = product_binding.receipt
     model_name = body_context.get("model_name")
 
     # Coerce non-string model_name values to str before truncation.
@@ -737,14 +919,20 @@ async def start_run(
             async with goal_thread_lock(thread_id):
                 record = await run_mgr.create_or_reject(
                     thread_id,
-                    body.assistant_id,
+                    effective_assistant_id,
                     on_disconnect=disconnect,
-                    metadata=body.metadata or {},
+                    metadata=run_metadata,
                     # Persist a secret-redacted copy of the config: the run record is
                     # written to runs.kwargs_json and echoed by the run API, so a
                     # request-scoped secret (#3861) must not ride along. The live
                     # config built below keeps the secrets for the actual run.
-                    kwargs={"input": body.input, "config": redact_config_secrets(body.config)},
+                    kwargs={
+                        "input": body.input,
+                        "config": _persistable_request_config(
+                            body.config,
+                            product_bound=product_binding is not None,
+                        ),
+                    },
                     multitask_strategy=body.multitask_strategy,
                     model_name=model_name,
                     user_id=owner_user_id,
@@ -768,22 +956,33 @@ async def start_run(
             if existing is None:
                 await run_ctx.thread_store.create(
                     thread_id,
-                    assistant_id=body.assistant_id,
-                    metadata=body.metadata,
+                    assistant_id=effective_assistant_id,
+                    metadata=thread_metadata,
                 )
             else:
+                await run_ctx.thread_store.update_assistant_id(
+                    thread_id,
+                    effective_assistant_id,
+                )
                 await run_ctx.thread_store.update_status(thread_id, "running")
         except Exception:
             logger.warning("Failed to upsert thread_meta for %s (non-fatal)", sanitize_log_param(thread_id))
 
-        agent_factory = resolve_agent_factory(body.assistant_id)
+        agent_factory = resolve_agent_factory(effective_assistant_id)
         is_internal_caller = getattr(getattr(request, "state", None), "auth_source", None) == AUTH_SOURCE_INTERNAL
         command = getattr(body, "command", None)
         if command and command.get("resume") is not None:
             graph_input = Command(resume=command["resume"])
         else:
             graph_input = normalize_input(body.input, trusted_internal=is_internal_caller)
-        config = build_run_config(thread_id, body.config, body.metadata, assistant_id=body.assistant_id)
+        config = build_run_config(
+            thread_id,
+            body.config,
+            run_metadata,
+            assistant_id=effective_assistant_id,
+            is_bootstrap=is_bootstrap,
+            identity_locked=product_binding is not None,
+        )
         await apply_checkpoint_to_run_config(config, body=body, thread_id=thread_id, request=request)
 
         # Merge DeerFlow-specific context overrides into both ``configurable`` and ``context``.
@@ -791,6 +990,18 @@ async def start_run(
         # that carries agent configuration (model_name, thinking_enabled, etc.).
         # Only agent-relevant keys are forwarded; unknown keys (e.g. thread_id) are ignored.
         merge_run_context_overrides(config, getattr(body, "context", None), internal=is_internal_caller)
+        if product_binding is not None:
+            for container_name in ("configurable", "context"):
+                container = config.get(container_name)
+                if isinstance(container, dict):
+                    for key in _PRODUCT_REQUEST_IDENTITY_KEYS:
+                        container.pop(key, None)
+        strip_server_owned_transient_context(config)
+        _bind_run_agent_identity(
+            config,
+            effective_assistant_id,
+            is_bootstrap=is_bootstrap,
+        )
         if not is_internal_caller:
             # ``body.config`` is free-form and copied verbatim by
             # ``build_run_config``; scrub internal-only keys smuggled there.
@@ -804,11 +1015,7 @@ async def start_run(
         )
         account_repo = getattr(request.app.state, "personal_ip_account_repo", None)
         subject_repo = getattr(request.app.state, "personal_ip_subject_repo", None)
-        if (
-            account_repo is not None
-            and subject_repo is not None
-            and personal_ip_context_enabled(config)
-        ):
+        if account_repo is not None and subject_repo is not None and personal_ip_context_enabled(config):
             await inject_personal_ip_portfolio_context(
                 config,
                 account_repo=account_repo,
@@ -879,7 +1086,18 @@ async def launch_scheduled_thread_run(
         # runtime-context consumers without a ContextVar fallback (e.g.
         # user-scoped GuardrailMiddleware providers) see the owning user;
         # ``inject_authenticated_user_context`` skips the internal user.
-        context=({"non_interactive": True, "user_id": owner_user_id} if owner_user_id else {"non_interactive": True}),
+        context=(
+            {
+                "non_interactive": True,
+                "product_entrypoint": "scheduler",
+                "user_id": owner_user_id,
+            }
+            if owner_user_id
+            else {
+                "non_interactive": True,
+                "product_entrypoint": "scheduler",
+            }
+        ),
         webhook=None,
         checkpoint_id=None,
         checkpoint=None,

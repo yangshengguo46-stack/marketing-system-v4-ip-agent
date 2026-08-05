@@ -109,6 +109,18 @@ class TestThreadMetaRepository:
         assert record["status"] == "busy"
 
     @pytest.mark.anyio
+    async def test_update_assistant_id_is_owner_scoped(self, repo):
+        await repo.create("t1", assistant_id="lead_agent", user_id="user1")
+
+        await repo.update_assistant_id("t1", "evil-agent", user_id="user2")
+        unchanged = await repo.get("t1", user_id="user1")
+        assert unchanged["assistant_id"] == "lead_agent"
+
+        await repo.update_assistant_id("t1", "ip-agent", user_id="user1")
+        updated = await repo.get("t1", user_id="user1")
+        assert updated["assistant_id"] == "ip-agent"
+
+    @pytest.mark.anyio
     async def test_delete(self, repo):
         await repo.create("t1")
         await repo.delete("t1")

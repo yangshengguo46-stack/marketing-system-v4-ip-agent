@@ -36,6 +36,13 @@ from deerflow.agents.middlewares.tool_output_synopsis import build_tool_output_s
 from deerflow.config.app_config import AppConfig
 from deerflow.config.sandbox_config import SandboxConfig
 from deerflow.config.tool_output_config import ToolOutputConfig
+from deerflow.tools.result_policy import RESULT_POLICY_METADATA_KEY
+
+_EVIDENCE_POLICY = {
+    "trust": "untrusted_external",
+    "semantic_class": "evidence",
+    "outcome_contract": "ip-evidence-operation-status-v1",
+}
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -56,13 +63,20 @@ def _lines_then_long_line(total: int, newline_ratio: float = 0.6) -> str:
     return lines + "A" * (total - len(lines))
 
 
-def _make_request(tool_name: str = "remote_executor", tool_call_id: str = "tc-1", outputs_path: str | None = None) -> SimpleNamespace:
+def _make_request(
+    tool_name: str = "remote_executor",
+    tool_call_id: str = "tc-1",
+    outputs_path: str | None = None,
+    *,
+    result_policy: dict[str, str] | None = None,
+) -> SimpleNamespace:
     thread_data = {"outputs_path": outputs_path} if outputs_path else None
     state = {"thread_data": thread_data} if thread_data else {}
     runtime = SimpleNamespace(state=state)
     return SimpleNamespace(
         tool_call={"name": tool_name, "id": tool_call_id},
         runtime=runtime,
+        tool=SimpleNamespace(metadata=({RESULT_POLICY_METADATA_KEY: dict(result_policy)} if result_policy is not None else {})),
     )
 
 
@@ -919,6 +933,54 @@ class TestMCPContentAndArtifact:
         result = mw.wrap_tool_call(req, lambda _: msg)
 
         assert result is msg
+
+    def test_operator_classified_mixed_result_is_budgeted_and_preserves_resource(self):
+        config = ToolOutputConfig(
+            externalize_min_chars=10,
+            fallback_max_chars=300,
+            fallback_head_chars=40,
+            fallback_tail_chars=20,
+        )
+        mw = ToolOutputBudgetMiddleware(config=config)
+        image = {
+            "type": "image_url",
+            "image_url": {"url": "/mnt/user-data/outputs/contact-sheet.jpg"},
+            "mime_type": "image/jpeg",
+        }
+        content = [
+            {"type": "text", "text": "x" * 40_056},
+            image,
+        ]
+        artifact = {
+            "structured_content": {
+                "contract_version": "ip-reference-video-evidence-v1",
+                "operation_status": "ok",
+            }
+        }
+        msg = ToolMessage(
+            content=content,
+            name="ip_evidence_inspect_reference_videos",
+            tool_call_id="tc-mixed-evidence",
+            artifact=artifact,
+            additional_kwargs={"kept": True},
+        )
+        req = _make_request(
+            tool_name="ip_evidence_inspect_reference_videos",
+            result_policy=_EVIDENCE_POLICY,
+        )
+
+        result = mw.wrap_tool_call(req, lambda _: msg)
+
+        assert result is not msg
+        assert isinstance(result.content, list)
+        text_blocks = [block for block in result.content if isinstance(block, dict) and block.get("type") == "text"]
+        assert len(text_blocks) == 1
+        assert len(text_blocks[0]["text"]) <= 300
+        assert "omitted" in text_blocks[0]["text"]
+        assert image in result.content
+        assert result.artifact == artifact
+        assert result.additional_kwargs["kept"] is True
+        assert result.tool_call_id == "tc-mixed-evidence"
 
     def test_small_text_blocks_pass_through(self):
         config = ToolOutputConfig(externalize_min_chars=1000)

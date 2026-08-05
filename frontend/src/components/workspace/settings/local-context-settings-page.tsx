@@ -67,8 +67,9 @@ export function LocalContextSettingsPage() {
                 <DatabaseIcon className="size-4" /> 本地上下文
               </CardTitle>
               <CardDescription className="max-w-3xl leading-6">
-                默认开启，智能体会自动使用本机工作上下文协助建模、预演和复盘。
-                登录凭据、密码和原始文件不会进入对话。
+                默认关闭。只有你明确确认后，本机才会开始有界的屏幕采集；
+                登录凭据、密码和原始文件不会进入对话。默认 IP Agent
+                当前不读取这些数据。
               </CardDescription>
             </div>
             <Badge variant={query.data?.running ? "secondary" : "outline"}>
@@ -114,15 +115,23 @@ export function LocalContextSettingsPage() {
                       !query.data.operator_enabled ||
                       !query.data.available
                     }
-                    onClick={() =>
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          "开启后将在本机对所有显示器进行有界的定时采集。是否继续？",
+                        )
+                      ) {
+                        return;
+                      }
                       void run(
                         () =>
                           enable.mutateAsync({
                             retention_days: 30,
+                            continuous_screen_capture_confirmed: true,
                           }),
                         "本地上下文已开启",
-                      )
-                    }
+                      );
+                    }}
                   >
                     <PlayIcon /> 开启本地上下文
                   </Button>

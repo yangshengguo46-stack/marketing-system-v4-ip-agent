@@ -27,6 +27,13 @@ from deerflow.scheduler.schedules import (
 router = APIRouter(prefix="/api", tags=["scheduled-tasks"])
 
 
+def _require_scheduler_enabled():
+    config = get_config()
+    if not config.scheduler.enabled:
+        raise HTTPException(status_code=404, detail="Scheduled tasks are disabled")
+    return config
+
+
 def _ensure_task_mutable(task: dict[str, Any]) -> None:
     if task.get("status") == "running":
         raise HTTPException(
@@ -67,7 +74,7 @@ async def list_scheduled_tasks(request: Request):
 @router.post("/scheduled-tasks")
 @require_permission("threads", "write")
 async def create_scheduled_task(request: Request, body: ScheduledTaskCreateRequest):
-    config = get_config()
+    config = _require_scheduler_enabled()
     repo = get_scheduled_task_repo(request)
     thread_store = get_thread_store(request)
     user = await get_optional_user_from_request(request)
@@ -252,6 +259,7 @@ async def resume_scheduled_task(task_id: str, request: Request):
 @router.post("/scheduled-tasks/{task_id}/trigger")
 @require_permission("threads", "write")
 async def trigger_scheduled_task(task_id: str, request: Request):
+    _require_scheduler_enabled()
     repo = get_scheduled_task_repo(request)
     service = get_scheduled_task_service(request)
     user = await get_optional_user_from_request(request)

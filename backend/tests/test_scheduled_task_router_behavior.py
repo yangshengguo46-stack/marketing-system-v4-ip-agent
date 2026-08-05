@@ -83,7 +83,10 @@ class _RunStore:
 
 class _Config:
     def __init__(self, min_once_delay_seconds: int = 60) -> None:
-        self.scheduler = SimpleNamespace(min_once_delay_seconds=min_once_delay_seconds)
+        self.scheduler = SimpleNamespace(
+            enabled=True,
+            min_once_delay_seconds=min_once_delay_seconds,
+        )
 
 
 @pytest.mark.asyncio
@@ -192,10 +195,12 @@ async def test_trigger_scheduled_task_dispatches_manual_run():
 
     old_repo = scheduled_tasks.get_scheduled_task_repo
     old_service = scheduled_tasks.get_scheduled_task_service
+    old_config = scheduled_tasks.get_config
     old_user = scheduled_tasks.get_optional_user_from_request
     try:
         scheduled_tasks.get_scheduled_task_repo = lambda _request: repo
         scheduled_tasks.get_scheduled_task_service = lambda _request: service
+        scheduled_tasks.get_config = _Config
         scheduled_tasks.get_optional_user_from_request = AsyncMock(return_value=user)
 
         result = await scheduled_tasks.trigger_scheduled_task.__wrapped__(
@@ -205,6 +210,7 @@ async def test_trigger_scheduled_task_dispatches_manual_run():
     finally:
         scheduled_tasks.get_scheduled_task_repo = old_repo
         scheduled_tasks.get_scheduled_task_service = old_service
+        scheduled_tasks.get_config = old_config
         scheduled_tasks.get_optional_user_from_request = old_user
 
     assert result == {"id": "task-1", "triggered": True}
@@ -235,10 +241,12 @@ async def test_trigger_scheduled_task_returns_conflict_when_dispatch_conflicts()
 
     old_repo = scheduled_tasks.get_scheduled_task_repo
     old_service = scheduled_tasks.get_scheduled_task_service
+    old_config = scheduled_tasks.get_config
     old_user = scheduled_tasks.get_optional_user_from_request
     try:
         scheduled_tasks.get_scheduled_task_repo = lambda _request: repo
         scheduled_tasks.get_scheduled_task_service = lambda _request: service
+        scheduled_tasks.get_config = _Config
         scheduled_tasks.get_optional_user_from_request = AsyncMock(return_value=user)
 
         with pytest.raises(Exception) as exc_info:
@@ -249,6 +257,7 @@ async def test_trigger_scheduled_task_returns_conflict_when_dispatch_conflicts()
     finally:
         scheduled_tasks.get_scheduled_task_repo = old_repo
         scheduled_tasks.get_scheduled_task_service = old_service
+        scheduled_tasks.get_config = old_config
         scheduled_tasks.get_optional_user_from_request = old_user
 
     assert "already has an active run" in str(exc_info.value)

@@ -1,10 +1,16 @@
-# IP Agent audit remediation ledger
+# IP Agent audit remediation closeout
 
-This is the executable audit ledger. It records the current cleanup and its
-acceptance gates; historical implementation detail remains available in Git.
-Do not create a parallel ledger.
+Status: frozen historical closeout as of 2026-08-01.
 
-Status vocabulary:
+This file records the completed clean-baseline and semantic-retirement audit.
+It is not a current product-status source and must not receive new feature,
+MediaKit, writer-brain or production progress. Current reachability and the
+only active delivery sequence live in `docs/IP_AGENT_PRODUCT_LEDGER.md`.
+Historical implementation detail remains available in Git.
+
+The historical rows below used this vocabulary. `done` means that the named
+remediation action and its acceptance completed at closeout; it never means a
+replacement product capability was delivered:
 
 - `done`: implementation and named acceptance completed;
 - `verifying`: implementation exists but the full gate is still running;
@@ -26,11 +32,11 @@ Status vocabulary:
 | RETIRE-04 | Method distillation and Skill promotion were mixed into production runtime | Python adapters moved to research quarantine; production imports are zero | done |
 | RETIRE-05 | Old tables could return through bootstrap or unsafe migration | 0021 refuses non-empty tables, drops empty legacy tables and `preflight_id`; fresh DB remains clean; downgrade restores empty schema only | done |
 | RETIRE-06 | Cockpit UI still published unsupported business judgments | Dashboard reads fact APIs directly and removes potential/boost/continue-adjust-restart conclusions | done |
-| RETIRE-07 | Accumulated documentation described retired code as current | `IP_AGENT.md` is sole contract; root/module guides compressed; both existing ledgers state retirement and quarantine | done |
+| RETIRE-07 | Accumulated documentation described retired code as current | `IP_AGENT.md` is sole contract; root/module guides compressed; product state and historical closeout were separated | done |
 | RETIRE-08 | Physical cleanup might change clean-Agent behavior | Run the same four real Doubao replays and compare answers, tool calls and input scale with phase one | done |
-| NEXT-01 | There is no coherent replacement IP architecture yet | Design from first principles only after the clean baseline is accepted | pending |
+| NEXT-01 | There was no coherent replacement IP architecture after retirement | Record a first-principles target only after the clean baseline is accepted | done — the target boundary was documented; no runtime replacement was claimed, and current implementation status is owned only by the product ledger |
 
-## Phase-two acceptance gate
+## Historical phase-two acceptance gate
 
 All of the following must pass before `RETIRE-*` becomes `done`:
 
@@ -78,12 +84,11 @@ did not fabricate a citation. Activating a citation-bearing search provider is
 an external configuration gate, not a reason to restore semantic middleware or
 add a new server-side quality gate.
 
-## Intentionally retained external gates
+## External gates recorded at closeout
 
 - Real login, collection and publication acceptance for all eight platforms.
 - Real UI-TARS and MineContext OS-permission acceptance.
 - Real paid multi-shot and real faceless-material video delivery.
 
-These do not turn research or unavailable integrations into active capability.
-They also do not block local verification of the clean runtime and retained
-execution safety boundaries.
+These were the remaining external gates on the closeout date. Their current
+state must be read from the product ledger, not inferred from this history.

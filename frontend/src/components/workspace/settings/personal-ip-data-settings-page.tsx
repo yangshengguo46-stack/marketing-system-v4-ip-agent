@@ -48,7 +48,9 @@ function messageOf(error: unknown) {
 export function PersonalIPDataSettingsPage() {
   const queryClient = useQueryClient();
   const fileInput = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState<"export" | "restore" | "preview" | "delete">();
+  const [busy, setBusy] = useState<
+    "export" | "restore" | "preview" | "delete"
+  >();
   const [preview, setPreview] = useState<PersonalIPDeletePreview>();
   const [phrase, setPhrase] = useState("");
   const [backupAcknowledged, setBackupAcknowledged] = useState(false);
@@ -153,7 +155,7 @@ export function PersonalIPDataSettingsPage() {
             <DownloadIcon className="size-4" /> 数据与备份
           </CardTitle>
           <CardDescription className="max-w-3xl leading-6">
-            导出经营主体、账号、策略、内容、表现、复盘和视频制作账本。备份不含密码、Cookie、平台访问令牌或一次性授权状态。
+            导出经营主体、账号、发布回执、指标与平台观测、平台连接外壳和视频制作账本。备份不含密码、Cookie、平台访问令牌、一次性授权状态或付费调用准入记录。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -227,7 +229,8 @@ export function PersonalIPDataSettingsPage() {
           ) : (
             <div className="border-destructive/40 bg-destructive/5 space-y-4 rounded-lg border p-4">
               <p className="text-sm font-medium">
-                将永久删除 {preview.total_records} 条数据库记录及全部本地上下文。
+                将永久删除 {preview.total_records}{" "}
+                条数据库记录及全部本地上下文。
               </p>
               <label className="flex items-start gap-2 text-sm">
                 <input

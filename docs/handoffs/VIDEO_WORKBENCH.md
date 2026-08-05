@@ -1,5 +1,9 @@
 # IP Agent video production workbench handoff
 
+> Historical handoff frozen at 2026-07-22. “Delivered” below means
+> branch-local implementation at that snapshot, not current customer
+> reachability. Current status lives only in `docs/IP_AGENT_PRODUCT_LEDGER.md`.
+
 Date: 2026-07-22
 
 Branch: `parallel/video-workbench`

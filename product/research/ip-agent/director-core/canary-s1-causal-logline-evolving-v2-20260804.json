@@ -1,0 +1,112 @@
+{
+  "schema_version": "ip-director-minimal-canary-result-v1",
+  "scope": "research_direct_provider_only",
+  "product_capability": false,
+  "evaluation": {
+    "verdict": "failed",
+    "retained_successes": [
+      "正确识别礼品为中心概念，黄金为修饰语",
+      "故事人物目标与经营咨询目标被分到两个世界",
+      "建立了送礼者与收礼者的不同欲望及相互反馈",
+      "现实反馈迫使人物改变策略并作出有代价选择",
+      "一句话故事只保留人物关系因果，没有账号、流量、平台或咨询",
+      "商业连接在故事成立后单独承接"
+    ],
+    "failures": [
+      "小金牌可以被手表、相册或其他纪念物替换，人物行动、反馈、选择和结局均不改变，因此黄金不是因果部件",
+      "模型把商业对象作为可替换的软植入留在故事内，没有先决定对象是因果必需还是完全缺席"
+    ],
+    "open_questions": [
+      "模型没有把 epistemic_state 压成约定枚举值，应由调用层预绑定而不是继续加提示词",
+      "具体亲属经历、死亡、辍学和产品形态均为虚构，虽已整体披露但仍需创意盲审",
+      "单条故事偏强情节和亲情催泪，尚不能证明能稳定生成不同情绪、类型和关系结构"
+    ],
+    "next_hypothesis": "在写故事前显式选择商业对象因果必需或完全缺席；本轮固定为缺席，检验模型能否仅保留从对象语义推导出的人情关系因果"
+  },
+  "request": {
+    "model": "doubao-seed-evolving-latest-version",
+    "thinking": "enabled",
+    "max_tokens": 3000,
+    "system_path": "../product/research/ip-agent/director-core/ark-lab-causal-logline-system-v2.md",
+    "input_path": "../product/research/ip-agent/director-core/ark-lab-s1-logline-input-v1.txt"
+  },
+  "response": {
+    "id": "0217858202071249f5b39bc7c9b73397fde4239cc8a84b4becfd7",
+    "actual_model": "doubao-seed-evolving-latest-version",
+    "elapsed_seconds": 50.988,
+    "finish_reason": "stop",
+    "usage": {
+      "completion_tokens": 2222,
+      "prompt_tokens": 816,
+      "total_tokens": 3038,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 1185
+      }
+    },
+    "json_parse_error": null,
+    "content": {
+      "epistemic_state": "只确认了两个事实：经营类别是黄金礼品，内容目标是获得咨询。经营者经历、真实客户、价格、受众、平台、预算和结果均未知，因此故事世界完全虚构，不代表真实客户案例或经营事实。",
+      "facts_used": [
+        "用户经营的产品类别是黄金礼品",
+        "用户希望通过内容账号获得咨询"
+      ],
+      "assumptions": [
+        "故事中的人物、关系、事件和结局均为虚构",
+        "黄金礼品在故事中被当作表达心意的叙事信物，不指向具体SKU、价格或品牌",
+        "未假设任何真实客户、成交数据、经营结果或平台效果",
+        "从黄金礼品中推导出的‘可长久保存、带有郑重感’属于语义联想，不是用户提供的事实"
+      ],
+      "semantic": {
+        "head_concept": "礼品",
+        "modifiers": [
+          "黄金"
+        ],
+        "semantic_action": "把一份不便明说、容易被误解为交易的心意，变成可长久保存并能被对方戴在身上或留在身边的郑重表示",
+        "relationship_at_stake": "送礼者与收礼者之间，那份既想回报又怕被说成还债的亲近与亏欠"
+      },
+      "association_sources": [
+        {
+          "id": "A",
+          "social_domain": "师徒手艺行",
+          "relation_structure": "一方曾因规矩和自尊拒绝对方的报答，后者没有强行给予，而是在多年后归还一件带有共同记忆的旧物，使身份交接被默默承认"
+        },
+        {
+          "id": "B",
+          "social_domain": "医患与临终关怀",
+          "relation_structure": "一个看似微小的遗留物被长期保存，多年后家属看见它仍在原处，才确认亲人曾经被认真善待，而不是被流程化处理"
+        },
+        {
+          "id": "C",
+          "social_domain": "邻里人情与债务",
+          "relation_structure": "一方在灾年借米，对方还债时在米中放入一枚不具交易价值的信物，使关系从清算账目回到记挂情分"
+        }
+      ],
+      "selected_source_ref": "C",
+      "story_world": {
+        "actors": [
+          "弟弟阿远",
+          "姐姐阿珍"
+        ],
+        "trigger": "母亲去世后，姐姐早年辍学打工供弟弟读书，弟弟工作后攒够了那笔钱",
+        "want": "弟弟想让姐姐知道，她当年的苦没有被白白消耗，自己也不再是她的负担",
+        "goal": "让姐姐坦然收下一份表示，而不是继续把所有牺牲都藏起来",
+        "initial_tactic": "弟弟把钱装进信封，明确说是还当年的学费和生活费",
+        "counterforce": "姐姐拒收，说那不是债，若收了钱，姐弟之间就只剩一笔账",
+        "feedback": "钱被退回来后，弟弟发现自己越想还清，越像是在否定姐姐当年的选择，也让两人更不敢提过去",
+        "strategy_change": "他不再提还钱，而是把那笔钱换成一枚不标价钱、可以戴在身上的小金牌",
+        "costly_choice": "他放弃让自己‘两清’的轻松，选择承认这份情分永远无法用钱算完",
+        "cost": "他必须放下急于还债的自尊，也让自己永远记住姐姐当年让出的人生",
+        "state_change": "姐姐没有再推让，低头把金牌戴上，只说‘这我留着’；两人从此不再谈还钱，却比以前更常坐下来吃饭",
+        "viewer_desire": "观众也想把一句说不出口的感谢，变成对方愿意留下、不会退回来的纪念"
+      },
+      "business_bridge": {
+        "meaning_attributed_to_operator": "观众可能认为经营者懂得把抽象的感激、亏欠和亲近，转化为不带交易感却能长久保存的郑重表达",
+        "business_connection": "当观众自身遇到‘想感谢却怕显得像还债’的表达困境时，可能向账号咨询适合承载这种心意的黄金礼品"
+      },
+      "logline": "弟弟攒够钱想还清姐姐当年供他读书的债，却被姐姐一句“那不是债”挡回，直到他把那笔钱换成一枚不标价钱的小金牌，姐姐才终于低头戴上，说这情分她留着。"
+    }
+  }
+}

@@ -4,8 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import getpass
 import json
 import os
+import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -16,12 +20,16 @@ from typing import Any, Literal
 
 import yaml
 
+from deerflow.config.agents_config import agent_artifact_sha256
+
 TEST_MODE_SCHEMA_VERSION = "ip-agent-test-mode-v1"
 TEST_STATE_RELATIVE = Path("backend/.deer-flow-ip-test")
 TEST_SNAPSHOTS_RELATIVE = Path("backend/.deer-flow-ip-test-snapshots")
 TEST_MARKER_NAME = ".ip-agent-test-mode.json"
 TEST_CONFIG_NAME = "config.yaml"
 TEST_EXTENSIONS_CONFIG_NAME = "extensions_config.json"
+TEST_MEDIAKIT_API_KEY_RELATIVE = Path("secrets/mediakit-api-key")
+PRODUCT_RUNTIME_PROFILE_NAME = "product-runtime-profile.yaml"
 TEST_PROFILE_CLEAN = "clean"
 TEST_PROFILE_EVIDENCE = "evidence"
 EVIDENCE_MCP_SERVER_NAME = "ip_evidence"
@@ -36,8 +44,10 @@ class TestModePaths:
     marker: Path
     config: Path
     extensions_config: Path
+    runtime_profile: Path
     database_dir: Path
     evidence_browser_profile_dir: Path
+    mediakit_api_key_file: Path
 
 
 def _utc_stamp(now: datetime | None = None) -> str:
@@ -56,11 +66,13 @@ def resolve_test_mode_paths(root: Path) -> TestModePaths:
         marker=state_dir / TEST_MARKER_NAME,
         config=state_dir / TEST_CONFIG_NAME,
         extensions_config=state_dir / TEST_EXTENSIONS_CONFIG_NAME,
+        runtime_profile=state_dir / PRODUCT_RUNTIME_PROFILE_NAME,
         database_dir=state_dir / "data",
         evidence_browser_profile_dir=state_dir
         / "evidence-mcp"
         / "browser-profile"
         / "douyin",
+        mediakit_api_key_file=state_dir / TEST_MEDIAKIT_API_KEY_RELATIVE,
     )
 
 
@@ -72,6 +84,35 @@ def _write_private_text(path: Path, value: str) -> None:
     temporary.chmod(0o600)
     temporary.replace(path)
     path.chmod(0o600)
+
+
+def _validated_mediakit_api_key(value: str) -> str:
+    key = str(value or "").strip()
+    if not re.fullmatch(r"AKLT[A-Za-z0-9_-]{32,252}", key):
+        raise ValueError("MediaKit API Key format is invalid")
+    return key
+
+
+def configure_mediakit_api_key(paths: TestModePaths, value: str) -> None:
+    """Store one test-only provider key outside runtime configuration."""
+
+    _validate_marker(paths, expected_profile=TEST_PROFILE_EVIDENCE)
+    _write_private_text(
+        paths.mediakit_api_key_file,
+        _validated_mediakit_api_key(value) + "\n",
+    )
+
+
+def _read_mediakit_api_key(paths: TestModePaths) -> str | None:
+    path = paths.mediakit_api_key_file
+    if not path.is_file():
+        return None
+    if os.name != "nt" and path.stat().st_mode & 0o077:
+        raise RuntimeError("test MediaKit API Key file permissions are too broad")
+    try:
+        return _validated_mediakit_api_key(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("test MediaKit API Key file is invalid") from exc
 
 
 def _load_mapping(path: Path) -> dict[str, Any]:
@@ -136,6 +177,7 @@ def _install_product_defaults(paths: TestModePaths, *, profile: TestProfile) -> 
     defaults = paths.root / "product" / "defaults"
     user_source = defaults / "USER.md"
     agent_source = defaults / "agents" / "ip-agent"
+    runtime_profile_source = defaults / PRODUCT_RUNTIME_PROFILE_NAME
     if not user_source.is_file():
         raise FileNotFoundError(f"product default is missing: {user_source}")
     if (
@@ -144,6 +186,10 @@ def _install_product_defaults(paths: TestModePaths, *, profile: TestProfile) -> 
     ):
         raise FileNotFoundError(
             f"product agent defaults are incomplete: {agent_source}"
+        )
+    if not runtime_profile_source.is_file():
+        raise FileNotFoundError(
+            f"product runtime profile is missing: {runtime_profile_source}"
         )
 
     paths.state_dir.mkdir(parents=True, exist_ok=True)
@@ -160,9 +206,30 @@ def _install_product_defaults(paths: TestModePaths, *, profile: TestProfile) -> 
         target = agent_target / name
         shutil.copy2(agent_source / name, target)
         target.chmod(0o600)
+    shutil.copy2(runtime_profile_source, paths.runtime_profile)
+    paths.runtime_profile.chmod(0o600)
+
+    config_target = agent_target / "config.yaml"
+    config = _load_mapping(config_target)
+    runtime_profile = _load_mapping(paths.runtime_profile)
+    source_artifact_sha256 = agent_artifact_sha256(agent_source)
+    if runtime_profile.get("agent_artifact_sha256") != source_artifact_sha256:
+        raise ValueError(
+            "IP Agent default files and product runtime profile artifact digest drifted"
+        )
+    capability_contract = runtime_profile.get("capability_contract")
+    if not isinstance(capability_contract, dict):
+        raise ValueError("IP Agent runtime profile must define capability_contract")
+    expected_contract = {
+        "tool_allowlist": config.get("tool_allowlist"),
+        "skills": config.get("skills"),
+        "memory_enabled": config.get("memory_enabled"),
+    }
+    if capability_contract != expected_contract:
+        raise ValueError(
+            "IP Agent default config and product runtime profile capability_contract drifted"
+        )
     if profile == TEST_PROFILE_EVIDENCE:
-        config_target = agent_target / "config.yaml"
-        config = _load_mapping(config_target)
         allowlist = config.get("tool_allowlist")
         if not isinstance(allowlist, list):
             raise ValueError("IP Agent test config must define a tool_allowlist")
@@ -175,6 +242,16 @@ def _install_product_defaults(paths: TestModePaths, *, profile: TestProfile) -> 
         _write_private_text(
             config_target,
             yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+        )
+        capability_contract["tool_allowlist"] = list(allowlist)
+        runtime_profile["agent_artifact_sha256"] = agent_artifact_sha256(agent_target)
+        _write_private_text(
+            paths.runtime_profile,
+            yaml.safe_dump(
+                runtime_profile,
+                allow_unicode=True,
+                sort_keys=False,
+            ),
         )
 
 
@@ -189,19 +266,43 @@ def _write_test_extensions(paths: TestModePaths, *, profile: TestProfile) -> Non
         payload = json.loads(source.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("test extensions configuration root must be an object")
+    existing_servers = payload.get("mcpServers")
+    existing_server = (
+        existing_servers.get(EVIDENCE_MCP_SERVER_NAME)
+        if isinstance(existing_servers, dict)
+        else None
+    )
+    previous_env = (
+        existing_server.get("env")
+        if isinstance(existing_server, dict)
+        and isinstance(existing_server.get("env"), dict)
+        else {}
+    )
     if profile == TEST_PROFILE_EVIDENCE:
         payload["middlewares"] = []
         payload["mcpInterceptors"] = []
+        payload.pop("mcpInterceptorsRequired", None)
         payload["mcpServers"] = {}
         payload["skills"] = {}
     servers = payload.get("mcpServers")
     if not isinstance(servers, dict):
         servers = {}
         payload["mcpServers"] = servers
+    binding_keys_json = previous_env.get("IP_AGENT_EVIDENCE_BINDING_KEYS_JSON")
+    if not isinstance(
+        binding_keys_json, str
+    ) or not binding_keys_json.strip().startswith("{"):
+        encoded_key = (
+            base64.urlsafe_b64encode(secrets.token_bytes(32))
+            .decode("ascii")
+            .rstrip("=")
+        )
+        binding_keys_json = json.dumps({"test-v1": encoded_key}, separators=(",", ":"))
     servers.pop(EVIDENCE_MCP_SERVER_NAME, None)
     if profile == TEST_PROFILE_EVIDENCE:
         servers[EVIDENCE_MCP_SERVER_NAME] = {
             "enabled": True,
+            "required": True,
             "type": "stdio",
             "command": "uv",
             "args": [
@@ -221,12 +322,22 @@ def _write_test_extensions(paths: TestModePaths, *, profile: TestProfile) -> Non
                     paths.evidence_browser_profile_dir
                 ),
                 "IP_AGENT_EVIDENCE_BROWSER_HEADLESS": "1",
+                "IP_AGENT_EVIDENCE_BINDING_ACTIVE_KID": "test-v1",
+                "IP_AGENT_EVIDENCE_BINDING_KEYS_JSON": binding_keys_json,
+                "IP_AGENT_EVIDENCE_BINDING_TTL_SECONDS": "1800",
+                "IP_AGENT_EVIDENCE_MCP_CLIENT_NAME": EVIDENCE_MCP_SERVER_NAME,
                 "MEDIAKIT_API_KEY": "$MEDIAKIT_API_KEY",
             },
-            "tool_call_timeout": 600,
+            "tool_call_timeout": 3600,
             "description": "Test-only grounded Douyin account and reference-video evidence.",
+            "result_policy": {
+                "trust": "untrusted_external",
+                "semantic_class": "evidence",
+                "outcome_contract": "ip-evidence-operation-status-v1",
+            },
             "tools": {
                 "collect_douyin_benchmark_account": {
+                    "required": True,
                     "routing": {
                         "mode": "prefer",
                         "priority": 100,
@@ -239,9 +350,10 @@ def _write_test_extensions(paths: TestModePaths, *, profile: TestProfile) -> Non
                             "profile URL",
                             "benchmark account",
                         ],
-                    }
+                    },
                 },
                 "inspect_reference_videos": {
+                    "required": True,
                     "routing": {
                         "mode": "prefer",
                         "priority": 90,
@@ -252,6 +364,8 @@ def _write_test_extensions(paths: TestModePaths, *, profile: TestProfile) -> Non
                             "拆解作品",
                             "参考视频",
                             "视频",
+                            "上传",
+                            "/mnt/user-data/uploads/",
                             "对标账号",
                             "v.douyin.com",
                             "douyin.com/user/",
@@ -260,7 +374,7 @@ def _write_test_extensions(paths: TestModePaths, *, profile: TestProfile) -> Non
                             "reference video",
                             "benchmark account",
                         ],
-                    }
+                    },
                 },
             },
         }
@@ -387,7 +501,7 @@ def reset_test_mode(
 
 
 def test_mode_environment(paths: TestModePaths) -> dict[str, str]:
-    _validate_marker(paths)
+    marker = _validate_marker(paths)
     environment = dict(os.environ)
     environment.update(
         {
@@ -401,6 +515,9 @@ def test_mode_environment(paths: TestModePaths) -> dict[str, str]:
             "DEER_FLOW_MCP_STDIO_COMMAND_ALLOWLIST": "npx,uvx,uv",
         }
     )
+    if marker.get("profile") == TEST_PROFILE_EVIDENCE:
+        if mediakit_api_key := _read_mediakit_api_key(paths):
+            environment["MEDIAKIT_API_KEY"] = mediakit_api_key
     return environment
 
 
@@ -428,6 +545,12 @@ def _status(paths: TestModePaths) -> dict[str, Any]:
         "database_exists": (paths.database_dir / "deerflow.db").is_file(),
         "snapshots": snapshots,
         "profile": profile,
+        "mediakit_api_key_configured": bool(
+            prepared
+            and marker_valid
+            and profile == TEST_PROFILE_EVIDENCE
+            and _read_mediakit_api_key(paths)
+        ),
     }
 
 
@@ -435,7 +558,15 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command",
-        choices=("prepare", "reset", "start", "status", "stop", "login-douyin"),
+        choices=(
+            "prepare",
+            "reset",
+            "start",
+            "status",
+            "stop",
+            "login-douyin",
+            "configure-mediakit",
+        ),
     )
     parser.add_argument(
         "--root",
@@ -480,6 +611,17 @@ def main() -> None:
         return
     if args.command == "stop":
         stop_services(root)
+        return
+
+    if args.command == "configure-mediakit":
+        _validate_marker(paths, expected_profile=TEST_PROFILE_EVIDENCE)
+        value = (
+            getpass.getpass("MediaKit API Key: ")
+            if sys.stdin.isatty()
+            else sys.stdin.read()
+        )
+        configure_mediakit_api_key(paths, value)
+        print("MediaKit API Key configured for isolated IP-Agent test mode.")
         return
 
     if args.command == "login-douyin":

@@ -11,9 +11,7 @@ export type MineContextScope =
   | "people"
   | "projects"
   | "work_activity";
-export type MineContextPurpose =
-  | "persona_modeling"
-  | "audience_modeling";
+export type MineContextPurpose = "persona_modeling" | "audience_modeling";
 
 export type MineContextStatus = {
   operator_enabled: boolean;
@@ -83,12 +81,15 @@ export function describeMineContextStatus(
     return { label: "等待安装", action: "请管理员从随包源码安装本地运行环境" };
   }
   if (!status.authorized) {
-    return { label: "尚未开启", action: "开启后即可自动使用" };
+    return { label: "尚未开启", action: "只有你明确确认后才会开始本地采集" };
   }
   if (!status.running) {
     return { label: "已关闭", action: "需要时可以重新开启" };
   }
-  return { label: "使用中", action: "智能体正在使用本机工作上下文" };
+  return {
+    label: "采集中",
+    action: "本地采集正在运行；默认 IP Agent 当前不读取这些数据",
+  };
 }
 
 export function useMineContextStatus(options: { enabled?: boolean } = {}) {
@@ -120,12 +121,16 @@ export function useAuthorizeMineContext() {
   );
 }
 export function useEnableMineContext() {
-  return useMineContextMutation((body: { retention_days: number }) =>
-    requestJSON("/api/personal-ip/minecontext/enable", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
+  return useMineContextMutation(
+    (body: {
+      retention_days: number;
+      continuous_screen_capture_confirmed: true;
+    }) =>
+      requestJSON("/api/personal-ip/minecontext/enable", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
   );
 }
 export function useStartMineContext() {

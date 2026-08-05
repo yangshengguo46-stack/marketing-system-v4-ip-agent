@@ -1,0 +1,53 @@
+{
+  "schema_version": "ip-director-loop-ab-result-v1",
+  "scope": "research_direct_provider_only",
+  "product_capability": false,
+  "request": {
+    "stage": "route",
+    "arm": "placebo",
+    "case_id": "DL1-fruit-grower-longterm",
+    "model": "doubao-seed-evolving-latest-version",
+    "thinking": "disabled",
+    "temperature": 0,
+    "max_tokens": 4000,
+    "contract_path": "product/research/ip-agent/director-core/director-route-output-contract-v1.md",
+    "contract_sha256": "784bfd4d8a5af484fc230d07842700db3c4b13528b7a815ac30e70f6a0d74d24",
+    "arm_path": "product/research/ip-agent/director-core/director-route-placebo-v1.md",
+    "arm_sha256": "639795bd6a866d3a419823289f98440e8055ac9e44a68da15efe337bad0d771f",
+    "brief_path": "product/research/ip-agent/director-core/director-loop-scenarios-v1.json",
+    "brief_sha256": "7432b23ad5f80914bbea3204f7d70d57628eef270917ca409bb7a8f80b6d5795",
+    "system_bytes": 3052,
+    "user_bytes": 1249,
+    "payload_sha256": "98525951b581714727829ca8854d182139131931d25512399ddee4ab8700bae3"
+  },
+  "response": {
+    "id": "02178582826844365a9bdff76a2fbd6d7791d2335c6a9986903a3",
+    "actual_model": "doubao-seed-evolving-latest-version",
+    "elapsed_seconds": 49.429,
+    "finish_reason": "stop",
+    "usage": {
+      "completion_tokens": 2074,
+      "prompt_tokens": 1130,
+      "total_tokens": 3204,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    },
+    "provider_response_sha256": "88a2b9939c0b6422ddd5b1c0b8de71bdc3ef61ab7cb136d91758f0d20d97795f",
+    "json_parse_error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+    "content": "```json\n{\n  \"schema_version\": \"ip-director-route-result-v1\",\n  \"epistemic_state\": \"creative\",\n  \"facts_used\": [\"f1\", \"f2\", \"f3\", \"f4\", \"f5\"],\n  \"creative_assumptions\": [\n    \"假设十五年果园经营积累了可被讲述的季节经验、人情观察和个人判断，但具体经历尚未提供，需后续验证\",\n    \"假设与村里老人聊天能获得方言表达、乡土智慧和代际视角，但具体人物关系与故事尚未提供\",\n    \"假设带方言的短段子能让观众感到真实、亲切或有记忆点，但受众反应尚未验证\",\n    \"假设正脸出镜有助于建立人与果园之间的长期识别关系，但实际信任转化尚未验证\",\n    \"假设一人一机在果园拍摄会形成朴素、连续、低修饰的视觉风格，但产能与稳定性尚未验证\"\n  ],\n  \"semantic_kernel\": {\n    \"surface_terms\": [\"果农\", \"果园\", \"水果\", \"桃子\", \"果品\", \"河南\", \"十五年\", \"方言\", \"村里老人\", \"一部手机\"],\n    \"head_concept\": \"长期守在一片果园里的人\",\n    \"modifiers\": [\"河南\", \"经营十五年\", \"收工后和村里老人聊天\", \"带方言短段子\", \"正脸出镜\", \"一人一机\", \"果园取景\"],\n    \"literal_action\": \"一个人种果、管果、收果，并在果园里用手机讲自己的农活观察\",\n    \"human_action\": \"一个人用长期重复的劳动和口头讲述，确认自己与土地、村庄、时间的关系\",\n    \"relationship_at_stake\": \"观众是否愿意把一个具体的人、一片具体果园和未来的果品信任联系在一起\",\n    \"social_rule\": \"长期经营、亲自劳作和在地表达，会比泛泛展示水果更容易形成可追溯的人情信任\",\n    \"desire_conflict\": \"既想让水果被看见、被购买，又不想让账号只剩叫卖而失去人的可信度与生活感\"\n  },\n  \"directions\": [\n    {\n      \"id\": \"near-orchard-year\",\n      \"semantic_distance\": \"near\",\n      \"industry_role\": \"subject\",\n      \"content_subject\": \"一个果农如何在十五年的果园周期里理解种桃、管树、看天和收成\",\n      \"association_path\": [\n        \"果农\",\n        \"果园十五年\",\n        \"一年四季的农活\",\n        \"每个环节里的判断与等待\",\n        \"把果品归因给长期照料果园的人\"\n      ],\n      \"structure_mapping\": [\n        {\"source_edge\": \"果树从开花、结果到采收需要连续管理\", \"target_edge\": \"账号从露面、重复讲述到被记住也需要连续积累\"},\n        {\"source_edge\": \"水果品质来自长期果园经营\", \"target_edge\": \"账号信任来自本人持续出现和可追溯表达\"}\n      ],\n      \"audience_tension\": \"观众想买可信的农产品，但常常只看到成品水果，看不到背后长期照料的人和判断\",\n      \"expression_mode\": \"果园实景中的口头故事：用方言讲当天农活、季节变化、种树经验和收工感受\",\n      \"subject_ownership\": \"只有这个经营果园十五年、愿意正脸出镜、能在果园现场讲述的人，才天然占有这条连续劳动线\",\n      \"business_attribution\": \"通过反复出现的人脸、果园场景和季节劳动，让观众未来把桃子等果品与本人而非泛化水果品类绑定\",\n      \"evidence_refs\": [\"f1\", \"f3\", \"f4\", \"f5\"],\n      \"creative_assumptions\": [\n        \"假设本人能持续讲出不同农时的具体观察，而不只是重复展示水果\",\n        \"假设观众愿意关注周期较长的农业劳动内容\"\n      ]\n    },\n    {\n      \"id\": \"mid-village-oral-chronicles\",\n      \"semantic_distance\": \"mid\",\n      \"industry_role\": \"metaphor\",\n      \"content_subject\": \"以果园为隐喻，讲村庄里关于时间、耐心、熟落、挑选和人情往来的生活故事\",\n      \"association_path\": [\n        \"果园劳动\",\n        \"果树有旺有弱、果子有生有熟\",\n        \"村庄老人的聊天与旧事\",\n        \"把农活观察讲成方言短段子\",\n        \"果园成为解释人生选择和关系变化的隐喻系统\"\n      ],\n      \"structure_mapping\": [\n        {\"source_edge\": \"种果需要等待季节，不能强行催熟\", \"target_edge\": \"人的选择、关系和生活结果也需要时间显影\"},\n        {\"source_edge\": \"果园里每棵树长势不同，需要分别照看\", \"target_edge\": \"村里每个人的处境、脾气和命运也不能用同一种说法概括\"},\n        {\"source_edge\": \"收工后和老人聊天获得旧事与经验\", \"target_edge\": \"账号通过口述保存正在消失的地方语言、判断和人情智慧\"}\n      ],\n      \"audience_tension\": \"观众在快速变化的生活里渴望有人替自己说出关于等待、选择、关系和命运的感受，又不想听空泛道理\",\n      \"expression_mode\": \"果园收工后的方言短故事：从一件农活或一句老人的话切入，落到一个可共鸣的生活感受\",\n      \"subject_ownership\": \"本人既有十五年果园观察，又常和村里老人聊天，并喜欢用方言短段子表达，因此这个隐喻系统来自其真实日常而非外部文案\",\n      \"business_attribution\": \"让观众先记住一个会讲土地与村庄感受的河南果农，再把这种人格识别迁移到其果园产品上\",\n      \"evidence_refs\": [\"f1\", \"f2\", \"f3\", \"f4\", \"f5\"],\n      \"creative_assumptions\": [\n        \"假设老人聊天内容可以被转化为不泄露隐私、不虚构真实人物的公共表达\",\n        \"假设方言短段子既能保留地方感，也能被更广泛观众理解\",\n        \"假设观众会把生活感受的表达者与可信生产者联系起来\"\n      ]\n    },\n    {\n      \"id\": \"far-one-person-orchard-stage\",\n      \"semantic_distance\": \"far\",\n      \"industry_role\": \"stage\",\n      \"content_subject\": \"把果园当作一个人面对自我、时间和生活的露天舞台，持续呈现普通人的生存独白\",\n      \"association_path\": [\n        \"果园\",\n        \"一个人收工后的空间\",\n        \"树、土地、天色和手机镜头\",\n        \"正脸出镜的独白\",\n        \"果园从生产场所变成普通人讲述生活的舞台\"\n      ],\n      \"structure_mapping\": [\n        {\"source_edge\": \"果园是每天劳动的固定场所\", \"target_edge\": \"舞台是人物反复出现、形成辨识度的固定场景\"},\n        {\"source_edge\": \"一部手机完成拍摄\", \"target_edge\": \"低门槛镜头形成直接、不伪装的面对观众关系\"},\n        {\"source_edge\": \"农活有重复也有意外\", \"target_edge\": \"普通人的生活独白可以在重复日常中产生细小但真实的张力\"}\n      ],\n      \"audience_tension\": \"许多观众身处普通、重复、缺少观众的生活中，既想确认这种生活也有分量，又害怕表达过于煽情或虚假\",\n      \"expression_mode\": \"固定在果园里的一人一脸一段独白：少道具、强语言、强场景，用方言讲当天的劳动和心里冒出来的感受\",\n      \"subject_ownership\": \"这个舞台不属于任意演员，因为它只能由本人在真实果园、用一部手机、以长期果农身份持续完成\",\n      \"business_attribution\": \"通过极强的人脸、空间和口头风格识别，让未来果品出现在同一个人格化舞台中时自然归因给本人\",\n      \"evidence_refs\": [\"f1\", \"f3\", \"f4\", \"f5\"],\n      \"creative_assumptions\": [\n        \"假设本人具备稳定口头表达和持续独白的能力，具体水平尚未验证\",\n        \"假设极简舞台不会因场景单一而削弱持续观看，需通过内容变化验证\",\n        \"假设观众能接受农业场景中更具存在感的个人表达\"\n      ]\n    }\n  ],\n  \"recommendation\": {\n    \"selected_direction_ref\": \"mid-village-oral-chronicles\",\n    \"reason\": \"中距离路线最能同时利用十五年果园、收工后与老人聊天、方言短段子和正脸出镜这些输入事实：它不把内容压成单纯种果知识，也不脱离果园去做抽象人生表达，而是让果园成为解释生活感受的隐喻系统，更贴近长期人格影响力的目标。\",\n    \"tradeoff\": \"主动放弃更直接的水果生产展示和更快的品类教育，短期内可能不会让每一条内容都明确指向桃子或果品销售。\",\n    \"why_not_near\": \"近距离虽然安全，但容易停留在农活记录和水果展示，难以充分释放与老人聊天、方言短段子所带来的人情和语言辨识度；在允许选择中、远的条件下，中距离更能建立不可替代的主体记忆点。\"\n  }\n}\n```"
+  },
+  "mechanical_validation": {
+    "passed": false,
+    "issues": [
+      {
+        "code": "response.json",
+        "message": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+      }
+    ]
+  },
+  "quality_verdict": "pending_blind_review"
+}

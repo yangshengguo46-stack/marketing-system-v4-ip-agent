@@ -8,12 +8,12 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 class MineContextConfig(BaseModel):
     """Startup-only limits for per-owner MineContext sidecars.
 
-    The Personal-IP product enables the bundled source for new owners by
-    default. An owner can still disable it persistently from Settings.
+    The bundled source is available to owners, but collection is never enabled
+    until an owner explicitly authorizes it from Settings.
     """
 
     enabled: bool = True
-    auto_enable_new_owners: bool = True
+    auto_enable_new_owners: bool = False
     source_path: str = "third_party/volcengine/MineContext"
     runtime_python: str | None = None
     host: str = "127.0.0.1"
@@ -40,6 +40,13 @@ class MineContextConfig(BaseModel):
     default_embedding_model: str = "doubao-embedding-vision-250615"
     vlm_provider: str = "doubao"
     embedding_provider: str = "doubao"
+
+    @field_validator("auto_enable_new_owners")
+    @classmethod
+    def reject_automatic_owner_authorization(cls, value: bool) -> bool:
+        if value:
+            raise ValueError("auto_enable_new_owners is retired; owners must authorize MineContext explicitly")
+        return False
 
     @field_validator("host")
     @classmethod

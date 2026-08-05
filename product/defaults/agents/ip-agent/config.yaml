@@ -1,5 +1,5 @@
 name: ip-agent
-description: A clean, read-only IP strategy agent for people, brands, products and organizations.
+description: An IP strategy and creation agent for people, brands, products and organizations.
 skills: []
 tool_allowlist:
   - web_search
@@ -10,4 +10,6 @@ tool_allowlist:
   - grep
   - view_image
   - ask_clarification
+  - ip_evidence_collect_douyin_benchmark_account
+  - ip_evidence_inspect_reference_videos
 memory_enabled: false

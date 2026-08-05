@@ -1,0 +1,104 @@
+[
+  {
+    "id": "role-as-entity-kind",
+    "path": ["ontology", "entities", 0, "kind"],
+    "value": "role",
+    "expected_code": "ontology.entity_kind"
+  },
+  {
+    "id": "product-given-psychological-desire",
+    "path": ["direction", "candidate_worlds", 0, "desire_subject_ref"],
+    "value": "offer-1",
+    "expected_code": "direction.desire_subject"
+  },
+  {
+    "id": "only-one-far-domain",
+    "path": ["direction", "candidate_worlds", 1, "semantic_distance"],
+    "value": "near",
+    "expected_code": "direction.far_candidate"
+  },
+  {
+    "id": "candidate-worlds-share-one-domain",
+    "path": ["direction", "candidate_worlds", 1, "social_domain"],
+    "value": "训练与进阶",
+    "expected_code": "direction.candidate_domains"
+  },
+  {
+    "id": "anchor-points-to-unknown-entity",
+    "path": ["direction", "four_anchors", "meaning", "entity_ref"],
+    "value": "unknown-entity",
+    "expected_code": "direction.anchor_ref"
+  },
+  {
+    "id": "asserted-fact-loses-provenance",
+    "path": ["information", "claims", 0, "source_refs"],
+    "value": [],
+    "expected_code": "information.provenance"
+  },
+  {
+    "id": "creator-and-audience-desire-conflated",
+    "path": ["direction", "desire_model", "audience_desire_claim_refs"],
+    "value": ["pc2"],
+    "expected_code": "direction.desire_conflation"
+  },
+  {
+    "id": "selection-does-not-resolve",
+    "path": ["direction", "selected_candidate_ref"],
+    "value": "missing-candidate",
+    "expected_code": "direction.selection"
+  },
+  {
+    "id": "life-role-assigned-to-product",
+    "path": ["ontology", "role_assignments", 0, "entity_ref"],
+    "value": "offer-1",
+    "expected_code": "ontology.life_role_subject"
+  },
+  {
+    "id": "resource-reduction-not-tested",
+    "path": ["direction", "stress_test", "resource_reduction_result"],
+    "value": "fail",
+    "expected_code": "direction.stress_result"
+  },
+  {
+    "id": "story-missing-feedback",
+    "path": ["direction", "communication", "desire_behavior", "feedback"],
+    "value": "",
+    "expected_code": "direction.story_causality"
+  },
+  {
+    "id": "story-source-does-not-match-selection",
+    "path": ["direction", "communication", "desire_behavior", "source_candidate_ref"],
+    "value": "person-candidate-3",
+    "expected_code": "direction.story_source"
+  },
+  {
+    "id": "story-fact-reference-does-not-resolve",
+    "path": ["direction", "communication", "desire_behavior", "fact_refs"],
+    "value": ["missing-claim"],
+    "expected_code": "direction.story_fact_refs"
+  },
+  {
+    "id": "story-pretends-creative-event-is-fact",
+    "path": ["direction", "communication", "desire_behavior", "epistemic_state"],
+    "value": "user_asserted",
+    "expected_code": "direction.story_epistemic_state"
+  },
+  {
+    "id": "creative-story-hides-assumptions",
+    "path": ["direction", "communication", "desire_behavior", "assumptions"],
+    "value": [],
+    "expected_code": "direction.story_assumptions"
+  },
+  {
+    "id": "story-allows-incidental-product-placement",
+    "path": ["direction", "communication", "desire_behavior", "commercial_object_mode"],
+    "value": "incidental",
+    "expected_code": "direction.story_object_mode"
+  },
+  {
+    "id": "story-skips-product-substitution-test",
+    "path": ["direction", "communication", "desire_behavior", "substitution_test"],
+    "value": "",
+    "expected_code": "direction.story_substitution_test"
+  }
+]

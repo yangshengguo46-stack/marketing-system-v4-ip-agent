@@ -7,6 +7,7 @@ installations that pre-date user isolation continue to work until they run the
 per-user layout.
 """
 
+import hashlib
 import logging
 import re
 from pathlib import Path
@@ -21,7 +22,24 @@ from deerflow.runtime.user_context import get_effective_user_id
 logger = logging.getLogger(__name__)
 
 SOUL_FILENAME = "SOUL.md"
+AGENT_ARTIFACT_FILENAMES = ("config.yaml", SOUL_FILENAME)
 AGENT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9-]+$")
+
+
+def agent_artifact_sha256(agent_dir: Path) -> str:
+    """Hash the exact config and soul bytes with unambiguous framing."""
+    digest = hashlib.sha256()
+    for filename in AGENT_ARTIFACT_FILENAMES:
+        path = agent_dir / filename
+        if path.is_symlink() or not path.is_file():
+            raise FileNotFoundError(f"Agent artifact file is missing or unsafe: {filename}")
+        name_bytes = filename.encode("utf-8")
+        content = path.read_bytes()
+        digest.update(len(name_bytes).to_bytes(4, "big"))
+        digest.update(name_bytes)
+        digest.update(len(content).to_bytes(8, "big"))
+        digest.update(content)
+    return digest.hexdigest()
 
 
 def _blank_to_none(value: str | None) -> str | None:

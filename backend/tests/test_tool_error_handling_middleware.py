@@ -437,6 +437,25 @@ def test_wrap_tool_call_stamps_tool_meta_on_exception():
     assert meta["error_type"] == "transient"
 
 
+def test_mcp_transport_error_keeps_credential_free_result_artifact():
+    from deerflow.mcp.result_metadata import McpToolResultError
+
+    middleware = ToolErrorHandlingMiddleware()
+    req = _request(name="remote_evidence", tool_call_id="tc-mcp-error")
+    artifact = {
+        "structured_content": {"status": "failed"},
+        "mcp_metadata": {"contract_version": "mcp-result-metadata-v1"},
+    }
+
+    def _boom(_req):
+        raise McpToolResultError("remote failed", artifact=artifact)
+
+    result = middleware.wrap_tool_call(req, _boom)
+
+    assert result.status == "error"
+    assert result.artifact == artifact
+
+
 def test_task_exception_wrapper_uses_subagent_result_formatter():
     middleware = ToolErrorHandlingMiddleware()
     req = _request(name="task", tool_call_id="tc-task")

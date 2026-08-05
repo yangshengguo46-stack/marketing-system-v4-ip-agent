@@ -1013,12 +1013,15 @@ class ChannelManager:
             run_context_identity,
         )
 
-        # Custom agents are implemented as lead_agent + agent_name context.
-        # Keep backward compatibility for channel configs that set
-        # assistant_id: <custom-agent-name> by routing through lead_agent.
-        if assistant_id != DEFAULT_ASSISTANT_ID:
-            run_context.setdefault("agent_name", _normalize_custom_agent_name(assistant_id))
+        # Keep the SDK assistant id as the single runtime identity. The
+        # embedded Gateway derives its internal ``agent_name`` from this value;
+        # retaining a second context selector would make RunRow and execution
+        # disagree and would let message/session metadata override the run.
+        if assistant_id.strip() == DEFAULT_ASSISTANT_ID:
             assistant_id = DEFAULT_ASSISTANT_ID
+        else:
+            assistant_id = _normalize_custom_agent_name(assistant_id)
+        run_context.pop("agent_name", None)
 
         # Apply per-channel run policy (recursion_limit bump for webhook
         # channels, etc.). Looking the policy up by channel_name keeps
@@ -1089,19 +1092,21 @@ class ChannelManager:
 
     def _resolve_available_skill_names(self, msg: InboundMessage) -> set[str] | None:
         thread_id = self.store.get_thread_id(msg.channel_name, msg.chat_id, topic_id=msg.topic_id) or ""
-        _, _, run_context = self._resolve_run_params(msg, thread_id)
+        assistant_id, _, run_context = self._resolve_run_params(msg, thread_id)
         if run_context.get("is_bootstrap"):
             return {"bootstrap"}
 
-        agent_name = run_context.get("agent_name")
-        if not isinstance(agent_name, str) or not agent_name.strip():
+        if assistant_id == DEFAULT_ASSISTANT_ID:
             return None
 
         # Read the agent config from the same owner bucket the run uses:
         # ``run_context["user_id"]`` is the resolved owner (``_channel_storage_user_id``),
         # but without it ``load_agent_config`` falls back to the dispatch loop's unset
         # contextvar (``"default"``), reading the wrong user's per-user custom agent.
-        agent_config = load_agent_config(_normalize_custom_agent_name(agent_name), user_id=run_context.get("user_id"))
+        agent_config = load_agent_config(
+            assistant_id,
+            user_id=run_context.get("user_id"),
+        )
         if agent_config and agent_config.skills is not None:
             return set(agent_config.skills)
         return None
@@ -1610,6 +1615,8 @@ class ChannelManager:
         # webhook channel is a one-row registration, not a fresh
         # if-branch here.
         policy = await self._apply_channel_policy(msg, run_context)
+        if _effective_owner_user_id(msg) and (policy is None or policy.is_interactive):
+            run_context["product_entrypoint"] = "owner_im"
 
         # If the inbound message contains file attachments, let the channel
         # materialize (download) them and update msg.text to include sandbox file paths.

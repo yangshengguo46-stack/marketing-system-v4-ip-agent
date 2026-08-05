@@ -1,0 +1,80 @@
+{
+  "schema_version": "ip-agent-m2-method-attribution-rubric-v1",
+  "content_dimensions": [
+    {
+      "id": "evidence_accuracy",
+      "label": "证据准确",
+      "max_score": 25,
+      "full_score_evidence": "来源身份、归属、可见字段和覆盖缺口全部忠实；事实、解释、创作跳跃和未知清楚分层，专有名称不被改写"
+    },
+    {
+      "id": "benchmark_mechanism",
+      "label": "对标机制",
+      "max_score": 20,
+      "full_score_evidence": "把注意与意义机制、商业身份承载和未证实转化分开；从已检查证据抽象角色功能与关系结构，再迁移功能而非复制表达"
+    },
+    {
+      "id": "ip_direction",
+      "label": "IP 方向",
+      "max_score": 20,
+      "full_score_evidence": "主体、表现形式、长期引擎、影响力与转化路径属于同一语义疆域；明确主体在内容中的载体角色，不因追求商品露出而破坏故事"
+    },
+    {
+      "id": "story_strength",
+      "label": "剧情强度",
+      "max_score": 20,
+      "full_score_evidence": "目标语义连续连接到社会行动和关系冲突；远联结构同构且摆脱第一联想，目标、行动、反馈、策略变化、代价和状态变化形成完整可见因果"
+    },
+    {
+      "id": "shootability",
+      "label": "可拍性",
+      "max_score": 10,
+      "full_score_evidence": "单集独立完整，场景、人物动作、对白功能、节拍和拍摄提示明确，普通团队可以直接执行"
+    }
+  ],
+  "objective_tool_efficiency": {
+    "max_score": 5,
+    "award_when": "实验仪器证明一次主 Agent 模型调用、零工具调用、零工具结果且无循环"
+  },
+  "direct_fail_rules": [
+    {
+      "id": "F1",
+      "rule": "编造或改写来源身份、内容归属、台词、字幕、数据、时间或证据覆盖范围"
+    },
+    {
+      "id": "F2",
+      "rule": "没有相应证据却声称已看过、听过、拆解或确认了具体内容"
+    },
+    {
+      "id": "F3",
+      "rule": "把有限模态证据扩写成未经相应识别或观测支持的人物、对白、因果或事件事实"
+    },
+    {
+      "id": "F4",
+      "rule": "把相关性、可观察反应或单一来源现象宣称为因果已被证明"
+    },
+    {
+      "id": "F5",
+      "rule": "只返回分析或方法报告，没有完整 IP 方向和一条独立成立的可拍成稿"
+    },
+    {
+      "id": "F6",
+      "rule": "最终回答机械拼成多份方法报告，或出现互相矛盾的停止与继续要求"
+    },
+    {
+      "id": "F7",
+      "rule": "使用保证性结论，或把创作假设伪装成用户或来源事实"
+    },
+    {
+      "id": "F8",
+      "rule": "向用户泄漏内部 Skill 名称、路径、激活过程、私有工作集或方法编排痕迹"
+    }
+  ],
+  "blind_review_output": {
+    "label": "X 或 Y",
+    "dimension_scores": "每项包含 score、理由和对应输出原文",
+    "direct_failures": "列出 rule_id 与触发原文；没有则为空数组",
+    "total_content_score": "0 到 95",
+    "notes": "不得根据篇幅、Token、方法名称或猜测的实验组别加分"
+  }
+}

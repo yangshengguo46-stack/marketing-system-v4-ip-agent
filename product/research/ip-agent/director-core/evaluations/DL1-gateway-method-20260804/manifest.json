@@ -1,0 +1,22 @@
+{
+  "schema_version": "ip-director-gateway-canary-manifest-v1",
+  "captured_at": "2026-08-04T08:04:35.870388+00:00",
+  "case_id": "DL1-fruit-grower-longterm",
+  "transport": "DeerFlow Gateway -> LangGraph Agent -> Volcengine Ark",
+  "assistant_id": "director-loop-test",
+  "model": "doubao-seed-evolving",
+  "thinking_enabled": true,
+  "memory_enabled": false,
+  "skills": [],
+  "tool_allowlist": [],
+  "route_thread_id": "2136cbdd-55f1-4b40-b7cc-eeb2dcb32f38",
+  "story_thread_id": "c43b8dff-dbb9-4980-9f8c-ef79cd87e60c",
+  "route_passed": true,
+  "story_passed": true,
+  "total_llm_calls": 2,
+  "total_tool_calls": 0,
+  "total_tokens": 15124,
+  "observed_runtime_issue": "story stage hit Ark RequestBurstTooFast; SDK and Agent middleware retries compounded latency",
+  "quality_verdict": "failed_62_of_100",
+  "independent_review": "independent-review.json"
+}

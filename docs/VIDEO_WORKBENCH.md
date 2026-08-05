@@ -1,12 +1,16 @@
-# Personal-IP video production workbench
+# Personal-IP video production workbench — isolated implementation reference
 
-The video production workbench is a thin, human/agent co-editing surface for
-DeerFlow's existing Personal-IP video line. It is mounted inside the production
-task at `/workspace/chats/{thread_id}` instead of occupying a global product
-page. A new video begins as a new conversation; once the Agent creates the
-production, that same task turns into the four-stage workbench. Leaving it puts
-the task back in ordinary history, and reopening the history item restores the
-same production.
+> This file documents retained production UI and tool contracts. It is not a
+> current customer-reachability claim: the default IP Agent has no production
+> tools and the product runtime profile keeps `video_workbench` off. Current
+> delivery state lives only in `docs/IP_AGENT_PRODUCT_LEDGER.md`.
+
+When a dedicated profile and the retained native tools are explicitly enabled,
+the video production workbench acts as a thin human/agent co-editing projection
+over DeerFlow's existing Personal-IP video ledger. The intended mount is inside
+the production task at `/workspace/chats/{thread_id}` rather than a second
+global product runtime. These contracts remain reusable for the later V2
+vertical slice; they are not wired into today's default Agent path.
 
 ## Ownership and source of truth
 
@@ -16,7 +20,8 @@ remain the business truth. The workbench does not create a video agent, restore
 the removed Video Studio Evidence Runtime, persist a projection, or introduce a
 second state machine.
 
-Creation, execution and recovery stay in conversation through the native tools:
+In that isolated/dedicated profile, creation, execution and recovery use the
+retained native tools:
 
 - `personal_ip_begin_video_production`
 - `personal_ip_compile_video_plan`
@@ -258,7 +263,8 @@ Chromium to software rendering, captures PNG frames, finishes them with the
 project-local OpenH264 FFmpeg build and seals the verified output as a
 `shot_generation_completed` candidate receipt. Remotion is currently an MVP
 renderer; customer distribution requires a separate license-eligibility gate.
-The implementation inventory is in `docs/VIDEO_PIPELINE_MIGRATION_LEDGER.md`;
+The historical implementation inventory is in
+`docs/handoffs/VIDEO_PIPELINE_MIGRATION_HISTORY.md`;
 the original workbench decision matrix remains in
 `docs/handoffs/VIDEO_WORKBENCH.md`.
 

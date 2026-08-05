@@ -1,0 +1,114 @@
+{
+  "schema_version": "ip-director-gateway-stage-result-v1",
+  "scope": "isolated_gateway_agent_canary",
+  "product_capability": false,
+  "case_id": "DL1-fruit-grower-longterm",
+  "stage": "story",
+  "thread_id": "c43b8dff-dbb9-4980-9f8c-ef79cd87e60c",
+  "run_id": "51b14b5c-19f3-4370-b36f-b600e4bf0866",
+  "assistant_id": "director-loop-test",
+  "requested_model": "doubao-seed-evolving",
+  "actual_models": [
+    "doubao-seed-evolving-latest-version"
+  ],
+  "run_status": "success",
+  "created_at": "2026-08-04T07:51:12.591906+00:00",
+  "updated_at": "2026-08-04T08:00:43.695230+00:00",
+  "llm_call_count": 1,
+  "tool_call_count": 0,
+  "llm_error_count": 1,
+  "token_usage": {
+    "thread_id": "c43b8dff-dbb9-4980-9f8c-ef79cd87e60c",
+    "total_tokens": 9774,
+    "total_input_tokens": 3153,
+    "total_output_tokens": 6621,
+    "total_runs": 1,
+    "by_model": {
+      "doubao-seed-evolving-latest-version": {
+        "tokens": 9774,
+        "runs": 1
+      }
+    },
+    "by_caller": {
+      "lead_agent": 9774,
+      "subagent": 0,
+      "middleware": 0
+    }
+  },
+  "response": {
+    "schema_version": "ip-director-story-result-v1",
+    "epistemic_state": "creative",
+    "source_route_sha256": "80b914c1600ee612cdee8c233230ac9e44c9d52383545d13186b887be9d81f38",
+    "selected_direction_ref": "d3-far",
+    "facts_used": [
+      "f1",
+      "f2",
+      "f3",
+      "f4",
+      "f5"
+    ],
+    "creative_assumptions": [
+      "老周是基于输入事实虚构化的第一人称讲述者，七爷是虚构的村中老人，不对应任何可识别真实个人。",
+      "七爷三日后随儿子进城、临走前说怕没人记得、把旧凳留给老周等情节为虚构。",
+      "七爷当年参与修水渠、曾想离开村子、歉收时蹲在地头落泪等往事为虚构，用来呈现长期守在一处的复杂处境。",
+      "老周在无团队情况下用一部手机正脸用方言讲述，延续输入中的能力假设；故事中的手机只是讲述工具，不涉及账号、流量、订单或成交。"
+    ],
+    "commercial_object_mode": "absent",
+    "substitution_test": "把果园、农活替换成磨坊、铁匠铺等任何长期固定劳作场景，trigger到state_change的五条因果边都不断裂；水果、桃子、果品的独特用途或后果没有改变人物的行动、反馈或选择，因此商业对象必须为absent。",
+    "story_world": {
+      "actors": [
+        "老周：十五年不挪窝的果园经营者，收工后常和老人聊天，爱用方言讲短段子",
+        "七爷：多年来和老周在收工后聊天的村中老人"
+      ],
+      "trigger": "七爷突然告诉老周，儿子在城里安了家，三日后就要接他走；他临走前说，自己守了一辈子，最怕走后村里再没人提他那点事。",
+      "want": "老周想让七爷也让自己确认，一辈子守在一个地方、不被很多人看见，并不等于白活。",
+      "goal": "在七爷离开前，把他的一段旧事讲到七爷亲口承认这样活过“值”。",
+      "initial_tactic": "老周沿用十五年最熟练的办法，用方言和农活错位的笑话把场面圆过去，把七爷的离开说成走亲戚。",
+      "counterforce": "七爷不接梗，低头搓手，直接说“你别哄我”，他要的不是被逗笑，而是自己的一辈子被人当回事。",
+      "feedback": "笑话越响，七爷越沉默，最后红着眼说笑话好听但不顶用；老周意识到自己的幽默没有接住七爷的害怕。",
+      "strategy_change": "老周收起笑脸，不再讲段子，改用方言原原本本复述七爷自己说过的旧事，连他想逃、落泪的狼狈也不修饰。",
+      "costly_choice": "要么把七爷讲成一辈子没怂过的英雄，让他走得舒服；要么讲出他真实的动摇和窘迫，让他被完整看见。客套和真相不能同时给。",
+      "cost": "老周选择真相，让七爷当着他的面掉泪；这也逼他当众承认自己十五年守下来并不轻松，同样有过想走的瞬间。",
+      "relationship_before": "两人只是收工后坐在一起说笑解闷、从不把害怕和软弱说破的聊伴。",
+      "relationship_after": "七爷临走把旧凳留给老周，说“以后你接着讲”，两人从互相解闷的人变成彼此选择的见证者和交接者。",
+      "state_change": "老周从听老人讲旧事的人，变成必须把旧事讲下去的人；第二天他把凳子摆在果园边，支起一部手机正脸开讲，不再只靠逗笑绕开真心话。",
+      "viewer_question": "七爷走后，老周能不能守住这份真实，把那些没被记录的人和事讲下去，而不是又讲成讨好别人的笑话？",
+      "causal_edges": [
+        {
+          "from": "trigger",
+          "to": "initial_tactic",
+          "because": "七爷突然要进城并表露害怕被遗忘，老周必须在他走前回应；而他过去十五年最熟练的反应，就是用方言笑话把沉重场面圆过去。"
+        },
+        {
+          "from": "initial_tactic",
+          "to": "feedback",
+          "because": "笑话把七爷的害怕变成了可供发笑的错位，等于在说“这没什么大不了”，七爷因此感到自己的担心没有被认真接住，只能沉默。"
+        },
+        {
+          "from": "feedback",
+          "to": "strategy_change",
+          "because": "七爷的沉默和“笑话不顶用”明确指出问题不在不够好笑，而在不敢碰真心，老周只能放弃幽默，改用直接复述旧事的方式回应。"
+        },
+        {
+          "from": "strategy_change",
+          "to": "costly_choice",
+          "because": "原原本本复述七爷的一生，必然涉及他硬气的一面和窘迫动摇的一面；要让七爷舒服就得美化，要让他被看见就得揭短，两者无法兼得。"
+        },
+        {
+          "from": "costly_choice",
+          "to": "state_change",
+          "because": "老周选择说出窘迫，七爷第一次感到自己被完整记住而非被安慰，于是把凳子和讲述权交给他；老周的身份也从聊天的人变成接续故事的人。"
+        }
+      ]
+    },
+    "business_bridge": {
+      "meaning_attributed_to_subject": "观众可能会把“长期守在一处、认真记住身边人和事、不拿漂亮话糊弄人”的可靠感归因到老周本人，进而相信他的判断和他经手的东西。",
+      "connection_to_objective": "故事之外，持续让老周用一人一机正脸讲这些人和事，会使果园成为他视角的来源；观众认同的是他十五年不挪窝的观察位置，对果品的信任便会自然归因到他身上，而不是靠单条内容推销。"
+    },
+    "logline": "七爷要随儿子进城，收工后在果园边对老周说守了一辈子怕没人记得；老周先用方言笑话逗他，却把七爷逗得沉默，只好收起笑脸讲出七爷当年想逃、歉收落泪的真事，宁可让他当场掉泪也不把他说成完美英雄；七爷临走把旧凳留给他，老周第二天支起手机坐在凳上，开始替离开的人把旧事讲下去。"
+  },
+  "mechanical_validation": {
+    "issues": [],
+    "passed": true
+  }
+}

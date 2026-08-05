@@ -1,0 +1,225 @@
+{
+  "schema_version": "ip-director-gateway-stage-result-v1",
+  "scope": "isolated_gateway_agent_canary",
+  "product_capability": false,
+  "case_id": "DL1-fruit-grower-longterm",
+  "stage": "route",
+  "method_revision": "v2-prompt-with-v1-contract",
+  "thread_id": "5208c562-2c1d-4072-ae06-93666acd9268",
+  "run_id": "e4b744fa-dfc6-407a-bd44-02c6644c9ed2",
+  "assistant_id": "director-loop-test",
+  "actual_models": [
+    "doubao-seed-evolving-latest-version"
+  ],
+  "run_status": "success",
+  "llm_call_count": 1,
+  "tool_call_count": 0,
+  "llm_error_count": 0,
+  "token_usage": {
+    "thread_id": "5208c562-2c1d-4072-ae06-93666acd9268",
+    "total_tokens": 7326,
+    "total_input_tokens": 2026,
+    "total_output_tokens": 5300,
+    "total_runs": 1,
+    "by_model": {
+      "doubao-seed-evolving-latest-version": {
+        "tokens": 7326,
+        "runs": 1
+      }
+    },
+    "by_caller": {
+      "lead_agent": 7326,
+      "subagent": 0,
+      "middleware": 0
+    }
+  },
+  "response": {
+    "schema_version": "ip-director-loop-result-v1",
+    "epistemic_state": "creative",
+    "facts_used": [
+      "f1",
+      "f2",
+      "f3",
+      "f4",
+      "f5"
+    ],
+    "creative_assumptions": [
+      "假设十五年果园经营中存在可连续讲述的农活观察和经营细节。",
+      "假设收工后与村里老人的聊天内容可以被公开转述，且不会伤害具体当事人。",
+      "假设带方言的短段子经过口头表达后，能被更广观众理解或通过字幕补足。",
+      "假设一人一机在果园取景的生产条件可以长期支撑稳定更新。",
+      "假设观众对讲述者人格的信任，未来能够迁移到对果园产品的归因。",
+      "假设从农活延伸到人情、关系和代际经验，不会削弱产品与本人的绑定。"
+    ],
+    "semantic_kernel": {
+      "surface_terms": [
+        "果农",
+        "果园",
+        "水果"
+      ],
+      "head_concept": "长期在果园劳作并讲述农活观察的人",
+      "modifiers": [
+        "经营十五年",
+        "常在收工后和村里老人聊天",
+        "带方言的短段子",
+        "愿意正脸出镜",
+        "一人一机",
+        "主要在果园取景"
+      ],
+      "literal_action": "本人长期经营果园，并在收工后把农活观察讲成带方言的短段子，用一部手机在果园持续拍摄。",
+      "human_action": "把重复、缓慢、看天吃饭的劳动经验，翻译成外人能听懂、愿意听的小故事和解释。",
+      "relationship_at_stake": "本地劳动者与土地、村中长辈以及外来观众之间的熟悉感、信任和理解。",
+      "social_rule": "长期在一处劳作、熟悉节气和本村人情的人，才适合用接地气的话评论这种生活；说得太像外人或太端着，就不可信。",
+      "desire_conflict": "想守住土地和长期劳作的节奏，又想让外面的人看见并理解这种生活；想把日子讲得轻松好笑，又不能回避农活的辛劳、等待和不确定。"
+    },
+    "directions": [
+      {
+        "id": "D-near",
+        "semantic_distance": "near",
+        "industry_role": "subject",
+        "content_subject": "果园一年四季的种植判断、一人经营的真实问题，以及水果如何被种出来。",
+        "association_path": [
+          "经营果园十五年",
+          "每天在果园完成具体农活",
+          "用方言短段子讲当天的种植观察",
+          "观众把这些判断与果园产品背后的人对应起来"
+        ],
+        "structure_mapping": [
+          {
+            "source_edge": "每天在同一果园完成具体农活",
+            "target_edge": "内容持续围绕同一果园的真实经营问题展开"
+          },
+          {
+            "source_edge": "本人愿意正脸出镜并持续拍摄",
+            "target_edge": "观众把账号中的脸、果园和未来果品稳定绑定"
+          }
+        ],
+        "audience_tension": "观众想买到可信、来路清楚的水果，但很难判断屏幕另一端的种植者是否真实、靠谱，也不理解农产品为什么会有价格和品相波动。",
+        "expression_mode": "以果园现场的短篇口头故事为主，讲当天修枝、疏果、看天气或收果时遇到的具体问题，用方言段子降低讲解感。",
+        "subject_ownership": "该方向直接依赖本人十五年的果园经营、本人正脸出镜，以及一人一机在本人果园的持续拍摄，不是任意解说号都能替代。",
+        "business_attribution": "内容长期展示同一张脸、同一片果园和同一套农活，未来观众看到果品时会归因给这个长期劳作的人。",
+        "evidence_refs": [
+          "f1",
+          "f3",
+          "f4",
+          "f5"
+        ],
+        "creative_assumptions": [
+          "假设本人能把十五年经验转化为清晰、可讲述的种植判断。",
+          "假设观众愿意持续观看果园日常，而不只是在购买时才关心。",
+          "假设果园场景能覆盖足够多的季节变化和经营事件。"
+        ]
+      },
+      {
+        "id": "D-mid",
+        "semantic_distance": "mid",
+        "industry_role": "metaphor",
+        "content_subject": "普通人在长期关系、机会和生活选择中的等待、取舍与分寸。",
+        "association_path": [
+          "果园劳作必须按节气等待",
+          "剪枝、疏果等动作意味着不能什么都留",
+          "农活中的分寸感",
+          "收工后和老人聊天听到的人情事理",
+          "用方言短段子讲成人的处境"
+        ],
+        "structure_mapping": [
+          {
+            "source_edge": "种果树要按节气等待，不能强行催熟",
+            "target_edge": "人在关系和选择中也需要等待，不能急着马上要结果"
+          },
+          {
+            "source_edge": "疏果、剪枝要去掉一部分，留下的才能长好",
+            "target_edge": "普通人面对机会、关系和精力也必须取舍，无法全部占有"
+          },
+          {
+            "source_edge": "长期劳作让人知道什么时候该管、什么时候该等",
+            "target_edge": "长期生活经验也让人理解关系中的分寸，不能只凭一时情绪"
+          }
+        ],
+        "audience_tension": "观众想同时留住所有关系、机会和可能性，又明白精力有限必须取舍；想立刻看到生活回报，又发现很多重要的事只能慢慢等。",
+        "expression_mode": "从一个真实农活动作或村里小段子开场，先讲果树，再自然落到人的选择；不直接讲大道理，保留方言和口头故事感。",
+        "subject_ownership": "果树的等待、剪枝和疏果来自本人十五年果园经验；人情素材来自收工后和村里老人聊天；讲述方式来自本人喜欢的方言短段子。",
+        "business_attribution": "账号人格始终是“种了十五年果子、会讲农活里的人情分寸”的人，未来水果不是硬广，而是这种长期生活视角自然结出的果实。",
+        "evidence_refs": [
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5"
+        ],
+        "creative_assumptions": [
+          "假设农活结构可以自然映射到观众的关系和选择，而不显生硬。",
+          "假设老人聊天中存在可公开、可迁移的人情观察。",
+          "假设观众愿意从一个果农的讲述中获得对自身生活的解释。"
+        ]
+      },
+      {
+        "id": "D-far",
+        "semantic_distance": "far",
+        "industry_role": "stage",
+        "content_subject": "正在退场的地方语言、长辈活法，以及普通人如何用笑话讲清时间在自己身上留下的选择。",
+        "association_path": [
+          "收工后和村里老人聊天",
+          "老人的话带着方言、旧经验和本村活法",
+          "本人把农活观察讲成方言短段子",
+          "用手机在果园这个固定现场持续记录",
+          "地方语言和人生经验被转译成可传播的故事"
+        ],
+        "structure_mapping": [
+          {
+            "source_edge": "收工后长期与村里老人聊天",
+            "target_edge": "在一个固定生活现场持续接触正在老去的一代，保存连续的人生经验，而不是一次性采访"
+          },
+          {
+            "source_edge": "把农活观察讲成带方言的短段子",
+            "target_edge": "把容易消失的地方语言和日常经验转译成可辨认、可传播的表达"
+          },
+          {
+            "source_edge": "果树一年一年重复生长、挂果、衰老",
+            "target_edge": "普通人的活法也在代际之间重复、变化和退场"
+          }
+        ],
+        "audience_tension": "观众在快速流动的生活里想留住长辈和乡土的经验，又不确定这些旧说法对今天还有什么用；想为普通生活留下解释，又害怕只是廉价怀旧。",
+        "expression_mode": "以一句方言、一个老人讲过的小故事或农活中的小观察开场，果园只是收工后讲话的现场；重点讲语言和活法，不教种果树。",
+        "subject_ownership": "该方向不依赖“果农专家”身份，而依赖本人长期在一处生活、收工后常和老人聊天、能用方言短段子表达，并愿意正脸持续讲述。",
+        "business_attribution": "未来产品归因不来自每条内容讲水果，而来自观众长期记住这张脸、这片果园和这种讲话方式，把果品视为这个人生活现场的一部分。",
+        "evidence_refs": [
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5"
+        ],
+        "creative_assumptions": [
+          "假设老人聊天中存在足够多具有普遍解释力的人生观察。",
+          "假设方言表达可以在保留地方感的同时被足够观众理解。",
+          "假设观众愿意持续观看不直接讲产品的人物故事。",
+          "假设长期记录不会因素材重复或村庄边界而难以为继。"
+        ]
+      }
+    ],
+    "recommendation": {
+      "selected_direction_ref": "D-mid",
+      "reason": "中距离路线保留了果园里可验证的动作结构，如等待、剪枝、疏果，同时把内容推进到观众正在面对的取舍、等待和关系分寸。它既能使用本人十五年劳作经验、老人聊天素材和方言短段子能力，也比远距离路线更容易把未来果品归因给这个长期在果园讲话的人。",
+      "tradeoff": "主动放弃远距离路线中更鲜明的方言、长辈和代际记录辨识度，也放弃近距离路线最直接的种植技术与购买信任建设。",
+      "why_not_near": "近距离路线虽最利于直接卖货，但内容主体容易停在果园经营和种植判断上，较难回应观众想从普通人处境中获得生活解释的假设；同时本轮选择策略也不要求停在最近距离。"
+    }
+  },
+  "mechanical_validation": {
+    "passed": false,
+    "issues": [
+      {
+        "code": "route.schema",
+        "path": "schema_version",
+        "message": "route schema version is invalid"
+      }
+    ]
+  },
+  "quality_verdict": "failed_before_story",
+  "observed_method_failure": [
+    "schema_version drifted despite explicit output contract",
+    "free-text subject ownership still strengthened operating duration into long-term residence",
+    "unprovided domain mechanics and audience beliefs remained mixed into declarative fields"
+  ],
+  "captured_at": "2026-08-04T08:20:11.878321+00:00"
+}

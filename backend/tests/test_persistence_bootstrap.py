@@ -48,7 +48,7 @@ from deerflow.persistence.migrations._helpers import _normalize_default
 asyncio_test = pytest.mark.asyncio
 
 
-HEAD = "0021_personal_ip_semantic_layer_retirement"
+HEAD = "0026_personal_ip_paid_call_submission_recovery"
 BASELINE = "0001_baseline"
 
 
@@ -139,6 +139,8 @@ async def test_empty_branch_creates_all_and_stamps_head(tmp_path: Path) -> None:
             "feedback",
             "personal_ip_accounts",
             "personal_ip_metric_observations",
+            "personal_ip_paid_call_scopes",
+            "personal_ip_paid_call_events",
             "personal_ip_platform_connections",
             "personal_ip_platform_credentials",
             "personal_ip_platform_oauth_states",

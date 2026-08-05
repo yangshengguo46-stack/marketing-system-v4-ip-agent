@@ -1,0 +1,34 @@
+{
+  "schema_version": "ip-agent-m2-method-experiment-spec-v1",
+  "experiment_id": "m2-e3-composite-method-v1",
+  "common_contract": {
+    "path": "product/research/ip-agent/m2/method-attribution/common-contract.md",
+    "sha256": "7724460a224337b6eea7f0be610f58b227de36e3e76ba93a62bc8f626451bcf8"
+  },
+  "placebo_method": {
+    "path": "product/research/ip-agent/m2/method-attribution/placebo-method.md",
+    "sha256": "a0c2a815d30654bcadb75a20e6e851f114a0c0fc28b154f448f3d3693014c188"
+  },
+  "treatment_parts": [
+    {
+      "path": "product/research/ip-agent/m2/method-attribution/composite-method.md",
+      "sha256": "74c10b517441e692d9baf24bb3ffab748604b51ca7ae9d19cd95816bc93a909c"
+    }
+  ],
+  "rubric": {
+    "path": "product/research/ip-agent/m2/method-attribution/rubric.json",
+    "sha256": "c74cb9af573f95824b75cb602f69561638c95efdb8ce5d332ae246fe9fcc1f96"
+  },
+  "source_skills": [
+    "ip-strategy-director",
+    "video-pattern-learning",
+    "engineer-audience-response",
+    "engineer-desire-behavior",
+    "write-ip-episode",
+    "write-scenes-dialogue"
+  ],
+  "thresholds": {
+    "treatment_total": 80,
+    "treatment_over_placebo": 15
+  }
+}

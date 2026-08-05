@@ -67,6 +67,7 @@ REQUIRED_PACKAGE_PATHS = (
     "frontend/pnpm-lock.yaml",
     "frontend/pnpm-workspace.yaml",
     "product/defaults/USER.md",
+    "product/defaults/product-runtime-profile.yaml",
     "product/defaults/agents/ip-agent/SOUL.md",
     "product/defaults/agents/ip-agent/config.yaml",
     "product/cinematic-ip/matrix.yaml",
@@ -176,6 +177,7 @@ REQUIRED_PACKAGE_PATHS = (
     "third_party/bytedance/UI-TARS-desktop/packages/ui-tars/action-parser/src/actionParser.ts",
     "third_party/bytedance/UI-TARS-desktop/packages/ui-tars/operators/nut-js/src/index.ts",
     "third_party/volcengine/mediakit-cli/go.mod",
+    "third_party/volcengine/mediakit-cli/VENDORED_VERSION.json",
     "third_party/volcengine/MineContext/VENDORED_VERSION.json",
     "third_party/volcengine/MineContext/LICENSE",
     "third_party/volcengine/MineContext/NOTICE",
@@ -236,9 +238,7 @@ def _tracked_files(root: Path) -> list[tuple[str, int]]:
         metadata, raw_path = record.split(b"\t", 1)
         mode_text, _object_id, stage = metadata.decode("ascii").split()
         if stage != "0":
-            raise RuntimeError(
-                "source package cannot be built with unresolved index stages"
-            )
+            raise RuntimeError("source package cannot be built with unresolved index stages")
         relative = os.fsdecode(raw_path)
         if mode_text not in {"100644", "100755"}:
             raise RuntimeError(f"unsupported tracked file mode {mode_text}: {relative}")
@@ -255,11 +255,7 @@ def _sha256(data: bytes) -> str:
 
 def _safe_archive_path(value: str) -> PurePosixPath:
     path = PurePosixPath(value)
-    if (
-        path.is_absolute()
-        or not path.parts
-        or any(part in {"", ".", ".."} for part in path.parts)
-    ):
+    if path.is_absolute() or not path.parts or any(part in {"", ".", ".."} for part in path.parts):
         raise RuntimeError(f"unsafe archive path: {value}")
     return path
 
@@ -267,13 +263,9 @@ def _safe_archive_path(value: str) -> PurePosixPath:
 def _assert_credential_free_path(relative: str) -> None:
     path = _safe_archive_path(relative)
     if any(part in FORBIDDEN_PARTS for part in path.parts):
-        raise RuntimeError(
-            f"forbidden local/runtime path in source package: {relative}"
-        )
+        raise RuntimeError(f"forbidden local/runtime path in source package: {relative}")
     if path.name.startswith(".env.") and path.name != ".env.example":
-        raise RuntimeError(
-            f"forbidden local/runtime path in source package: {relative}"
-        )
+        raise RuntimeError(f"forbidden local/runtime path in source package: {relative}")
     if len(path.parts) == 1 and path.name in RUNTIME_ROOT_FILES:
         raise RuntimeError(f"runtime config must not enter source package: {relative}")
     if path.name == "config.yaml" and str(path) not in SOURCE_CONFIG_PATHS:
@@ -311,29 +303,21 @@ def _manifest(
     }
 
 
-def build_source_package(
-    root: Path, output: Path, *, allow_dirty: bool = False
-) -> Path:
+def build_source_package(root: Path, output: Path, *, allow_dirty: bool = False) -> Path:
     root = root.resolve()
     output = output.resolve()
     if not allow_dirty:
         dirty = _git(root, "status", "--porcelain", "--untracked-files=no")
         if dirty:
-            raise RuntimeError(
-                "tracked worktree changes exist; commit them before building a release package"
-            )
+            raise RuntimeError("tracked worktree changes exist; commit them before building a release package")
     commit = _git(root, "rev-parse", "HEAD")
     short_commit = commit[:12]
     commit_timestamp = int(_git(root, "show", "-s", "--format=%ct", "HEAD"))
     prefix = f"ip-agent-source-{short_commit}"
     tracked = _tracked_files(root)
-    required_missing = sorted(
-        set(REQUIRED_PACKAGE_PATHS) - {relative for relative, _mode in tracked}
-    )
+    required_missing = sorted(set(REQUIRED_PACKAGE_PATHS) - {relative for relative, _mode in tracked})
     if required_missing:
-        raise RuntimeError(
-            f"required package paths are not tracked: {', '.join(required_missing)}"
-        )
+        raise RuntimeError(f"required package paths are not tracked: {', '.join(required_missing)}")
 
     file_entries: list[dict[str, Any]] = []
     payloads: list[tuple[str, int, bytes]] = []
@@ -366,12 +350,8 @@ def build_source_package(
     temporary = output.with_name(f".{output.name}.tmp")
     try:
         with temporary.open("wb") as raw_output:
-            with gzip.GzipFile(
-                filename="", mode="wb", fileobj=raw_output, mtime=commit_timestamp
-            ) as compressed:
-                with tarfile.open(
-                    fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT
-                ) as archive:
+            with gzip.GzipFile(filename="", mode="wb", fileobj=raw_output, mtime=commit_timestamp) as compressed:
+                with tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as archive:
                     for relative, mode, data in payloads:
                         info = tarfile.TarInfo(f"{prefix}/{relative}")
                         info.size = len(data)
@@ -395,9 +375,7 @@ def build_source_package(
     finally:
         temporary.unlink(missing_ok=True)
     digest = _sha256(output.read_bytes())
-    output.with_suffix(output.suffix + ".sha256").write_text(
-        f"{digest}  {output.name}\n", encoding="utf-8"
-    )
+    output.with_suffix(output.suffix + ".sha256").write_text(f"{digest}  {output.name}\n", encoding="utf-8")
     return output
 
 
@@ -412,22 +390,12 @@ def verify_source_package(archive_path: Path) -> dict[str, Any]:
                 raise RuntimeError(f"duplicate archive member: {member.name}")
             seen_names.add(member.name)
             if not member.isfile():
-                raise RuntimeError(
-                    f"source package contains a non-regular member: {member.name}"
-                )
+                raise RuntimeError(f"source package contains a non-regular member: {member.name}")
             if len(path.parts) < 2:
-                raise RuntimeError(
-                    f"source package member is outside its package root: {member.name}"
-                )
-        manifest_members = [
-            member
-            for member in members
-            if PurePosixPath(member.name).name == MANIFEST_NAME
-        ]
+                raise RuntimeError(f"source package member is outside its package root: {member.name}")
+        manifest_members = [member for member in members if PurePosixPath(member.name).name == MANIFEST_NAME]
         if len(manifest_members) != 1:
-            raise RuntimeError(
-                "source package must contain exactly one package manifest"
-            )
+            raise RuntimeError("source package must contain exactly one package manifest")
         manifest_file = archive.extractfile(manifest_members[0])
         if manifest_file is None:
             raise RuntimeError("package manifest cannot be read")
@@ -446,28 +414,18 @@ def verify_source_package(archive_path: Path) -> dict[str, Any]:
             expected[relative] = item
         required_missing = sorted(set(REQUIRED_PACKAGE_PATHS) - set(expected))
         if required_missing:
-            raise RuntimeError(
-                f"source package is incomplete: {', '.join(required_missing)}"
-            )
-        actual_names = {
-            member.name
-            for member in members
-            if member.name != f"{prefix}/{MANIFEST_NAME}"
-        }
+            raise RuntimeError(f"source package is incomplete: {', '.join(required_missing)}")
+        actual_names = {member.name for member in members if member.name != f"{prefix}/{MANIFEST_NAME}"}
         expected_names = {f"{prefix}/{relative}" for relative in expected}
         if actual_names != expected_names:
-            raise RuntimeError(
-                "archive members do not match the signed package manifest"
-            )
+            raise RuntimeError("archive members do not match the signed package manifest")
         for relative, item in expected.items():
             member = archive.getmember(f"{prefix}/{relative}")
             fileobj = archive.extractfile(member)
             if fileobj is None:
                 raise RuntimeError(f"package source cannot be read: {relative}")
             data = fileobj.read()
-            if len(data) != item.get("size_bytes") or _sha256(data) != item.get(
-                "sha256"
-            ):
+            if len(data) != item.get("size_bytes") or _sha256(data) != item.get("sha256"):
                 raise RuntimeError(f"package checksum mismatch: {relative}")
             if f"{member.mode & 0o777:04o}" != item.get("mode"):
                 raise RuntimeError(f"package mode mismatch: {relative}")
@@ -502,17 +460,10 @@ def smoke_test_source_package(archive_path: Path) -> None:
         required_installed = (
             state_dir / "USER.md",
             state_dir / "users" / "package-smoke" / "agents" / "ip-agent" / "SOUL.md",
-            state_dir
-            / "users"
-            / "package-smoke"
-            / "agents"
-            / "ip-agent"
-            / "config.yaml",
+            state_dir / "users" / "package-smoke" / "agents" / "ip-agent" / "config.yaml",
         )
         if not all(path.is_file() for path in required_installed):
-            raise RuntimeError(
-                "extracted package could not install the default IP Agent profile"
-            )
+            raise RuntimeError("extracted package could not install the default IP Agent profile")
         subprocess.run(
             [
                 sys.executable,
@@ -520,23 +471,8 @@ def smoke_test_source_package(archive_path: Path) -> None:
                 "compileall",
                 "-q",
                 str(root / "scripts"),
-                str(
-                    root
-                    / "backend"
-                    / "packages"
-                    / "harness"
-                    / "deerflow"
-                    / "personal_ip"
-                ),
-                str(
-                    root
-                    / "backend"
-                    / "packages"
-                    / "harness"
-                    / "deerflow"
-                    / "community"
-                    / "ui_tars"
-                ),
+                str(root / "backend" / "packages" / "harness" / "deerflow" / "personal_ip"),
+                str(root / "backend" / "packages" / "harness" / "deerflow" / "community" / "ui_tars"),
                 str(root / "skills" / "public" / "volcengine-stack" / "scripts"),
             ],
             cwd=root,

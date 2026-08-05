@@ -1,0 +1,69 @@
+{
+  "schema_version": "ip-agent-m2-semantic-bridge-v2",
+  "purpose": "把封存证据转成可追溯的机制解释、目标语义疆域、远距离结构映射和创作产物。",
+  "contexts": {
+    "identity": "只拥有用户明示事实、IP 主体与目标。",
+    "benchmark": "只拥有来源观察、覆盖范围与可纠正的机制解释。",
+    "creative": "只拥有语义桥接、创作假设、IP 方向与成稿。"
+  },
+  "claim_kinds": [
+    "observation",
+    "interpretation",
+    "creative_leap",
+    "unknown"
+  ],
+  "benchmark_layers": [
+    "attention_and_meaning_mechanism",
+    "business_identity_carrier",
+    "unproven_conversion_path"
+  ],
+  "semantic_kernel": {
+    "required_fields": [
+      "head_concept",
+      "human_or_social_action",
+      "participant_roles",
+      "relationship_tensions",
+      "stakes"
+    ]
+  },
+  "ip_carrier_roles": [
+    "account_identity",
+    "semantic_source",
+    "story_world",
+    "plot_instrument",
+    "choice",
+    "evidence",
+    "consequence"
+  ],
+  "structural_candidate": {
+    "required_fields": [
+      "social_domain",
+      "source_roles",
+      "source_relations",
+      "target_roles",
+      "target_relations",
+      "preserved_structure",
+      "replaced_surface_elements",
+      "ip_carrier_role",
+      "causal_premise"
+    ]
+  },
+  "selection_tests": [
+    "structural_fit",
+    "semantic_distance",
+    "relationship_tension",
+    "ip_territory_recognizability",
+    "shootability"
+  ],
+  "invariants": [
+    "事实、解释、创作跳跃和未知必须分层，下游不得把后三者改写成来源事实。",
+    "未观察的模态不得产生确定性结论，可观察结果不得被宣称为已证明的原因。",
+    "对标的内容机制、商业身份承载和实际转化必须分开；内容与商品表面分离不能自动判为缺陷。",
+    "目标概念必须先被还原为语义中心，再连接到人的行动、角色、关系、欲望、选择和代价。",
+    "至少形成三个处于不同社会系统的结构候选；第一联想只作基线，不得未经比较直接成为答案。",
+    "远距离迁移只保留角色功能和因果关系，必须替换具体人物、场景、台词、音乐、视觉身份与受保护表达。",
+    "必须明确 IP 主体在本集承担哪一种载体角色；当它只承担账号身份或语义来源时，不得为了露出而把商品硬塞进剧情。",
+    "不可替代性判断的是作品是否仍属于同一 IP 语义疆域，不是每一集是否必须展示实物。",
+    "最终只交付一份连贯方案，不展示私有工作集、候选表或方法编排。"
+  ]
+}

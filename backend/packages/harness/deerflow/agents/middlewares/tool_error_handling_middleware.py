@@ -18,15 +18,18 @@ from deerflow.agents.middlewares.skill_context import (
 )
 from deerflow.agents.middlewares.tool_result_meta import (
     normalize_tool_result,
+    stamp_declared_result_outcome,
     stamp_exception_meta,
 )
 from deerflow.config.app_config import AppConfig
 from deerflow.config.summarization_config import DEFAULT_SKILL_FILE_READ_TOOL_NAMES
 from deerflow.constants import DEFAULT_SKILLS_CONTAINER_PATH
+from deerflow.mcp.result_metadata import McpToolResultError
 from deerflow.subagents.status_contract import (
     format_subagent_result_message,
     make_subagent_additional_kwargs,
 )
+from deerflow.tools.result_policy import get_tool_result_policy
 
 if TYPE_CHECKING:
     from deerflow.tools.builtins.tool_search import DeferredToolSetup
@@ -79,6 +82,8 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
             name=tool_name,
             status="error",
         )
+        if isinstance(exc, McpToolResultError):
+            message.artifact = exc.artifact
         # This middleware is the producer for exception wrappers, so task
         # failures raised before task_tool can build its own Command still
         # carry the same structured metadata.
@@ -116,7 +121,15 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         if not isinstance(result, ToolMessage):
             return result
         tool_name = str(request.tool_call.get("name") or "")
-        return self._stamp_skill_read_metadata(result, request, tool_name=tool_name)
+        result = self._stamp_skill_read_metadata(
+            result,
+            request,
+            tool_name=tool_name,
+        )
+        policy = get_tool_result_policy(getattr(request, "tool", None))
+        if policy is not None:
+            result = stamp_declared_result_outcome(result, policy)
+        return result
 
     @override
     def wrap_tool_call(

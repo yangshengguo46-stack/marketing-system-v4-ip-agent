@@ -34,7 +34,7 @@ MINECONTEXT_UPSTREAM_COMMIT = "171c7a9ea8091e326ddcf0f10718aa1b58c83c65"
 MINECONTEXT_UPSTREAM_RELATIVE_PATH = Path("third_party/volcengine/MineContext")
 MINECONTEXT_EVIDENCE_SCHEMA_VERSION = "personal-ip-local-context-evidence-v1"
 MINECONTEXT_CONSENT_SCHEMA_VERSION = "personal-ip-local-context-consent-v1"
-MINECONTEXT_DEFAULT_PROFILE_VERSION = "personal-ip-default-on-v1"
+MINECONTEXT_BOUNDED_SCREEN_PROFILE_VERSION = "personal-ip-explicit-bounded-screen-v2"
 
 MineContextScope = Literal["screen", "files", "people", "projects", "work_activity"]
 MineContextPurpose = Literal[
@@ -327,10 +327,13 @@ class MineContextService:
         self._lock = threading.RLock()
 
     def _owner_root(self, owner_user_id: str) -> Path:
-        root = self.paths.user_dir(owner_user_id) / "minecontext"
-        root.mkdir(parents=True, exist_ok=True)
-        root.chmod(0o700)
-        return root
+        """Return the owner path without creating it.
+
+        Read paths, especially the public status GET, must not create owner
+        state. Write helpers create and chmod their exact parent when needed.
+        """
+
+        return self.paths.user_dir(owner_user_id) / "minecontext"
 
     def _consent_path(self, owner_user_id: str) -> Path:
         return self._owner_root(owner_user_id) / "consent.json"
@@ -361,17 +364,18 @@ class MineContextService:
         value = self._read_json(self._consent_path(owner_user_id), None)
         return value if isinstance(value, dict) else None
 
-    def _default_consent(self) -> MineContextConsent:
+    def _default_consent(self, *, continuous_screen_capture_confirmed: bool = False) -> MineContextConsent:
+        collection_mode: Literal["manual", "bounded_continuous"] = "bounded_continuous" if continuous_screen_capture_confirmed else "manual"
         return MineContextConsent(
             scopes=list(DEFAULT_MINECONTEXT_SCOPES),
             purposes=list(DEFAULT_MINECONTEXT_PURPOSES),
             retention_days=self.config.default_retention_days,
-            collection_mode="bounded_continuous",
+            collection_mode=collection_mode,
             watched_paths=[],
             recursive_file_watch=False,
-            screen_targets=["all_displays"],
+            screen_targets=["all_displays"] if continuous_screen_capture_confirmed else [],
             screen_capture_interval_seconds=self.config.min_screen_interval_seconds,
-            continuous_screen_capture_confirmed=True,
+            continuous_screen_capture_confirmed=continuous_screen_capture_confirmed,
         )
 
     def enable_default(
@@ -380,38 +384,44 @@ class MineContextService:
         *,
         retention_days: int | None = None,
         preserve_existing_paths: bool = True,
+        continuous_screen_capture_confirmed: bool,
     ) -> dict[str, Any]:
-        """Apply the product default and start it, including after owner opt-out."""
+        """Apply the bounded profile after an explicit owner confirmation."""
+
+        if not continuous_screen_capture_confirmed:
+            raise ValueError("explicit screen capture confirmation is required")
 
         consent = self._read_consent(owner_user_id)
-        default_consent = self._default_consent()
+        default_consent = self._default_consent(continuous_screen_capture_confirmed=True)
         default_consent.retention_days = int(retention_days if retention_days is not None else (consent or {}).get("retention_days", self.config.default_retention_days))
         if consent is not None and preserve_existing_paths:
             default_consent.watched_paths = list(consent.get("watched_paths", []))
             default_consent.recursive_file_watch = bool(consent.get("recursive_file_watch", False))
         self.authorize(owner_user_id, default_consent)
         migrated = self._read_consent(owner_user_id) or {}
-        migrated["default_profile_version"] = MINECONTEXT_DEFAULT_PROFILE_VERSION
+        migrated["default_profile_version"] = MINECONTEXT_BOUNDED_SCREEN_PROFILE_VERSION
         self._write_json(self._consent_path(owner_user_id), migrated)
         return self.start(owner_user_id)
 
     def ensure_default(self, owner_user_id: str, *, strict: bool = False) -> dict[str, Any]:
-        """Start the bundled default for a new owner without overriding opt-out."""
+        """Resume an already authorized owner without creating consent.
+
+        This compatibility entry point is used by explicit evidence operations.
+        It must never authorize a new owner or change an existing consent mode.
+        """
 
         current = self.status(owner_user_id)
-        if not self.config.enabled or not self.config.auto_enable_new_owners:
+        if not self.config.enabled:
             return current
         consent = self._read_consent(owner_user_id)
-        if consent is not None and not consent.get("active"):
+        if consent is None or not consent.get("active"):
             return current
         if not current["available"]:
             return current
         try:
-            if consent is None or consent.get("default_profile_version") != MINECONTEXT_DEFAULT_PROFILE_VERSION:
-                return self.enable_default(owner_user_id)
-            if not self.status(owner_user_id)["running"]:
+            if not current["running"]:
                 return self.start(owner_user_id)
-            return self.status(owner_user_id)
+            return current
         except (PermissionError, RuntimeError, ValueError) as exc:
             if strict:
                 raise
@@ -456,11 +466,8 @@ class MineContextService:
     def status(self, owner_user_id: str) -> dict[str, Any]:
         with self._lock:
             consent = self._read_consent(owner_user_id)
-            self._prune(owner_user_id, consent=consent)
             session = self._sessions.get(owner_user_id)
             running = bool(session and session["process"].poll() is None)
-            if session and not running:
-                self._sessions.pop(owner_user_id, None)
             evidence = self._read_json(self._evidence_path(owner_user_id), [])
         source_verified = False
         source_error: str | None = None
@@ -829,7 +836,7 @@ class MineContextService:
             disabled.update(
                 {
                     "schema_version": MINECONTEXT_CONSENT_SCHEMA_VERSION,
-                    "default_profile_version": MINECONTEXT_DEFAULT_PROFILE_VERSION,
+                    "default_profile_version": MINECONTEXT_BOUNDED_SCREEN_PROFILE_VERSION,
                     "active": False,
                     "authorized_at": None,
                     "revoked_at": _iso(_utc_now()),

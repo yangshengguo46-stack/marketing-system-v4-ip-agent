@@ -1,0 +1,129 @@
+{
+  "schema_version": "ip-director-loop-scenario-suite-v1",
+  "runtime_status": "research_quarantined",
+  "purpose": "编导小循环的跨品类固定研究样本；不得进入运行提示或默认 Agent。",
+  "active_case_id": "DL1-fruit-grower-longterm",
+  "cases": [
+    {
+      "schema_version": "ip-director-loop-brief-v1",
+      "runtime_status": "research_quarantined",
+      "research_fixture": true,
+      "case_id": "DL1-fruit-grower-longterm",
+      "subject": {
+        "kind": "person",
+        "description": "一名经营果园十五年的河南果农"
+      },
+      "facts": [
+        {"id": "f1", "statement": "本人经营果园十五年"},
+        {"id": "f2", "statement": "本人常在收工后和村里老人聊天"},
+        {"id": "f3", "statement": "本人喜欢把农活观察讲成带方言的短段子"},
+        {"id": "f4", "statement": "本人愿意正脸出镜"},
+        {"id": "f5", "statement": "当前只能由本人用一部手机在果园持续拍摄"}
+      ],
+      "objective": ["长期建立属于本人的账号影响力", "未来可以让观众把果园产品归因给本人"],
+      "audience_hypotheses": [
+        "可能有人想从普通人的处境中获得对选择、关系和生活的解释",
+        "可能有人愿意转发能替自己说出生活感受的内容"
+      ],
+      "production_constraints": ["一人一机", "主要在果园取景", "可以口头表达但没有演员团队"],
+      "surface_terms": ["果农", "果园", "水果"],
+      "commercial_object_terms": ["水果", "桃子", "果品"],
+      "selection_policy": {"allowed_distances": ["mid", "far"], "required_mode": "story"}
+    },
+    {
+      "schema_version": "ip-director-loop-brief-v1",
+      "runtime_status": "research_quarantined",
+      "research_fixture": true,
+      "case_id": "DL2-gift-category",
+      "subject": {"kind": "product", "description": "一个黄金礼品业务"},
+      "facts": [
+        {"id": "f1", "statement": "业务类别是黄金礼品"},
+        {"id": "f2", "statement": "经营目标是获得礼品方案咨询"},
+        {"id": "f3", "statement": "当前没有提供经营者经历、客户案例或价格信息"}
+      ],
+      "objective": ["建立不依赖产品硬露出的内容方向", "通过内容获得方案咨询"],
+      "audience_hypotheses": ["可能有人在关系表达、礼数和边界之间感到为难"],
+      "production_constraints": ["允许使用明确标注的虚构人物", "不把虚构故事冒充客户案例"],
+      "surface_terms": ["黄金", "礼品"],
+      "commercial_object_terms": ["黄金", "礼品", "礼物", "首饰"],
+      "selection_policy": {"allowed_distances": ["mid", "far"], "required_mode": "story"}
+    },
+    {
+      "schema_version": "ip-director-loop-brief-v1",
+      "runtime_status": "research_quarantined",
+      "research_fixture": true,
+      "case_id": "DL3-stage-role",
+      "subject": {"kind": "person", "description": "一名当前在照顾幼儿、过去做过地下乐队鼓手的人"},
+      "facts": [
+        {"id": "f1", "statement": "本人当前承担照料幼儿的角色"},
+        {"id": "f2", "statement": "本人过去是地下乐队鼓手"},
+        {"id": "f3", "statement": "本人明确希望一年内重新登台"},
+        {"id": "f4", "statement": "本人不展示孩子和伴侣"},
+        {"id": "f5", "statement": "本人有镜头恐惧但可以录声音和手部"}
+      ],
+      "objective": ["长期记录重新登台的过程", "让观众记住本人而不是阶段身份"],
+      "audience_hypotheses": ["可能有人正在处理责任与个人愿望之间的冲突"],
+      "production_constraints": ["不展示家人", "以声音、手部和行动物证为主"],
+      "surface_terms": ["照料幼儿", "鼓手", "重新登台"],
+      "commercial_object_terms": [],
+      "selection_policy": {"allowed_distances": ["mid", "far"], "required_mode": "story"}
+    },
+    {
+      "schema_version": "ip-director-loop-brief-v1",
+      "runtime_status": "research_quarantined",
+      "research_fixture": true,
+      "case_id": "DL4-ktv-organization",
+      "subject": {"kind": "organization", "description": "一家县城 KTV"},
+      "facts": [
+        {"id": "f1", "statement": "经营场所是一家县城 KTV"},
+        {"id": "f2", "statement": "场所每天会接触不同年龄和关系的人群"},
+        {"id": "f3", "statement": "员工愿意出演虚构短剧情"},
+        {"id": "f4", "statement": "目标是建立长期品牌记忆并带来到店"}
+      ],
+      "objective": ["让观众记住一个属于该场所的社会关系世界", "形成长期品牌归因"],
+      "audience_hypotheses": ["可能有人把唱歌场所当作表达、重逢、告别或恢复身份的空间"],
+      "production_constraints": ["可在非营业高峰使用包厢", "固定演员只能来自少量员工"],
+      "surface_terms": ["KTV", "唱歌", "包厢"],
+      "commercial_object_terms": ["套餐", "酒水", "包厢消费"],
+      "selection_policy": {"allowed_distances": ["mid", "far"], "required_mode": "story"}
+    },
+    {
+      "schema_version": "ip-director-loop-brief-v1",
+      "runtime_status": "research_quarantined",
+      "research_fixture": true,
+      "case_id": "DL5-neighborhood-shop-owner",
+      "subject": {"kind": "person", "description": "一名在居民楼下经营烟酒店的老板娘"},
+      "facts": [
+        {"id": "f1", "statement": "本人在同一片居民区经营烟酒店十年"},
+        {"id": "f2", "statement": "本人每天会遇到熟客、送货员和附近住户"},
+        {"id": "f3", "statement": "本人说话直接，愿意面对镜头讲述但不愿演哭戏"},
+        {"id": "f4", "statement": "目标是建立个人影响力并让附近顾客记住小店"}
+      ],
+      "objective": ["建立不局限于商品介绍的个人内容方向", "让人物记忆能够归因到小店"],
+      "audience_hypotheses": ["可能有人愿意看社区关系、人情边界和普通人的直接判断"],
+      "production_constraints": ["主要在小店拍摄", "可以本人出镜", "不安排强煽情表演"],
+      "surface_terms": ["烟酒店", "老板娘", "社区小店"],
+      "commercial_object_terms": ["烟", "酒", "商品"],
+      "selection_policy": {"allowed_distances": ["mid", "far"], "required_mode": "story"}
+    },
+    {
+      "schema_version": "ip-director-loop-brief-v1",
+      "runtime_status": "research_quarantined",
+      "research_fixture": true,
+      "case_id": "DL6-county-hotpot",
+      "subject": {"kind": "brand", "description": "一家县城火锅店品牌"},
+      "facts": [
+        {"id": "f1", "statement": "品牌经营一家县城火锅店"},
+        {"id": "f2", "statement": "店里有固定店长和三名愿意出镜的员工"},
+        {"id": "f3", "statement": "店内高频出现家庭聚会、同学聚会和同事聚餐"},
+        {"id": "f4", "statement": "目标是形成长期品牌影响力并带来到店"}
+      ],
+      "objective": ["建立能持续发生事件的品牌内容世界", "让内容归因到火锅店品牌"],
+      "audience_hypotheses": ["可能有人关心饭桌上的关系变化、体面、和解和立场表达"],
+      "production_constraints": ["固定场景为店内", "演员以店长和三名员工为主", "顾客未经同意不出镜"],
+      "surface_terms": ["火锅店", "饭桌", "聚餐"],
+      "commercial_object_terms": ["火锅", "锅底", "菜品"],
+      "selection_policy": {"allowed_distances": ["mid", "far"], "required_mode": "story"}
+    }
+  ]
+}

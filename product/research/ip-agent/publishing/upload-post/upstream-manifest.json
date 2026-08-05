@@ -1,0 +1,54 @@
+{
+  "schema_version": "ip-agent-upstream-research-manifest-v1",
+  "audited_at": "2026-08-04T00:00:00+08:00",
+  "runtime_status": "research_quarantined",
+  "moneyprinterturbo": {
+    "repository": "https://github.com/harry0703/MoneyPrinterTurbo",
+    "commit": "254cd028906ee657eab844dc94087cdbea2a7aa8",
+    "license": "MIT",
+    "files": [
+      {
+        "path": "app/services/upload_post.py",
+        "sha256": "8d5d74ed2d03e7c6e40376d2a6f05d2cf6bc2a4de8830cd3be10637b3cab99d6"
+      },
+      {
+        "path": "app/services/task.py",
+        "sha256": "dea37202b816970178ccb927feb5f02d1c1175a03c5d08a565d4993241030d7a"
+      },
+      {
+        "path": "test/services/test_upload_post.py",
+        "sha256": "b690fe02a202b4cbed2a21dd8ae809e039a893d780f48012672b1baca35f291c"
+      },
+      {
+        "path": "config.example.toml",
+        "sha256": "6725955c5f0f688b1e3eeedb995932120440412b0450fdddcdf89c69fa0a7827"
+      }
+    ]
+  },
+  "upload_post_mcp": {
+    "repository": "https://github.com/Upload-Post/upload-post-mcp",
+    "commit": "80e2bdc6a372d4fb57cab6f264550f1c3a5dd25b",
+    "npm_package": "@upload-post/mcp",
+    "npm_version": "0.6.1",
+    "license": "MIT",
+    "package_tarball_sha256": "85f7646ec09c49a969eaac9c31b2d5b6e757f9e6e62598756bc859c9bd109358",
+    "files": [
+      {
+        "path": "dist/tools/upload.js",
+        "sha256": "1a76dcb33b210c33d0336143fff7a63324c0f6376a96d6b1722ac3f1c588220f"
+      },
+      {
+        "path": "dist/tools/status.js",
+        "sha256": "d2e83cc3dde9d8a778e6a90cd231aed35af125379a38cb1e289c939c58101838"
+      },
+      {
+        "path": "dist/tools/posts.js",
+        "sha256": "f23b693d2acf2c27006508236eeb553b3e1ed3eeac471bc1646e1e39e8f7a5fb"
+      },
+      {
+        "path": "package.json",
+        "sha256": "9bca3c977c9f40bbf4d87176d63a4b4f711440893fb3d3e4a95515bc5c8f06dd"
+      }
+    ]
+  }
+}

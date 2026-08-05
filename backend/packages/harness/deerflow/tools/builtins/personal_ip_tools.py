@@ -166,8 +166,9 @@ async def _personal_ip_begin_video_production(
         source: Immutable source snapshot, such as an idea, brief or full script.
         delivery_spec: Aspect ratios, durations, languages and target deliverables.
         provider_policy: Preferred models/providers and allowed fallbacks.
-        budget: Immutable currency, hard_limit and paid-call approval policy.
-            It may be empty only for a free-only production; paid provider
+        budget: Immutable currency and hard_limit. Paid-call approval is a
+            server policy and cannot be disabled by this argument. The object
+            may be empty only for a free-only production; paid provider
             submission requires an enforceable hard_limit.
         production_mode: faceless_material for Personal-IP material videos, or generative_cinematic for films and ads.
 
@@ -216,8 +217,7 @@ async def _personal_ip_reserve_video_budget(
 
     Call this before any paid image, video, speech or cloud-processing request.
     The server serializes concurrent reservations against the production's
-    immutable hard limit. When the production requires explicit approval,
-    approval_event_key must identify the human-approved paid-provider review
+    immutable hard limit. approval_event_key must identify the human-approved paid-provider review
     whose budget request exactly matches this reservation. Every retry needs a
     new reservation_key and reservation.
 
@@ -230,7 +230,7 @@ async def _personal_ip_reserve_video_budget(
         entity_id: Stable target entity id.
         maximum_amount: Hard maximum this call may consume, in the budget currency.
         currency: Currency matching the immutable production budget.
-        approval_event_key: Approved paid-provider review event key, or empty only when approval is disabled.
+        approval_event_key: Approved paid-provider review event key. It cannot be empty for a paid call.
         request_ref: Credential-free immutable request or shot reference.
 
     Returns:

@@ -124,27 +124,38 @@ def test_manual_mode_never_enables_screenshot_or_file_capture(tmp_path: Path) ->
     assert generated["web"]["host"] == "127.0.0.1"
 
 
-def test_new_owner_is_authorized_and_started_with_default_screen_context(
+def test_new_owner_status_is_read_only_and_does_not_create_owner_state(
+    tmp_path: Path,
+) -> None:
+    launched: list[dict] = []
+    service = _service(tmp_path, enabled=True, launched=launched)
+    owner_root = tmp_path / "users" / "owner-a" / "minecontext"
+
+    status = service.status("owner-a")
+
+    assert status["authorized"] is False
+    assert status["running"] is False
+    assert status["scopes"] == []
+    assert status["purposes"] == []
+    assert launched == []
+    assert not owner_root.exists()
+
+
+def test_explicit_default_enablement_requires_screen_capture_confirmation(
     tmp_path: Path,
 ) -> None:
     launched: list[dict] = []
     service = _service(tmp_path, enabled=True, launched=launched)
 
-    status = service.ensure_default("owner-a", strict=True)
+    with pytest.raises(ValueError, match="explicit screen capture confirmation"):
+        service.enable_default("owner-a", continuous_screen_capture_confirmed=False)
+
+    status = service.enable_default("owner-a", continuous_screen_capture_confirmed=True)
 
     assert status["authorized"] is True
     assert status["running"] is True
-    assert status["scopes"] == [
-        "screen",
-        "files",
-        "people",
-        "projects",
-        "work_activity",
-    ]
-    assert status["purposes"] == [
-        "persona_modeling",
-        "audience_modeling",
-    ]
+    assert status["scopes"] == ["screen", "files", "people", "projects", "work_activity"]
+    assert status["purposes"] == ["persona_modeling", "audience_modeling"]
     generated = yaml.safe_load(Path(launched[0]["command"][5]).read_text(encoding="utf-8"))
     assert generated["capture"]["screenshot"]["enabled"] is True
     assert generated["capture"]["folder_monitor"]["enabled"] is False
@@ -152,7 +163,7 @@ def test_new_owner_is_authorized_and_started_with_default_screen_context(
     assert generated["embedding_model"]["provider"] == "doubao"
 
 
-def test_existing_active_consent_is_migrated_to_default_on_profile(tmp_path: Path) -> None:
+def test_existing_active_consent_is_resumed_without_changing_scope(tmp_path: Path) -> None:
     launched: list[dict] = []
     service = _service(tmp_path, enabled=True, launched=launched)
     service.authorize("owner-a", _manual_consent(retention_days=14))
@@ -160,16 +171,16 @@ def test_existing_active_consent_is_migrated_to_default_on_profile(tmp_path: Pat
     status = service.ensure_default("owner-a", strict=True)
 
     assert status["running"] is True
-    assert status["collection_mode"] == "bounded_continuous"
+    assert status["collection_mode"] == "manual"
     assert status["retention_days"] == 14
     generated = yaml.safe_load(Path(launched[0]["command"][5]).read_text(encoding="utf-8"))
-    assert generated["capture"]["screenshot"]["enabled"] is True
+    assert generated["capture"]["screenshot"]["enabled"] is False
 
 
 def test_owner_opt_out_is_not_automatically_restarted(tmp_path: Path) -> None:
     launched: list[dict] = []
     service = _service(tmp_path, enabled=True, launched=launched)
-    service.ensure_default("owner-a", strict=True)
+    service.enable_default("owner-a", continuous_screen_capture_confirmed=True)
     service.revoke("owner-a")
 
     status = service.ensure_default("owner-a", strict=True)
@@ -182,7 +193,7 @@ def test_owner_opt_out_is_not_automatically_restarted(tmp_path: Path) -> None:
 def test_clear_all_preserves_default_off_preference(tmp_path: Path) -> None:
     launched: list[dict] = []
     service = _service(tmp_path, enabled=True, launched=launched)
-    service.ensure_default("owner-a", strict=True)
+    service.enable_default("owner-a", continuous_screen_capture_confirmed=True)
     service.clear("owner-a", scope="all")
 
     status = service.ensure_default("owner-a", strict=True)

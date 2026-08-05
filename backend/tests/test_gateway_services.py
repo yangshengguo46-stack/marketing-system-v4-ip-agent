@@ -434,19 +434,17 @@ def test_build_run_config_none_assistant_id_no_agent_name():
     assert "run_name" not in config
 
 
-def test_build_run_config_explicit_agent_name_not_overwritten():
-    """An explicit configurable['agent_name'] in the request must take precedence."""
+def test_build_run_config_rejects_configurable_agent_name_conflict():
+    """One request must not carry two conflicting runtime identities."""
     from app.gateway.services import build_run_config
 
-    config = build_run_config(
-        "thread-1",
-        {"configurable": {"agent_name": "explicit-agent"}},
-        None,
-        assistant_id="other-agent",
-    )
-    assert config["configurable"]["agent_name"] == "explicit-agent"
-    assert config["context"]["agent_name"] == "explicit-agent"
-    assert config["run_name"] == "explicit-agent"
+    with pytest.raises(ValueError, match="Conflicting agent identities"):
+        build_run_config(
+            "thread-1",
+            {"configurable": {"agent_name": "explicit-agent"}},
+            None,
+            assistant_id="other-agent",
+        )
 
 
 def test_build_run_config_context_custom_agent_injects_agent_name():
@@ -494,40 +492,235 @@ def test_build_run_config_configurable_custom_agent_dual_writes_agent_name():
     assert config["context"]["agent_name"] == "finalis"
 
 
-def test_build_run_config_context_explicit_agent_name_not_overwritten():
-    """An explicit ``context['agent_name']`` from the request must take
-    precedence over the value derived from ``assistant_id`` and be mirrored
-    to ``configurable`` so the two containers never diverge.
-    """
+def test_build_run_config_rejects_context_agent_name_conflict():
+    """A context alias cannot silently override the explicit assistant."""
     from app.gateway.services import build_run_config
 
-    config = build_run_config(
-        "thread-1",
-        {"context": {"agent_name": "explicit-agent"}},
-        None,
-        assistant_id="other-agent",
+    with pytest.raises(ValueError, match="Conflicting agent identities"):
+        build_run_config(
+            "thread-1",
+            {"context": {"agent_name": "explicit-agent"}},
+            None,
+            assistant_id="other-agent",
+        )
+
+
+def test_resolve_effective_assistant_id_promotes_one_legacy_agent_name():
+    """An omitted assistant_id keeps one bounded legacy compatibility path."""
+    from app.gateway.services import resolve_effective_assistant_id
+
+    assert (
+        resolve_effective_assistant_id(
+            None,
+            request_config=None,
+            request_context={"agent_name": "Legacy_Agent"},
+        )
+        == "legacy-agent"
     )
 
-    assert config["context"]["agent_name"] == "explicit-agent"
-    assert config["configurable"]["agent_name"] == "explicit-agent"
-    assert config["run_name"] == "explicit-agent"
+
+def test_resolve_effective_assistant_id_keeps_bootstrap_target_separate():
+    """Agent creation runs as lead_agent; agent_name remains an operation target."""
+    from app.gateway.services import resolve_effective_assistant_id
+
+    assert (
+        resolve_effective_assistant_id(
+            "lead_agent",
+            request_config=None,
+            request_context={"is_bootstrap": True, "agent_name": "new-agent"},
+        )
+        == "lead_agent"
+    )
 
 
-def test_build_run_config_dual_write_matches_merge_run_context_overrides_shape():
-    """The shape produced by ``build_run_config`` for a custom agent must be
-    indistinguishable from what ``merge_run_context_overrides`` would produce
-    when ``agent_name`` is supplied via ``body.context`` — guarding against
-    the two code paths drifting apart again (issue #3549).
-    """
-    from app.gateway.services import build_run_config, merge_run_context_overrides
+def test_start_run_persists_and_executes_one_effective_assistant(_stub_app_config):
+    """RunRow, ThreadMeta and RunnableConfig must identify the same Agent."""
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import patch
 
-    via_assistant_id = build_run_config("thread-1", None, None, assistant_id="finalis")
+    from langgraph.checkpoint.memory import InMemorySaver
+    from langgraph.store.memory import InMemoryStore
 
-    via_context = build_run_config("thread-1", None, None)
-    merge_run_context_overrides(via_context, {"agent_name": "finalis"})
+    from app.gateway.routers.thread_runs import RunCreateRequest
+    from app.gateway.services import start_run
+    from deerflow.persistence.thread_meta.memory import MemoryThreadMetaStore
+    from deerflow.runtime import RunManager
+    from deerflow.runtime.runs.store.memory import MemoryRunStore
 
-    assert via_assistant_id["configurable"]["agent_name"] == via_context["configurable"]["agent_name"]
-    assert via_assistant_id["context"]["agent_name"] == via_context["context"]["agent_name"]
+    async def _scenario():
+        run_store = MemoryRunStore()
+        thread_store = MemoryThreadMetaStore(InMemoryStore())
+        await thread_store.create(
+            "identity-thread",
+            assistant_id="lead_agent",
+            user_id=None,
+        )
+        run_manager = RunManager(store=run_store)
+        state = SimpleNamespace(
+            stream_bridge=SimpleNamespace(),
+            run_manager=run_manager,
+            checkpointer=InMemorySaver(),
+            store=InMemoryStore(),
+            run_event_store=SimpleNamespace(),
+            run_events_config=None,
+            thread_store=thread_store,
+        )
+        request = SimpleNamespace(
+            headers={},
+            state=SimpleNamespace(auth_source=None),
+            app=SimpleNamespace(state=state),
+        )
+        body = RunCreateRequest(
+            assistant_id="IP_AGENT",
+            input={"messages": [{"role": "human", "content": "hi"}]},
+            config={"context": {"agent_name": "ip-agent"}},
+            context={"agent_name": "ip-agent"},
+        )
+        captured: dict[str, object] = {}
+
+        async def fake_run_agent(*args, **kwargs):
+            captured["config"] = kwargs["config"]
+
+        with (
+            patch("app.gateway.services.resolve_agent_factory", return_value=object()),
+            patch("app.gateway.services.run_agent", side_effect=fake_run_agent),
+        ):
+            record = await start_run(body, "identity-thread", request)
+            await record.task
+
+        return (
+            await run_store.get(record.run_id),
+            await thread_store.get("identity-thread", user_id=None),
+            captured["config"],
+        )
+
+    run_row, thread_row, config = asyncio.run(_scenario())
+
+    assert run_row["assistant_id"] == "ip-agent"
+    assert thread_row["assistant_id"] == "ip-agent"
+    assert config["configurable"]["agent_name"] == "ip-agent"
+    assert config["context"]["agent_name"] == "ip-agent"
+    assert config["run_name"] == "ip-agent"
+
+
+def test_start_run_product_binding_pins_client_identity(
+    _stub_app_config,
+    monkeypatch,
+):
+    """A server product binding wins before client identity aliases are parsed."""
+    import asyncio
+    import threading
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    from langgraph.checkpoint.memory import InMemorySaver
+    from langgraph.store.memory import InMemoryStore
+
+    from app.gateway import services
+    from app.gateway.routers.thread_runs import RunCreateRequest
+    from deerflow.persistence.thread_meta.memory import MemoryThreadMetaStore
+    from deerflow.runtime import RunManager
+    from deerflow.runtime.runs.store.memory import MemoryRunStore
+
+    binding = SimpleNamespace(
+        assistant_id="ip-agent",
+        entrypoint="customer_run",
+        receipt={
+            "schema_version": "product-runtime-binding-v1",
+            "product_id": "ip-agent",
+            "entrypoint": "customer_run",
+            "assistant_id": "ip-agent",
+            "agent_artifact_sha256": "b" * 64,
+            "declared_capability_digest": "a" * 64,
+        },
+    )
+    calls = []
+
+    def _binding(request, context, **kwargs):
+        calls.append((request, context, kwargs, threading.get_ident()))
+        return binding
+
+    monkeypatch.setattr(
+        services,
+        "resolve_product_runtime_binding",
+        _binding,
+        raising=False,
+    )
+
+    async def _scenario():
+        caller_thread_id = threading.get_ident()
+        run_store = MemoryRunStore()
+        thread_store = MemoryThreadMetaStore(InMemoryStore())
+        run_manager = RunManager(store=run_store)
+        state = SimpleNamespace(
+            stream_bridge=SimpleNamespace(),
+            run_manager=run_manager,
+            checkpointer=InMemorySaver(),
+            store=InMemoryStore(),
+            run_event_store=SimpleNamespace(),
+            run_events_config=None,
+            thread_store=thread_store,
+        )
+        request = SimpleNamespace(
+            headers={},
+            state=SimpleNamespace(auth_source="auth_disabled"),
+            app=SimpleNamespace(state=state),
+        )
+        body = RunCreateRequest(
+            assistant_id="lead_agent",
+            input={"messages": [{"role": "human", "content": "hi"}]},
+            config={
+                "context": {
+                    "agent_name": "lead_agent",
+                    "product_entrypoint": "video_workbench",
+                },
+                "configurable": {"product_entrypoint": "scheduler"},
+            },
+            context={
+                "agent_name": "lead_agent",
+                "product_entrypoint": "video_workbench",
+            },
+            metadata={"deerflow_product_runtime": {"forged": True}},
+        )
+        captured: dict[str, object] = {}
+
+        async def fake_run_agent(*args, **kwargs):
+            captured["config"] = kwargs["config"]
+
+        with (
+            patch("app.gateway.services.resolve_agent_factory", return_value=object()),
+            patch("app.gateway.services.run_agent", side_effect=fake_run_agent),
+        ):
+            record = await services.start_run(body, "profile-thread", request)
+            await record.task
+
+        return (
+            await run_store.get(record.run_id),
+            await thread_store.get("profile-thread", user_id=None),
+            captured["config"],
+            caller_thread_id,
+        )
+
+    run_row, thread_row, config, caller_thread_id = asyncio.run(_scenario())
+
+    assert len(calls) == 1
+    assert calls[0][3] != caller_thread_id
+    assert calls[0][2]["requested_assistant_id"] == "lead_agent"
+    assert calls[0][2]["request_config"]["context"]["agent_name"] == "lead_agent"
+    assert run_row["assistant_id"] == "ip-agent"
+    assert thread_row["assistant_id"] == "ip-agent"
+    assert "deerflow_product_runtime" not in thread_row["metadata"]
+    assert config["context"]["agent_name"] == "ip-agent"
+    assert "product_entrypoint" not in config["context"]
+    assert "product_entrypoint" not in config["configurable"]
+    assert run_row["metadata"]["deerflow_product_runtime"] == binding.receipt
+    persisted_config = run_row["kwargs"]["config"]
+    for container_name in ("context", "configurable"):
+        persisted_container = persisted_config[container_name]
+        assert "agent_name" not in persisted_container
+        assert "is_bootstrap" not in persisted_container
+        assert "product_entrypoint" not in persisted_container
 
 
 def test_non_interactive_context_override_is_internal_only():
@@ -1341,7 +1534,11 @@ def test_launch_scheduled_thread_run_marks_context_non_interactive(_stub_app_con
     captured, result = asyncio.run(_scenario())
 
     assert captured["thread_id"] == "thread-scheduled"
-    assert captured["context"] == {"non_interactive": True, "user_id": "user-1"}
+    assert captured["context"] == {
+        "non_interactive": True,
+        "product_entrypoint": "scheduler",
+        "user_id": "user-1",
+    }
     assert captured["metadata"] == {"scheduled_task_id": "task-1"}
     assert result == {"run_id": "run-1", "thread_id": "thread-scheduled"}
 
@@ -1647,9 +1844,7 @@ def test_personal_ip_context_is_skipped_for_bounded_clean_agent(monkeypatch):
         ),
     )
 
-    assert personal_ip_context_enabled(
-        {"context": {"agent_name": "ip-agent", "user_id": "owner-1"}}
-    ) is False
+    assert personal_ip_context_enabled({"context": {"agent_name": "ip-agent", "user_id": "owner-1"}}) is False
 
 
 def test_personal_ip_context_remains_for_agents_with_native_ip_tools(monkeypatch):
@@ -1664,6 +1859,4 @@ def test_personal_ip_context_remains_for_agents_with_native_ip_tools(monkeypatch
         ),
     )
 
-    assert personal_ip_context_enabled(
-        {"context": {"agent_name": "operator", "user_id": "owner-1"}}
-    ) is True
+    assert personal_ip_context_enabled({"context": {"agent_name": "operator", "user_id": "owner-1"}}) is True

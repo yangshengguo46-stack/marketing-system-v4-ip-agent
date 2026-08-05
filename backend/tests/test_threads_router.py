@@ -245,7 +245,14 @@ def test_strip_reserved_metadata_empty_input():
 
 
 def test_strip_reserved_metadata_strips_all_reserved_keys():
-    out = threads._strip_reserved_metadata({"user_id": "x", "keep": "me"})
+    out = threads._strip_reserved_metadata(
+        {
+            "user_id": "x",
+            "owner_id": "y",
+            "deerflow_product_runtime": {"forged": True},
+            "keep": "me",
+        }
+    )
     assert out == {"keep": "me"}
 
 

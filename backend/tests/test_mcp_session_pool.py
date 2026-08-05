@@ -906,10 +906,11 @@ async def test_http_transport_tools_not_pooled():
     # Tool discovery is lazy: no pooled sessions are created until a wrapped tool is invoked.
     assert list(pool._entries.keys()) == []
 
-    # Verify the HTTP tool was NOT wrapped with the pool (it's the original tool).
+    # HTTP uses a per-call session wrapper so it shares DeerFlow's raw-result
+    # converter without entering the persistent pool.
     http_tools = [t for t in tools if t.name == "myserver_search"]
     assert len(http_tools) == 1
-    assert http_tools[0].coroutine is http_tool.coroutine
+    assert http_tools[0].coroutine is not http_tool.coroutine
 
     # Verify the stdio tool WAS wrapped with the pool.
     stdio_tools = [t for t in tools if t.name == "playwright_navigate"]
@@ -964,7 +965,8 @@ async def test_non_stdio_tool_call_timeout_warns_that_it_is_ignored(caplog):
 
         tools = await get_mcp_tools()
 
-    assert tools == [http_tool]
+    assert [tool.name for tool in tools] == [http_tool.name]
+    assert tools[0].coroutine is not http_tool.coroutine
     assert any(record.levelno == logging.WARNING and "remote" in record.getMessage() and "tool_call_timeout" in record.getMessage() and "stdio" in record.getMessage() for record in caplog.records)
 
 
@@ -1677,7 +1679,14 @@ async def test_mcp_tools_routed_to_source_server_with_prefix_overlap():
 
     routed: list[tuple[str, str]] = []
 
-    def fake_wrap(tool, server_name, connection, interceptors, tool_call_timeout=None):
+    def fake_wrap(
+        tool,
+        server_name,
+        connection,
+        interceptors,
+        tool_call_timeout=None,
+        expected_capability_digest=None,
+    ):
         routed.append((tool.name, server_name))
         return tool
 

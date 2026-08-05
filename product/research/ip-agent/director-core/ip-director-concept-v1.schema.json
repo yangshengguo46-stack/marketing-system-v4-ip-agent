@@ -1,0 +1,505 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ip-agent:contract:ip-director-concept-v1",
+  "title": "IP Director Concept V1",
+  "description": "research_quarantined contract for an ontology-grounded, falsifiable IP direction hypothesis",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "runtime_status",
+    "contract_id",
+    "system",
+    "ontology",
+    "information",
+    "semantic",
+    "direction",
+    "control"
+  ],
+  "properties": {
+    "schema_version": { "const": "ip-director-concept-v1" },
+    "runtime_status": { "const": "research_quarantined" },
+    "contract_id": { "type": "string", "minLength": 1 },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_public",
+        "desired_relation_changes",
+        "desired_action",
+        "boundary",
+        "time_horizon"
+      ],
+      "properties": {
+        "target_public": { "type": "string", "minLength": 1 },
+        "desired_relation_changes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "recognition",
+              "memory",
+              "trust",
+              "expectation",
+              "preference",
+              "action"
+            ]
+          }
+        },
+        "desired_action": { "type": "string", "minLength": 1 },
+        "boundary": { "type": "string", "minLength": 1 },
+        "time_horizon": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ontology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entities",
+        "operated_subject_ref",
+        "operated_subject_kind",
+        "primary_carrier_ref",
+        "role_assignments",
+        "brand_cognition"
+      ],
+      "properties": {
+        "entities": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/entity" }
+        },
+        "operated_subject_ref": { "type": "string", "minLength": 1 },
+        "operated_subject_kind": {
+          "enum": ["person", "product", "organization"]
+        },
+        "primary_carrier_ref": { "type": "string", "minLength": 1 },
+        "role_assignments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/roleAssignment" }
+        },
+        "brand_cognition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attribution_target_refs", "desired_associations"],
+          "properties": {
+            "attribution_target_refs": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "desired_associations": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "information": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claims"],
+      "properties": {
+        "claims": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/claim" }
+        }
+      }
+    },
+    "semantic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frame", "de_labelling"],
+      "properties": {
+        "frame": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "surface_terms",
+            "head_concept",
+            "modifiers",
+            "event_roles"
+          ],
+          "properties": {
+            "surface_terms": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "head_concept": { "type": "string", "minLength": 1 },
+            "modifiers": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "event_roles": {
+              "type": "array",
+              "minItems": 2,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "de_labelling": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "subject_without_labels",
+            "role_reintroduced_effect",
+            "result"
+          ],
+          "properties": {
+            "subject_without_labels": { "type": "string", "minLength": 1 },
+            "role_reintroduced_effect": { "type": "string", "minLength": 1 },
+            "result": { "const": "pass" }
+          }
+        }
+      }
+    },
+    "direction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_worlds",
+        "desire_model",
+        "selected_candidate_ref",
+        "selection_reason",
+        "tradeoff",
+        "four_anchors",
+        "communication",
+        "marketing",
+        "production",
+        "stress_test"
+      ],
+      "properties": {
+        "candidate_worlds": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "$ref": "#/$defs/candidateWorld" }
+        },
+        "desire_model": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "creator_desire_claim_refs",
+            "audience_desire_claim_refs",
+            "commercial_objective_claim_refs"
+          ],
+          "properties": {
+            "creator_desire_claim_refs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string" }
+            },
+            "audience_desire_claim_refs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string" }
+            },
+            "commercial_objective_claim_refs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "selected_candidate_ref": { "type": "string", "minLength": 1 },
+        "selection_reason": { "type": "string", "minLength": 1 },
+        "tradeoff": { "type": "string", "minLength": 1 },
+        "four_anchors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attention", "trust", "meaning", "transaction"],
+          "properties": {
+            "attention": { "$ref": "#/$defs/anchor" },
+            "trust": { "$ref": "#/$defs/anchor" },
+            "meaning": { "$ref": "#/$defs/anchor" },
+            "transaction": { "$ref": "#/$defs/anchor" }
+          }
+        },
+        "communication": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "account_narrative"],
+          "properties": {
+            "mode": {
+              "enum": ["story", "proof", "teaching", "experience", "ritual", "hybrid"]
+            },
+            "account_narrative": { "type": "string", "minLength": 1 },
+            "desire_behavior": { "$ref": "#/$defs/desireBehavior" }
+          }
+        },
+        "marketing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "viewer_desire",
+            "reason_to_choose",
+            "reason_to_believe",
+            "desired_behavior",
+            "business_connection"
+          ],
+          "properties": {
+            "viewer_desire": { "type": "string", "minLength": 1 },
+            "reason_to_choose": { "type": "string", "minLength": 1 },
+            "reason_to_believe": { "type": "string", "minLength": 1 },
+            "desired_behavior": { "type": "string", "minLength": 1 },
+            "business_connection": { "type": "string", "minLength": 1 }
+          }
+        },
+        "production": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["expression_carriers", "constraints", "feasibility_reason"],
+          "properties": {
+            "expression_carriers": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "constraints": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "feasibility_reason": { "type": "string", "minLength": 1 }
+          }
+        },
+        "stress_test": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "episode_generators",
+            "label_removal_result",
+            "role_reintroduction_result",
+            "no_hotspot_result",
+            "resource_reduction_result"
+          ],
+          "properties": {
+            "episode_generators": {
+              "type": "array",
+              "minItems": 12,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "label_removal_result": { "const": "pass" },
+            "role_reintroduction_result": { "const": "pass" },
+            "no_hotspot_result": { "const": "pass" },
+            "resource_reduction_result": { "const": "pass" }
+          }
+        }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pilot_hypothesis",
+        "single_variable",
+        "observation_window",
+        "success_signal",
+        "failure_signal",
+        "revision_rule"
+      ],
+      "properties": {
+        "pilot_hypothesis": { "type": "string", "minLength": 1 },
+        "single_variable": { "type": "string", "minLength": 1 },
+        "observation_window": { "type": "string", "minLength": 1 },
+        "success_signal": { "type": "string", "minLength": 1 },
+        "failure_signal": { "type": "string", "minLength": 1 },
+        "revision_rule": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "name", "epistemic_state"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": {
+          "enum": [
+            "person",
+            "product",
+            "organization",
+            "audience",
+            "fictional_character",
+            "content_series"
+          ]
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "epistemic_state": { "$ref": "#/$defs/epistemicState" }
+      }
+    },
+    "roleAssignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_ref", "role_kind", "role", "valid_time"],
+      "properties": {
+        "entity_ref": { "type": "string", "minLength": 1 },
+        "role_kind": {
+          "enum": ["life_role", "business_role", "story_role", "content_role"]
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "valid_time": { "type": "string", "minLength": 1 }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "state",
+        "statement",
+        "subject_refs",
+        "source_refs",
+        "basis_refs",
+        "coverage"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": {
+          "enum": ["fact", "desire", "objective", "constraint", "observation", "mechanism"]
+        },
+        "state": { "$ref": "#/$defs/epistemicState" },
+        "statement": { "type": "string", "minLength": 1 },
+        "subject_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "source_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "basis_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "coverage": { "type": "string", "minLength": 1 }
+      }
+    },
+    "candidateWorld": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "social_domain",
+        "semantic_distance",
+        "relation_structure",
+        "desire_subject_ref",
+        "fact_refs",
+        "assumptions",
+        "premise"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "social_domain": { "type": "string", "minLength": 1 },
+        "semantic_distance": { "enum": ["near", "mid", "far"] },
+        "relation_structure": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "desire_subject_ref": { "type": "string", "minLength": 1 },
+        "fact_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "assumptions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "premise": { "type": "string", "minLength": 1 }
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_ref", "mechanism"],
+      "properties": {
+        "entity_ref": { "type": "string", "minLength": 1 },
+        "mechanism": { "type": "string", "minLength": 1 }
+      }
+    },
+    "desireBehavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "epistemic_state",
+        "source_candidate_ref",
+        "fact_refs",
+        "assumptions",
+        "subject_ref",
+        "commercial_object_mode",
+        "substitution_test",
+        "semantic_action",
+        "relationship_at_stake",
+        "trigger",
+        "want",
+        "goal",
+        "initial_tactic",
+        "counterforce",
+        "feedback",
+        "strategy_change",
+        "costly_choice",
+        "cost",
+        "state_change",
+        "viewer_desire",
+        "logline"
+      ],
+      "properties": {
+        "epistemic_state": { "enum": ["source_observed", "creative"] },
+        "source_candidate_ref": { "type": "string", "minLength": 1 },
+        "fact_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "assumptions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "subject_ref": { "type": "string", "minLength": 1 },
+        "commercial_object_mode": { "enum": ["absent", "causal"] },
+        "substitution_test": { "type": "string", "minLength": 1 },
+        "semantic_action": { "type": "string", "minLength": 1 },
+        "relationship_at_stake": { "type": "string", "minLength": 1 },
+        "trigger": { "type": "string", "minLength": 1 },
+        "want": { "type": "string", "minLength": 1 },
+        "goal": { "type": "string", "minLength": 1 },
+        "initial_tactic": { "type": "string", "minLength": 1 },
+        "counterforce": { "type": "string", "minLength": 1 },
+        "feedback": { "type": "string", "minLength": 1 },
+        "strategy_change": { "type": "string", "minLength": 1 },
+        "costly_choice": { "type": "string", "minLength": 1 },
+        "cost": { "type": "string", "minLength": 1 },
+        "state_change": { "type": "string", "minLength": 1 },
+        "viewer_desire": { "type": "string", "minLength": 1 },
+        "logline": { "type": "string", "minLength": 1 }
+      }
+    },
+    "epistemicState": {
+      "enum": [
+        "user_asserted",
+        "source_observed",
+        "derived",
+        "hypothesized",
+        "creative",
+        "unknown",
+        "contradicted"
+      ]
+    }
+  }
+}

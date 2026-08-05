@@ -4,6 +4,9 @@ The service deliberately uses the existing owner-scoped tables as its source of
 truth.  It does not create a second mutable state store.  Platform credentials
 and one-use OAuth state are deletion-only data: exports contain a revoked
 connection shell so a restore always requires a fresh platform authorization.
+One-shot paid-call scopes/events are also deletion-only, but unlike connection
+shells they are omitted entirely so restore can never revive an approval,
+reservation, or consumed admission.
 """
 
 from __future__ import annotations
@@ -22,6 +25,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from deerflow.persistence.base import Base
 from deerflow.persistence.personal_ip_accounts.model import PersonalIPAccountRow
 from deerflow.persistence.personal_ip_metrics.model import PersonalIPMetricObservationRow
+from deerflow.persistence.personal_ip_paid_calls.model import (
+    PersonalIPPaidCallEventRow,
+    PersonalIPPaidCallScopeRow,
+)
 from deerflow.persistence.personal_ip_platform_connections.model import (
     PersonalIPPlatformConnectionRow,
     PersonalIPPlatformCredentialRow,
@@ -80,6 +87,13 @@ PERSONAL_IP_SECRET_TABLES: frozenset[str] = frozenset(
         PersonalIPPlatformCredentialRow.__tablename__,
         PersonalIPPlatformOAuthStateRow.__tablename__,
     }
+)
+_DELETION_ONLY_DATASETS: tuple[_Dataset, ...] = (
+    _Dataset("paid_call_scopes", PersonalIPPaidCallScopeRow),
+    _Dataset("paid_call_events", PersonalIPPaidCallEventRow),
+)
+PERSONAL_IP_DELETION_ONLY_TABLES: frozenset[str] = frozenset(
+    item.model.__tablename__ for item in _DELETION_ONLY_DATASETS
 )
 
 
@@ -208,6 +222,23 @@ class PersonalIPDataLifecycleService:
         }
 
     @staticmethod
+    async def _deletion_only_counts(
+        session: AsyncSession,
+        owner_user_id: str,
+    ) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for dataset in _DELETION_ONLY_DATASETS:
+            count = (
+                await session.execute(
+                    select(func.count())
+                    .select_from(dataset.model)
+                    .where(dataset.model.owner_user_id == owner_user_id)
+                )
+            ).scalar_one()
+            counts[dataset.name] = int(count)
+        return counts
+
+    @staticmethod
     def _data_digest(datasets: Sequence[Mapping[str, Any]]) -> str:
         return _digest([{"name": dataset["name"], "records": dataset["records"]} for dataset in datasets])
 
@@ -254,7 +285,9 @@ class PersonalIPDataLifecycleService:
             "credential_policy": {
                 "credentials_included": False,
                 "oauth_states_included": False,
+                "paid_call_admissions_included": False,
                 "platform_reauthorization_required_after_restore": True,
+                "paid_call_reapproval_required_after_restore": True,
             },
             "datasets": datasets,
             "verification": {
@@ -343,7 +376,12 @@ class PersonalIPDataLifecycleService:
                 await self._lock_owner(session, owner_user_id)
                 existing = await self._export_datasets(session, owner_user_id)
                 secret_counts = await self._secret_counts(session, owner_user_id)
-                if any(item["count"] for item in existing) or any(secret_counts.values()):
+                deletion_only_counts = await self._deletion_only_counts(session, owner_user_id)
+                if (
+                    any(item["count"] for item in existing)
+                    or any(secret_counts.values())
+                    or any(deletion_only_counts.values())
+                ):
                     raise ValueError("Personal-IP restore requires an empty owner scope; delete existing data first")
                 for specification, dataset in zip(_DATASETS, datasets, strict=True):
                     for record in dataset["records"]:
@@ -368,7 +406,9 @@ class PersonalIPDataLifecycleService:
             "restored_data_digest": restored_digest,
             "restored_records": sum(item["count"] for item in datasets),
             "credentials_restored": False,
+            "paid_call_admissions_restored": False,
             "platform_reauthorization_required": True,
+            "paid_call_reapproval_required": True,
             "restored_at": _iso(datetime.now(UTC)),
         }
 
@@ -381,8 +421,10 @@ class PersonalIPDataLifecycleService:
         async with self._sf() as session:
             datasets = await self._export_datasets(session, owner_user_id)
             secret_counts = await self._secret_counts(session, owner_user_id)
+            deletion_only_counts = await self._deletion_only_counts(session, owner_user_id)
         counts = {item["name"]: int(item["count"]) for item in datasets}
         counts.update(secret_counts)
+        counts.update(deletion_only_counts)
         data_digest = self._data_digest(datasets)
         state_digest = _digest(
             {
@@ -433,8 +475,10 @@ class PersonalIPDataLifecycleService:
                 await self._lock_owner(session, owner_user_id)
                 datasets = await self._export_datasets(session, owner_user_id)
                 secret_counts = await self._secret_counts(session, owner_user_id)
+                deletion_only_counts = await self._deletion_only_counts(session, owner_user_id)
                 counts = {item["name"]: int(item["count"]) for item in datasets}
                 counts.update(secret_counts)
+                counts.update(deletion_only_counts)
                 current_state_digest = _digest(
                     {
                         "owner_user_id": owner_user_id,
@@ -457,6 +501,8 @@ class PersonalIPDataLifecycleService:
                 connection_ids = select(PersonalIPPlatformConnectionRow.id).where(PersonalIPPlatformConnectionRow.owner_user_id == owner_user_id)
                 await session.execute(delete(PersonalIPPlatformCredentialRow).where(PersonalIPPlatformCredentialRow.connection_id.in_(connection_ids)))
                 await session.execute(delete(PersonalIPPlatformOAuthStateRow).where(PersonalIPPlatformOAuthStateRow.owner_user_id == owner_user_id))
+                for dataset in reversed(_DELETION_ONLY_DATASETS):
+                    await session.execute(delete(dataset.model).where(dataset.model.owner_user_id == owner_user_id))
                 for dataset in reversed(_DATASETS):
                     await session.execute(delete(dataset.model).where(dataset.model.owner_user_id == owner_user_id))
                 await session.commit()
@@ -472,6 +518,7 @@ class PersonalIPDataLifecycleService:
             "local_context_deleted": True,
             "credentials_deleted": True,
             "oauth_states_deleted": True,
+            "paid_call_admissions_deleted": True,
             "deleted_at": _iso(now or datetime.now(UTC)),
         }
 
@@ -480,6 +527,7 @@ __all__ = [
     "BACKUP_SCHEMA_VERSION",
     "DELETE_CONFIRMATION_PHRASE",
     "EXPORT_DATASET_NAMES",
+    "PERSONAL_IP_DELETION_ONLY_TABLES",
     "PERSONAL_IP_EXPORT_TABLES",
     "PERSONAL_IP_SECRET_TABLES",
     "PersonalIPDataLifecycleService",

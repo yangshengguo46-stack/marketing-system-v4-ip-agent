@@ -1,0 +1,26 @@
+schema_version: ip-agent-runtime-profile-v1
+enabled: true
+product_id: ip-agent
+assistant_id: ip-agent
+agent_artifact_sha256: 54d265b6c13c128cfabda71b31e32829306976cbd5d0e3915a8ac9e382e6723b
+capability_contract:
+  tool_allowlist:
+    - web_search
+    - image_search
+    - ls
+    - read_file
+    - glob
+    - grep
+    - view_image
+    - ask_clarification
+    - ip_evidence_collect_douyin_benchmark_account
+    - ip_evidence_inspect_reference_videos
+  skills: []
+  memory_enabled: false
+entrypoints:
+  customer_run: pin
+  owner_im: pin
+  scheduler: pin
+  # Dormant until the server can derive this entrypoint from an authoritative
+  # video-production/thread relationship. Browser input must not select it.
+  video_workbench: "off"

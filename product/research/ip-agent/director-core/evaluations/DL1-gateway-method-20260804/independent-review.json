@@ -1,0 +1,25 @@
+{
+  "schema_version": "ip-director-independent-review-v1",
+  "reviewer": "independent-agent",
+  "score": 62,
+  "maximum_score": 100,
+  "verdict": "failed",
+  "direct_fail": true,
+  "dimensions": {
+    "facts_and_ontology": {"score": 7, "maximum": 15},
+    "semantics": {"score": 10, "maximum": 15},
+    "association_lift": {"score": 12, "maximum": 20},
+    "causal_story": {"score": 17, "maximum": 25},
+    "ip_direction": {"score": 11, "maximum": 15},
+    "production_fit": {"score": 5, "maximum": 10}
+  },
+  "direct_fail_reasons": [
+    "路线把未提供的歉收经历、老人一生经历和十五年不挪窝写成结构依据，而没有标为创作假设。"
+  ],
+  "top_method_weaknesses": [
+    "机械合同只检查事实引用字段，不检查自由文本中的命题是否来自事实或假设。",
+    "远距离路线没有证明跨出原行业的即时社会近邻，仍停在果园、老人和乡村旧事。",
+    "故事合同会填满因果槽位，却没有验证目标是否兑现、代价是否由主角承担，以及是否转换成一人一机可拍形式。"
+  ],
+  "logline_verdict": "结构完整但不够强；目标没有明确兑现，二选一不互斥，主要代价由配角承担，乡土催泪机关偏多。"
+}

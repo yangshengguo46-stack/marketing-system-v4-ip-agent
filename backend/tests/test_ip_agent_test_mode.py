@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from deerflow.config.agents_config import agent_artifact_sha256
+
 
 def _load_module():
     path = Path(__file__).resolve().parents[2] / "scripts" / "ip_agent_test_mode.py"
@@ -27,8 +29,44 @@ def _repo_fixture(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     (root / "product/defaults/agents/ip-agent").mkdir(parents=True)
     (root / "product/defaults/USER.md").write_text("default user\n", encoding="utf-8")
-    (root / "product/defaults/agents/ip-agent/config.yaml").write_text("name: ip-agent\n", encoding="utf-8")
+    (root / "product/defaults/agents/ip-agent/config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "name": "ip-agent",
+                "tool_allowlist": [],
+                "skills": [],
+                "memory_enabled": False,
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
     (root / "product/defaults/agents/ip-agent/SOUL.md").write_text("test soul\n", encoding="utf-8")
+    artifact_sha256 = agent_artifact_sha256(root / "product/defaults/agents/ip-agent")
+    (root / "product/defaults/product-runtime-profile.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "ip-agent-runtime-profile-v1",
+                "enabled": True,
+                "product_id": "ip-agent",
+                "assistant_id": "ip-agent",
+                "agent_artifact_sha256": artifact_sha256,
+                "capability_contract": {
+                    "tool_allowlist": [],
+                    "skills": [],
+                    "memory_enabled": False,
+                },
+                "entrypoints": {
+                    "customer_run": "pin",
+                    "owner_im": "pin",
+                    "scheduler": "pin",
+                    "video_workbench": "deny",
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
     (root / "extensions_config.example.json").write_text('{"mcpServers": {}, "skills": {}}\n', encoding="utf-8")
     (root / "config.yaml").write_text(
         yaml.safe_dump(
@@ -50,6 +88,16 @@ def _repo_fixture(tmp_path: Path) -> Path:
     return root
 
 
+def _refresh_source_artifact_digest(root: Path) -> None:
+    profile_path = root / "product/defaults/product-runtime-profile.yaml"
+    profile = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
+    profile["agent_artifact_sha256"] = agent_artifact_sha256(root / "product/defaults/agents/ip-agent")
+    profile_path.write_text(
+        yaml.safe_dump(profile, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
 def test_prepare_uses_an_isolated_database_and_product_defaults(tmp_path: Path):
     root = _repo_fixture(tmp_path)
     paths = test_mode.prepare_test_mode(
@@ -68,6 +116,7 @@ def test_prepare_uses_an_isolated_database_and_product_defaults(tmp_path: Path):
     assert config["channel_connections"]["slack"]["enabled"] is False
     assert (paths.state_dir / "USER.md").read_text(encoding="utf-8") == "default user\n"
     assert (paths.state_dir / "users/default/agents/ip-agent/SOUL.md").read_text(encoding="utf-8") == "test soul\n"
+    assert paths.runtime_profile.is_file()
     marker = json.loads(paths.marker.read_text(encoding="utf-8"))
     assert marker["schema_version"] == test_mode.TEST_MODE_SCHEMA_VERSION
     assert marker["state_dir"] == str(paths.state_dir)
@@ -79,6 +128,7 @@ def test_prepare_refreshes_product_files_without_erasing_test_memory(tmp_path: P
     memory = paths.state_dir / "users/default/agents/ip-agent/memory.json"
     memory.write_text('{"facts":["test"]}\n', encoding="utf-8")
     (root / "product/defaults/agents/ip-agent/SOUL.md").write_text("new soul\n", encoding="utf-8")
+    _refresh_source_artifact_digest(root)
 
     test_mode.prepare_test_mode(root)
 
@@ -171,10 +221,22 @@ def test_evidence_profile_adds_only_the_two_mcp_tools_to_the_clean_agent(tmp_pat
         ),
         encoding="utf-8",
     )
+    _refresh_source_artifact_digest(root)
+    source_runtime_profile = root / "product/defaults/product-runtime-profile.yaml"
+    runtime_profile_payload = yaml.safe_load(source_runtime_profile.read_text(encoding="utf-8"))
+    runtime_profile_payload["capability_contract"]["tool_allowlist"] = [
+        "web_search",
+        "read_file",
+    ]
+    source_runtime_profile.write_text(
+        yaml.safe_dump(runtime_profile_payload, sort_keys=False),
+        encoding="utf-8",
+    )
 
     paths = test_mode.prepare_test_mode(root, profile=test_mode.TEST_PROFILE_EVIDENCE)
 
     installed = yaml.safe_load((paths.state_dir / "users/default/agents/ip-agent/config.yaml").read_text(encoding="utf-8"))
+    runtime_profile = yaml.safe_load(paths.runtime_profile.read_text(encoding="utf-8"))
     assert installed["skills"] == []
     assert installed["memory_enabled"] is False
     assert installed["tool_allowlist"] == [
@@ -183,14 +245,34 @@ def test_evidence_profile_adds_only_the_two_mcp_tools_to_the_clean_agent(tmp_pat
         "ip_evidence_collect_douyin_benchmark_account",
         "ip_evidence_inspect_reference_videos",
     ]
+    assert runtime_profile["capability_contract"] == {
+        "tool_allowlist": installed["tool_allowlist"],
+        "skills": [],
+        "memory_enabled": False,
+    }
+    assert runtime_profile["agent_artifact_sha256"] == agent_artifact_sha256(paths.state_dir / "users/default/agents/ip-agent")
     extensions = json.loads(paths.extensions_config.read_text(encoding="utf-8"))
     assert extensions["middlewares"] == []
     assert extensions["mcpInterceptors"] == []
+    assert "mcpInterceptorsRequired" not in extensions
     assert list(extensions["mcpServers"]) == [test_mode.EVIDENCE_MCP_SERVER_NAME]
     assert extensions["skills"] == {}
     server = extensions["mcpServers"][test_mode.EVIDENCE_MCP_SERVER_NAME]
     assert server["command"] == "uv"
+    assert server["required"] is True
+    assert server["tool_call_timeout"] == 3600
+    assert server["result_policy"] == {
+        "trust": "untrusted_external",
+        "semantic_class": "evidence",
+        "outcome_contract": "ip-evidence-operation-status-v1",
+    }
     assert server["env"]["IP_AGENT_EVIDENCE_BROWSER_PROFILE_DIR"] == str(paths.evidence_browser_profile_dir)
+    assert server["env"]["IP_AGENT_EVIDENCE_BINDING_ACTIVE_KID"] == "test-v1"
+    assert server["env"]["IP_AGENT_EVIDENCE_MCP_CLIENT_NAME"] == "ip_evidence"
+    assert "IP_AGENT_EVIDENCE_PAID_GRANT_SECRET" not in server["env"]
+    binding_keys = json.loads(server["env"]["IP_AGENT_EVIDENCE_BINDING_KEYS_JSON"])
+    assert list(binding_keys) == ["test-v1"]
+    assert len(binding_keys["test-v1"]) >= 43
     assert server["tools"]["collect_douyin_benchmark_account"]["routing"] == {
         "mode": "prefer",
         "priority": 100,
@@ -204,10 +286,22 @@ def test_evidence_profile_adds_only_the_two_mcp_tools_to_the_clean_agent(tmp_pat
             "benchmark account",
         ],
     }
+    assert server["tools"]["collect_douyin_benchmark_account"]["required"] is True
     assert server["tools"]["inspect_reference_videos"]["routing"]["mode"] == "prefer"
+    assert server["tools"]["inspect_reference_videos"]["required"] is True
     assert "对标账号" in server["tools"]["inspect_reference_videos"]["routing"]["keywords"]
     marker = json.loads(paths.marker.read_text(encoding="utf-8"))
     assert marker["profile"] == test_mode.TEST_PROFILE_EVIDENCE
+
+    environment = test_mode.test_mode_environment(paths)
+    assert "IP_AGENT_EVIDENCE_PAID_GRANT_SECRET" not in environment
+    assert "IP_AGENT_EVIDENCE_ASR_DIRECT_PAY_ENABLED" not in environment
+    assert "IP_AGENT_EVIDENCE_ASR_DIRECT_PAY_MAXIMUM_MICROS" not in environment
+    assert "IP_AGENT_EVIDENCE_ASR_DIRECT_PAY_MAX_DURATION_SECONDS" not in environment
+
+    test_mode.prepare_test_mode(root, profile=test_mode.TEST_PROFILE_EVIDENCE)
+    refreshed = json.loads(paths.extensions_config.read_text(encoding="utf-8"))
+    assert refreshed["mcpServers"][test_mode.EVIDENCE_MCP_SERVER_NAME]["env"]["IP_AGENT_EVIDENCE_BINDING_KEYS_JSON"] == server["env"]["IP_AGENT_EVIDENCE_BINDING_KEYS_JSON"]
 
 
 def test_profile_switch_requires_a_reset(tmp_path: Path):
@@ -216,3 +310,45 @@ def test_profile_switch_requires_a_reset(tmp_path: Path):
 
     with pytest.raises(RuntimeError, match="reset before switching"):
         test_mode.prepare_test_mode(root, profile=test_mode.TEST_PROFILE_EVIDENCE)
+
+
+def test_mediakit_key_is_private_test_state_and_only_enters_process_environment(
+    tmp_path: Path,
+) -> None:
+    root = _repo_fixture(tmp_path)
+    paths = test_mode.prepare_test_mode(
+        root,
+        profile=test_mode.TEST_PROFILE_EVIDENCE,
+    )
+    api_key = "AKLT" + "a" * 40
+
+    test_mode.configure_mediakit_api_key(paths, api_key)
+
+    assert paths.mediakit_api_key_file.stat().st_mode & 0o777 == 0o600
+    assert paths.mediakit_api_key_file.read_text(encoding="utf-8") == api_key + "\n"
+    assert test_mode.test_mode_environment(paths)["MEDIAKIT_API_KEY"] == api_key
+    extensions = paths.extensions_config.read_text(encoding="utf-8")
+    marker = paths.marker.read_text(encoding="utf-8")
+    assert api_key not in extensions
+    assert api_key not in marker
+    assert '"MEDIAKIT_API_KEY": "$MEDIAKIT_API_KEY"' in extensions
+    assert test_mode._status(paths)["mediakit_api_key_configured"] is True
+
+
+def test_mediakit_key_rejects_invalid_value_and_broad_permissions(
+    tmp_path: Path,
+) -> None:
+    root = _repo_fixture(tmp_path)
+    paths = test_mode.prepare_test_mode(
+        root,
+        profile=test_mode.TEST_PROFILE_EVIDENCE,
+    )
+
+    with pytest.raises(ValueError, match="format"):
+        test_mode.configure_mediakit_api_key(paths, "not-a-provider-key")
+    assert not paths.mediakit_api_key_file.exists()
+
+    test_mode.configure_mediakit_api_key(paths, "AKLT" + "b" * 40)
+    paths.mediakit_api_key_file.chmod(0o644)
+    with pytest.raises(RuntimeError, match="permissions"):
+        test_mode.test_mode_environment(paths)

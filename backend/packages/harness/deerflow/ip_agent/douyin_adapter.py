@@ -41,6 +41,7 @@ _MAX_DOWNLOAD_BYTES = 200 * 1024 * 1024
 _MAX_REDIRECTS = 6
 _API_PATH_MARKERS = ("/aweme/v1/web/aweme/post/", "/aweme/v1/web/aweme/detail/")
 _SESSION_COOKIE_NAMES = frozenset({"sessionid", "sessionid_ss", "sid_guard", "uid_tt", "uid_tt_ss"})
+_TRUSTED_API_HOSTS = frozenset({"douyin.com", "www.douyin.com"})
 
 
 def _clean_text(value: Any, *, limit: int) -> str:
@@ -78,6 +79,42 @@ def validate_douyin_reference(value: str) -> str:
         raise ValueError("reference must be a Douyin profile, work, or share URL")
     validate_public_url(value, action="inspect")
     return canonical
+
+
+def _is_trusted_douyin_api_response(response: Any) -> bool:
+    """Accept identity payloads only from bounded first-party successful responses."""
+    with contextlib.suppress(ValueError, TypeError):
+        parsed = urlsplit(canonical_http_url(str(response.url)))
+        if (parsed.hostname or "").lower() not in _TRUSTED_API_HOSTS:
+            return False
+        if not any(parsed.path.startswith(marker) for marker in _API_PATH_MARKERS):
+            return False
+        status = int(response.status)
+        if status < 200 or status >= 300:
+            return False
+        length = response.headers.get("content-length")
+        if length is not None and int(length) > _MAX_CAPTURE_BYTES:
+            return False
+        return True
+    return False
+
+
+async def _trusted_awemes_from_response(response: Any) -> list[Mapping[str, Any]]:
+    if not _is_trusted_douyin_api_response(response):
+        return []
+    try:
+        payload = await response.json()
+    except Exception:
+        return []
+    if not isinstance(payload, Mapping):
+        return []
+    status_code = payload.get("status_code")
+    if status_code is not None and status_code != 0:
+        return []
+    with contextlib.suppress(TypeError, ValueError):
+        if len(str(payload).encode("utf-8")) > _MAX_CAPTURE_BYTES:
+            return []
+    return _aweme_candidates(payload)[:20]
 
 
 def _headless() -> bool:
@@ -255,14 +292,8 @@ async def fetch_douyin_account_pages(url: str, max_posts: int, _session_hint: st
     captured_responses: list[Any] = []
 
     def capture(response: Any) -> None:
-        if not any(marker in response.url for marker in _API_PATH_MARKERS):
-            return
-        length = response.headers.get("content-length")
-        if length:
-            with contextlib.suppress(ValueError):
-                if int(length) > _MAX_CAPTURE_BYTES:
-                    return
-        captured_responses.append(response)
+        if _is_trusted_douyin_api_response(response):
+            captured_responses.append(response)
 
     page.on("response", capture)
     await page.route("**/*", _guard_document_route)
@@ -333,8 +364,7 @@ async def fetch_douyin_account_pages(url: str, max_posts: int, _session_hint: st
 
         captured_awemes: list[Mapping[str, Any]] = []
         for response in captured_responses:
-            with contextlib.suppress(Exception):
-                captured_awemes.extend(_aweme_candidates(await response.json())[:20])
+            captured_awemes.extend(await _trusted_awemes_from_response(response))
         api_works: list[dict[str, Any]] = []
         api_profile = None
         seen: set[str] = set()
@@ -363,6 +393,7 @@ def _video_metadata_from_aweme(item: Mapping[str, Any]) -> dict[str, Any]:
         key: value
         for key, value in {
             "id": item.get("aweme_id"),
+            "author_sec_uid": _clean_text(author.get("sec_uid"), limit=200) or None,
             "title": _clean_text(item.get("desc"), limit=500) or None,
             "uploader": _clean_text(author.get("nickname"), limit=100) or None,
             "timestamp": item.get("create_time"),
@@ -388,18 +419,29 @@ def _media_urls_from_aweme(item: Mapping[str, Any]) -> list[str]:
     return urls
 
 
-async def resolve_douyin_video(reference: str) -> tuple[str, dict[str, Any], list[dict[str, Any]]]:
+async def resolve_douyin_video(
+    reference: str,
+    *,
+    expected_account_sec_uid: str | None = None,
+) -> tuple[str, dict[str, Any], list[dict[str, Any]]]:
     """Resolve one exact work to a public media URL and internal-only browser cookies."""
-    validate_douyin_reference(reference)
+    input_ref = validate_douyin_reference(reference)
+    input_match = DOUYIN_VIDEO_PATH.search(urlsplit(input_ref).path)
+    input_work_id = input_match.group("id") if input_match else None
     resolved = await _resolve_bounded_redirects(reference)
+    resolved_ref = canonical_http_url(resolved)
+    resolved_match = DOUYIN_VIDEO_PATH.search(urlsplit(resolved_ref).path)
+    resolved_work_id = resolved_match.group("id") if resolved_match else None
+    if input_work_id and resolved_work_id and input_work_id != resolved_work_id:
+        raise ValueError("Douyin page could not prove exact work identity")
+    expected_author = _clean_text(expected_account_sec_uid, limit=200) or None
     playwright, context, temporary = await _launch_context(headless=_headless())
     page = context.pages[0] if context.pages else await context.new_page()
     captured_responses: list[Any] = []
 
     def capture(response: Any) -> None:
-        if not any(marker in response.url for marker in _API_PATH_MARKERS):
-            return
-        captured_responses.append(response)
+        if _is_trusted_douyin_api_response(response):
+            captured_responses.append(response)
 
     page.on("response", capture)
     await page.route("**/*", _guard_document_route)
@@ -407,7 +449,8 @@ async def resolve_douyin_video(reference: str) -> tuple[str, dict[str, Any], lis
         detail_response = None
         try:
             async with page.expect_response(
-                lambda response: "/aweme/v1/web/aweme/detail/" in response.url,
+                lambda response: _is_trusted_douyin_api_response(response)
+                and "/aweme/v1/web/aweme/detail/" in response.url,
                 timeout=_timeout_ms(),
             ) as response_info:
                 try:
@@ -421,36 +464,50 @@ async def resolve_douyin_video(reference: str) -> tuple[str, dict[str, Any], lis
                 raise
         await page.wait_for_timeout(2_000)
         validate_douyin_reference(page.url)
-        expected = DOUYIN_VIDEO_PATH.search(urlsplit(canonical_http_url(page.url)).path)
-        expected_id = expected.group("id") if expected else None
+        final_ref = canonical_http_url(page.url)
+        final_match = DOUYIN_VIDEO_PATH.search(urlsplit(final_ref).path)
+        if final_match is None:
+            raise ValueError("Douyin page could not prove exact work identity")
+        final_work_id = final_match.group("id")
+        if resolved_work_id is None:
+            raise ValueError("Douyin page could not prove exact work identity")
+        requested_work_id = input_work_id or resolved_work_id
+        if requested_work_id != final_work_id:
+            raise ValueError("Douyin page could not prove exact work identity")
         captured_awemes: list[Mapping[str, Any]] = []
         if detail_response is not None:
-            with contextlib.suppress(Exception):
-                captured_awemes.extend(_aweme_candidates(await detail_response.json())[:10])
+            captured_awemes.extend((await _trusted_awemes_from_response(detail_response))[:10])
         for response in captured_responses:
-            with contextlib.suppress(Exception):
-                captured_awemes.extend(_aweme_candidates(await response.json())[:10])
+            captured_awemes.extend((await _trusted_awemes_from_response(response))[:10])
 
         selected = next(
-            (item for item in captured_awemes if expected_id is None or str(item.get("aweme_id") or "") == expected_id),
+            (item for item in captured_awemes if str(item.get("aweme_id") or "") == requested_work_id),
             None,
         )
-        media_urls = _media_urls_from_aweme(selected) if selected is not None else []
-        if not media_urls:
-            current_src = await page.evaluate(
-                """() => {
-                  const video = document.querySelector('video');
-                  return video ? (video.currentSrc || video.src || '') : '';
-                }"""
-            )
-            if isinstance(current_src, str) and current_src.startswith(("http://", "https://")):
-                media_urls.append(current_src)
+        if selected is None:
+            raise ValueError("Douyin page could not prove exact work identity")
+        author = selected.get("author") if isinstance(selected.get("author"), Mapping) else {}
+        author_sec_uid = _clean_text(author.get("sec_uid"), limit=200) or None
+        if author_sec_uid is None:
+            raise ValueError("Douyin page could not prove exact account author")
+        if expected_author is not None and author_sec_uid != expected_author:
+            raise ValueError("Douyin work did not match the expected account author")
+        media_urls = _media_urls_from_aweme(selected)
         if not media_urls:
             raise ValueError("Douyin work page did not expose a verifiable media stream")
         media_url = media_urls[0]
         validate_public_url(media_url, action="download")
         cookies = await context.cookies([media_url])
-        metadata = _video_metadata_from_aweme(selected) if selected is not None else {}
+        metadata = {
+            **_video_metadata_from_aweme(selected),
+            "requested_work_id": requested_work_id,
+            "resolved_work_id": resolved_work_id,
+            "observed_work_id": str(selected.get("aweme_id")),
+            "expected_account_sec_uid": expected_author,
+            "author_sec_uid": author_sec_uid,
+            "canonical_work_ref": f"https://www.douyin.com/video/{requested_work_id}",
+            "identity_verification": ("api_work_and_author_match" if expected_author is not None else "api_work_id_match"),
+        }
         return media_url, metadata, cookies
     finally:
         page.remove_listener("response", capture)

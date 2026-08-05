@@ -1,6 +1,9 @@
-# IP Agent 工具与 Skill 能力总清单
+# IP Agent 工具与 Skill 能力库存（非产品状态台账）
 
-审计日期：2026-08-01。
+复核日期：2026-08-05。
+
+文件名保留 `LEDGER` 仅为兼容既有链接和机械测试。本文件是源码库存投影，不能发布
+“已交付”“当前主线”或完成度结论；客户可达状态只看 `IP_AGENT_PRODUCT_LEDGER.md`。
 
 这份文档是仓库内 Agent 工具与 `skills/public` 方法包的唯一分类清单，回答三件事：
 
@@ -26,13 +29,13 @@
 
 当前数量：
 
-- 默认 IP Agent：8 个精确白名单工具，0 个 Skill；
+- 默认 IP Agent：10 个精确白名单工具，0 个 Skill；
 - 当前全局配置：16 个配置工具，其中 6 个进入白名单，10 个被隔离；
 - DeerFlow 原生固定工具：43 个，其中 `ask_clarification` 进入白名单，其余 42 个隔离；
 - 公共 Skill 包：97 个，全部研究隔离；
-- MCP、ACP、记忆、自修改、子 Agent、Skill 管理和 Plan Mode 工具：均不进入默认 IP Agent。
+- Evidence MCP 的 2 个 MediaKit 证据工具进入默认 IP Agent；其余 MCP、ACP、记忆、自修改、子 Agent、Skill 管理和 Plan Mode 工具不进入默认 IP Agent。
 
-## 一、默认 IP Agent 的 8 个现役工具
+## 一、默认 IP Agent 的 10 个现役工具
 
 来源：`product/defaults/agents/ip-agent/config.yaml`。过滤发生在配置工具、内置工具、
 MCP、ACP、子 Agent、Skill 和记忆工具全部组装之后；Plan Mode 注入的
@@ -49,6 +52,8 @@ MCP、ACP、子 Agent、Skill 和记忆工具全部组装之后；Plan Mode 注�
 | `grep` | 在允许文件中搜索文本 | 只读检索，不修改命中项 |
 | `view_image` | 读取并展示本地图片供视觉判断 | 仅在当前模型支持视觉时组装；不处理非图片文件 |
 | `ask_clarification` | 缺少决定性材料时向用户索取一个必要信息 | 不把可自行回答的问题变成固定访谈；账号无法确认时索要平台或主页/视频链接 |
+| `ip_evidence_collect_douyin_benchmark_account` | 读取用户指定的抖音主页和作品清单 | 只观察指定公开账号；不修改平台内容 |
+| `ip_evidence_inspect_reference_videos` | 用本地工具链和 MediaKit 分析指定作品链接或上传视频的台词、字幕、场景和故事线 | 配置 `MEDIAKIT_API_KEY` 后直接执行云分析；返回观察结果，不把分析结果伪装成用户事实 |
 <!-- END ACTIVE IP AGENT TOOLS -->
 
 ## 二、当前配置存在但被默认 IP Agent 隔离的 10 个工具
@@ -146,7 +151,7 @@ MCP、ACP、子 Agent、Skill 和记忆工具全部组装之后；Plan Mode 注�
 | `skill_manage` | `skill_evolution.enabled=true` 时加入 | 精确白名单过滤；隔离 |
 | `ui_tars_desktop_step` | UI-TARS 显式开启时加入 | 精确白名单过滤；隔离 |
 | `task` | 运行请求启用子 Agent 时加入 | 精确白名单过滤；隔离 |
-| `tool_search` | 有延迟加载的 MCP 工具时动态生成 | MCP 已先被白名单移除，因此不生成 |
+| `tool_search` | 有延迟加载的 MCP 工具时动态生成 | Evidence MCP Schema 由精确路由自动提升；`tool_search` 本身不进入白名单 |
 | `describe_skill` | 有可发现 Skill 且开启延迟发现时动态生成 | `skills: []`，不生成 |
 | `invoke_acp_agent` | 配置了 ACP Agent 时动态生成 | 精确白名单过滤；隔离 |
 | `memory_search` | 记忆工具模式开启 | `memory_enabled: false`，不生成 |
@@ -154,14 +159,14 @@ MCP、ACP、子 Agent、Skill 和记忆工具全部组装之后；Plan Mode 注�
 | `memory_update` | 记忆工具模式开启 | `memory_enabled: false`，不生成 |
 | `memory_delete` | 记忆工具模式开启 | `memory_enabled: false`，不生成 |
 | `write_todos` | Plan Mode 中间件开启 | 未列入白名单，不注入 |
-| MCP 工具 | `extensions_config.json` 中服务器启用并成功连接 | 当前示例服务器均关闭；任意返回工具仍受精确白名单 |
-| `ip_evidence_collect_douyin_benchmark_account` | 测试模式显式选择 `evidence` Profile | 限域读取一个精确抖音主页；最多 12 条作者归属可验证作品；正式默认 Agent 隔离 |
-| `ip_evidence_inspect_reference_videos` | 测试模式显式选择 `evidence` Profile | 检查最多 3 条精确视频/上传文件，返回哈希、时间证据、联系表和覆盖；正式默认 Agent 隔离 |
+| MCP 工具 | `extensions_config.json` 中服务器启用并成功连接 | `ip_evidence` 默认启用且 required；其他 MCP 仍受精确白名单 |
+| `ip_evidence_collect_douyin_benchmark_account` | 默认 `ip_evidence` MCP | 限域读取一个精确抖音主页；最多 12 条作者归属可验证作品；默认 Agent 现役 |
+| `ip_evidence_inspect_reference_videos` | 默认 `ip_evidence` MCP；配置 `MEDIAKIT_API_KEY` | 检查最多 3 条精确视频/上传文件；Agent 公开参数固定为 `full + 12`，一次执行本地证据、ASR、OCR、场景切分和故事线；内部历史深度不是模型选择；每个 stage 隔离，外层超时 3600 秒；默认 Agent 现役 |
 
 这两个条件工具来自同一个自研 stdio Capability MCP。MCP 内部使用确定性 Manifest、
 能力探测、精确 Child 绑定、运行上限和输入/输出 Schema 校验；抖音只是首个平台 Child。
 以后新增或恢复的平台、供应商、浏览器、重媒体、发布和有状态执行能力沿用同一骨架，
-不得注册成新的 Agent 原生特例。正式默认配置仍是八工具纯净基线。
+不得注册成新的 Agent 原生特例。正式默认配置是八个基线工具加两个 Evidence MCP 工具。
 
 仓库还保留 `personal_ip_collect_douyin_browser_page` 这个抖音页面采集兼容包装器，
 但它没有进入 `BUILTIN_TOOLS`，因此不是模型可调用工具；现役统一入口是
@@ -339,14 +344,14 @@ MCP、ACP、子 Agent、Skill 和记忆工具全部组装之后；Plan Mode 注�
 | `surprise-me` | 动态发现并组合多个已启用 Skill 产生创意展示 |
 <!-- END PUBLIC SKILL INVENTORY -->
 
-## 七、当前最重要的能力边界
+## 七、库存解释边界
 
 - 默认 IP Agent 的专业度目前来自模型、精简 SOUL 和只读证据工具，不来自上述 97 个 Skill。
 - 35 个电影模块、Cangjie、平台诊断、HLLM 和视频学习仍是研究库存；未经统一语义审计前不得接回默认运行链。
 - 账号、发布、指标、观察和视频工具是事实采集或确定性执行器，不负责定义 IP 战略和创意判断。
 - 版权、披露、付费、删除、Owner 隔离、路径、哈希、候选一致性与幂等是安全/执行边界，不属于已退役的经营语义门禁。
 - REST API 和专用工作台可以继续调用保留服务；这不等于聊天 Agent 获得了相应模型工具。
-- 新的 IP 第一性原理、IP 形态分类和总编排尚未开始。未来启用 Skill 时，应从本清单选择最小能力链，而不是把 97 个包一次性重新挂回去。
+- 三板块产品主线见产品总台账。未来启用 Skill 时，应从本库存选择经过纵切验证的最小方法，而不是把 97 个包一次性重新挂回去。
 
 ## 八、维护规则
 

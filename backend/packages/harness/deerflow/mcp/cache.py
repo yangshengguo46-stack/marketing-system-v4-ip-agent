@@ -38,19 +38,11 @@ def _resolve_config_path() -> Path | None:
     ``get_mcp_tools()``): an operator-asserted explicit path going missing is
     a real misconfiguration and must be surfaced loudly.
 
-    This helper is not one of those callers — it only backs the cache's own
-    staleness check (``_is_cache_stale``, via ``_current_config_state``),
-    which runs on every ``get_cached_mcp_tools()`` call and just wants to know
-    whether the previously loaded config is still current. If the file behind
-    a previously-valid explicit/env-var path becomes unreadable later
-    (deleted mid-run, a Docker mount hiccup, ...), raising here would crash
-    every subsequent call to that hot per-request path instead of leaving the
-    cache serving its last-known-good MCP tools. So this wrapper catches that
-    specific failure and treats it the same as "unconfigured", matching
-    ``_is_cache_stale()``'s existing fail-soft handling of a ``None`` config
-    state (see its docstring). Scoping the catch here — rather than making
-    ``resolve_config_path()`` itself return ``None`` for every caller — keeps
-    the loud failure intact for callers that actually need the file.
+    This helper only backs the cache's staleness check. If a previously valid
+    explicit path disappears, it converts the resolver exception to the
+    ``(None, None)`` state so ``_is_cache_stale`` can revoke cached tools
+    without crashing the per-request path. Callers that load configuration for
+    actual use still receive the resolver's loud ``FileNotFoundError``.
     """
     from deerflow.config.extensions_config import ExtensionsConfig
 
@@ -88,19 +80,6 @@ def _is_cache_stale() -> bool:
         return False  # Not initialized yet, not stale
 
     current_path, current_signature = _current_config_state()
-
-    # Preserve the original "config missing / not yet recorded" behavior: if
-    # there was no readable config when the cache was populated, or there is
-    # none now, do not invalidate. This also covers the config being deleted
-    # entirely after a successful init (current_signature flips to None): the
-    # cache intentionally keeps serving its last-known-good MCP tools rather
-    # than invalidating into an unconfigured state, matching the pre-fix
-    # mtime-only contract (which also returned False once the file could no
-    # longer be stat-ed). Treat this as a deliberate fail-soft choice, not an
-    # oversight — a future change that wants "config deleted" to tear down
-    # MCP tools needs its own explicit signal here, not an inferred one.
-    if _config_signature is None or current_signature is None:
-        return False
 
     if current_path != _config_path:
         logger.info("MCP config path changed (%s -> %s), cache is stale", _config_path, current_path)
@@ -175,16 +154,22 @@ def get_cached_mcp_tools() -> list[BaseTool]:
             else:
                 # If no loop is running, we can use the current loop
                 loop.run_until_complete(initialize_mcp_tools())
-        except RuntimeError:
-            # No event loop exists, create one
+        except Exception as exc:
+            from deerflow.mcp.tools import RequiredMCPConfigurationError
+
+            if isinstance(exc, RequiredMCPConfigurationError):
+                raise
+            if not isinstance(exc, RuntimeError):
+                logger.exception("Failed to lazy-initialize MCP tools")
+                return []
+            # No event loop exists, create one.
             try:
                 asyncio.run(initialize_mcp_tools())
+            except RequiredMCPConfigurationError:
+                raise
             except Exception:
                 logger.exception("Failed to lazy-initialize MCP tools")
                 return []
-        except Exception:
-            logger.exception("Failed to lazy-initialize MCP tools")
-            return []
 
     return _mcp_tools_cache or []
 

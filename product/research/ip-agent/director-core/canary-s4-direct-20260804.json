@@ -1,0 +1,74 @@
+{
+  "schema_version": "ip-director-canary-result-v1",
+  "run_id": "s4-direct-20260804",
+  "scope": "research_direct_provider_only",
+  "product_capability": false,
+  "scenario_ref": "s4-stage-role-person",
+  "provider": {
+    "requested_model": "doubao-seed-evolving",
+    "actual_model": "doubao-seed-evolving-latest-version",
+    "thinking_enabled": true,
+    "temperature": 0,
+    "http_status": 200,
+    "elapsed_seconds": 270.449,
+    "usage": {
+      "prompt_tokens": 4871,
+      "completion_tokens": 15300,
+      "reasoning_tokens": 10457,
+      "total_tokens": 20171
+    }
+  },
+  "output_evidence": {
+    "contract_sha256": "b75daeb2e3ccb2b34186c66a8442cb8b04258a403b2760874486f8d442f5190e",
+    "raw_output_persisted": false,
+    "coverage": "terminal-selected-sections-only",
+    "validator_issues": [
+      {
+        "code": "information.provenance",
+        "path": "information.claims[5].source_refs"
+      },
+      {
+        "code": "information.provenance",
+        "path": "information.claims[7].source_refs"
+      }
+    ]
+  },
+  "observed_strengths": [
+    "The current childcare role remained a time-scoped role rather than the person's identity.",
+    "The explicit one-year return-to-stage desire remained the direction center.",
+    "The production route respected no-family and no-face constraints by using hands and sound.",
+    "The model generated two far-domain structural associations instead of remaining inside the original industry vocabulary."
+  ],
+  "observed_failures": [
+    "Two derived claims did not carry required provenance.",
+    "Far-domain association sources were presented as candidate target worlds instead of remaining ideation scaffolds.",
+    "The output modeled the skill-training feedback loop but not the public-relationship feedback loop required by an IP system.",
+    "Most episode generators shared one structure: vary a training metric and display the result.",
+    "A future invitation and completed performance were written into state change without separating controllable target, external dependency, and observed result.",
+    "Latency and token usage are unsuitable for synchronous first-turn interaction."
+  ],
+  "verdict": "failed",
+  "allowed_interpretation": "The canary supports ontology de-labelling and production-fit feasibility only; it does not validate the directorial core.",
+  "next_experiment": {
+    "shape": "minimal-s4-two-arm-slice",
+    "fields": [
+      "subject_and_time_scoped_role",
+      "explicit_desire_ref",
+      "three_short_association_sources",
+      "one_target_ip_direction",
+      "production_carrier",
+      "capability_inner_loop",
+      "public_relationship_outer_loop",
+      "one_falsifiable_pilot"
+    ],
+    "arms": [
+      "thinking_off",
+      "thinking_on_with_minimal_budget"
+    ],
+    "limits": {
+      "max_completion_tokens": 2500,
+      "max_total_tokens_per_arm": 6000,
+      "automatic_retry": false
+    }
+  }
+}

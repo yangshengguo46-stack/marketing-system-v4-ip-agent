@@ -798,6 +798,8 @@ class TestIPAgentProductChecks:
 
         assert all(result.status == "ok" for result in results)
         assert "AppID is not required" in rendered
+        assert "default Evidence capabilities enabled" in rendered
+        assert "explicit admission" not in rendered
         assert "secret-" not in rendered
 
     def test_product_credentials_accept_legacy_tts_key_name_without_appid(self, monkeypatch):
@@ -856,9 +858,7 @@ class TestIPAgentProductChecks:
         assert "1 persisted" in results[1].detail
 
     def test_local_state_warns_when_product_agent_is_stale(self, tmp_path, monkeypatch):
-        product_agent = (
-            tmp_path / "product" / "defaults" / "agents" / "ip-agent"
-        )
+        product_agent = tmp_path / "product" / "defaults" / "agents" / "ip-agent"
         product_agent.mkdir(parents=True)
         (product_agent / "SOUL.md").write_text("current soul")
         (product_agent / "config.yaml").write_text("name: ip-agent")
@@ -877,21 +877,11 @@ class TestIPAgentProductChecks:
 
     def test_local_state_defaults_to_backend_runtime_home(self, tmp_path, monkeypatch):
         monkeypatch.delenv("DEER_FLOW_HOME", raising=False)
-        product_agent = (
-            tmp_path / "product" / "defaults" / "agents" / "ip-agent"
-        )
+        product_agent = tmp_path / "product" / "defaults" / "agents" / "ip-agent"
         product_agent.mkdir(parents=True)
         (product_agent / "SOUL.md").write_text("current soul")
         (product_agent / "config.yaml").write_text("name: ip-agent")
-        installed = (
-            tmp_path
-            / "backend"
-            / ".deer-flow"
-            / "users"
-            / "default"
-            / "agents"
-            / "ip-agent"
-        )
+        installed = tmp_path / "backend" / ".deer-flow" / "users" / "default" / "agents" / "ip-agent"
         installed.mkdir(parents=True)
         (installed / "SOUL.md").write_text("current soul")
         (installed / "config.yaml").write_text("name: ip-agent")

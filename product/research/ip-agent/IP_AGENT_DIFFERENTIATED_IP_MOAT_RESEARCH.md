@@ -1,14 +1,16 @@
 # IP Agent：差异化 IP 引擎与长期壁垒研究
 
-> 研究快照，不是现役产品合同。差异化运行层已于 2026-08-01 退役；本文只作
-> 隔离研究材料，当前能力只看 `IP_AGENT.md`。
+> `research_quarantined`：2026-07-30 历史研究快照。差异化运行层已经退役；
+> 正文中的“实施状态”“产品纵切面已进入源码”只按当时的局部实现判断理解，
+> 不代表当前产品能力。当前产品状态只看 `docs/IP_AGENT_PRODUCT_LEDGER.md`，
+> 运行边界只看 `IP_AGENT.md`。
 
 审计日期：2026-07-30
 
 本报告承接：
 
 - [IP_AGENT_INFLUENCE_ASSET_FIRST_PRINCIPLES_RESEARCH.md](IP_AGENT_INFLUENCE_ASSET_FIRST_PRINCIPLES_RESEARCH.md)
-- [IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md](IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md)
+- [IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md](../../../docs/IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md)
 
 前一轮回答“IP 是什么、主体不只有人、现有能力边界在哪里”；本轮只回答一个更难的问题：
 

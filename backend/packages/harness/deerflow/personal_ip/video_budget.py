@@ -13,6 +13,23 @@ VIDEO_BUDGET_RELEASE_CONTRACT_VERSION = "personal-ip-video-budget-release-v1"
 
 _MICRO_UNITS = Decimal("1000000")
 _MAX_AMOUNT = Decimal("1000000000")
+_KNOWN_PAID_PROVIDER_CAPABILITIES: dict[str, frozenset[str]] = {
+    "doubaoseedance": frozenset({"video_generation"}),
+    "doubaoseedream": frozenset({"image_generation"}),
+    "doubaospeech": frozenset({"speech_generation"}),
+    "mediakitcloud": frozenset({"media_processing"}),
+    "seedance": frozenset({"video_generation"}),
+    "seedream": frozenset({"image_generation"}),
+    "volcengine": frozenset(
+        {
+            "image_generation",
+            "media_processing",
+            "speech_generation",
+            "video_generation",
+        }
+    ),
+    "volcenginemediakit": frozenset({"media_processing"}),
+}
 
 
 def amount_to_micros(value: Any, *, field: str, allow_zero: bool = True) -> int:
@@ -38,6 +55,17 @@ def micros_to_amount(value: int) -> float:
     """Return a stable JSON number for integer micro-units."""
 
     return float(Decimal(value) / _MICRO_UNITS)
+
+
+def provider_requires_paid_admission(provider: str, capability: str) -> bool:
+    """Classify known cloud executors independently of caller billing claims."""
+
+    normalized_provider = "".join(character for character in str(provider).lower() if character.isalnum())
+    normalized_capability = str(capability or "").strip().lower()
+    return normalized_capability in _KNOWN_PAID_PROVIDER_CAPABILITIES.get(
+        normalized_provider,
+        frozenset(),
+    )
 
 
 def budget_limit(budget: dict[str, Any]) -> tuple[str, int]:

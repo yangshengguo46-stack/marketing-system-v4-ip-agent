@@ -43,10 +43,7 @@ import {
   usePersonalIPVideoProductions,
 } from "@/core/personal-ip";
 import { useThreadSettings } from "@/core/settings";
-import {
-  useThreadMetadata,
-  useThreadStream,
-} from "@/core/threads/hooks";
+import { useThreadMetadata, useThreadStream } from "@/core/threads/hooks";
 import { textOfMessage } from "@/core/threads/utils";
 import { env } from "@/env";
 import { cn } from "@/lib/utils";
@@ -59,12 +56,11 @@ export default function ChatPage() {
     threadId: isNewThread || isMock ? null : threadId,
     enabled: !isNewThread && !isMock,
   });
-  const videoTask =
-    !isNewThread && !isMock ? videoTasks.data?.[0] : undefined;
+  const videoTask = !isNewThread && !isMock ? videoTasks.data?.[0] : undefined;
 
   if (!isNewThread && !isMock && videoTasks.isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
+      <div className="text-muted-foreground flex h-screen items-center justify-center text-sm">
         正在打开任务…
       </div>
     );
@@ -134,6 +130,7 @@ function StandardChatPage() {
   } = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     displayThreadId: threadId,
+    assistantId: "ip-agent",
     context: runtimeContext,
     isMock,
     // onSend only animates the UI; do NOT flip `isNewThread` here — the

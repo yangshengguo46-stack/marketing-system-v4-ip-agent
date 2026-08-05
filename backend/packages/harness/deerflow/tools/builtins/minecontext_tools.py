@@ -1,4 +1,4 @@
-"""Native DeerFlow read/sync tools for default-on local MineContext evidence."""
+"""Native DeerFlow read/sync tools for explicitly authorized MineContext evidence."""
 
 from __future__ import annotations
 

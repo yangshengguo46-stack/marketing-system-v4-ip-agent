@@ -20,6 +20,7 @@ from langchain.tools import BaseTool
 
 MCP_TOOL_METADATA_KEY = "deerflow_mcp"
 MCP_TOOL_ROUTING_METADATA_KEY = "deerflow_mcp_routing"
+MCP_TOOL_CAPABILITY_METADATA_KEY = "deerflow_mcp_capability"
 
 
 def tag_mcp_tool(tool: BaseTool) -> BaseTool:
@@ -50,3 +51,15 @@ def get_mcp_routing(tool: BaseTool) -> dict[str, Any] | None:
     if not isinstance(routing, dict) or routing.get("mode") == "off":
         return None
     return routing
+
+
+def tag_mcp_capability(tool: BaseTool, *, server_name: str, generation: str) -> BaseTool:
+    """Attach operator-owned server identity and capability generation."""
+    tool.metadata = {
+        **(tool.metadata or {}),
+        MCP_TOOL_CAPABILITY_METADATA_KEY: {
+            "server_name": server_name,
+            "generation": generation,
+        },
+    }
+    return tool

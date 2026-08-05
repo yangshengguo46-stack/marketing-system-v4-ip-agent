@@ -1,0 +1,681 @@
+[
+  {
+    "schema_version": "ip-director-concept-v1",
+    "runtime_status": "research_quarantined",
+    "contract_id": "valid-person-led",
+    "system": {
+      "target_public": "正在经历职业转折并需要可信行动参照的人",
+      "desired_relation_changes": ["recognition", "trust", "action"],
+      "desired_action": "持续关注并对明确服务发起咨询",
+      "boundary": "只使用本人确认的经历和可持续行动，不代替本人诊断隐性动机",
+      "time_horizon": "十二周试拍期"
+    },
+    "ontology": {
+      "entities": [
+        {
+          "id": "person-operator",
+          "kind": "person",
+          "name": "项目本人",
+          "epistemic_state": "user_asserted"
+        },
+        {
+          "id": "offer-1",
+          "kind": "product",
+          "name": "当前服务",
+          "epistemic_state": "user_asserted"
+        },
+        {
+          "id": "audience-1",
+          "kind": "audience",
+          "name": "目标公众",
+          "epistemic_state": "hypothesized"
+        }
+      ],
+      "operated_subject_ref": "person-operator",
+      "operated_subject_kind": "person",
+      "primary_carrier_ref": "person-operator",
+      "role_assignments": [
+        {
+          "entity_ref": "person-operator",
+          "role_kind": "life_role",
+          "role": "当前职业阶段",
+          "valid_time": "当前，起止时间未知"
+        }
+      ],
+      "brand_cognition": {
+        "attribution_target_refs": ["person-operator"],
+        "desired_associations": ["会把复杂改变落实成可见行动"]
+      }
+    },
+    "information": {
+      "claims": [
+        {
+          "id": "pc1",
+          "kind": "fact",
+          "state": "user_asserted",
+          "statement": "本人正在经历一次明确的职业转折",
+          "subject_refs": ["person-operator"],
+          "source_refs": ["user:message-1"],
+          "basis_refs": [],
+          "coverage": "本人当前陈述"
+        },
+        {
+          "id": "pc2",
+          "kind": "desire",
+          "state": "user_asserted",
+          "statement": "本人希望在十二周内完成一个可观察的新阶段",
+          "subject_refs": ["person-operator"],
+          "source_refs": ["user:message-1"],
+          "basis_refs": [],
+          "coverage": "本人明确目标"
+        },
+        {
+          "id": "pc3",
+          "kind": "desire",
+          "state": "hypothesized",
+          "statement": "目标公众希望看见普通人如何在现实限制下完成改变",
+          "subject_refs": ["audience-1"],
+          "source_refs": [],
+          "basis_refs": [],
+          "coverage": "待样片验证的受众假设"
+        },
+        {
+          "id": "pc4",
+          "kind": "objective",
+          "state": "user_asserted",
+          "statement": "希望由内容带来与当前服务有关的合格咨询",
+          "subject_refs": ["offer-1"],
+          "source_refs": ["user:message-1"],
+          "basis_refs": [],
+          "coverage": "本轮商业目标"
+        },
+        {
+          "id": "pc5",
+          "kind": "constraint",
+          "state": "user_asserted",
+          "statement": "每周只能完成一次低成本拍摄",
+          "subject_refs": ["person-operator"],
+          "source_refs": ["user:message-1"],
+          "basis_refs": [],
+          "coverage": "当前生产能力"
+        }
+      ]
+    },
+    "semantic": {
+      "frame": {
+        "surface_terms": ["当前职业身份", "转折"],
+        "head_concept": "一个跨时间持续存在的人",
+        "modifiers": ["当前职业角色", "转折阶段"],
+        "event_roles": ["行动者", "旧状态", "目标状态", "现实反作用"]
+      },
+      "de_labelling": {
+        "subject_without_labels": "一个拥有过去、当前目标和未来状态的人",
+        "role_reintroduced_effect": "当前职业角色只增加时间、资源和声誉代价",
+        "result": "pass"
+      }
+    },
+    "direction": {
+      "candidate_worlds": [
+        {
+          "id": "person-candidate-1",
+          "social_domain": "训练与进阶",
+          "semantic_distance": "near",
+          "relation_structure": ["设定里程碑", "执行训练", "暴露差距", "修正策略"],
+          "desire_subject_ref": "person-operator",
+          "fact_refs": ["pc1", "pc2", "pc5"],
+          "assumptions": ["公众会对过程中的真实策略变化感兴趣"],
+          "premise": "用每周一次真实行动记录一个人如何跨过职业转折"
+        },
+        {
+          "id": "person-candidate-2",
+          "social_domain": "航行与校准",
+          "semantic_distance": "far",
+          "relation_structure": ["确定目的地", "读取环境反馈", "调整航向", "承担绕行代价"],
+          "desire_subject_ref": "person-operator",
+          "fact_refs": ["pc1", "pc2", "pc5"],
+          "assumptions": ["航向校准结构能转译为可见职业决策"],
+          "premise": "把每次职业选择当作一次有反馈的航向修正"
+        },
+        {
+          "id": "person-candidate-3",
+          "social_domain": "修复与复原",
+          "semantic_distance": "far",
+          "relation_structure": ["识别断裂", "保留可用部分", "替换失效结构", "验证新状态"],
+          "desire_subject_ref": "person-operator",
+          "fact_refs": ["pc1", "pc2"],
+          "assumptions": ["本人愿意把失败策略作为创作假设公开"],
+          "premise": "以修复而非逆袭的视角重建一个人的工作方法"
+        }
+      ],
+      "desire_model": {
+        "creator_desire_claim_refs": ["pc2"],
+        "audience_desire_claim_refs": ["pc3"],
+        "commercial_objective_claim_refs": ["pc4"]
+      },
+      "selected_candidate_ref": "person-candidate-2",
+      "selection_reason": "它保留真实行动和反馈，同时摆脱职业标签附近的常见励志表达",
+      "tradeoff": "需要持续暴露策略调整，不能只展示成功结果",
+      "four_anchors": {
+        "attention": {
+          "entity_ref": "person-operator",
+          "mechanism": "每次行动都面临一个可判断成败的现实选择"
+        },
+        "trust": {
+          "entity_ref": "person-operator",
+          "mechanism": "使用可观察的行动、反馈和策略变化而非自我评价"
+        },
+        "meaning": {
+          "entity_ref": "person-operator",
+          "mechanism": "让公众把持续校准而非一次成功归因给本人"
+        },
+        "transaction": {
+          "entity_ref": "offer-1",
+          "mechanism": "由公开的方法证明自然连接到服务咨询"
+        }
+      },
+      "communication": {
+        "mode": "story",
+        "account_narrative": "一个人在十二周内用真实行动从旧状态走向新状态",
+        "desire_behavior": {
+          "epistemic_state": "creative",
+          "source_candidate_ref": "person-candidate-2",
+          "fact_refs": ["pc1", "pc2", "pc5"],
+          "assumptions": ["具体职业选择、失败反馈和公开过程是待验证创作情境"],
+          "subject_ref": "person-operator",
+          "commercial_object_mode": "absent",
+          "substitution_test": "本集不让服务或商品进入故事世界，移除业务名称后人物的行动、反馈和状态变化保持完整",
+          "semantic_action": "在转折期做出一次可观察的职业选择",
+          "relationship_at_stake": "本人同旧方法及目标公众信任之间的关系",
+          "trigger": "熟悉做法无法推进明确的新阶段",
+          "want": "完成明确的新阶段",
+          "goal": "在十二周里完成一个可以被观察的新工作路径",
+          "initial_tactic": "继续沿用熟悉做法并只展示预期结果",
+          "counterforce": "有限时间与旧方法的惯性",
+          "feedback": "旧策略没有产生预期进展，也无法让公众看见真实能力",
+          "strategy_change": "公开一次策略失效并改用可观察的小步试验",
+          "costly_choice": "在维持熟悉感与暴露不确定性之间选择后者",
+          "cost": "公开一次策略失效并放弃熟悉做法",
+          "state_change": "从重复旧策略转为建立一条新的工作路径",
+          "viewer_desire": "确认这个人能否在现实限制下改变方法并抵达新阶段",
+          "logline": "当熟悉做法再也推不动职业转折，一个想在十二周内进入新阶段的人仍试图只展示结果，却被停滞迫使他在保住体面和公开失败之间选择，最终用一次可观察的小试验换掉了旧工作路径。"
+        }
+      },
+      "marketing": {
+        "viewer_desire": "确认现实限制下是否仍能改变",
+        "reason_to_choose": "看到可复用的决策过程而不是抽象鼓励",
+        "reason_to_believe": "行动、反馈和调整过程可以被持续观察",
+        "desired_behavior": "关注后续并在需要同类帮助时发起咨询",
+        "business_connection": "服务是方法能力的交付，不在剧情结尾强行露出"
+      },
+      "production": {
+        "expression_carriers": ["本人低表演纪录", "声音复盘", "行动物证"],
+        "constraints": ["每周一次拍摄"],
+        "feasibility_reason": "主内容来自真实行动和物证，不依赖多人表演"
+      },
+      "stress_test": {
+        "episode_generators": [
+          "第一次设定里程碑",
+          "旧方法首次失效",
+          "一次主动求助",
+          "一次资源减少",
+          "一次拒绝熟悉机会",
+          "一次公开修正判断",
+          "一次小范围成功",
+          "一次外部规则变化",
+          "一次目标停滞",
+          "一次关系支持",
+          "一次有代价的取舍",
+          "阶段终点复核"
+        ],
+        "label_removal_result": "pass",
+        "role_reintroduction_result": "pass",
+        "no_hotspot_result": "pass",
+        "resource_reduction_result": "pass"
+      }
+    },
+    "control": {
+      "pilot_hypothesis": "一次完整的选择—反馈—修正比身份自述更能形成可信记忆",
+      "single_variable": "是否展示一次真实策略变化",
+      "observation_window": "首条发布后七天",
+      "success_signal": "目标公众能复述选择和变化并提出与方法有关的问题",
+      "failure_signal": "反馈只停留在身份标签或泛化鼓励",
+      "revision_rule": "若失败，先重做可见行动和反馈，不增加身份标签与视觉包装"
+    }
+  },
+  {
+    "schema_version": "ip-director-concept-v1",
+    "runtime_status": "research_quarantined",
+    "contract_id": "valid-product-led",
+    "system": {
+      "target_public": "需要在移动环境中快速整理工具的人",
+      "desired_relation_changes": ["recognition", "trust", "preference", "action"],
+      "desired_action": "申请试用并在验证后购买",
+      "boundary": "只展示已完成的产品能力和可重复测试",
+      "time_horizon": "四周验证期"
+    },
+    "ontology": {
+      "entities": [
+        {
+          "id": "product-operator",
+          "kind": "product",
+          "name": "模块化工具组件",
+          "epistemic_state": "user_asserted"
+        },
+        {
+          "id": "maker-org",
+          "kind": "organization",
+          "name": "产品团队",
+          "epistemic_state": "user_asserted"
+        },
+        {
+          "id": "audience-worker",
+          "kind": "audience",
+          "name": "移动作业者",
+          "epistemic_state": "hypothesized"
+        }
+      ],
+      "operated_subject_ref": "product-operator",
+      "operated_subject_kind": "product",
+      "primary_carrier_ref": "product-operator",
+      "role_assignments": [],
+      "brand_cognition": {
+        "attribution_target_refs": ["product-operator", "maker-org"],
+        "desired_associations": ["能以可重复测试改善移动作业秩序"]
+      }
+    },
+    "information": {
+      "claims": [
+        {
+          "id": "pd1",
+          "kind": "fact",
+          "state": "user_asserted",
+          "statement": "组件可以在移动工作空间中重新排列",
+          "subject_refs": ["product-operator"],
+          "source_refs": ["user:message-1"],
+          "basis_refs": [],
+          "coverage": "用户陈述的当前产品能力"
+        },
+        {
+          "id": "pd2",
+          "kind": "desire",
+          "state": "hypothesized",
+          "statement": "移动作业者希望减少寻找和掉落造成的失控",
+          "subject_refs": ["audience-worker"],
+          "source_refs": [],
+          "basis_refs": [],
+          "coverage": "待实测的受众欲望"
+        },
+        {
+          "id": "pd3",
+          "kind": "objective",
+          "state": "user_asserted",
+          "statement": "产品团队希望获得真实试用与购买",
+          "subject_refs": ["maker-org", "product-operator"],
+          "source_refs": ["user:message-1"],
+          "basis_refs": [],
+          "coverage": "本轮商业目标"
+        },
+        {
+          "id": "pd4",
+          "kind": "constraint",
+          "state": "user_asserted",
+          "statement": "当前没有适合长期真人出镜的人",
+          "subject_refs": ["maker-org"],
+          "source_refs": ["user:message-1"],
+          "basis_refs": [],
+          "coverage": "当前生产限制"
+        }
+      ]
+    },
+    "semantic": {
+      "frame": {
+        "surface_terms": ["模块", "移动作业", "整理"],
+        "head_concept": "可重构的工作空间",
+        "modifiers": ["移动环境", "模块化连接"],
+        "event_roles": ["使用者", "工具", "空间", "任务", "结果"]
+      },
+      "de_labelling": {
+        "subject_without_labels": "一个改变工具与空间关系的产品",
+        "role_reintroduced_effect": "行业场景只限定测试条件和受众任务",
+        "result": "pass"
+      }
+    },
+    "direction": {
+      "candidate_worlds": [
+        {
+          "id": "product-candidate-1",
+          "social_domain": "工作流优化",
+          "semantic_distance": "near",
+          "relation_structure": ["记录基线", "改变排列", "执行任务", "比较结果"],
+          "desire_subject_ref": "audience-worker",
+          "fact_refs": ["pd1", "pd2", "pd3"],
+          "assumptions": ["寻找和掉落是重要问题"],
+          "premise": "用重复任务证明空间重排能否减少失控"
+        },
+        {
+          "id": "product-candidate-2",
+          "social_domain": "城市交通调度",
+          "semantic_distance": "far",
+          "relation_structure": ["识别拥堵点", "重排节点", "运行同一任务", "观察流量变化"],
+          "desire_subject_ref": "audience-worker",
+          "fact_refs": ["pd1", "pd2"],
+          "assumptions": ["空间中的取放可视作有限路径调度"],
+          "premise": "把狭小工作空间当成需要持续调度的微型城市"
+        },
+        {
+          "id": "product-candidate-3",
+          "social_domain": "应急系统冗余",
+          "semantic_distance": "far",
+          "relation_structure": ["设定故障", "暴露单点", "重构配置", "验证恢复速度"],
+          "desire_subject_ref": "audience-worker",
+          "fact_refs": ["pd1", "pd2"],
+          "assumptions": ["目标任务存在可重复的意外场景"],
+          "premise": "用故障演练检验工具系统能否在意外中快速恢复"
+        }
+      ],
+      "desire_model": {
+        "creator_desire_claim_refs": [],
+        "audience_desire_claim_refs": ["pd2"],
+        "commercial_objective_claim_refs": ["pd3"]
+      },
+      "selected_candidate_ref": "product-candidate-3",
+      "selection_reason": "故障演练能把功能变成可重复证明，并形成连续内容",
+      "tradeoff": "每次实验必须控制条件，制作速度低于普通功能展示",
+      "four_anchors": {
+        "attention": {
+          "entity_ref": "product-operator",
+          "mechanism": "先制造一个可见的真实故障任务"
+        },
+        "trust": {
+          "entity_ref": "maker-org",
+          "mechanism": "公开基线、步骤和重复结果"
+        },
+        "meaning": {
+          "entity_ref": "product-operator",
+          "mechanism": "让公众把可重构与现场掌控联系起来"
+        },
+        "transaction": {
+          "entity_ref": "product-operator",
+          "mechanism": "实验结果连接到试用申请和购买"
+        }
+      },
+      "communication": {
+        "mode": "proof",
+        "account_narrative": "持续用受控故障检验一个可重构工具系统"
+      },
+      "marketing": {
+        "viewer_desire": "在意外和狭小空间里仍能掌控工作",
+        "reason_to_choose": "同一任务有前后对照而不是只看功能口播",
+        "reason_to_believe": "测试条件、动作和结果可以重复",
+        "desired_behavior": "申请试用并用自己的场景复测",
+        "business_connection": "试用是证明链的延续，购买建立在复测结果上"
+      },
+      "production": {
+        "expression_carriers": ["手部", "工具物件", "俯拍实验"],
+        "constraints": ["无长期真人出镜者"],
+        "feasibility_reason": "证明内容由任务和物件完成，不需要人物表演"
+      },
+      "stress_test": {
+        "episode_generators": [
+          "急刹后的掉落测试",
+          "夜间盲取测试",
+          "戴手套操作测试",
+          "空间缩减一半测试",
+          "常用工具换位测试",
+          "新手首次配置测试",
+          "单点失效恢复测试",
+          "多人交接测试",
+          "雨天湿手测试",
+          "高频任务计时测试",
+          "非标工具兼容测试",
+          "四周磨损复核"
+        ],
+        "label_removal_result": "pass",
+        "role_reintroduction_result": "pass",
+        "no_hotspot_result": "pass",
+        "resource_reduction_result": "pass"
+      }
+    },
+    "control": {
+      "pilot_hypothesis": "故障演练比静态功能展示更能建立对可重构能力的信任",
+      "single_variable": "是否包含同条件故障前后对照",
+      "observation_window": "两条配对内容发布后七天",
+      "success_signal": "目标用户询问测试条件并申请用自己的工作空间复测",
+      "failure_signal": "反馈只评价画面新奇而不关心任务结果",
+      "revision_rule": "若失败，先重做任务真实性和对照条件，不增加剧情人物"
+    }
+  },
+  {
+    "schema_version": "ip-director-concept-v1",
+    "runtime_status": "research_quarantined",
+    "contract_id": "valid-organization-led",
+    "system": {
+      "target_public": "需要判断服务组织是否可靠的本地公众",
+      "desired_relation_changes": ["recognition", "trust", "preference", "action"],
+      "desired_action": "在真实需求发生时预约服务",
+      "boundary": "只使用组织已执行的规则和真实成员行动",
+      "time_horizon": "一个季度"
+    },
+    "ontology": {
+      "entities": [
+        {
+          "id": "organization-operator",
+          "kind": "organization",
+          "name": "协作服务组织",
+          "epistemic_state": "user_asserted"
+        },
+        {
+          "id": "member-1",
+          "kind": "person",
+          "name": "组织成员",
+          "epistemic_state": "user_asserted"
+        },
+        {
+          "id": "audience-local",
+          "kind": "audience",
+          "name": "本地目标公众",
+          "epistemic_state": "hypothesized"
+        }
+      ],
+      "operated_subject_ref": "organization-operator",
+      "operated_subject_kind": "organization",
+      "primary_carrier_ref": "organization-operator",
+      "role_assignments": [
+        {
+          "entity_ref": "member-1",
+          "role_kind": "business_role",
+          "role": "执行服务的成员",
+          "valid_time": "当前任职期"
+        }
+      ],
+      "brand_cognition": {
+        "attribution_target_refs": ["organization-operator"],
+        "desired_associations": ["先展示判断依据再要求公众相信"]
+      }
+    },
+    "information": {
+      "claims": [
+        {
+          "id": "oc1",
+          "kind": "fact",
+          "state": "user_asserted",
+          "statement": "组织要求成员先公开判断依据再提出方案",
+          "subject_refs": ["organization-operator", "member-1"],
+          "source_refs": ["user:message-1"],
+          "basis_refs": [],
+          "coverage": "用户描述的当前组织规则"
+        },
+        {
+          "id": "oc2",
+          "kind": "desire",
+          "state": "hypothesized",
+          "statement": "本地公众希望在选择服务前降低信息不对称",
+          "subject_refs": ["audience-local"],
+          "source_refs": [],
+          "basis_refs": [],
+          "coverage": "待真实咨询验证的公众欲望"
+        },
+        {
+          "id": "oc3",
+          "kind": "objective",
+          "state": "user_asserted",
+          "statement": "组织希望增加合格预约",
+          "subject_refs": ["organization-operator"],
+          "source_refs": ["user:message-1"],
+          "basis_refs": [],
+          "coverage": "本轮商业目标"
+        },
+        {
+          "id": "oc4",
+          "kind": "constraint",
+          "state": "user_asserted",
+          "statement": "不同成员轮流出现在内容中",
+          "subject_refs": ["organization-operator", "member-1"],
+          "source_refs": ["user:message-1"],
+          "basis_refs": [],
+          "coverage": "当前组织生产方式"
+        }
+      ]
+    },
+    "semantic": {
+      "frame": {
+        "surface_terms": ["协作组织", "公开判断", "服务"],
+        "head_concept": "一套可被成员重复执行的判断规则",
+        "modifiers": ["多人协作", "本地服务"],
+        "event_roles": ["成员", "公众", "问题", "判断依据", "选择结果"]
+      },
+      "de_labelling": {
+        "subject_without_labels": "由具体成员通过共同规则持续行动的组织",
+        "role_reintroduced_effect": "成员角色决定谁执行，不替代组织规则和公众结果",
+        "result": "pass"
+      }
+    },
+    "direction": {
+      "candidate_worlds": [
+        {
+          "id": "org-candidate-1",
+          "social_domain": "服务透明化",
+          "semantic_distance": "near",
+          "relation_structure": ["公开问题", "展示依据", "比较方案", "接受选择"],
+          "desire_subject_ref": "audience-local",
+          "fact_refs": ["oc1", "oc2", "oc3"],
+          "assumptions": ["公众愿意理解部分判断过程"],
+          "premise": "由不同成员持续公开一次真实判断的依据与取舍"
+        },
+        {
+          "id": "org-candidate-2",
+          "social_domain": "公开审判程序",
+          "semantic_distance": "far",
+          "relation_structure": ["陈列证据", "允许反方解释", "说明判断规则", "承担裁决后果"],
+          "desire_subject_ref": "audience-local",
+          "fact_refs": ["oc1", "oc2"],
+          "assumptions": ["服务选择可以转译为公开论证而不冒充司法程序"],
+          "premise": "把每次方案判断做成可质疑、可复核的小型公开论证"
+        },
+        {
+          "id": "org-candidate-3",
+          "social_domain": "科学同行评议",
+          "semantic_distance": "far",
+          "relation_structure": ["提出判断", "展示方法", "由同伴复核", "根据反证修正"],
+          "desire_subject_ref": "audience-local",
+          "fact_refs": ["oc1", "oc4"],
+          "assumptions": ["成员之间允许公开复核和修正"],
+          "premise": "让不同成员交叉复核同一问题，公开一致与分歧"
+        }
+      ],
+      "desire_model": {
+        "creator_desire_claim_refs": [],
+        "audience_desire_claim_refs": ["oc2"],
+        "commercial_objective_claim_refs": ["oc3"]
+      },
+      "selected_candidate_ref": "org-candidate-3",
+      "selection_reason": "轮换成员从生产限制变成可信度结构，也能展示组织规则而非单一名人",
+      "tradeoff": "公开分歧会降低整齐感，并要求组织真正允许修正",
+      "four_anchors": {
+        "attention": {
+          "entity_ref": "member-1",
+          "mechanism": "同一问题出现两个真实判断及其分歧"
+        },
+        "trust": {
+          "entity_ref": "organization-operator",
+          "mechanism": "共同规则和交叉复核可被重复观察"
+        },
+        "meaning": {
+          "entity_ref": "organization-operator",
+          "mechanism": "让公众把可质疑和可修正归因给组织"
+        },
+        "transaction": {
+          "entity_ref": "organization-operator",
+          "mechanism": "公开判断后提供明确预约入口"
+        }
+      },
+      "communication": {
+        "mode": "hybrid",
+        "account_narrative": "一个组织如何通过成员交叉复核持续证明共同规则",
+        "desire_behavior": {
+          "epistemic_state": "creative",
+          "source_candidate_ref": "org-candidate-3",
+          "fact_refs": ["oc1", "oc2", "oc4"],
+          "assumptions": ["具体问题、首次判断和反证内容是待验证创作情境"],
+          "subject_ref": "member-1",
+          "commercial_object_mode": "absent",
+          "substitution_test": "本集只表现成员之间的判断与复核，移除组织服务名称后因果链仍完整且故事中没有替代性植入",
+          "semantic_action": "公开判断依据并接受另一位成员复核",
+          "relationship_at_stake": "个人专业权威与组织共同规则之间的信任关系",
+          "trigger": "同一问题得到两个不同判断",
+          "want": "给出能够经受同伴复核的判断",
+          "goal": "在信息不完整时形成一份可被组织共同承担的判断",
+          "initial_tactic": "先维护自己的原判断并逐条解释依据",
+          "counterforce": "信息不完整和专业分歧",
+          "feedback": "另一位成员提出的反证使原判断无法继续维持",
+          "strategy_change": "重新检查依据并公开修改结论",
+          "costly_choice": "在保住个人权威与维护组织规则之间选择后者",
+          "cost": "承认原判断需要修改",
+          "state_change": "从个人意见变成组织可复核的共同判断",
+          "viewer_desire": "确认组织会保护成员面子还是忠于公开复核规则",
+          "logline": "当同一问题得到两个不同结论，一名想证明自己判断可靠的成员先为原答案辩护，却被同伴的反证迫使他在个人权威和共同规则之间选择，最终公开改口，让个人意见第一次变成组织能够承担的判断。"
+        }
+      },
+      "marketing": {
+        "viewer_desire": "在购买服务前降低信息不对称",
+        "reason_to_choose": "组织允许成员公开分歧和修正",
+        "reason_to_believe": "共同规则在不同成员和问题上重复出现",
+        "desired_behavior": "保存判断方法并在真实需求时预约",
+        "business_connection": "预约承接已经发生的信任，不把内容伪装成客户结果"
+      },
+      "production": {
+        "expression_carriers": ["成员轮换", "问题物证", "白板复核"],
+        "constraints": ["没有固定单一出镜者"],
+        "feasibility_reason": "组织规则是稳定载体，成员可以轮换"
+      },
+      "stress_test": {
+        "episode_generators": [
+          "两名成员首次分歧",
+          "证据不足时拒绝判断",
+          "低价方案胜出",
+          "原判断被反证",
+          "新人复核老成员",
+          "公众提出反例",
+          "规则遇到例外",
+          "时间压力下取舍",
+          "成员能力边界公开",
+          "跨专业协作",
+          "复核后仍保留分歧",
+          "季度规则复盘"
+        ],
+        "label_removal_result": "pass",
+        "role_reintroduction_result": "pass",
+        "no_hotspot_result": "pass",
+        "resource_reduction_result": "pass"
+      }
+    },
+    "control": {
+      "pilot_hypothesis": "公开成员之间的复核与修正比统一口号更能建立组织信任",
+      "single_variable": "是否展示一次真实分歧和修正",
+      "observation_window": "两条配对内容发布后十四天",
+      "success_signal": "目标公众能复述组织判断规则并提出具体预约问题",
+      "failure_signal": "反馈只记住某位成员而不能归因给组织",
+      "revision_rule": "若失败，增强共同规则的可见重复，不强迫成员使用统一人格"
+    }
+  }
+]

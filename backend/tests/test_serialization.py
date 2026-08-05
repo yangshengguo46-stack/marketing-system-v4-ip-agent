@@ -330,6 +330,41 @@ def test_serialize_channel_values_for_api_no_messages():
     assert result == {"title": "empty"}
 
 
+def test_rest_and_sse_serialization_strip_legacy_operator_private_artifact():
+    import json
+
+    from langchain_core.messages import ToolMessage
+
+    from deerflow.runtime.serialization import (
+        serialize,
+        serialize_channel_values_for_api,
+    )
+
+    private_key = "ip_agent_operator_private_sealed_source_handoff"
+    message = ToolMessage(
+        content="safe evidence",
+        tool_call_id="tool-call-1",
+        artifact={
+            "mcp_metadata": {
+                "result_meta": {
+                    private_key: {"relative_ref": "outputs/private/source.mp4"},
+                    "trace_id": "safe-trace",
+                }
+            }
+        },
+    )
+
+    rest = serialize_channel_values_for_api({"messages": [message]})
+    values_stream = serialize({"messages": [message]}, mode="values")
+    message_stream = serialize((message, {"node": "tools"}), mode="messages")
+
+    for payload in (rest, values_stream, message_stream):
+        encoded = json.dumps(payload, ensure_ascii=False)
+        assert private_key not in encoded
+        assert "outputs/private/source.mp4" not in encoded
+        assert "safe-trace" in encoded
+
+
 def test_serialize_values_mode_strips_base64_from_hidden_messages():
     """The SSE stream emits ``values`` snapshots of the full state, so it must
     strip base64 image data from hide_from_ui messages just like the REST

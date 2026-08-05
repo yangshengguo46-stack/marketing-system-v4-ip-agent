@@ -27,7 +27,10 @@ describe("MineContext user-visible state", () => {
         authorized: false,
         running: false,
       }),
-    ).toEqual({ label: "尚未开启", action: "开启后即可自动使用" });
+    ).toEqual({
+      label: "尚未开启",
+      action: "只有你明确确认后才会开始本地采集",
+    });
   });
 
   it("never describes authorization as active capture", () => {

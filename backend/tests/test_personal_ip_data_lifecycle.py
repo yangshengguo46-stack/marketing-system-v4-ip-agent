@@ -23,6 +23,7 @@ from deerflow.persistence.personal_ip_subjects.model import PersonalIPSubjectRow
 from deerflow.personal_ip.data_lifecycle import (
     DELETE_CONFIRMATION_PHRASE,
     EXPORT_DATASET_NAMES,
+    PERSONAL_IP_DELETION_ONLY_TABLES,
     PERSONAL_IP_EXPORT_TABLES,
     PERSONAL_IP_SECRET_TABLES,
     PersonalIPDataLifecycleService,
@@ -43,8 +44,10 @@ class _FakeMineContext:
 
 def test_every_personal_ip_table_is_exported_or_explicitly_secret_deletion_only() -> None:
     actual = {table_name for table_name in Base.metadata.tables if table_name.startswith("personal_ip_")}
-    assert actual == PERSONAL_IP_EXPORT_TABLES | PERSONAL_IP_SECRET_TABLES
+    assert actual == PERSONAL_IP_EXPORT_TABLES | PERSONAL_IP_SECRET_TABLES | PERSONAL_IP_DELETION_ONLY_TABLES
     assert PERSONAL_IP_EXPORT_TABLES.isdisjoint(PERSONAL_IP_SECRET_TABLES)
+    assert PERSONAL_IP_EXPORT_TABLES.isdisjoint(PERSONAL_IP_DELETION_ONLY_TABLES)
+    assert PERSONAL_IP_SECRET_TABLES.isdisjoint(PERSONAL_IP_DELETION_ONLY_TABLES)
 
 
 async def _seed_owner(sf, owner_user_id: str) -> tuple[dict, dict, PersonalIPPlatformConnectionRepository]:

@@ -34,8 +34,12 @@ Personal-IP customer surfaces retain:
 
 - `/workspace/personal-ip` for subjects, accounts and platform login;
 - `/workspace/dashboard` for factual Owner-wide observations;
-- task-bound video workbenches backed by the immutable production ledger;
 - Settings for MineContext consent and data lifecycle.
+
+The task-bound video workbench is a retained implementation projection over the
+immutable production ledger. It is customer-reachable only when the product
+runtime profile explicitly enables it; the default profile currently keeps that
+entry off.
 
 The dashboard must read existing subject, account, metrics, platform
 observation, publish-receipt and video-production APIs directly. Show source
@@ -66,5 +70,7 @@ revision. Do not create a second video runtime or mutable projection database.
   `ai-elements/` unless their generation workflow explicitly permits it.
 - Keep accessible names and keyboard/focus behavior for interactive controls.
 
-The current IP Agent product contract is `../IP_AGENT.md`; the two existing
-ledgers under `../docs/` are the only product-status records.
+The current IP Agent product contract is `../IP_AGENT.md`;
+`../docs/IP_AGENT_PRODUCT_LEDGER.md` is the only current product-status record.
+The audit closeout and capability inventory under `../docs/` are supporting
+history/inventory, not competing delivery ledgers.

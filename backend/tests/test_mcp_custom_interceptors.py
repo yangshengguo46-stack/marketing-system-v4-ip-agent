@@ -1,12 +1,22 @@
 """Tests for custom MCP tool interceptors loaded via extensions_config.json."""
 
 import asyncio
+import builtins
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from deerflow.mcp.tools import get_mcp_tools
+import pytest
+
+from deerflow.config.extensions_config import ExtensionsConfig
+from deerflow.mcp.paid_admission import (
+    PaidCallRouteGroupResolution,
+    PaidMCPToolRoute,
+    PaidMCPToolRouteGroup,
+    build_paid_call_grant_interceptor,
+)
+from deerflow.mcp.tools import RequiredMCPConfigurationError, get_mcp_tools
 
 
-def _make_patches(*, interceptor_paths=None):
+def _make_patches(*, interceptor_paths=None, required: bool = False):
     """Set up mocks for get_mcp_tools() with optional custom interceptors.
 
     Returns a dict of patch context managers.
@@ -17,8 +27,11 @@ def _make_patches(*, interceptor_paths=None):
     extra = {}
     if interceptor_paths is not None:
         extra["mcpInterceptors"] = interceptor_paths
+    if required:
+        extra["mcpInterceptorsRequired"] = True
 
     return {
+        "mock_client": mock_client,
         "client_cls": patch(
             "langchain_mcp_adapters.client.MultiServerMCPClient",
             return_value=mock_client,
@@ -108,6 +121,65 @@ def test_multiple_custom_interceptors():
         assert len(interceptors) == 2
         assert interceptors[0] is interceptor_a
         assert interceptors[1] is interceptor_b
+
+
+def test_overlapping_paid_interceptors_fail_closed_even_when_not_required():
+    """ASR single-route and R1/R2 group cannot be installed in parallel."""
+
+    class SingleResolver:
+        async def reserve_approved_call(self, scope):
+            del scope
+            return None
+
+    class GroupResolver:
+        async def reserve_approved_call_for_group(self, scope):
+            del scope
+            return PaidCallRouteGroupResolution()
+
+        async def compensate_admitted_call_for_group(self, scope, **kwargs):
+            del scope, kwargs
+
+    route_key = ("ip_evidence", "inspect_reference_videos")
+    single = build_paid_call_grant_interceptor(
+        routes=[PaidMCPToolRoute(*route_key, "volcengine-mediakit", "asr")],
+        resolver=SingleResolver(),
+    )
+    group = build_paid_call_grant_interceptor(
+        routes=[
+            PaidMCPToolRouteGroup(
+                *route_key,
+                "volcengine-mediakit",
+                ("managed_https_ingress_remux", "video_understanding_chat"),
+            )
+        ],
+        resolver=GroupResolver(),
+    )
+    builders = {
+        "paid.asr:build": lambda: single,
+        "paid.derived:build": lambda: group,
+    }
+    p = _make_patches(
+        interceptor_paths=["paid.asr:build", "paid.derived:build"],
+    )
+
+    with (
+        p["client_cls"] as client_cls,
+        p["from_file"],
+        p["build_servers"],
+        p["oauth_headers"],
+        p["oauth_interceptor"],
+        patch(
+            "deerflow.mcp.tools.resolve_variable",
+            side_effect=lambda path: builders[path],
+        ),
+        pytest.raises(
+            RequiredMCPConfigurationError,
+            match="one composite dispatcher",
+        ),
+    ):
+        asyncio.run(get_mcp_tools())
+
+    client_cls.assert_not_called()
 
 
 def test_custom_interceptor_builder_returning_none_is_skipped():
@@ -272,3 +344,139 @@ def test_custom_interceptor_non_callable_return_logs_warning():
         assert len(_get_interceptors(mock_cls)) == 0
         mock_warn.assert_called_once()
         assert "non-callable" in mock_warn.call_args[0][0]
+
+
+def test_required_custom_interceptor_import_failure_stops_tool_loading():
+    p = _make_patches(
+        interceptor_paths=["broken.path:does_not_exist"],
+        required=True,
+    )
+
+    with (
+        p["client_cls"],
+        p["from_file"],
+        p["build_servers"],
+        p["oauth_headers"],
+        p["oauth_interceptor"],
+        patch(
+            "deerflow.mcp.tools.resolve_variable",
+            side_effect=ImportError("no such module"),
+        ),
+        pytest.raises(RuntimeError, match="Required MCP interceptor failed"),
+    ):
+        asyncio.run(get_mcp_tools())
+
+
+def test_required_mcp_server_discovery_failure_stops_tool_loading():
+    p = _make_patches(
+        interceptor_paths=["pkg.required:build"],
+        required=True,
+    )
+    p["mock_client"].get_tools = AsyncMock(side_effect=RuntimeError("server unavailable"))
+
+    async def interceptor(request, handler):
+        return await handler(request)
+
+    with (
+        p["client_cls"],
+        p["from_file"],
+        p["build_servers"],
+        p["oauth_headers"],
+        p["oauth_interceptor"],
+        patch(
+            "deerflow.mcp.tools.resolve_variable",
+            return_value=lambda: interceptor,
+        ),
+        pytest.raises(RuntimeError, match="Required MCP server failed discovery"),
+    ):
+        asyncio.run(get_mcp_tools())
+
+
+def test_required_mcp_server_returning_no_tools_stops_tool_loading():
+    p = _make_patches(
+        interceptor_paths=["pkg.required:build"],
+        required=True,
+    )
+
+    async def interceptor(request, handler):
+        return await handler(request)
+
+    with (
+        p["client_cls"],
+        p["from_file"],
+        p["build_servers"],
+        p["oauth_headers"],
+        p["oauth_interceptor"],
+        patch(
+            "deerflow.mcp.tools.resolve_variable",
+            return_value=lambda: interceptor,
+        ),
+        pytest.raises(RuntimeError, match="Required MCP capabilities missing"),
+    ):
+        asyncio.run(get_mcp_tools())
+
+
+def test_required_mcp_adapter_dependency_failure_stops_tool_loading():
+    p = _make_patches(
+        interceptor_paths=["pkg.required:build"],
+        required=True,
+    )
+    real_import = builtins.__import__
+
+    def guarded_import(name, *args, **kwargs):
+        if name == "langchain_mcp_adapters.client":
+            raise ImportError("adapter unavailable")
+        return real_import(name, *args, **kwargs)
+
+    with (
+        p["from_file"],
+        patch("builtins.__import__", side_effect=guarded_import),
+        pytest.raises(RuntimeError, match="adapter dependency is unavailable"),
+    ):
+        asyncio.run(get_mcp_tools())
+
+
+def test_required_mcp_server_missing_one_named_tool_stops_tool_loading():
+    p = _make_patches(
+        interceptor_paths=["pkg.required:build"],
+        required=True,
+    )
+    discovered = MagicMock()
+    discovered.name = "test-server_collect_douyin_benchmark_account"
+    p["mock_client"].get_tools = AsyncMock(return_value=[discovered])
+    config = ExtensionsConfig.model_validate(
+        {
+            "mcpInterceptors": ["pkg.required:build"],
+            "mcpInterceptorsRequired": True,
+            "mcpServers": {
+                "test-server": {
+                    "enabled": True,
+                    "required": True,
+                    "type": "stdio",
+                    "command": "fake-server",
+                    "tools": {
+                        "collect_douyin_benchmark_account": {"required": True},
+                        "inspect_reference_videos": {"required": True},
+                    },
+                }
+            },
+        }
+    )
+
+    async def interceptor(request, handler):
+        return await handler(request)
+
+    with (
+        p["client_cls"],
+        p["from_file"] as from_file,
+        p["build_servers"],
+        p["oauth_headers"],
+        p["oauth_interceptor"],
+        patch(
+            "deerflow.mcp.tools.resolve_variable",
+            return_value=lambda: interceptor,
+        ),
+        pytest.raises(RuntimeError, match="inspect_reference_videos"),
+    ):
+        from_file.return_value = config
+        asyncio.run(get_mcp_tools())

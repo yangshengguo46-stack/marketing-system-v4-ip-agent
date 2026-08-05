@@ -1,8 +1,6 @@
 {
   "middlewares": [],
-  "mcpInterceptors": [
-    "my_package.mcp.auth:build_auth_interceptor"
-  ],
+  "mcpInterceptors": [],
   "mcpServers": {
     "github": {
       "enabled": false,
@@ -49,6 +47,65 @@
               "查库",
               "订单表",
               "指标"
+            ]
+          }
+        }
+      }
+    },
+    "ip_evidence": {
+      "enabled": true,
+      "required": true,
+      "type": "stdio",
+      "command": "$DEER_FLOW_PYTHON_EXECUTABLE",
+      "args": [
+        "-m",
+        "deerflow.ip_agent.evidence_mcp"
+      ],
+      "env": {
+        "MEDIAKIT_API_KEY": "$MEDIAKIT_API_KEY",
+        "DEER_FLOW_PROJECT_ROOT": "$DEER_FLOW_PROJECT_ROOT",
+        "DEER_FLOW_HOME": "$DEER_FLOW_HOME",
+        "IP_AGENT_EVIDENCE_BINDING_ACTIVE_KID": "$IP_AGENT_EVIDENCE_BINDING_ACTIVE_KID",
+        "IP_AGENT_EVIDENCE_BINDING_KEYS_JSON": "$IP_AGENT_EVIDENCE_BINDING_KEYS_JSON",
+        "IP_AGENT_EVIDENCE_BINDING_TTL_SECONDS": "1800"
+      },
+      "tool_call_timeout": 3600,
+      "description": "MediaKit-backed Douyin account and reference-video analysis for the IP Agent.",
+      "result_policy": {
+        "trust": "untrusted_external",
+        "semantic_class": "evidence",
+        "outcome_contract": "ip-evidence-operation-status-v1"
+      },
+      "tools": {
+        "collect_douyin_benchmark_account": {
+          "required": true,
+          "routing": {
+            "mode": "prefer",
+            "priority": 100,
+            "keywords": [
+              "抖音主页",
+              "抖音账号",
+              "对标账号",
+              "douyin.com/user/",
+              "benchmark account"
+            ]
+          }
+        },
+        "inspect_reference_videos": {
+          "required": true,
+          "routing": {
+            "mode": "prefer",
+            "priority": 100,
+            "keywords": [
+              "作品链接",
+              "参考视频",
+              "视频",
+              "视频分析",
+              "拆解视频",
+              "上传",
+              "上传视频",
+              "/mnt/user-data/uploads/",
+              "reference video"
             ]
           }
         }

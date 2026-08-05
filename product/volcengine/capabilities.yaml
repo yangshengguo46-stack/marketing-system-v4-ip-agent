@@ -1,5 +1,5 @@
-version: 1
-updated_at: "2026-07-22"
+version: 2
+updated_at: "2026-08-03"
 policy:
   harness: deerflow-local
   provider_preference: bytedance-volcengine-first
@@ -58,16 +58,927 @@ capabilities:
     legacy_credential_alias: VOLCENGINE_TTS_ACCESS_TOKEN
   media_editing_and_understanding:
     product: AI MediaKit
-    integration:
+    role: replaceable-media-kernel
+    agent_direct_access: false
+    integration_boundary: evidence-mcp-bounded-adapters-only
+    upstream_skill_assets:
       - skill:byted-mediakit-shared
       - skill:byted-mediakit-editing
       - skill:byted-mediakit-video
       - skill:byted-mediakit-image
       - skill:byted-mediakit-audio
+    upstream_skill_runtime_status: quarantined-reference-only
     credential: MEDIAKIT_API_KEY
+    credential_effect: key-presence-does-not-authorize-or-promote-any-capability
     cli_source: third_party/volcengine/mediakit-cli
     cli_commit: 279e5bb97e97c6875ae2c6891c2c3fa9a43f39c0
+    cli_upstream_tree: e9b40b73ef691e7bbf5a38c9af4e06d699d62beb
+    cli_source_manifest: third_party/volcengine/mediakit-cli/VENDORED_VERSION.json
+    cli_package_version: 0.2.0
     cli_binary: .deer-flow/bin/mediakit-cli
+    cloud_endpoint:
+      official_current: https://mediakit.cn-beijing.volces.com
+      pinned_cli_default: https://amk.cn-beijing.volces.com
+      legacy_endpoint_status: temporary-compatibility-only
+      product_override: official-current
+      video_understanding_chat_api: https://amk-ark.cn-beijing.volces.com
+    official_surfaces:
+      reviewed_at: "2026-08-03"
+      product_documentation_approximate_capabilities: 63
+      pinned_cli_commands: 40
+      official_mcp_source_tools: 39
+      official_mcp_documentation_tools: 13
+      bundled_upstream_skills: 5
+      rule: product-cli-mcp-skill-and-marketing-counts-are-distinct-contracts
+    official_product_catalog:
+      contract: current-product-directory-grouped-items-v1
+      counting_basis: grouped-items-in-the-official-multimedia-toolset-overview-not-the-sidebar-document-count
+      total: 63
+      groups:
+        video:
+          - generative-video-enhancement
+          - standard-professional-and-fast-video-enhancement
+          - video-subtitle-erasure
+          - video-understanding-smart-strategy
+          - scene-segmentation
+          - speech-to-subtitles
+          - video-hard-subtitle-ocr
+          - microdrama-highlight-editing
+          - minigame-highlight-editing
+          - film-and-tv-highlight-editing
+          - highlight-analysis
+          - greenscreen-video-matting
+          - portrait-video-matting
+          - storyline-analysis
+          - drama-script-restoration
+          - drama-recap-generation
+          - vertical-drama-recap-generation
+          - frame-extraction
+          - invisible-video-watermark
+          - video-face-blur
+          - video-transcoding
+          - intelligent-video-encoding
+          - video-remuxing
+          - video-quality-vqscore
+          - video-metadata
+        image:
+          - image-enhancement
+          - image-quality-assessment
+          - image-face-blur
+          - image-background-removal
+          - image-erasure-and-inpainting
+          - image-ocr
+          - smart-image-crop
+          - image-outpainting
+          - intelligent-image-slimming
+          - image-translation
+          - ecommerce-overlay-removal
+          - product-scene-image-generation
+          - basic-image-editing-suite
+        editing:
+          - vibe-editing
+          - audio-video-concatenation
+          - audio-video-trimming
+          - audio-video-speed-adjustment
+          - audio-extraction
+          - audio-video-muxing
+          - image-to-video
+          - audio-mixing
+          - volume-adjustment
+          - audio-fade-in-and-out
+          - video-flip
+          - video-rotation
+          - video-crop
+          - video-stitching
+          - burn-video-subtitles
+          - overlay-image-on-video
+          - video-filter
+          - extract-animated-image
+          - video-gaussian-blur
+          - scrolling-text-video
+        audio:
+          - vocal-and-background-separation
+          - voice-activity-detection
+          - audio-transcoding
+          - audio-metadata
+        large_model:
+          - video-understanding-chat-extension
+      separately_documented_not-yet-in-primary-directory:
+        - semantic-segmentation
+        - video-face-swap
+    separate_provider_surfaces:
+      video_understanding_chat:
+        counted_in_pinned_cli_commands: false
+        endpoint: https://amk-ark.cn-beijing.volces.com/api/v1/chat/completions
+        official_contract_reviewed_at: "2026-08-03"
+        official_contract_updated_at: "2026-07-14"
+        lifecycle_state: real_sample_verified
+        exposure: none
+        role: provider-semantic-observation
+        implementation_status: isolated-adapter-real-sample-verified
+        real_sample_validation:
+          fixture: product/research/ip-agent/mediakit/2026-08-03-capability-canaries.yaml
+          categorical_visual_observations: passed-on-one-five-second-fixture
+          first-clear-time-error-seconds: 0.2
+          conclusion_limit: transport-and-one-visual-sample-only-not-temporal-authority
+          fixed-profile-repeatability: passed-six-of-six-core-fields-on-two-official-fixture-runs
+          request-compatibility-and-observed-usage:
+            fixture: volcengine-official-five-second-boxing-video
+            observed-at: "2026-08-03"
+            service-tier-requested-and-returned: default
+            max-completion-tokens-requested: 3000
+            completion-tokens-returned: 2929
+            max-completion-enforcement-proof: not-yet-forced-because-fixture-naturally-stayed-below-cap
+            reasoning-tokens-included-in-completion: 1911
+            prompt-tokens-returned: 8382
+            public-tariff-estimate-cny: 0.073687
+            actual-provider-cny-returned: false
+            request-sha256: 4e4892c93a76c8554f3e37513f943b0dccb287ef5ddb9c656aed585c94863da5
+            result-sha256: dd66bac9b2d56b2da9a8f8ed30265af657d6c8cd4400b6cce65fd35b9d43ff59
+          exact-douyin-work: passed-one-70.867-second-account-bound-work-after-one-billing-unknown-timeout
+          stable-canonical-douyin-work-url: failed-provider-operator-error-500-with-real-credential
+          mediakit-uploaded-file-id: upload-succeeded-chat-failed-provider-500
+          stable-provider-input: passed-remux-temporary-https-on-one-exact-douyin-work
+          selected-ingress: mediakit-remux-temporary-https-public-reference-canary
+          ingress-state: protocol-canary-passed-not-yet-evidence-mcp-integrated
+          native-upload-authentication: mediakit-api-key-only-confirmed
+          cross-service-tos-authorization: operator-confirmed-enabled
+          rejected-diagnosis: missing-tos-authorization-or-tos-credentials-for-native-upload
+          managed-remux-https:
+            adapter: volcengine-mediakit-remux-https-ingress-v1
+            input: sealed-local-source-to-mediakit-uri
+            output: provider-temporary-https
+            output-ttl-seconds-observed: 86399
+            source-to-candidate-binding: audio-and-video-packet-payload-equivalent
+            source-duration-seconds: 70.867
+            candidate-duration-seconds: 70.867
+            chat-outcome: success
+            chat-total-tokens: 41313
+            pricing-document: https://docs.volcengine.com/docs/6448/2486473?lang=zh
+            published-remux-cny-per-output-minute: 0.007
+            q157-public-tariff-estimate-cny: 0.008268
+            actual-provider-cny-returned: false
+            runtime-url-persisted: false
+            immediate-delete-or-revoke-receipt: unavailable
+            public-reference-scope: protocol-canary-passed
+            private-or-confidential-scope: not-approved
+            product-promoted: false
+          evidence_mcp_integration: not-yet-complete
+        api_shape: volcengine-ark-chat-wrapper
+        authentication:
+          requires:
+            - volcengine-ark-api-key
+            - mediakit-api-key
+          credential_sources:
+            volcengine-ark-api-key: VOLCENGINE_API_KEY
+            mediakit-api-key: MEDIAKIT_API_KEY
+          wire_format: composite-bearer-with-slash
+          product_control: compose-server-side-and-never-persist-or-expose-the-composite-value
+        model_selection:
+          mode: caller-supplied-explicit-ark-model-id
+          q157_canary_model_id: doubao-seed-2-0-pro-260215
+          provider_auto_routing: false
+        input:
+          modalities:
+            - text
+            - video-url
+          maximum_video_url_size_gb: 5
+          base64_and_files_api:
+            supported_by_this_mediakit_endpoint: false
+            separate_contract: volcengine-ark-direct-video-understanding
+            maximum_size_gb_not_inherited: true
+        preprocessing:
+          provider-managed-frame-extraction: true
+          provider-managed-frame-serialization: true
+          fps:
+            default: 1
+            minimum: 0.01
+            maximum: 5
+          max_frames_supported: true
+          max_pixels:
+            default: 677376
+            maximum: 9031680
+          approximate_internal_token_ceiling: 200000
+          rule: actual-frame-coverage-is-bounded-by-fps-max-frames-and-token-ceiling
+        output:
+          default: free-form-model-response
+          structured_json_object_status: beta
+          structured_json_schema_status: beta
+          provider_usage_tokens_returned: true
+          timestamped-evidence-guaranteed: false
+          frame-coverage-receipt-guaranteed: false
+        pricing:
+          mediakit_video-understanding-processing-currently-free: true
+          ark_input-and-output-tokens-billed-separately: true
+          ark-price-document: https://docs.volcengine.com/docs/82379/1544106?lang=zh
+          price-status: public-tariff-estimate-not-provider-quote-or-invoice
+          fixed-model-id: doubao-seed-2-0-pro-260215
+          model-family: doubao-seed-2.0-pro
+          billing-mode: online-standard
+          service-tier: default
+          prompt-tier-selects-whole-request-rate: true
+          uncached-prompt-cny-per-million-by-upper-inclusive-token-bound:
+            32768: 3.2
+            131072: 4.8
+            262144: 9.6
+          completion-cny-per-million-by-upper-inclusive-prompt-token-bound:
+            32768: 16
+            131072: 24
+            262144: 48
+          reasoning-accounting: included-once-in-provider-completion-tokens
+          cache-assumption: all-prompt-tokens-uncached-until-explicit-cache-is-proven
+        audio_understanding_supported: false
+        semantic_boundary:
+          - output-is-provider-model-inference-not-source-fact
+          - omitted-or-misread-events-remain-possible
+          - no-account-or-work-identity-authority
+          - no-virality-causality-or-ip-direction-authority
+          - reconcile-material-claims-with-sealed-frames-asr-ocr-and-human-ground-truth
+        promotion_gate:
+          - persist-provider-task-or-request-recovery-before-paid-canary
+          - normalize-request-model-sampling-and-usage-receipts
+          - require-a-fixed-structured-question-contract
+          - benchmark-against-human-annotated-reference-videos
+          - measure-temporal-coverage-hallucination-and-repeatability
+      video_understanding_smart_strategy:
+        counted_in_pinned_cli_commands: false
+        pinned-cli-version: 0.2.0
+        pinned-and-upstream-head-commit: 279e5bb97e97c6875ae2c6891c2c3fa9a43f39c0
+        route-exposed-by-current-cli: false
+        endpoint: https://mediakit.cn-beijing.volces.com/api/v1/tools/video-understand-router
+        official_contract_reviewed_at: "2026-08-03"
+        official_guide_updated_at: "2026-07-31"
+        official_submit-api_updated_at: "2026-07-30"
+        official_guide-pdf-sha256: 344e62bd8b5ea6939d6b92a417c3b398ae26352b2b68e04622953fd411c8cc6e
+        official_submit-api-pdf-sha256: b2cbb49cbcde5db0cb2a95a2957f75c7dc0c6cb130953e14a519259becb618a3
+        lifecycle_state: paid-canary-external-blocked
+        exposure: none
+        role: provider-inference
+        implementation_status: isolated-research-adapter-and-canary-only
+        make-or-buy_hypothesis: may-replace-custom-remux-plus-synchronous-chat-route-if-grounded-canary-passes
+        asynchronous_execution:
+          client-token-idempotency: supported
+          provider-task-id: supported
+          query-existing-task: supported
+          callback-not-required: true
+          automatic-submit-retry-product-policy: forbidden
+          recoverable-encrypted-task-handle: standalone-canary-wired-not-product-promoted
+          bounded-provider-error-code-receipt: isolated-canary-implemented
+          provider-error-receipt-policy:
+            cleartext-fields:
+              - code
+              - type
+              - param
+            unsafe-value-policy: field-sha256-only
+            raw-message-and-payload-persisted: false
+        input:
+          maximum_video_count: 10
+          maximum_each_hours: 2
+          protocols:
+            - http
+            - https
+            - mediakit
+            - vod
+            - tos
+        routing:
+          editing-scene: timestamped-storyboard-oriented-provider-mode
+          automatic_levels:
+            - Economy
+            - Balanced
+            - Quality
+          short-video-under-one-minute:
+            level-ignored: true
+            frame-strategy: uniform-1-fps
+            model: doubao-seed-2-0-mini-260428
+          medium-and-long-video:
+            Economy:
+              frame-strategy: intelligent-about-30-percent-of-1-fps-total
+              model: doubao-seed-2-0-mini-260428
+            Balanced:
+              frame-strategy: intelligent-about-60-percent-of-1-fps-total
+              model: doubao-seed-2-0-pro-260215
+            Quality:
+              frame-strategy: uniform-1-fps
+              model: doubao-seed-2-0-pro-260215
+          manual_fps:
+            default: 1
+            minimum: 0.2
+            maximum: 5
+          maximum_frames: 1000
+          audio_prompt_keywords_can_override_level: true
+          audio-keyword-forced-model-currently-documented: doubao-seed-2-0-lite-260428
+          manual-audio-capable-models-currently-documented:
+            - doubao-seed-2-0-lite-260428
+            - doubao-seed-2-0-mini-260428
+          provider_selects_frame-strategy-model-and-audio-path: true
+        output:
+          contents_are_model_generated: true
+          contents-contract: array-of-generated-strings-not-a-source-fact-schema
+          total-input-duration-seconds-returned: true
+          provider_usage_tokens_returned: true
+          exact_frame_coverage_receipt_returned: false
+        pricing:
+          mediakit-price-document: https://docs.volcengine.com/docs/6448/2486473?lang=zh
+          mediakit-price-document-updated-at: "2026-07-22"
+          mediakit-price-pdf-sha256: d96ddef356ed6e513c6c605e5d727787e29638f94c82a6545d313fd770fc7bdb
+          mediakit-billing-basis: input-video-duration
+          mediakit_cny_per_input_minute: 0.01
+          ark_tokens_billed_separately: true
+          returned-token-usage-separates-audio-from-non-audio-input: false
+          exact-ark-public-estimate-with-audio-from-this-receipt-alone: unavailable
+          estimate-is-not-provider-quote-or-invoice: true
+          resource-package-may-change-cash-bill: true
+          ark-price-document-pdf-sha256: b2fa9555cc4b9a5459f31300e0daea2f85e6630aee353119385d550f1c0f2808
+        semantic_boundary:
+          - output-is-provider-inference-not-source-fact
+          - automatic-routing-reduces-repeatability
+          - audio-keywords-can-change-the-model-and-ignore-level-selection
+          - the-0.01-cny-per-minute-fee-excludes-ark-model-token-charges
+          - important-claims-require-sealed-observation-cross-checks
+        q157_paid_canary:
+          source_sha256: 8e098c16f3634f27bbd8ca6bd30e41ed5c9816d6ff4654922d115198a4ec10fc
+          local-pre-submit-failure: signed-upload-url-was-incorrectly-subjected-to-identifier-limit
+          local-pre-submit-billing-outcome: not-submitted
+          official-upload-host-observed: tob-upload-x-d.volcvod.com
+          official-upload-url-length-observed: 6079
+          upload-url-contract-corrected-to-independent-max-bytes: 8192
+          real-submit-attempts: 1
+          automatic-submit-retries: 0
+          terminal-local-status: provider-rejected
+          safe-error-code: POLL_REJECTED
+          billing-outcome: unknown
+          duration-contents-or-token-usage-returned: false
+          receipt_sha256: 55cbf8c4922d42389e978461f534905e193a5cbbb3a9568af8c04edbe8dce6c1
+          capability-or-quality-conclusion: unavailable
+          provider-console-task-status: failed
+          provider-console-task-created-at: "2026-08-03T21:48:12+08:00"
+          provider-console-experience-detail-supported: false
+          provider-console-diagnostic-boundary: task-type-does-not-support-experience-detail
+          existing-task-get-attempts-after-console-block: 1
+          existing-task-get-created-no-new-provider-task: true
+          provider-safe-error-code: AbilityProcessingError
+          provider-safe-error-type: InternalServerError
+          provider-task-response-sha256: 113836ecbe67b216bb6678d4a7711667dcefdba2e457cc83b958b053f2770a6f
+          provider-task-response-matches-original-final-poll: true
+          exact-provider-cause-and-billing-detail: unavailable
+          supported-failure-layer: provider-internal-ability-processing
+          identifier-confidentiality-finding: plain-sha256-is-not-a-secrecy-boundary-for-low-entropy-provider-ids
+          next-gate: provider-support-cause-and-billing-reconciliation-plus-local-timeline-evidence
+          recovery-plan:
+            reuse-migrations: 0022-through-0026
+            new-migration-required: false
+            remux-specific-recovery-contract-validation: resolved-with-strict-dispatch
+            current-code-blocker: resolved-in-standalone-canary
+            dispatch-key:
+              - provider
+              - capability
+              - contract-version
+            required-strategy-contracts:
+              - ip-mediakit-video-strategy-submission-recovery-v1
+              - ip-mediakit-video-strategy-submitted-task-recovery-v1
+            future-submit-rule: persist-exact-encrypted-body-and-token-before-post
+            future-query-rule: existing-task-id-allows-get-only
+            repository-contract-regression: 59-passed
+            repository-and-bridge-neighbor-regression: 54-passed
+            standalone-canary-strategy-regression: 31-passed
+            standalone-canary-plus-paid-remux-regression: 66-passed
+        rule: must-not-be-aliased-to-video-understanding-chat
+      semantic_segmentation:
+        counted_in_pinned_cli_commands: false
+        endpoint: https://mediakit.cn-beijing.volces.com/api/v1/tools/semantic-segment
+        official_contract_reviewed_at: "2026-08-03"
+        lifecycle_state: contract_verified
+        exposure: none
+        role: probabilistic-observation-sensor
+        implementation_status: not-integrated
+        input:
+          maximum_each_hours: 3
+          protocols:
+            - http
+            - https
+            - mediakit
+            - vod
+            - tos
+        controls:
+          minimum_segment_seconds_default: 3
+          maximum_segment_seconds_default: 30
+          boundary_shift_tolerance_seconds_default: 0
+        output:
+          gzip_json: true
+          timestamps_only: true
+          segment_transcript_or_semantic_label_returned: false
+          temporary_result_hours: 24
+        pricing:
+          cny_per_input_minute: 0.03
+        semantic_boundary:
+          - boundaries-are-provider-observations-not-editorial-decisions
+          - semantic-completeness-claim-requires-golden-cut-testing
+      vibe_editing:
+        counted_in_pinned_cli_commands: false
+        endpoint: https://mediakit.cn-beijing.volces.com/api/v1/tools/vibe-editing
+        official_contract_reviewed_at: "2026-08-03"
+        lifecycle_state: real_sample_verified
+        exposure: none
+        role: artifact-candidate-effector
+        implementation_status: not-integrated
+        real_sample_validation:
+          fixture: product/research/ip-agent/mediakit/2026-08-03-capability-canaries.yaml
+          simple-zero-to-two-second-trim: mechanically-passed-on-one-fixture
+          editable-project-returned: false
+          conclusion_limit: one-simple-trim-does-not-prove-semantic-editing-repeatability-or-project-authority
+        input:
+          modalities:
+            - natural-language
+            - public-image-url
+            - public-video-url
+            - public-audio-url
+            - public-subtitle-url
+          public-http-or-https-only: true
+        supported_operations:
+          - content-aware-selection
+          - multi-asset-sequencing
+          - trim-loop-speed
+          - crop-transform-flip-rotate
+          - color-filter-effect-blur
+          - transitions-and-element-animation
+          - volume-and-audio-fades
+          - text-srt-ass-and-styling
+          - cloud-multitrack-render
+        output:
+          formats:
+            - mp4
+            - mp3
+          video_resolution_presets:
+            - 360p
+            - 480p
+            - 720p
+            - 1080p
+            - 2k
+            - 4k
+          custom_dimension_minimum: 160
+          custom_dimension_maximum: 8192
+          fps_minimum: 15
+          fps_maximum: 60
+          artifact_url_hours: 24
+          editable_timeline_returned: false
+          edl_returned: false
+          operation_receipts_returned: false
+          source_project_returned: false
+        preview_editor:
+          console_available: true
+          integration_api_status: future
+          web_sdk_status: future
+        pricing:
+          intent_and-llm-currently-free: true
+          synthesis_uses_basic-editing-output-duration: true
+          content-understanding_ark_tokens_billed_separately: true
+        semantic_boundary:
+          - use-as-rough-cut-or-artifact-candidate-not-project-authority
+          - final-artifact-requires-local-download-hash-and-qa
+          - never-infer-that-a-prompt-was-executed-exactly-from-description-text
+      drama_script_restoration:
+        counted_in_pinned_cli_commands: false
+        endpoint: https://mediakit.cn-beijing.volces.com/api/v1/tools/drama-script
+        official_contract_reviewed_at: "2026-08-03"
+        lifecycle_state: contract_verified
+        exposure: none
+        role: domain-specific-provider-inference
+        implementation_status: not-integrated
+        applicable_inputs:
+          - live-action-short-drama
+          - live-action-long-drama
+          - live-action-film
+        unsupported_inputs:
+          - animation
+          - documentary
+          - advertising
+          - livestream-recording
+        requirements:
+          hard-subtitles: true
+          same-resolution-across-inputs: true
+          minimum_video_count: 1
+          maximum_video_count: 100
+          maximum_each_minutes: 120
+          maximum_total_minutes: 300
+        output:
+          structured_scene-segment-camera-visual-dialogue-json: true
+          gzip_or_package: true
+          temporary_result_hours: 24
+          creative-script-generation: false
+        pricing:
+          cny_per_input_minute: 3
+        semantic_boundary:
+          - reverse-engineers-eligible-existing-drama-only
+          - not-a-general-ip-script-writer
+          - not-default-for-mv-advertising-documentary-or-talking-head-inputs
+      drama_recap_generation:
+        counted_in_pinned_cli_commands: false
+        endpoint: https://mediakit.cn-beijing.volces.com/api/v1/tools/drama-recap
+        official_contract_reviewed_at: "2026-08-03"
+        lifecycle_state: contract_verified
+        exposure: none
+        role: domain-specific-artifact-candidate-effector
+        implementation_status: not-integrated
+        prerequisites:
+          completed-drama-script-task-required: true
+        output:
+          ai-or-user-recap-text: true
+          ai-voice: true
+          subtitles: true
+          original-hard-subtitle-erasure: true
+        pricing:
+          cny_per_output_minute: 0.39
+          upstream-drama-script-charged-separately: true
+        semantic_boundary:
+          - niche-drama-recap-production-only
+          - not-a-general-personal-brand-or-product-ip-video-pipeline
+    capability_catalog:
+      contract: pinned-cli-help-and-source-v1
+      total: 40
+      marketing_100_plus_is_runtime_contract: false
+      modes:
+        local_and_cloud_async:
+          - probe-audio-metadata
+          - add-image-to-video
+          - add-subtitle-to-video
+          - adjust-audio-speed
+          - adjust-video-speed
+          - adjust-video-volume
+          - concat-audio
+          - concat-video
+          - extract-audio
+          - fade-audio
+          - fade-video-audio
+          - flip-video
+          - mix-audio
+          - mux-audio-video
+          - trim-audio
+          - trim-video
+          - matte-greenscreen-video
+          - probe-video-metadata
+        local_only:
+          - fetch-file
+        cloud_async_only:
+          - separate-voice
+          - apply-video-filter
+          - image-to-video
+          - analyze-video-highlights
+          - analyze-video-storyline
+          - asr-subtitles
+          - enhance-video
+          - enhance-video-generative
+          - erase-video-subtitle
+          - erase-video-subtitle-pro
+          - generate-highlights-microdrama
+          - generate-highlights-minigame
+          - matte-portrait-video
+          - segment-scenes
+          - video-ocr
+        cloud_sync_only:
+          - enhance-image
+          - erase-image
+          - evaluate-image-quality
+          - image-ocr
+          - remove-image-background
+        cloud_task_query:
+          - query-task
+      domains:
+        audio:
+          - probe-audio-metadata
+          - separate-voice
+        editing:
+          - add-image-to-video
+          - add-subtitle-to-video
+          - adjust-audio-speed
+          - adjust-video-speed
+          - adjust-video-volume
+          - apply-video-filter
+          - concat-audio
+          - concat-video
+          - extract-audio
+          - fade-audio
+          - fade-video-audio
+          - flip-video
+          - image-to-video
+          - mix-audio
+          - mux-audio-video
+          - trim-audio
+          - trim-video
+        image:
+          - enhance-image
+          - erase-image
+          - evaluate-image-quality
+          - image-ocr
+          - remove-image-background
+        shared:
+          - fetch-file
+          - query-task
+        video:
+          - analyze-video-highlights
+          - analyze-video-storyline
+          - asr-subtitles
+          - enhance-video
+          - enhance-video-generative
+          - erase-video-subtitle
+          - erase-video-subtitle-pro
+          - generate-highlights-microdrama
+          - generate-highlights-minigame
+          - matte-greenscreen-video
+          - matte-portrait-video
+          - probe-video-metadata
+          - segment-scenes
+          - video-ocr
+    semantic_classes:
+      mechanical_sensors:
+        - probe-audio-metadata
+        - probe-video-metadata
+      probabilistic_observation_sensors:
+        - asr-subtitles
+        - video-ocr
+        - image-ocr
+        - segment-scenes
+      inferential_sensors:
+        - analyze-video-highlights
+        - analyze-video-storyline
+        - evaluate-image-quality
+      derivative_effectors:
+        - separate-voice
+        - add-image-to-video
+        - add-subtitle-to-video
+        - adjust-audio-speed
+        - adjust-video-speed
+        - adjust-video-volume
+        - apply-video-filter
+        - concat-audio
+        - concat-video
+        - extract-audio
+        - fade-audio
+        - fade-video-audio
+        - flip-video
+        - image-to-video
+        - mix-audio
+        - mux-audio-video
+        - trim-audio
+        - trim-video
+        - enhance-image
+        - erase-image
+        - remove-image-background
+        - enhance-video
+        - enhance-video-generative
+        - erase-video-subtitle
+        - erase-video-subtitle-pro
+        - generate-highlights-microdrama
+        - generate-highlights-minigame
+        - matte-greenscreen-video
+        - matte-portrait-video
+      transport_controls:
+        - fetch-file
+        - query-task
+    capability_lifecycle:
+      states:
+        - inventory
+        - contract_verified
+        - real_sample_verified
+        - product_promoted
+        - suspended
+      default_state: inventory
+      promotion_rule: only-product-promoted-capabilities-may-enter-the-default-agent
+      current_overrides:
+        probe-video-metadata:
+          state: product_promoted
+          exposure: default-ip-agent-evidence-mcp
+          validation: one-local-real-file-mediakit-versus-ffprobe-ab
+          conclusion_limit: mechanical-container-and-first-stream-metadata-only
+        asr-subtitles:
+          state: product_promoted
+          exposure: default-ip-agent-evidence-mcp
+          validation: real-direct-mcp-and-default-agent-turn
+          quality_status: insufficient-one-sample-known-homophone-substitution
+          execution_status: active-when-mediakit-api-key-is-configured
+          conclusion_limit: probabilistic-timestamped-speech-observation-not-verbatim-fact
+        video-ocr:
+          state: product_promoted
+          exposure: default-ip-agent-evidence-mcp
+          validation: real-cloud-execution-through-evidence-mcp
+        segment-scenes:
+          state: product_promoted
+          exposure: default-ip-agent-evidence-mcp
+          validation: real-full-cloud-execution-through-default-evidence-pipeline
+        analyze-video-storyline:
+          state: product_promoted
+          exposure: default-ip-agent-evidence-mcp
+          validation: real-full-cloud-execution-through-default-evidence-pipeline
+    production_admission:
+      promoted_capabilities:
+        - probe-video-metadata
+        - asr-subtitles
+        - video-ocr
+        - segment-scenes
+        - analyze-video-storyline
+      key_alone_enables_cloud: true
+      per_capability_paid_admission_required: false
+      source_sha256_required: true
+      normalized_contract_required: true
+      bounded_timeout_required: true
+      receipt_required: true
+      human_ground_truth_quality_suite_required_for_probabilistic_sensors: true
+      exact_output_hash_and_qa_required_for_effectors: true
+    replacement_boundary:
+      video-use:
+        relationship: provider-beneath-method
+        mediakit_may_replace:
+          - metadata-asr-ocr-scene-and-audio-observation-backends
+          - commodity-trim-concat-mix-overlay-subtitle-transcode-and-enhancement-execution
+          - best-effort-rough-cut-candidate-generation
+        product_must_retain:
+          - conversational-source-and-intent-discovery
+          - editing-strategy-confirmation
+          - typed-versioned-edl-or-timeline-ir
+          - word-boundary-and-cut-quality-evidence
+          - user-directed-iteration
+          - independent-final-qa-and-project-state
+      hyperframes:
+        relationship: complementary-programmatic-renderer
+        product_must_retain:
+          - html-css-svg-and-arbitrary-programmatic-composition
+          - deterministic-seekable-frame-runtime
+          - source-controlled-variables-components-and-checks
+      remotion:
+        relationship: compatibility-programmatic-renderer-pending-consolidation
+        retirement_condition:
+          - hyperframes-passes-the-same-programmatic-scene-golden-suite
+          - no-live-product-path-requires-react-specific-composition
+          - existing-projects-have-a-tested-migration-or-reader
+      vibe-editing:
+        allowed_role:
+          - rough-cut-candidate
+          - low-risk-automatic-cloud-assembly
+        forbidden_role:
+          - sole-editable-project-authority
+          - sole-deterministic-final-renderer
+          - evidence-or-causal-creative-authority
+    responsibility_boundary:
+      owns:
+        - bounded-media-execution-behind-product-adapters
+        - provider-task-transport
+        - local-ffmpeg-command-plans
+      does_not_own:
+        - account-or-work-identity
+        - source-content-identity
+        - owner-authorization
+        - paid-call-authorization
+        - evidence-coverage
+        - ip-positioning
+        - causal-content-mechanisms
+        - virality-or-conversion-claims
+        - scripts-or-business-decisions
+    hard_invariants:
+      - upstream-local-and-cloud-flags-are-preference-order-not-security-boundaries
+      - no-agent-shell-or-direct-upstream-skill-execution
+      - fetch-file-is-never-agent-visible
+      - query-task-uses-caller-owned-bounded-polling
+      - provider-file-id-is-never-content-identity
+      - provider-results-are-untrusted-and-normalized-per-capability
+      - observations-inferences-and-derived-assets-remain-distinct
+      - missing-or-truncated-provider-data-is-never-relabelled-complete
+    known_upstream_gaps:
+      execution_mode_fallback:
+        risk: local-first-may-fall-back-to-paid-cloud-and-cloud-first-may-fall-back-local
+        product_control: exact-environment-plus-capability-specific-adapter
+      upload_cache:
+        identity: absolute-path-plus-size-plus-mtime
+        ttl_days: 30
+        missing_dimensions:
+          - content-sha256
+          - owner
+          - api-key
+          - endpoint
+          - capability
+        product_control: isolated-per-request-home-plus-local-content-sha256
+      cloud_input_attestation:
+        provider_returns_content_sha256: false
+        product_label: sealed-local-snapshot-provider-unattested
+      output_contract:
+        cli_schema_is_sufficient_for_cloud_semantics: false
+        observed_drift: real-asr-used-subtitle_text-not-described-by-final-result-schema
+        product_control: versioned-capability-normalizer-plus-real-contract-fixtures
+      polling:
+        upstream_poll_complete_is_bounded: false
+        product_control: caller-deadline-single-query
+      local_file_and_network_access:
+        upstream_safe_for_direct-agent-use: false
+        risks:
+          - arbitrary-local-path-read
+          - remote-fetch-without-product-ssrf-boundary
+          - missing-content-type-and-size-enforcement
+        product_control: owner-scoped-sealed-inputs-and-product-network-policy
+      local_resource_limits:
+        upstream_declared_limits_are_enforced: false
+        product_control: product-process-time-size-and-concurrency-limits
+      provider_accuracy:
+        guaranteed: false
+        known_error: mandarin-asr-misrecognized-huizhi-receipt-as-huizhi-value
+      local_trim_precision:
+        upstream_plan: input-seek-plus-stream-copy
+        requested_window_real_ab_seconds:
+          start: 1
+          end: 3
+          expected_duration: 2
+          observed_duration: 2.166016
+        exact_reencode_reference_duration: 2
+        conclusion: not-suitable-for-word-boundary-or-frame-exact-cuts-without-a-precise-render-path
+      pricing:
+        published-unit-price-available: true
+        asr-cny-per-input-minute-reviewed-2026-08-03: 0.03
+        exact-provider-quote-per-task-available: false
+        provider-actual-cost-returned: false
+        product_control: local-risk-cap-plus-reconciliation-required
+      service_retention:
+        local-upload-maximum-gibibytes: 5
+        upload-url-hours: 24
+        uploaded-source-retention-days: 30
+        ordinary-result-link-retention-hours: 24
+        product_control: immediately-download-hash-and-seal-required-results
+      idempotency:
+        client-token-maximum-characters: 64
+        official-default-window-is-consistent: false
+        documented-windows:
+          - 24-hours
+          - 2-days
+        product_control: persist-client-token-task-id-and-source-sha256
+        owner_isolation: owner-call-stage-sha256
+      async_recovery:
+        paid-call-recovery-repository-implemented: true
+        adapter-submit-query-wired: false
+        provider-task-reference-is-durably-persisted-by-current-product-path: false
+        risk: timeout-or-process-loss-can-still-leave-a-billable-task-unrecoverable-before-adapter-wiring
+        product_control: no-new-product-path-paid-promotion-until-submit-query-uses-the-recovery-repository
+      concurrency:
+        account-wide-async-limit: 20
+        maximum-queues-per-account: 10
+        unified-qps-published: false
+        product_control: bounded-concurrency-and-exponential-backoff
+      result_service_levels:
+        asr-or-ocr-accuracy-guarantee: absent
+        per-tool-latency-guarantee: absent
+        model-output-stability-guarantee: absent
+        cli-or-mcp-backward-compatibility-policy: absent
+      data_and_authorization:
+        credential_kind: server-api-key-not-end-user-oauth
+        customer-content-authorization-owned-by: product-owner
+        provider-result-accuracy-guaranteed: false
+        dedicated-public-dpa-found: false
+        exact-source-deletion-sla-found: false
+      local_runtime_compatibility:
+        upstream_documented_ffmpeg: 5.1.x
+        project_ffmpeg: 8.1.2
+        product_control: each-local-operation-needs-real-ab-before-promotion
+      upstream_tests:
+        media-algorithm-or-cloud-contract-coverage: absent
+        product_control: product-owned-golden-media-and-contract-regressions
+      license:
+        root-license-and-package: MIT
+        open-source-notice-product-statement: Apache-2.0
+        status: clarification-required-before-distribution
+    documented_limits:
+      asr-subtitles:
+        maximum_hours: 3
+        explicit-language-hints:
+          - cmn-Hans-CN
+          - eng-US
+        automatic-language-detection_claimed: true
+        semantic_status: observation-not-verbatim-fact
+      video-ocr:
+        maximum_minutes: 10
+        minimum_resolution: 240p
+        maximum_resolution: 4k
+        recognized-languages:
+          - simplified-chinese
+          - english
+        semantic_status: observation-not-account-or-content-identity
+      image-ocr:
+        recognized-print-languages:
+          - simplified-chinese
+          - english
+      analyze-video-highlights:
+        maximum_video_count: 100
+        maximum_total_minutes: 300
+        supported_models:
+          - Miniseries
+          - Game
+      analyze-video-storyline:
+        maximum_video_count: 30
+        maximum_total_minutes: 210
+        intended_domain: film-and-episodic-story
+        semantic_status: provider-model-interpretation-not-causal-fact
+      segment-scenes:
+        maximum_each_hours: 2
+        semantic_status: visual-transition-boundary-not-narrative-causality
+      enhance-video:
+        maximum_each_gibibytes: 100
+      probe-video-metadata-cloud:
+        public-http-or-https-only: true
+        maximum_resolution: 4k
     local_ffmpeg:
       version: 8.1.2
       binary: .deer-flow/toolchains/ffmpeg/bin/ffmpeg
@@ -120,6 +1031,30 @@ sources:
   - https://www.volcengine.com/docs/82379/seedream?lang=zh
   - https://www.volcengine.com/docs/6561/153106?lang=zh
   - https://www.volcengine.com/docs/6448?lang=zh
+  - https://www.volcengine.com/docs/6448/2373721
+  - https://www.volcengine.com/docs/6448/2300661
+  - https://www.volcengine.com/docs/6448/2536893
+  - https://www.volcengine.com/docs/6448/2566475
+  - https://www.volcengine.com/docs/6448/2253924
+  - https://www.volcengine.com/docs/6448/2519520
+  - https://www.volcengine.com/docs/6448/2600011
+  - https://www.volcengine.com/docs/6448/2222230
+  - https://www.volcengine.com/docs/6448/2222229
+  - https://www.volcengine.com/docs/6448/2210221
+  - https://www.volcengine.com/docs/6448/2486472
+  - https://www.volcengine.com/docs/6448/2551133
+  - https://www.volcengine.com/docs/6448/2552748
+  - https://www.volcengine.com/docs/6448/2549864
+  - https://www.volcengine.com/docs/6448/2563056
+  - https://www.volcengine.com/docs/6448/2558632
+  - https://www.volcengine.com/docs/6448/2563057
+  - https://www.volcengine.com/docs/6448/2479866
+  - https://www.volcengine.com/docs/6448/2484442
+  - https://www.volcengine.com/docs/6448/2479867
+  - https://www.volcengine.com/docs/6448/2488167
+  - https://www.volcengine.com/docs/6448/2486459
+  - https://www.volcengine.com/docs/6448/2486470
+  - https://www.volcengine.com/docs/6448/2486473
   - https://www.volcengine.com/docs/86681?lang=zh
   - https://github.com/bytedance/deer-flow
   - https://github.com/bytedance/HLLM

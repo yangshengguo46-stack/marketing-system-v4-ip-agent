@@ -569,10 +569,37 @@ class TestConvertCallToolResultRewrites:
     def test_error_result_raises_tool_exception(self, paths: Paths):
         from langchain_core.tools import ToolException
 
-        result = CallToolResult(content=[TextContent(type="text", text="boom")], isError=True)
+        result = CallToolResult(
+            content=[
+                TextContent(
+                    type="text",
+                    text="boom",
+                    _meta={"source_id": "failure-1"},
+                )
+            ],
+            structuredContent={"status": "failed"},
+            _meta={"trace_id": "trace-failed"},
+            isError=True,
+        )
 
-        with _patch_paths(paths), pytest.raises(ToolException, match="boom"):
+        with _patch_paths(paths), pytest.raises(ToolException, match="boom") as raised:
             mcp_tools._convert_call_tool_result(result, thread_id="t1", user_id="u1")
+
+        assert raised.value.artifact == {
+            "structured_content": {"status": "failed"},
+            "mcp_metadata": {
+                "contract_version": "mcp-result-metadata-v1",
+                "sanitization_policy": "credential-redacted-bounded-v1",
+                "result_meta": {"trace_id": "trace-failed"},
+                "content": [
+                    {
+                        "index": 0,
+                        "type": "text",
+                        "meta": {"source_id": "failure-1"},
+                    }
+                ],
+            },
+        }
 
     def test_structured_content_becomes_artifact(self, paths: Paths):
         result = CallToolResult(content=[TextContent(type="text", text="ok")], structuredContent={"k": "v"}, isError=False)
@@ -581,3 +608,152 @@ class TestConvertCallToolResultRewrites:
             _, artifact = mcp_tools._convert_call_tool_result(result, thread_id="t1", user_id="u1")
 
         assert artifact == {"structured_content": {"k": "v"}}
+
+    def test_audio_content_remains_an_audio_block(self, paths: Paths):
+        from mcp.types import AudioContent
+
+        result = CallToolResult(
+            content=[AudioContent(type="audio", data="QUJD", mimeType="audio/mpeg")],
+            isError=False,
+        )
+
+        with _patch_paths(paths):
+            content, artifact = mcp_tools._convert_call_tool_result(
+                result,
+                thread_id="t1",
+                user_id="u1",
+            )
+
+        assert content[0]["type"] == "audio"
+        assert content[0]["base64"] == "QUJD"
+        assert content[0]["mime_type"] == "audio/mpeg"
+        assert artifact is None
+
+    def test_oversized_audio_fails_closed_before_reaching_model_content(self, paths: Paths, monkeypatch):
+        from langchain_core.tools import ToolException
+        from mcp.types import AudioContent
+
+        monkeypatch.setattr(mcp_tools, "_MAX_MCP_AUDIO_BYTES", 2)
+        result = CallToolResult(
+            content=[AudioContent(type="audio", data="QUJD", mimeType="audio/mpeg")],
+            isError=False,
+        )
+
+        with _patch_paths(paths), pytest.raises(ToolException, match="audio payload exceeds"):
+            mcp_tools._convert_call_tool_result(result, thread_id="t1", user_id="u1")
+
+    def test_mcp_annotations_and_meta_are_preserved_in_bounded_artifact(self, paths: Paths):
+        from mcp.types import Annotations
+
+        result = CallToolResult(
+            content=[
+                TextContent(
+                    type="text",
+                    text="observed text",
+                    annotations=Annotations(audience=["assistant"], priority=0.75),
+                    _meta={
+                        "source_id": "source-1",
+                        "authorization": "Bearer must-not-survive",
+                        "note": "token=must-not-survive",
+                    },
+                )
+            ],
+            _meta={"trace_id": "trace-1", "cookie": "must-not-survive"},
+            isError=False,
+        )
+
+        with _patch_paths(paths):
+            content, artifact = mcp_tools._convert_call_tool_result(
+                result,
+                thread_id="t1",
+                user_id="u1",
+            )
+
+        assert content[0]["type"] == "text"
+        assert content[0]["text"] == "observed text"
+        assert "annotations" not in content[0]
+        assert "meta" not in content[0]
+        assert artifact == {
+            "mcp_metadata": {
+                "contract_version": "mcp-result-metadata-v1",
+                "sanitization_policy": "credential-redacted-bounded-v1",
+                "result_meta": {"trace_id": "trace-1"},
+                "content": [
+                    {
+                        "index": 0,
+                        "type": "text",
+                        "annotations": {"audience": ["assistant"], "priority": 0.75},
+                        "meta": {"source_id": "source-1", "note": "token=[REDACTED]"},
+                    }
+                ],
+            }
+        }
+
+    def test_resource_descriptor_and_nested_metadata_survive_without_entering_model_content(self, paths: Paths):
+        from mcp.types import Annotations, EmbeddedResource, TextResourceContents
+
+        resource = TextResourceContents(
+            uri="mem://note.txt",
+            text="note",
+            mimeType="text/plain",
+            _meta={"resource_version": "v2"},
+        )
+        result = CallToolResult(
+            content=[
+                ResourceLink(
+                    type="resource_link",
+                    name="frame",
+                    title="Frame 01",
+                    description="sampled frame",
+                    uri="https://example.com/frame.png",
+                    mimeType="image/png",
+                    size=123,
+                    annotations=Annotations(audience=["user"], priority=0.5),
+                    _meta={"observed_at": "2026-08-02T10:00:00Z"},
+                ),
+                EmbeddedResource(
+                    type="resource",
+                    resource=resource,
+                    _meta={"container": "evidence"},
+                ),
+            ],
+            structuredContent={"status": "ok"},
+            isError=False,
+        )
+
+        with _patch_paths(paths):
+            content, artifact = mcp_tools._convert_call_tool_result(
+                result,
+                thread_id="t1",
+                user_id="u1",
+            )
+
+        assert [block["type"] for block in content] == ["image", "text"]
+        assert artifact == {
+            "structured_content": {"status": "ok"},
+            "mcp_metadata": {
+                "contract_version": "mcp-result-metadata-v1",
+                "sanitization_policy": "credential-redacted-bounded-v1",
+                "content": [
+                    {
+                        "index": 0,
+                        "type": "resource_link",
+                        "annotations": {"audience": ["user"], "priority": 0.5},
+                        "meta": {"observed_at": "2026-08-02T10:00:00Z"},
+                        "resource": {
+                            "name": "frame",
+                            "title": "Frame 01",
+                            "description": "sampled frame",
+                            "mime_type": "image/png",
+                            "size": 123,
+                        },
+                    },
+                    {
+                        "index": 1,
+                        "type": "resource",
+                        "meta": {"container": "evidence"},
+                        "resource_meta": {"resource_version": "v2"},
+                    },
+                ],
+            },
+        }

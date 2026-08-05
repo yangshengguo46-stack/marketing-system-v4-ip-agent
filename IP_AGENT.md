@@ -1,7 +1,9 @@
 # IP Agent product contract
 
-This file is the sole contract for the currently active IP Agent baseline. It
-describes shipped runtime behavior, not research ambitions.
+This file is the sole product contract for IP Agent. It separates shipped
+runtime behavior from an approved target architecture that is still behind
+verification gates. A target design is never a claim that the capability is
+already live.
 
 ## Product boundary
 
@@ -12,8 +14,211 @@ creative hypotheses.
 
 The default Agent does not run a fixed onboarding interview, inspect operating
 ledgers on the first turn, diagnose accounts, predict virality or manufacture
-an incubation workflow. A new first-principles IP architecture and its overall
-orchestration have not started.
+an incubation workflow. The four-lens system architecture below is approved,
+but it is not enabled in the default runtime until each vertical slice passes
+the product ledger's unit, integration and real-sample gates.
+
+## System constitution
+
+IP is a time-varying relationship between a person, brand, product or
+organization and a target audience. The relevant state is not content volume;
+it is recognition, memory, trust, expectation, preference and action. Content
+is an intervention into that relationship, platforms are environments and
+distribution channels, and metrics are delayed, noisy observations rather than
+the relationship itself.
+
+The product purpose is to help an IP subject change that audience relationship
+through truthful evidence, original content, real execution and delayed
+external feedback, under the Owner's goals and safety constraints.
+
+The architecture is governed by four inseparable lenses:
+
+- systems theory owns purpose, boundaries, hierarchy, stocks, flows and delays;
+- ontology owns entities, relationships, state, authority and bounded context;
+- information theory owns identity, provenance, coverage and lossless transfer;
+- control theory owns goals, observation, action, feedback and correction.
+
+Every product path must preserve four separate worlds: reality, epistemic
+claims, creative fiction and execution receipts. Creative fiction is allowed;
+presenting it as a user fact or source observation is not. The shared epistemic
+states are `user_asserted`, `source_observed`, `derived`, `hypothesized`,
+`creative`, `unknown` and `contradicted`.
+
+The target business lineage is:
+
+```text
+Owner -> Subject -> IPObjective -> IPDirectionVersion
+EvidenceItem -> Claim -> Interpretation -> MechanismHypothesis
+IPDirectionVersion + MechanismHypothesis
+  -> Work -> WorkVersion -> Artifact -> Publication
+  -> Observation -> OutcomeAssessment -> LearningDecision
+```
+
+Agent runtime, models, MCP and Skills orchestrate or transform these objects;
+they do not become the authority for business facts. MCP Sensors obtain external
+evidence, pure Skill Methods transform typed inputs into typed outputs, MCP
+Effectors perform controlled side effects, and domain services plus immutable
+ledgers own product state. The user remains the co-controller for goals,
+meaning corrections and consequential choices.
+
+## Media capability boundary
+
+Volcengine AI MediaKit is the selected media execution subsystem. It owns
+commodity video, image and audio understanding and processing: metadata, ASR,
+OCR, frame/scene operations, storyline/highlight analysis, editing, transcoding,
+enhancement and result delivery when the corresponding official capability has
+passed a real local or cloud acceptance.
+
+MediaKit is not the IP business brain. It does not own platform account or work
+identity, evidence provenance, IP subjects and objectives, transferable causal
+mechanisms, creative direction, publication state or feedback decisions. The
+bounded Evidence MCP must first resolve the exact source and seal its identity,
+snapshot hash, observation time and coverage. A thin adapter may then submit
+that sealed snapshot to the pinned official CLI/API and normalize its receipt;
+it must not rebuild the provider's upload, polling or media algorithms.
+
+The five upstream Bash-based MediaKit Skills remain internal implementation
+assets and are not exposed directly to the clean IP Agent. Product-page or
+API-only capabilities are target inventory until their exact input, terminal
+result, cost and evidence boundaries pass a real sample. Provider output remains
+untrusted observed material and cannot itself decide an IP direction or claim a
+causal business result.
+
+The pinned CLI is version `0.2.0` and exposes exactly 40 commands; the product
+catalog, official MCP, bundled Skills and the advertised “100+” capability pool
+are different surfaces and are never treated as interchangeable contracts.
+`product/volcengine/capabilities.yaml` is the machine-readable inventory and
+promotion state. `third_party/volcengine/mediakit-cli/VENDORED_VERSION.json`
+fixes the exact non-prebuilt source tree and catalog; build/doctor validation
+fails on source or command drift. No catalogued capability enters the default
+Agent until it is explicitly `product_promoted`.
+
+MediaKit also publishes a separate Video Understanding Chat API at
+`amk-ark.cn-beijing.volces.com`; it is not one of the pinned CLI's 40 commands.
+That API wraps an Ark model with provider-managed extraction and serialization
+of frames and accepts text plus a video URL. The documented 5 GB ceiling applies
+to URL inputs; it must not be generalized to Base64 payloads handled by Ark's
+separate direct API. It does not analyze the video's audio. Its `fps` range is `0.01–5`;
+`max_frames`, `max_pixels` and the internal token ceiling also bound
+what the model can actually see. The result is therefore a useful semantic
+observation, not a transcript, exhaustive frame record, platform identity or
+causal IP conclusion. It remains unexposed and unintegrated until a fixed
+structured question contract is compared with human-annotated videos and its
+temporal coverage, hallucination and repeatability are measured. The fixed
+URL-only adapter has now passed two repeated official-fixture runs and one
+exact account-bound Douyin work in an isolated operator path. It remains
+unexposed to the Agent and is not yet part of the Evidence MCP contract: two
+further heterogeneous videos, paid-call reconciliation and an isolated Agent
+replay still gate promotion. A follow-up paid probe with the real test-mode
+credential returned `500 OperatorError` for the stable canonical Douyin work
+page. Uploading the hash-verified local snapshot through MediaKit succeeded,
+but giving the resulting `mediakit://` file id to Chat also returned `500`.
+The successful resolved Douyin media URL is time-limited and therefore cannot
+bind a later approved replay. Promotion also requires a controlled, revocable,
+read-only HTTPS media ingress that binds the sealed local source hash to the
+runtime provider-input digest without exposing that URL to the model or
+ordinary receipts. The current MediaKit upload path has no product-verified
+delete receipt and is not a substitute for that boundary.
+
+The separate Video Understanding Smart Strategy is a different asynchronous
+contract. It can inspect audio, route among models and frame-selection strategies,
+and change that route when the prompt contains audio-related words. Its manual
+`fps` range is `0.2–5`, not the Chat API's range. This convenience makes the
+result less reproducible, so it remains a provider inference and must not be
+silently aliased to Chat, ASR or source fact.
+
+MediaKit's Vibe Editing, semantic segmentation, drama-script restoration and
+drama-recap APIs are also separate contracts rather than hidden CLI commands.
+Vibe can turn natural-language instructions plus public media URLs into a
+multitrack cloud-rendered artifact, but the current REST response contains only
+the final artifact, not an EDL, editable timeline, operation receipts or source
+project. The interactive preview editor exists in the MediaKit console; its
+integration API and Web SDK are documented as future capabilities. Vibe may
+therefore generate a rough-cut candidate, but it cannot own the product's
+editable project or deterministic final render.
+
+Drama-script restoration is reverse analysis for eligible live-action dramas
+and films with hard subtitles. It explicitly excludes animation, documentary,
+advertising and livestream recordings, and it is not a general IP script writer.
+Semantic segmentation returns provider-selected time boundaries, not editorial
+decisions or transcript content. Domain-specific drama/highlight/recap routes
+must never become the default path for ordinary personal, brand or product IP.
+
+`video-use` is retained as an editing-director method: source discovery,
+strategy confirmation, typed and versioned timeline decisions, cut review,
+user-directed iteration and independent QA. Its unsafe helper scripts are not a
+product runtime. MediaKit's sentence/segment ASR may replace transcription for
+content understanding and subtitles, but it does not provide the word-level
+timestamps required for word-boundary cuts and cut padding. MediaKit may replace
+other accepted sensor and commodity execution ports beneath the method.
+HyperFrames as the programmatic renderer and Remotion as a compatibility-only
+path is the target consolidation, not current shipped behavior: HyperFrames is
+currently an unregistered fixed template, Remotion still has a live tool, and
+both current templates mute source video. Neither may be retired until the same
+programmatic-scene golden suite and existing-project migration pass.
+
+The active MediaKit cloud adapter accepts only the same private local snapshot
+whose SHA-256 was sealed by the Evidence MCP; it never asks MediaKit to fetch
+the mutable public URL again. One evidence request gets a temporary `0700`
+request root and an isolated CLI home for each ASR/OCR/scene/storyline stage.
+The stages of one video run concurrently; videos remain sequential. Each stage
+has a submission timeout and a separate 300-second bounded polling window, and
+both the capability dispatcher and stdio MCP call have a 3,600-second outer
+deadline. Cancellation waits for already-started provider workers before their
+temporary directories are removed. The adapter avoids MediaKit CLI's unbounded
+`poll-complete` mode. A versioned media-semantic allowlist removes operational
+IDs, URLs, paths, secrets and raw provider envelopes without treating those
+intentional redactions as missing semantic coverage. The execution receipt must
+hash the exact payload exposed as evidence. The adapter verifies the sealed
+local content hash before and after the official CLI call. The provider's lack
+of a separate content digest attestation remains recorded in the receipt, but
+it no longer downgrades a successfully returned stage to partial.
+
+The presence of `MEDIAKIT_API_KEY` enables direct cloud execution for the two
+default Evidence MCP tools. The Agent-facing video tool intentionally exposes no
+cheap-depth or frame-count switch: every call performs `full` analysis with 12
+uniform frame samples plus ASR, OCR, scene segmentation and storyline analysis.
+These calls do not require a per-call approval, proposal ledger or
+model-supplied budget. A failed cloud stage is retried once inside the same tool
+call with a fresh provider task. The API key stays in the process environment
+and is never placed in tool arguments, model context or normal receipts. Direct
+provider idempotency tokens are scoped to the current evidence request and
+stage attempt, so a later Agent turn performs a new execution instead of
+silently reusing an older task. `ip-init` and `ip-refresh` create or preserve
+the local account-binding keyring needed by the companion Douyin inventory
+tool.
+
+The legacy admission schemas in migrations `0022_personal_ip_paid_call_admission` and
+`0023_personal_ip_paid_call_execution_run` and
+`0024_personal_ip_paid_call_operator_cap` separate origin and execution runs,
+record Owner decisions, atomically reserve/admit an exact provider request, and
+mint a signed one-use ASR-only grant. The grant binds Owner, Thread, run, source,
+stage, capability and a local risk limit; its provider idempotency key is also
+Owner/call isolated. They remain for compatibility with dedicated execution
+surfaces and are not on the default Agent's MediaKit evidence path.
+
+The active path passed the earlier real checks on the 3.648-second Mandarin fixture:
+one direct MediaKit ASR call, one stdio Evidence MCP `speech_text` call returning
+completed ASR and OCR, and one real `ip-agent` turn that selected
+`ip_evidence_inspect_reference_videos` and used its result. A subsequent real
+`full` execution finished in 135.353 seconds with ASR, OCR, provider scene
+segmentation and storyline all `completed`; it returned one scene segment, one
+storyline clip and one highlight with no limitation. MediaKit still
+misrecognized the known word “回执” as “回值”; this is preserved as an ASR
+accuracy observation rather than hidden by the integration. The current adapter
+polls within the live request and cannot resume an in-flight provider task after
+process loss. Separate Chat, Remux and Vibe canaries remain separate capabilities
+and are not implied by this Agent integration.
+
+The final Agent acceptance on 2026-08-04 used a clean thread and the uploaded
+fixture. It made exactly one `ip_evidence_inspect_reference_videos` call, ran
+`analysis_depth=full` with 12/12 frame samples, and completed source identity,
+metadata, contact sheet, local scene detection, ASR, OCR, provider scene
+segmentation and storyline with `operation_status=ok` and no limitation. The
+turn finished in 176.104 seconds. This acceptance replaced an earlier run in
+which the model first chose `speech_text` and then repeated the complete tool;
+the Agent-facing cheap-depth/frame-count choices and the obsolete ASR grant
+verifier were removed after that failure.
 
 ## Active Agent runtime
 
@@ -21,8 +226,11 @@ The installed `ip-agent` uses:
 
 - `skills: []`;
 - `memory_enabled: false`;
-- the exact read-only tool allowlist `web_search`, `image_search`, `ls`,
-  `read_file`, `glob`, `grep`, `view_image`, `ask_clarification`;
+- the eight baseline tools `web_search`, `image_search`, `ls`, `read_file`,
+  `glob`, `grep`, `view_image`, `ask_clarification`;
+- the MediaKit-backed Evidence MCP tools
+  `ip_evidence_collect_douyin_benchmark_account` and
+  `ip_evidence_inspect_reference_videos`;
 - the compact product prompt in
   `product/defaults/agents/ip-agent/SOUL.md`.
 
@@ -35,11 +243,13 @@ The Personal-IP context middleware is not mounted for this clean Agent. Simple
 conversation therefore goes directly to one model call and makes no tool call.
 Search is used only when the answer depends on current or externally verified
 facts. Search citations are ordinary Markdown links placed next to the claim.
+An exact video link or `/mnt/user-data/uploads/` path routes to video evidence
+instead of web search or a repeated upload request.
 
 ## Retained execution products
 
-The following owner-scoped product surfaces remain available through their
-dedicated UI and explicit APIs, but are not tools of the default Agent:
+The following owner-scoped product surfaces remain available through dedicated
+UI and/or explicit APIs, but are not tools of the default Agent:
 
 - subjects, accounts, platform connections and OAuth;
 - publish requests and append-only attempts;
@@ -47,11 +257,15 @@ dedicated UI and explicit APIs, but are not tools of the default Agent:
 - video productions and their append-only event ledger;
 - the factual workspace dashboard.
 
+The production APIs/ledger being retained does not make the video workbench an
+active customer path. Its default runtime entry is off; reachability and
+end-to-end status are recorded only in `docs/IP_AGENT_PRODUCT_LEDGER.md`.
+
 The dashboard displays observations and their timestamps. Missing data stays
 `未采集`; it does not infer high potential, paid-traffic suitability, or a
 continue/adjust/restart verdict.
 
-## Stable safety boundaries
+## Stable execution invariants
 
 Credential ciphertext, passwords, cookies and one-use OAuth state never enter
 model context or Owner backups. Publishing still validates rights, moderation,
@@ -60,7 +274,7 @@ rights, paid-call approval and reservation, immutable receipts, paths, hashes,
 candidate consistency, QA and idempotency. Owner data export, same-owner
 empty-scope restore and confirmed deletion remain enforced.
 
-These are execution and safety invariants, not creative or business judgments.
+These are execution invariants, not creative or business judgments.
 
 ## Retired semantic layer
 
@@ -105,10 +319,12 @@ make video-e2e-local
 `make ip-test-reset` rotates only the marked isolated test home into a
 recoverable snapshot. It never rewrites the normal Owner home.
 
-Current delivery state and executable audit gates live in the two existing
-ledgers: `docs/IP_AGENT_PRODUCT_LEDGER.md` and
-`docs/IP_AGENT_AUDIT_REMEDIATION_LEDGER.md`.
+Current delivery state lives only in `docs/IP_AGENT_PRODUCT_LEDGER.md`. It
+separates the three customer boards—breakdown, writer brain and production—from
+their shared execution substrate and feedback loop.
 
+`docs/IP_AGENT_AUDIT_REMEDIATION_LEDGER.md` is a frozen historical closeout.
 The exhaustive, code-checked catalog of active, isolated and conditional tools
-plus all 97 quarantined public Skills lives in
-`docs/IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md`.
+plus the generated inventory of quarantined public Skills lives in
+`docs/IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md`; neither file is a current
+product-completion record.

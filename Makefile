@@ -1,12 +1,16 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install ip-test-prepare ip-test-start ip-test-reset ip-test-status ip-test-stop ip-test-evidence-reset ip-test-evidence-start ip-test-evidence-login ip-m2-prepare ip-m2-run personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-direct dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis ip-init ip-refresh ip-package ip-package-verify ip-clean-install ip-test-prepare ip-test-start ip-test-reset ip-test-status ip-test-stop ip-test-evidence-reset ip-test-evidence-start ip-test-evidence-login ip-test-evidence-mediakit-key ip-m2-prepare ip-m2-run ip-m2-method-prepare ip-m2-method-run ip-m2-method-recover ip-m2-method-unblind personal-ip-publish-acceptance personal-ip-cost-acceptance personal-ip-data-lifecycle-acceptance personal-ip-observability-acceptance video-e2e-local video-e2e-paid-checkpoints video-renderers-install video-renderers-verify volcengine-install volcengine-doctor hllm-doctor ui-tars-install ui-tars-start ui-tars-stop ui-tars-status ui-tars-doctor minecontext-verify minecontext-install minecontext-doctor douyin-metrics-smoke ffmpeg-toolchain mediakit-toolchain mediakit-build mediakit-test
 
 BASH ?= bash
 PNPM ?= pnpm
 BACKEND_UV_RUN = cd backend && uv run
 IP_TEST_RUN = cd backend && PYTHONPATH=.. uv run python -m scripts.ip_agent_test_mode
 IP_M2_RUN = cd backend && PYTHONPATH=.. uv run python -m scripts.ip_agent_m2_replay
+IP_M2_METHOD_RUN = cd backend && PYTHONPATH=.. uv run python -m scripts.ip_agent_m2_method_attribution
+IP_M2_METHOD_BASE_URL ?= http://127.0.0.1:8011
+IP_M2_METHOD_ORDER ?= placebo-method
+IP_M2_METHOD_SPEC ?= product/research/ip-agent/m2/method-attribution/experiment.json
 VIDEO_E2E_DIR ?= .deer-flow/acceptance/video-e2e
 VIDEO_E2E_FINISHER ?= auto
 
@@ -34,8 +38,13 @@ help:
 	@echo "  make ip-test-evidence-reset - Reset into the isolated two-tool Evidence MCP profile"
 	@echo "  make ip-test-evidence-login - Open the dedicated Douyin login profile"
 	@echo "  make ip-test-evidence-start - Start the two-tool Evidence MCP test profile"
+	@echo "  make ip-test-evidence-mediakit-key - Privately configure the test MediaKit API Key"
 	@echo "  make ip-m2-prepare    - Validate the isolated four-group M2 comparison matrix"
 	@echo "  make ip-m2-run        - Run locked Doubao M2 groups with controlled-exit config restore"
+	@echo "  make ip-m2-method-prepare - Validate the frozen M2-E3 evidence and method experiment"
+	@echo "  make ip-m2-method-run - Run the one-call, zero-tool M2-E3 placebo/method pair"
+	@echo "  make ip-m2-method-recover - Remove only a marked interrupted M2-E3 Agent/Skill"
+	@echo "  make ip-m2-method-unblind RESULTS=... REVIEWS='a.json b.json' - Verify reviews and unblind"
 	@echo "  make personal-ip-publish-acceptance - Run local-only eight-platform publish recovery checks"
 	@echo "  make personal-ip-cost-acceptance - Run video hard-budget reservation/retry/concurrency checks"
 	@echo "  make personal-ip-data-lifecycle-acceptance - Verify credential-safe backup, restore and whole-domain deletion"
@@ -129,6 +138,9 @@ ip-test-evidence-reset:
 ip-test-evidence-login:
 	@$(IP_TEST_RUN) login-douyin --profile evidence
 
+ip-test-evidence-mediakit-key:
+	@$(IP_TEST_RUN) configure-mediakit --profile evidence
+
 ip-test-evidence-start:
 	@$(IP_TEST_RUN) start --profile evidence
 
@@ -137,6 +149,20 @@ ip-m2-prepare:
 
 ip-m2-run:
 	@$(IP_M2_RUN) run
+
+ip-m2-method-prepare:
+	@$(IP_M2_METHOD_RUN) prepare --experiment-spec $(IP_M2_METHOD_SPEC)
+
+ip-m2-method-run:
+	@$(IP_M2_METHOD_RUN) run --base-url $(IP_M2_METHOD_BASE_URL) --order $(IP_M2_METHOD_ORDER) --experiment-spec $(IP_M2_METHOD_SPEC)
+
+ip-m2-method-recover:
+	@$(IP_M2_METHOD_RUN) recover
+
+ip-m2-method-unblind:
+	@test -n "$(RESULTS)" || (echo "Set RESULTS=/path/to/results.json" && exit 2)
+	@test -n "$(REVIEWS)" || (echo "Set REVIEWS='/path/review-a.json /path/review-b.json'" && exit 2)
+	@$(IP_M2_METHOD_RUN) unblind --results "$(RESULTS)" $(foreach review,$(REVIEWS),--review "$(review)")
 
 personal-ip-publish-acceptance:
 	@$(MAKE) -C backend personal-ip-publish-acceptance

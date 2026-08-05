@@ -23,21 +23,17 @@ optional organ is shown as skipped. A configured but malformed provider, an
 unsafe literal secret or a required product dependency remains a warning or
 failure.
 
-The Personal-IP operating cockpit is the runtime failure surface for the
-customer and Agent. It reports sanitized, owner-scoped alerts in three
-categories:
-
-- `loop`: failed/unknown publication, unavailable observations and blocked
-  workflow state;
-- `provider`: failed video-provider execution without forwarding raw provider
-  payloads;
-- `cost`: rejected budget admission and exhausted video budget.
+The old Personal-IP operating cockpit is retired and is not a supported runtime
+profile or product status surface. The workspace dashboard may project factual,
+owner-scoped records already present in the active stores; it must not infer a
+workflow verdict or completion state. Current reachability is recorded only in
+`docs/IP_AGENT_PRODUCT_LEDGER.md`.
 
 Video budget admission rejection is an append-only
 `personal-ip-video-budget-rejection-v1` event. It records the requested maximum,
 available amount and stable reason code, but not request refs, credentials or
-raw provider errors. The cockpit reads active production events and budget
-state from the authoritative video ledger; it does not create another state
+raw provider errors. Production views read active production events and budget
+state from the existing production ledger; they do not create another state
 store.
 
 ## Acceptance

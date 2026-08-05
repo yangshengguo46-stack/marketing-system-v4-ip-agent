@@ -1,0 +1,489 @@
+contract: ip-agent-mediakit-capability-canary-v1
+observed_at: "2026-08-03T13:34:00+08:00"
+purpose: make-or-buy evidence; not a product-promotion receipt
+
+source_fixture:
+  provenance: Volcengine official Video Understanding API example
+  url: https://ark-project.tos-cn-beijing.volces.com/doc_video/video-understanding.mp4
+  acceptance_artifact: .deer-flow/acceptance/mediakit-capability-canaries-2026-08-03/source.mp4
+  downloaded_sha256: 9878f4b203952db0301b5c4576d857d7e6db4fe955ac74207f6ba4fd06fe2c1e
+  duration_seconds: 5.066667
+  video:
+    width: 1906
+    height: 1080
+    fps: 30
+  audio_present: true
+  human_visual_annotation:
+    primary_activity: boxing
+    initial_active_people: 2
+    primary_shirt_colors:
+      - black
+      - white
+    third_person_visible_later: true
+    third_person_first_clear_sample_seconds_at_5fps: 3.4
+    contact_sheet:
+      path: .deer-flow/acceptance/mediakit-capability-canaries-2026-08-03/chat-ground-truth.png
+      sha256: 6cffb29f76cdf1d18d97e5dcf88211f1f830c6f49980d0f07d89dfed203ce248
+
+video_understanding_chat:
+  paid_execution: true
+  canary_correlation_id: e83c9190-b112-40b4-a6b3-8e50c7279bc2
+  endpoint_contract: https://www.volcengine.com/docs/6448/2210221
+  model: doubao-seed-2-0-pro-260215
+  request_sha256: 70830b5e9e7e46995d8f349a28fd35cb77410d9292729029e9f7fb668a455c7c
+  request_controls:
+    visual_only: true
+    fps: 5
+    max_frames: 30
+    max_pixels: 518400
+    response_format: json_object
+  provider_request_id_observed: true
+  provider_identifier_digest_persisted_in_public_research_ledger: false
+  usage:
+    prompt_tokens: 7912
+    completion_tokens: 873
+    reasoning_tokens: 764
+    total_tokens: 8785
+  normalized_answer:
+    primary_activity: boxing
+    initial_active_people: 2
+    primary_shirt_colors:
+      - black
+      - white
+    third_person_visible_later: true
+    third_person_first_clear_seconds: 3.6
+  mechanical_verdict:
+    categorical_observations: pass_on_this_fixture
+    first-clear-time_error_seconds: 0.2
+    exact-edit-boundary: fail
+    conclusion: useful semantic observation; not an exact timeline authority
+  billing_boundary:
+    mediakit_processing_fee_currently: free
+    ark_tokens_billed_separately: true
+    actual_cny_returned_by_response: false
+  product_adapter_validation:
+    observed_at: "2026-08-03T15:19:00+08:00"
+    contract: ip-video-visual-observation-v1
+    adapter: volcengine-mediakit-video-understanding-chat-v2
+    profile: ip-visible-events-120-frames-v3
+    exposure: isolated-operator-only
+    unit_gate:
+      command: uv run pytest -q tests/test_ip_agent_mediakit_video_understanding.py
+      result: 13-passed
+      properties:
+        - fixed-url-only-request
+        - strict-local-json-schema
+        - composite-bearer-never-enters-receipt
+        - bounded-response
+        - zero-automatic-retry
+        - timeout-billing-outcome-unknown
+    profile_iteration_evidence:
+      v1: rejected-unsupported-gender-inference
+      v2: rejected-chat-ocr-varied-between-ORRRO-SYNAIS-and-SYIAIS
+      v3:
+        output_language: simplified-chinese
+        visible_text: presence-only-ocr-remains-separate
+        demographic-and-role-inference: forbidden-by-fixed-question-contract
+    official_fixture_repeatability:
+      runs: 2
+      request_sha256: eed06aac8c552554bca5ec4c21954ce9143d1fc0dc7aa0bfad489faaf6038aec
+      output_schema_sha256: bdf5e30816cce2952a618afd01ab55f572c5fa613d5284beff5cfeef34d0fd40
+      invariant_core_fields:
+        primary_activity: boxing
+        initial_people: 2
+        primary_clothing_colors:
+          - black
+          - white
+        third_person_first_visible_seconds: 3.6
+        camera_order: wide-close-wide
+        visible_text_presence: present_unread
+      important_field_consistency: 6-of-6
+      run_1:
+        usage:
+          prompt_tokens: 8370
+          completion_tokens: 2969
+          reasoning_tokens: 1949
+          total_tokens: 11339
+        latency_millis: 67608
+        raw_response_sha256: 878b58b6f4be07a340ef5da5bcb4f01b1c6cda6d7848b465d9bfebe48aa0fc66
+        result_sha256: aeec91d33c6a934ee568ad8e123b80557d0119bd4fae5a60ed3f8c09814cccdb
+      run_2:
+        usage:
+          prompt_tokens: 8370
+          completion_tokens: 2616
+          reasoning_tokens: 1699
+          total_tokens: 10986
+        latency_millis: 58500
+        raw_response_sha256: f259387999a328409d65d2357788f1d8bd9097c189b6575fbadb29d670a72fa5
+        result_sha256: a50a0c7b4b7529a46c294f85c996982fd5aeaf348db13d01f1071a821a3c6a6c
+    real_douyin_account_sample:
+      input_profile: https://v.douyin.com/Q157NhQ4X1Q/
+      verified_account_display_name: 云沐荟足道官方号
+      ownership_verification: api-work-and-author-match
+      selected_work_id: "7658501922794432731"
+      selection_basis: highest-public-likes-and-shares-in-the-current-12-work-inventory
+      source_sha256: 8e098c16f3634f27bbd8ca6bd30e41ed5c9816d6ff4654922d115198a4ec10fc
+      duration_seconds: 70.867
+      local_contact_sheet_sha256: 5eab5be0c733ded3f37478b2c247a00f1edc9eeccec5791294452977eff58d58
+      first_attempt:
+        read_timeout_seconds: 90
+        outcome: provider-transport-unknown
+        automatic_retry: false
+        billing_outcome: unknown
+      successful_operator_retry:
+        read_timeout_seconds: 300
+        latency_millis: 99647
+        fps: 1.6792
+        max_frames: 120
+        input_binding: public_url_unverified
+        coverage: partial
+        usage:
+          prompt_tokens: 37489
+          completion_tokens: 3204
+          reasoning_tokens: 1946
+          total_tokens: 40693
+        request_sha256: 35b519a8b0b651bb9717a4ca542292bf2c815b8bd74363c9e56ecde3232c6333
+        raw_response_sha256: 9596d2fce041a557da1004a7c12279290a49a41de26351e77d5ed776b505c3d2
+        result_sha256: f409f0ec0c1710186e44b1612858dddadbbf3760852b71893ea16078b2c7ff2f
+      stable_canonical_work_url_probe:
+        provider_input: https://www.douyin.com/video/7658501922794432731
+        credential_source: test-mode-0600-secret-file
+        outcome: provider-operator-error
+        http_status: 500
+        safe_error_code: PROVIDER_OPERATORERROR
+        billing_outcome: unknown
+        automatic_retry: false
+        conclusion: canonical-douyin-work-page-did-not-produce-an-accepted-chat-video-input
+      mediakit_uploaded_file_id_probe:
+        canary_correlation_id: b4f5db0a-3ad9-4faa-989c-78ee5d62fdac
+        sealed_source_sha256_verified: true
+        upload_target_issued: true
+        sealed_bytes_uploaded: true
+        provider_input_scheme: mediakit
+        provider_file_id_observed: true
+        provider_identifier_digest_persisted_in_public_research_ledger: false
+        chat_outcome: provider-error
+        http_status: 500
+        billing_outcome: unknown
+        automatic_retry: false
+        request_sha256: 156be5c1728653e2db26f9f4680bcf610e2574885886f21e3051c1d5278b1f1f
+        provider_delete_receipt_available: false
+        conclusion: uploaded-file-id-path-not-yet-usable-for-video-understanding-chat
+      managed_remux_https_ingress_probe:
+        observed_at: "2026-08-03T16:37:24+08:00"
+        canary_correlation_id: a730b31e-4c62-4d88-9547-e23fd4e8d71c
+        official_contracts:
+          remux_api: https://www.volcengine.com/docs/6448/2515357
+          remux_guide: https://www.volcengine.com/docs/6448/2505582
+          task_query: https://www.volcengine.com/docs/6448/2278532
+          pricing: https://www.volcengine.com/docs/6448/2486473
+        adapter: volcengine-mediakit-remux-https-ingress-v1
+        exposure: isolated-operator-only
+        unit_gate:
+          command: uv run pytest -q tests/test_ip_agent_mediakit_remux_ingress.py
+          result: 24-passed
+          joint_mediakit_regression: 64-passed
+        source_sha256: 8e098c16f3634f27bbd8ca6bd30e41ed5c9816d6ff4654922d115198a4ec10fc
+        source_size_bytes: 13436953
+        source_duration_seconds: 70.867
+        provider_identifiers_observed: true
+        provider_identifier_digests_persisted_in_public_research_ledger: false
+        runtime_url_persisted: false
+        remux_result:
+          container_format: MP4
+          candidate_sha256: 7c744b4e637b203c487d7cfaf02941126fe573008311e9915996e0358bcad66a
+          candidate_size_bytes: 13437038
+          duration_seconds: 70.867
+          duration_delta_seconds: 0
+          whole_file_byte_identical: false
+          elementary_stream_payload_equivalent: true
+          stream_index_order_changed: true
+          conclusion: audio-and-video-packet-payloads-preserved-container-bytes-differ
+        temporary_https:
+          completed_at: "2026-08-03T08:37:24.317395Z"
+          expires_at: "2026-08-04T08:37:23Z"
+          observed_ttl_seconds: 86399
+          poll_attempts: 2
+        billing:
+          published_remux_cny_per_output_minute: 0.007
+          estimated_cny_per_70_867_second_execution: 0.008268
+          provider_actual_cny_returned: false
+          submit_requests_used_same_client_token: true
+          provider_idempotent_replay_attested: false
+          automatic_retries: 0
+        operator_harness_corrections:
+          - pre-submit-upload-host-allowlist-added-official-volcvod-domain
+          - stream-comparison-changed-from-index-identity-to-stream-type-and-packet-payload
+          - ark-env-reference-resolved-before-composite-authentication
+        chat_result:
+          outcome: success
+          latency_millis: 100842
+          request_sha256: 83d0095c1816d6875dd543dfdf2a31ced23030aacee9bb6fa0ac21f26cbe8f6b
+          raw_response_sha256: b0f93bdada927a389c00138006dc14d7e44d712976f89f5f4fe78a4794bb494c
+          result_sha256: f1d0ae2621372909c2b3bee003b1761a1b0251a3bcc086d7514b06357fe97b2e
+          usage:
+            prompt_tokens: 37501
+            completion_tokens: 3812
+            reasoning_tokens: 2309
+            total_tokens: 41313
+          source_binding: remux-candidate-sha256-plus-derived-from-sealed-source-sha256
+          observation_scope: provider-sampled-visual-frames-unknown
+        lifecycle:
+          mediakit_input_retention: provider-auto-cleanup-after-30-days
+          temporary_https_expiry_verified: true
+          immediate_delete_or_revoke_receipt: unavailable
+          public_reference_video_use: protocol-canary-passed-with-declared-retention
+          private_or_confidential_upload_use: not-approved
+        product_promoted: false
+      observed_visual_sequence:
+        - rainy-alley-and-shared-umbrella
+        - ring-and-hand-interaction
+        - handholding-parting-and-tree-side-interaction
+        - indoor-writing-heart-shape-and-small-guitar
+        - back-to-back-departure-and-monochrome-ending
+      limits:
+        - no-audio-understanding
+        - no-subtitle-transcription
+        - provider-content-hash-not-attested
+        - provider-frame-coverage-not-attested
+        - timestamps-are-not-edit-boundaries
+        - visual-sequence-is-not-yet-an-ip-causal-conclusion
+        - transient-resolved-media-url-is-not-a-stable-paid-approval-binding
+        - mediakit-uploaded-file-id-did-not-produce-a-chat-result-on-this-sample
+        - remux-runtime-url-expires-but-has-no-immediate-delete-or-revoke-receipt
+        - private-or-confidential-uploads-require-a-separate-lifecycle-controlled-ingress
+      next_ingress_gate:
+        state: protocol-canary-passed-integration-required
+        confirmed:
+          - mediakit-cross-service-tos-authorization-enabled
+          - native-upload-uses-mediakit-api-key-only
+          - native-upload-returned-file-id
+          - remux-produced-chat-readable-temporary-https
+          - remux-preserved-audio-and-video-packet-payloads
+          - video-understanding-chat-succeeded-on-remux-https
+        rejected_diagnosis:
+          - tos-not-authorized
+          - mediakit-native-upload-requires-dedicated-bucket
+          - mediakit-native-upload-requires-tos-ak-sk
+        current_blocker: remux-path-not-yet-wired-to-paid-recovery-evidence-mcp-or-isolated-agent
+        next_canary:
+          - wire-remux-submit-query-through-paid-call-recovery
+          - expose-derived-source-binding-through-evidence-mcp-without-runtime-url
+          - run-two-additional-content-diverse-reference-videos
+          - run-one-isolated-agent-replay
+        optional_fallback:
+          provider: volcengine-tos
+          mode: dedicated-private-bucket-with-short-lived-read-only-https
+          activate_only_if: private-or-confidential-input-requires-immediate-delete-control
+
+video_understanding_smart_strategy:
+  paid_execution: true-one-submit-no-automatic-retry
+  preregistered_at: "2026-08-03T21:41:03+08:00"
+  endpoint_contract: https://docs.volcengine.com/docs/6448/2552748?lang=zh
+  guide_contract: https://docs.volcengine.com/docs/6448/2551133?lang=zh
+  pricing_contract: https://docs.volcengine.com/docs/6448/2486473?lang=zh
+  exposure: isolated-research-canary-only
+  source:
+    account_display_name: 云沐荟足道官方号
+    work_id: "7658501922794432731"
+    sha256: 8e098c16f3634f27bbd8ca6bd30e41ed5c9816d6ff4654922d115198a4ec10fc
+    duration_seconds: 70.866667
+  fixed_request:
+    input_count: 1
+    level: Quality
+    scene: editing
+    need_audio: true
+    provider_model_pin: omitted-provider-routes-automatically
+    automatic_submit_retries: 0
+    prompt_scope:
+      - visible-and-audible-source-observation-only
+      - chronological-scenes-actions-audio-and-transitions
+      - no-identity-intent-causality-or-virality-inference
+      - uncertainty-must-be-explicit
+  frozen_human_visual_sequence:
+    - rainy-alley-and-shared-umbrella
+    - ring-and-hand-interaction
+    - handholding-parting-and-tree-side-interaction
+    - indoor-writing-heart-shape-and-small-guitar
+    - back-to-back-departure-and-monochrome-ending
+  acceptance:
+    required:
+      - exact-sealed-source-sha256-verified-before-upload-and-submit
+      - provider-task-reaches-a-declared-terminal-state
+      - major-visual-sequence-has-no-order-reversal
+      - audio-observations-are-either-grounded-or-explicitly-uncertain
+      - no-invented-real-identity-business-performance-causality-or-virality
+      - provider-output-remains-provider-inference-not-source-fact
+      - token-usage-and-provider-duration-are-recorded
+      - raw-credential-upload-url-file-id-task-id-and-request-id-are-not-persisted
+    compare_against:
+      contract: ip-video-visual-observation-v1
+      existing_chat_result_sha256: f1d0ae2621372909c2b3bee003b1761a1b0251a3bcc086d7514b06357fe97b2e
+      existing_chat_audio_processed: false
+      existing_chat_latency_millis: 100842
+      existing_chat_total_tokens: 41313
+    direct_failures:
+      - provider-success-with-wrong-or-unverifiable-source
+      - invented-dialogue-lyrics-identity-intent-causality-or-business-effect
+      - limited-sampling-described-as-full-coverage
+      - local-cap-described-as-provider-quote-or-invoice
+      - unknown-submit-outcome-retried-automatically
+  billing_boundary:
+    mediakit_rate_cny_per_input_minute: 0.01
+    mediakit_preflight_public_estimate_cny: 0.011812
+    ark_tokens_billed_separately: true
+    aggregate-token-usage-does-not-split-audio-input: true
+    exact_ark_cny_from_task_receipt: unavailable
+    combined_actual_cny_from_task_receipt: unavailable
+    resource-pack-or-discount-may-change-cash-bill: true
+  actual_result:
+    observed_at: "2026-08-03T21:48:00+08:00"
+    local_pre_submit_probe:
+      status: failed-safe
+      billing_outcome: not-submitted
+      error: signed-upload-url-was-incorrectly-subjected-to-ordinary-identifier-length
+      observed_official_upload_url_length: 6079
+      correction: independent-8192-byte-upload-url-contract
+      regression: 26-passed
+    paid_attempt:
+      source_hash_checks: 3
+      upload_target_attempts: 1
+      media_upload_attempts: 1
+      submit_attempts: 1
+      poll_attempts: 5
+      automatic_submit_retries: 0
+      terminal_local_status: provider-rejected
+      safe_error_code: POLL_REJECTED
+      billing_outcome: unknown
+      provider_duration_returned: false
+      token_usage_returned: false
+      content_returned: false
+      receipt_path: .deer-flow/acceptance/mediakit-video-strategy-q157-20260803-02/receipt.json
+      receipt_sha256: 55cbf8c4922d42389e978461f534905e193a5cbbb3a9568af8c04edbe8dce6c1
+      receipt_mode: "0600"
+      receipt_contains_raw-provider-identifiers: false
+      console_reconciliation:
+        matching_task_found: true
+        task_type: video-understanding-smart-strategy
+        task_status: failed
+        task_created_at: "2026-08-03T21:48:12+08:00"
+        experience_detail_supported: false
+        console_notice: task-type-does-not-support-experience-detail
+        failure_layer_supported_by_evidence: provider-asynchronous-task-execution
+        exact-error-code-message-token-and-billing-detail: unavailable
+      original_task_api_reconciliation:
+        new_upload_or_submit_performed: false
+        existing_task_get_attempts: 1
+        task_status: failed
+        safe_error_code: AbilityProcessingError
+        safe_error_type: InternalServerError
+        provider_response_sha256: 113836ecbe67b216bb6678d4a7711667dcefdba2e457cc83b958b053f2770a6f
+        matches_original_final_poll_response_sha256: true
+        error_message_persisted: false
+        supported_conclusion: provider-internal-ability-processing-failed
+        unsupported-distinction:
+          - transient-provider-service-fault
+          - provider-defect-triggered-by-this-input
+        identifier-confidentiality-finding: plain-sha256-is-not-a-secrecy-boundary-for-low-entropy-provider-ids
+    verdict: external-blocked-no-capability-or-quality-conclusion
+    next_required_action:
+      - obtain-provider-support-cause-and-billing-reconciliation-for-ability-processing-error
+      - do-not-resubmit-the-unknown-billing-request
+      - preserve-the-now-wired-encrypted-task-recovery-path-for-any-future-approved-attempt
+    post_failure_hardening:
+      bounded-provider-error-code-type-param: implemented-for-future-attempts
+      unsafe-provider-error-values: field-sha256-only
+      raw-provider-message-and-payload-persisted: false
+      mocktransport-regression: 28-passed
+      encrypted-recovery-repository-contracts:
+        state: standalone-canary-wired-not-product-promoted
+        migrations-reused: 0022-through-0026
+        new-migration-created: false
+        strict-contracts:
+          - ip-mediakit-video-strategy-submission-recovery-v1
+          - ip-mediakit-video-strategy-submitted-task-recovery-v1
+        owner-isolation-encryption-and-public-redaction: verified
+        once-only-same-body-and-token-replay-claim: verified
+        submitted-and-running-get-only-recovery: verified
+        remux-regression-preserved: verified
+        focused-regression: 59-passed
+        repository-and-bridge-neighbor-regression: 54-passed
+        private-output-directory-mode: "0700"
+        recovery-key-and-database-file-mode: "0600"
+        exact-body-and-token-persisted-before-paid-post: true
+        returned-task-id-persisted-before-ordinary-receipt: true
+        explicit-resume-submitting-replay-claim: once-only-same-body-and-token
+        explicit-resume-submitted-or-running: get-only-no-upload-no-post
+        strategy-canary-regression: 31-passed
+        combined-strategy-recovery-and-remux-regression: 66-passed
+        remaining: provider-support-cause-and-billing-plus-valid-result-canary
+  product_promoted: false
+
+vibe_exact_trim:
+  paid_execution: true
+  canary_correlation_id: cb3c5c17-f256-4cf2-8182-58e9615245d0
+  endpoint_contract: https://www.volcengine.com/docs/6448/2563056
+  request_sha256: bf42502d9b65adb85c0da49662dfc590c23790ba5a93fd3d5ea3f80c83017a0d
+  provider_task_id_observed: true
+  provider_identifier_digest_persisted_in_public_research_ledger: false
+  instruction:
+    trim_start_seconds: 0
+    trim_end_seconds: 2
+    preserve_audio: true
+    add_text: false
+    add_transition: false
+    color_change: false
+  requested_output:
+    resolution: 720p
+    format: mp4
+    fps: 30
+  output:
+    acceptance_artifact: .deer-flow/acceptance/mediakit-capability-canaries-2026-08-03/vibe-trim.mp4
+    sha256: 4ec349f4cf96d2202e676049af66c5aad7c5cf363d9ee8e08f40750c026ca713
+    duration_seconds: 2
+    width: 1280
+    height: 720
+    fps: 30
+    video_codec: h264
+    audio_codec: aac
+    audio_sample_rate: 44100
+    audio_channels: 2
+    video_and_audio_start_seconds: 0
+    video_and_audio_duration_seconds: 2
+    contact_sheet:
+      path: .deer-flow/acceptance/mediakit-capability-canaries-2026-08-03/vibe-contact.png
+      sha256: 9be80f80383eb0a47d8efb8f298cbb0a2b08987ad925b9291a8686971540523d
+  mechanical_verdict:
+    simple_exact_trim: pass_on_this_fixture
+    requested_audio_presence: pass
+    visible_unrequested_overlay_or_transition: not_observed_in_three_sampled_frames
+    editable_timeline_or_edl_returned: false
+    conclusion: viable simple artifact candidate; one fixture does not prove semantic editing, repeatability, or project authority
+  billing_boundary:
+    published_720p_basic-editing_cny_per_output_minute: 0.03
+    nominal_synthesis_cost_cny_for_two_seconds: 0.001
+    intent_llm_currently_free: true
+    actual_cny_returned_by_task: false
+
+local_trim_precision_ab:
+  paid_execution: false
+  source_path: .deer-flow/acceptance/live-volcengine-minimal-2026-07-23/paid-outputs/final.mp4
+  source_sha256: f338260bc08f2d6d85b22cb4a9cf1a2f2a2ab41ad914d85ecd85ea6ee0340fcc
+  source_duration_seconds: 3.648
+  requested_start_seconds: 1
+  requested_end_seconds: 3
+  mediakit:
+    version: 0.2.0+ip-agent.279e5bb
+    command: mediakit-cli --local editing trim-video --video-url SOURCE --start-time 1 --end-time 3
+    implementation: input seek plus stream copy
+    output_sha256: b4c180abadabe7303479906794adcdd901b311b676e1b2c3477e5914081e5e49
+    acceptance_artifact: .deer-flow/acceptance/mediakit-capability-canaries-2026-08-03/local-stream-copy-trim.mp4
+    output_duration_seconds: 2.166016
+    output_size_bytes: 682411
+  exact_reference:
+    implementation: project FFmpeg re-encode from 1 second for 2 seconds
+    output_sha256: 42a708a8ca7df4a7d9ffa3487e9902bfc5958f2a7f9b26cc0a5a5c03219edecd
+    acceptance_artifact: .deer-flow/acceptance/mediakit-capability-canaries-2026-08-03/exact-reference-trim.mp4
+    output_duration_seconds: 2
+    output_size_bytes: 490003
+  verdict: MediaKit local stream-copy trim is a rough lossless cut, not a frame- or word-exact edit path

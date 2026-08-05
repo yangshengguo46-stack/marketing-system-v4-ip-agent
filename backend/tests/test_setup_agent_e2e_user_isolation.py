@@ -166,6 +166,7 @@ class TestConfigAssembly:
             body_config={"context": {"agent_name": "myagent"}, "recursion_limit": 1000},
             body_context=None,
             request_user_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            assistant_id=None,
         )
         runtime_ctx = _build_runtime_context("thread-e2e", "run-1", config.get("context"), None)
         assert runtime_ctx["user_id"] == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"

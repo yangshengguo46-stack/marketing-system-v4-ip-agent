@@ -595,6 +595,43 @@ class TestAgentsAPI:
         assert data["description"] == "Reviews code"
         assert data["soul"] == "You are a code reviewer."
 
+    def test_create_cannot_claim_operator_owned_product_agent(
+        self,
+        agent_client,
+        tmp_path,
+        monkeypatch,
+    ):
+        from app.gateway import product_runtime
+
+        profile = tmp_path / "product-runtime-profile.yaml"
+        profile.write_text(
+            yaml.safe_dump(
+                {
+                    "schema_version": "ip-agent-runtime-profile-v1",
+                    "enabled": True,
+                    "product_id": "ip-agent",
+                    "assistant_id": "ip-agent",
+                    "agent_artifact_sha256": "b" * 64,
+                    "capability_contract": {
+                        "tool_allowlist": [],
+                        "skills": [],
+                        "memory_enabled": False,
+                    },
+                    "entrypoints": {},
+                }
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(product_runtime, "_profile_path", lambda: profile)
+
+        response = agent_client.post(
+            "/api/agents",
+            json={"name": "IP-Agent", "soul": "forged"},
+        )
+
+        assert response.status_code == 403
+        assert not (tmp_path / "users" / "test-user-autouse" / "agents" / "ip-agent").exists()
+
     def test_create_agent_invalid_name(self, agent_client):
         payload = {"name": "Code Reviewer!", "soul": "test"}
         response = agent_client.post("/api/agents", json=payload)
@@ -646,6 +683,49 @@ class TestAgentsAPI:
         response = agent_client.put("/api/agents/update-me", json={"soul": "updated"})
         assert response.status_code == 200
         assert response.json()["soul"] == "updated"
+
+    def test_update_cannot_mutate_operator_owned_product_agent(
+        self,
+        agent_client,
+        tmp_path,
+        monkeypatch,
+    ):
+        from app.gateway import product_runtime
+
+        profile = tmp_path / "product-runtime-profile.yaml"
+        profile.write_text(
+            yaml.safe_dump(
+                {
+                    "schema_version": "ip-agent-runtime-profile-v1",
+                    "enabled": True,
+                    "product_id": "ip-agent",
+                    "assistant_id": "ip-agent",
+                    "agent_artifact_sha256": "b" * 64,
+                    "capability_contract": {
+                        "tool_allowlist": [],
+                        "skills": [],
+                        "memory_enabled": False,
+                    },
+                    "entrypoints": {},
+                }
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(product_runtime, "_profile_path", lambda: profile)
+        target = tmp_path / "users" / "test-user-autouse" / "agents" / "ip-agent"
+        target.mkdir(parents=True)
+        config = "name: ip-agent\nskills: []\ntool_allowlist: []\nmemory_enabled: false\n"
+        (target / "config.yaml").write_text(config, encoding="utf-8")
+        (target / "SOUL.md").write_text("operator soul", encoding="utf-8")
+
+        response = agent_client.put(
+            "/api/agents/ip-agent",
+            json={"soul": "forged"},
+        )
+
+        assert response.status_code == 403
+        assert (target / "config.yaml").read_text(encoding="utf-8") == config
+        assert (target / "SOUL.md").read_text(encoding="utf-8") == "operator soul"
 
     def test_update_agent_description(self, agent_client):
         agent_client.post("/api/agents", json={"name": "desc-agent", "description": "old desc", "soul": "p"})
@@ -750,6 +830,44 @@ class TestAgentsAPI:
         # Verify it's gone
         response = agent_client.get("/api/agents/del-me")
         assert response.status_code == 404
+
+    def test_delete_cannot_remove_operator_owned_product_agent(
+        self,
+        agent_client,
+        tmp_path,
+        monkeypatch,
+    ):
+        from app.gateway import product_runtime
+
+        profile = tmp_path / "product-runtime-profile.yaml"
+        profile.write_text(
+            yaml.safe_dump(
+                {
+                    "schema_version": "ip-agent-runtime-profile-v1",
+                    "enabled": True,
+                    "product_id": "ip-agent",
+                    "assistant_id": "ip-agent",
+                    "agent_artifact_sha256": "b" * 64,
+                    "capability_contract": {
+                        "tool_allowlist": [],
+                        "skills": [],
+                        "memory_enabled": False,
+                    },
+                    "entrypoints": {},
+                }
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(product_runtime, "_profile_path", lambda: profile)
+        target = tmp_path / "users" / "test-user-autouse" / "agents" / "ip-agent"
+        target.mkdir(parents=True)
+        (target / "config.yaml").write_text("name: ip-agent\n", encoding="utf-8")
+        (target / "SOUL.md").write_text("operator soul", encoding="utf-8")
+
+        response = agent_client.delete("/api/agents/ip-agent")
+
+        assert response.status_code == 403
+        assert target.is_dir()
 
     def test_delete_missing_agent_404(self, agent_client):
         response = agent_client.delete("/api/agents/does-not-exist")

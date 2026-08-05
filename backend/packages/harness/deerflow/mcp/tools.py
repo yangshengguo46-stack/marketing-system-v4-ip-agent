@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import logging
 import re
 from collections.abc import Iterable, Mapping
@@ -11,17 +13,24 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from langchain_core.tools import BaseTool, StructuredTool
+from langchain_core.tools import BaseTool, StructuredTool, ToolException
 from langgraph.config import get_config
 
-from deerflow.config.extensions_config import ExtensionsConfig, resolve_effective_mcp_routing
+from deerflow.config.extensions_config import ExtensionsConfig, McpServerConfig, ToolResultPolicyConfig, resolve_effective_mcp_routing
 from deerflow.config.paths import VIRTUAL_PATH_PREFIX, Paths, get_paths
+from deerflow.mcp.capability import McpCapabilityRevokedError, require_active_server_capability, server_capability_digest
 from deerflow.mcp.client import build_servers_config
 from deerflow.mcp.oauth import build_oauth_tool_interceptor, get_initial_oauth_headers
+from deerflow.mcp.paid_admission import paid_mcp_interceptor_route_keys
+from deerflow.mcp.result_metadata import MCP_RESULT_METADATA_KEY, McpToolResultError, build_mcp_result_metadata
 from deerflow.mcp.session_pool import get_session_pool
 from deerflow.reflection import resolve_variable
 from deerflow.runtime.user_context import resolve_runtime_user_id
-from deerflow.tools.mcp_metadata import tag_mcp_routing, tag_mcp_tool
+from deerflow.tools.mcp_metadata import tag_mcp_capability, tag_mcp_routing, tag_mcp_tool
+from deerflow.tools.result_policy import (
+    clear_tool_result_policy,
+    tag_tool_result_policy,
+)
 from deerflow.tools.sync import make_sync_tool_wrapper
 from deerflow.tools.types import Runtime
 
@@ -45,6 +54,10 @@ _VALID_MCP_TOOL_NAME = re.compile(r"^[A-Za-z0-9_-]+$")
 # sandbox/artifact API — instead of on an unreachable host temp path.
 _MCP_TMP_SUBDIR = ".mcp/tmp"
 
+# Audio has no filesystem externalization path at this conversion boundary.
+# Bound its decoded size before it can enter a model request or checkpoint.
+_MAX_MCP_AUDIO_BYTES = 10 * 1024 * 1024
+
 # Matches local-file references embedded in free text returned by an MCP server.
 # Some servers (notably Playwright's ``browser_take_screenshot``) report saved
 # files only as text/markdown links rather than ``ResourceLink`` blocks. Those
@@ -58,6 +71,33 @@ _LOCAL_PATH_IN_TEXT_RE = re.compile(r"(?:file://)?/[^\s'\"<>|*?]+|(?:\.{0,2}/|[\
 _TEXT_PATH_TRAILING_CHARS = ".,;:!?)]}>\"'`"
 
 _FILE_SNAPSHOT = dict[Path, tuple[int, int]]
+
+
+class RequiredMCPConfigurationError(RuntimeError):
+    """A required MCP control or capability failed to assemble."""
+
+
+def _require_disjoint_paid_interceptor_routes(
+    interceptors: Iterable[Any],
+) -> None:
+    """Forbid independently installed paid interceptors on one MCP route.
+
+    Paid grant interceptors strip caller-supplied reserved headers. Chaining
+    two interceptors for the same server/tool route would therefore erase the
+    outer grant after admission and leave an orphaned paid-call record. One
+    composite dispatcher must own each paid route instead.
+    """
+
+    owners: dict[tuple[str, str], int] = {}
+    for index, interceptor in enumerate(interceptors):
+        for route_key in paid_mcp_interceptor_route_keys(interceptor):
+            previous = owners.get(route_key)
+            if previous is not None:
+                server_name, tool_name = route_key
+                raise RequiredMCPConfigurationError(
+                    f"Conflicting paid MCP interceptors for {server_name}/{tool_name}; configure one composite dispatcher",
+                )
+            owners[route_key] = index
 
 
 def _local_path_from_uri(uri: str, *, base_dir: Path | None = None) -> Path | None:
@@ -342,9 +382,8 @@ def _convert_call_tool_result(
     tree are left untouched.
     """
     from langchain_core.messages import ToolMessage
-    from langchain_core.messages.content import create_file_block, create_image_block, create_text_block
-    from langchain_core.tools import ToolException
-    from mcp.types import EmbeddedResource, ImageContent, ResourceLink, TextContent, TextResourceContents
+    from langchain_core.messages.content import create_audio_block, create_file_block, create_image_block, create_text_block
+    from mcp.types import AudioContent, EmbeddedResource, ImageContent, ResourceLink, TextContent, TextResourceContents
 
     # Pass ToolMessage through directly (interceptor short-circuit).
     if isinstance(call_tool_result, ToolMessage):
@@ -380,6 +419,17 @@ def _convert_call_tool_result(
             changed_files=changed_files,
         )
 
+    def _validate_audio(data: str) -> None:
+        max_base64_chars = ((_MAX_MCP_AUDIO_BYTES + 2) // 3) * 4
+        if len(data) > max_base64_chars:
+            raise ToolException("MCP audio payload exceeds the configured byte limit")
+        try:
+            decoded = base64.b64decode(data, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise ToolException("MCP audio payload is not valid base64") from exc
+        if len(decoded) > _MAX_MCP_AUDIO_BYTES:
+            raise ToolException("MCP audio payload exceeds the configured byte limit")
+
     # Convert MCP content blocks to LangChain content blocks.
     lc_content = []
     for item in call_tool_result.content:
@@ -387,6 +437,9 @@ def _convert_call_tool_result(
             lc_content.append(create_text_block(text=_resolve_text(item.text)))
         elif isinstance(item, ImageContent):
             lc_content.append(create_image_block(base64=item.data, mime_type=item.mimeType))
+        elif isinstance(item, AudioContent):
+            _validate_audio(item.data)
+            lc_content.append(create_audio_block(base64=item.data, mime_type=item.mimeType))
         elif isinstance(item, ResourceLink):
             mime = item.mimeType or None
             url = _resolve_link_url(str(item.uri))
@@ -411,15 +464,43 @@ def _convert_call_tool_result(
         else:
             lc_content.append(create_text_block(text=str(item)))
 
-    if call_tool_result.isError:
-        error_parts = [item["text"] for item in lc_content if isinstance(item, dict) and item.get("type") == "text"]
-        raise ToolException("\n".join(error_parts) if error_parts else str(lc_content))
-
     artifact = None
     if call_tool_result.structuredContent is not None:
         artifact = {"structured_content": call_tool_result.structuredContent}
 
+    mcp_metadata = build_mcp_result_metadata(call_tool_result)
+    if mcp_metadata is not None:
+        if artifact is None:
+            artifact = {}
+        artifact[MCP_RESULT_METADATA_KEY] = mcp_metadata
+
+    if call_tool_result.isError:
+        error_parts = [item["text"] for item in lc_content if isinstance(item, dict) and item.get("type") == "text"]
+        raise McpToolResultError(
+            "\n".join(error_parts) if error_parts else str(lc_content),
+            artifact=artifact,
+        )
+
     return lc_content, artifact
+
+
+async def _require_bound_capability(
+    *,
+    server_name: str,
+    expected_capability_digest: str | None,
+    pool: Any,
+) -> None:
+    if expected_capability_digest is None:
+        return
+    try:
+        await asyncio.to_thread(
+            require_active_server_capability,
+            server_name,
+            expected_capability_digest,
+        )
+    except McpCapabilityRevokedError as exc:
+        await pool.close_server(server_name)
+        raise ToolException("MCP capability was revoked or changed; start a new run") from exc
 
 
 def _make_session_pool_tool(
@@ -428,6 +509,7 @@ def _make_session_pool_tool(
     connection: dict[str, Any],
     tool_interceptors: list[Any] | None = None,
     tool_call_timeout: float | None = None,
+    expected_capability_digest: str | None = None,
 ) -> BaseTool:
     """Wrap an MCP tool so it reuses a persistent session from the pool.
 
@@ -451,6 +533,11 @@ def _make_session_pool_tool(
         runtime: Runtime | None = None,
         **arguments: Any,
     ) -> Any:
+        await _require_bound_capability(
+            server_name=server_name,
+            expected_capability_digest=expected_capability_digest,
+            pool=pool,
+        )
         thread_id = _extract_thread_id(runtime)
         user_id = resolve_runtime_user_id(runtime)
         # Scope the pooled session by user *and* thread. Filesystem isolation is
@@ -566,31 +653,133 @@ def _make_session_pool_tool(
     )
 
 
+def _make_ephemeral_session_tool(
+    tool: BaseTool,
+    server_name: str,
+    connection: dict[str, Any],
+    tool_interceptors: list[Any] | None = None,
+    callbacks: Any | None = None,
+    expected_capability_digest: str | None = None,
+) -> BaseTool:
+    """Wrap a remote MCP tool with the same raw-result converter as stdio.
+
+    HTTP/SSE/WebSocket sessions remain per-call; only their result conversion
+    and invocation-time capability check are shared with pooled stdio tools.
+    """
+    original_name = tool.name
+    prefix = f"{server_name}_"
+    if original_name.startswith(prefix):
+        original_name = original_name[len(prefix) :]
+    pool = get_session_pool()
+
+    async def call_with_ephemeral_session(
+        runtime: Runtime | None = None,
+        **arguments: Any,
+    ) -> Any:
+        await _require_bound_capability(
+            server_name=server_name,
+            expected_capability_digest=expected_capability_digest,
+            pool=pool,
+        )
+
+        from langchain_mcp_adapters.callbacks import CallbackContext, Callbacks
+        from langchain_mcp_adapters.interceptors import MCPToolCallRequest
+        from langchain_mcp_adapters.sessions import create_session
+
+        mcp_callbacks = None
+        if isinstance(callbacks, Callbacks):
+            mcp_callbacks = callbacks.to_mcp_format(context=CallbackContext(server_name=server_name, tool_name=original_name))
+
+        async def base_handler(request: MCPToolCallRequest) -> Any:
+            effective_connection = dict(connection)
+            if request.headers:
+                existing_headers = dict(effective_connection.get("headers") or {})
+                effective_connection["headers"] = {
+                    **existing_headers,
+                    **dict(request.headers),
+                }
+
+            captured_exception: Exception | None = None
+            call_tool_result = None
+            session_kwargs = {"mcp_callbacks": mcp_callbacks} if mcp_callbacks is not None else {}
+            async with create_session(effective_connection, **session_kwargs) as session:
+                await session.initialize()
+                try:
+                    call_kwargs: dict[str, Any] = {}
+                    if mcp_callbacks is not None:
+                        call_kwargs["progress_callback"] = mcp_callbacks.progress_callback
+                    call_tool_result = await session.call_tool(
+                        request.name,
+                        request.args,
+                        **call_kwargs,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    captured_exception = exc
+            if captured_exception is not None:
+                raise captured_exception
+            if call_tool_result is None:
+                raise RuntimeError("MCP tool call returned no result")
+            return call_tool_result
+
+        handler = base_handler
+        for interceptor in reversed(tool_interceptors or []):
+            outer = handler
+
+            async def wrapped(req: Any, _i: Any = interceptor, _h: Any = outer) -> Any:
+                return await _i(req, _h)
+
+            handler = wrapped
+
+        request = MCPToolCallRequest(
+            name=original_name,
+            args=arguments,
+            server_name=server_name,
+            runtime=runtime,
+        )
+        call_tool_result = await handler(request)
+        return await asyncio.to_thread(_convert_call_tool_result, call_tool_result)
+
+    return StructuredTool(
+        name=tool.name,
+        description=tool.description,
+        args_schema=tool.args_schema,
+        coroutine=call_with_ephemeral_session,
+        response_format="content_and_artifact",
+        metadata=tool.metadata,
+    )
+
+
 async def get_mcp_tools() -> list[BaseTool]:
     """Get all tools from enabled MCP servers.
 
     Tools using stdio transport are wrapped with persistent-session logic so
     consecutive calls within the same thread reuse the same MCP session.
-    HTTP/SSE tools are returned unwrapped to avoid cross-task TaskGroup
-    cleanup errors.
+    HTTP/SSE tools use one ephemeral session per call so they share the same
+    result converter without cross-task TaskGroup reuse.
 
     Returns:
         List of LangChain tools from all enabled MCP servers.
     """
-    try:
-        from langchain_mcp_adapters.client import MultiServerMCPClient
-    except ImportError:
-        logger.warning("langchain-mcp-adapters not installed. Install it to enable MCP tools: pip install langchain-mcp-adapters")
-        return []
-
     # NOTE: We use ExtensionsConfig.from_file() instead of get_extensions_config()
     # to always read the latest configuration from disk. This ensures that changes
     # made through the Gateway API (which runs in a separate process) are immediately
     # reflected when initializing MCP tools.
     extensions_config = ExtensionsConfig.from_file()
+    extension_extras = extensions_config.model_extra or {}
+    interceptors_required = extension_extras.get("mcpInterceptorsRequired") is True
+    try:
+        from langchain_mcp_adapters.client import MultiServerMCPClient
+    except ImportError as exc:
+        if interceptors_required:
+            raise RequiredMCPConfigurationError("Required MCP adapter dependency is unavailable") from exc
+        logger.warning("langchain-mcp-adapters not installed. Install it to enable MCP tools: pip install langchain-mcp-adapters")
+        return []
+
     servers_config = build_servers_config(extensions_config)
 
     if not servers_config:
+        if interceptors_required:
+            raise RequiredMCPConfigurationError("Required MCP interceptors cannot load without an enabled MCP server")
         logger.info("No enabled MCP servers configured")
         return []
 
@@ -615,27 +804,39 @@ async def get_mcp_tools() -> list[BaseTool]:
 
         # Load custom interceptors declared in extensions_config.json
         # Format: "mcpInterceptors": ["pkg.module:builder_func", ...]
-        raw_interceptor_paths = (extensions_config.model_extra or {}).get("mcpInterceptors")
+        raw_interceptor_paths = extension_extras.get("mcpInterceptors")
         if isinstance(raw_interceptor_paths, str):
             raw_interceptor_paths = [raw_interceptor_paths]
         elif not isinstance(raw_interceptor_paths, list):
             if raw_interceptor_paths is not None:
+                if interceptors_required:
+                    raise RequiredMCPConfigurationError("Required MCP interceptors must be configured as a list of paths")
                 logger.warning(f"mcpInterceptors must be a list of strings, got {type(raw_interceptor_paths).__name__}; skipping")
             raw_interceptor_paths = []
+        if interceptors_required and not raw_interceptor_paths:
+            raise RequiredMCPConfigurationError("Required MCP interceptor list is empty")
         for interceptor_path in raw_interceptor_paths:
             try:
+                if not isinstance(interceptor_path, str) or not interceptor_path:
+                    raise ValueError("interceptor path must be a non-empty string")
                 builder = resolve_variable(interceptor_path)
                 interceptor = builder()
                 if callable(interceptor):
                     tool_interceptors.append(interceptor)
                     logger.info(f"Loaded MCP interceptor: {interceptor_path}")
+                elif interceptors_required:
+                    raise TypeError(f"Required MCP interceptor builder {interceptor_path} returned {type(interceptor).__name__}")
                 elif interceptor is not None:
                     logger.warning(f"Builder {interceptor_path} returned non-callable {type(interceptor).__name__}; skipping")
             except Exception as e:
+                if interceptors_required:
+                    raise RequiredMCPConfigurationError(f"Required MCP interceptor failed to load: {interceptor_path}") from e
                 logger.warning(
                     f"Failed to load MCP interceptor {interceptor_path}: {e}",
                     exc_info=True,
                 )
+
+        _require_disjoint_paid_interceptor_routes(tool_interceptors)
 
         client = MultiServerMCPClient(
             servers_config,
@@ -644,14 +845,27 @@ async def get_mcp_tools() -> list[BaseTool]:
         )
 
         async def load_server_tools(server_name: str) -> list[BaseTool]:
+            server_cfg = extensions_config.mcp_servers.get(server_name)
+            server_required = isinstance(server_cfg, McpServerConfig) and (server_cfg.model_extra or {}).get("required") is True
             try:
-                return await client.get_tools(server_name=server_name)
+                server_tools = await client.get_tools(server_name=server_name)
             except Exception as e:
+                if interceptors_required or server_required:
+                    raise RequiredMCPConfigurationError(f"Required MCP server failed discovery: {server_name}") from e
                 logger.warning(
                     f"Skipping MCP server '{server_name}' after tool discovery failed: {e}",
                     exc_info=True,
                 )
                 return []
+
+            prefix = f"{server_name}_"
+            discovered_original_names = {tool.name[len(prefix) :] if str(tool.name).startswith(prefix) else str(tool.name) for tool in server_tools}
+            required_tool_names = {name for name, override in (server_cfg.tools.items() if isinstance(server_cfg, McpServerConfig) else ()) if (override.model_extra or {}).get("required") is True}
+            missing = required_tool_names - discovered_original_names
+            if missing or ((interceptors_required or server_required) and not server_tools):
+                detail = ", ".join(sorted(missing)) or "no tools discovered"
+                raise RequiredMCPConfigurationError(f"Required MCP capabilities missing from {server_name}: {detail}")
+            return server_tools
 
         # Get tools from each server independently so one broken MCP server does
         # not prevent healthy servers from contributing their tools.
@@ -674,6 +888,7 @@ async def get_mcp_tools() -> list[BaseTool]:
         for source_name, server_tools in zip(servers_config.keys(), tools_by_server, strict=True):
             transport = servers_config[source_name].get("transport", "stdio")
             server_cfg = extensions_config.mcp_servers.get(source_name)
+            capability_digest = server_capability_digest(server_cfg) if isinstance(server_cfg, McpServerConfig) else None
             for tool in server_tools:
                 if not _VALID_MCP_TOOL_NAME.fullmatch(tool.name or ""):
                     logger.warning(
@@ -683,15 +898,49 @@ async def get_mcp_tools() -> list[BaseTool]:
                         _VALID_MCP_TOOL_NAME.pattern,
                     )
                     continue
+                # A remote MCP server may populate BaseTool.metadata during
+                # discovery, but it may not assign itself a local trust or
+                # outcome policy. Clear the reserved key first, then apply the
+                # operator-owned server policy from extensions configuration.
+                clear_tool_result_policy(tool)
                 tag_mcp_tool(tool)
+                if capability_digest is not None:
+                    tag_mcp_capability(
+                        tool,
+                        server_name=source_name,
+                        generation=capability_digest,
+                    )
+                server_result_policy = getattr(server_cfg, "result_policy", None)
+                if isinstance(server_result_policy, ToolResultPolicyConfig):
+                    tag_tool_result_policy(
+                        tool,
+                        server_result_policy.model_dump(mode="json"),
+                    )
                 prefix = f"{source_name}_"
                 original_name = tool.name[len(prefix) :] if tool.name.startswith(prefix) else tool.name
                 routing = resolve_effective_mcp_routing(server_cfg, original_name)
                 if routing.get("mode") != "off":
                     tag_mcp_routing(tool, routing)
-                if tool.name.startswith(f"{source_name}_") and transport == "stdio":
+                has_source_prefix = tool.name.startswith(prefix)
+                if not has_source_prefix:
+                    # MultiServerMCPClient is configured with
+                    # tool_name_prefix=True, so real discovered tools always
+                    # identify their source. Preserve legacy/test adapters that
+                    # return an unprefixed BaseTool, but do not guess a server
+                    # and replace its already-working coroutine.
+                    wrapped_tools.append(tool)
+                elif transport == "stdio":
                     _timeout = server_cfg.tool_call_timeout if server_cfg else None
-                    wrapped_tools.append(_make_session_pool_tool(tool, source_name, servers_config[source_name], tool_interceptors, tool_call_timeout=_timeout))
+                    wrapped_tools.append(
+                        _make_session_pool_tool(
+                            tool,
+                            source_name,
+                            servers_config[source_name],
+                            tool_interceptors,
+                            tool_call_timeout=_timeout,
+                            expected_capability_digest=capability_digest,
+                        )
+                    )
                 else:
                     if transport != "stdio" and server_cfg and server_cfg.tool_call_timeout is not None:
                         logger.warning(
@@ -699,7 +948,16 @@ async def get_mcp_tools() -> list[BaseTool]:
                             source_name,
                             transport,
                         )
-                    wrapped_tools.append(tool)
+                    wrapped_tools.append(
+                        _make_ephemeral_session_tool(
+                            tool,
+                            source_name,
+                            servers_config[source_name],
+                            tool_interceptors,
+                            callbacks=getattr(client, "callbacks", None),
+                            expected_capability_digest=capability_digest,
+                        )
+                    )
 
         # Patch tools to support sync invocation, as deerflow client streams synchronously
         for tool in wrapped_tools:
@@ -710,4 +968,8 @@ async def get_mcp_tools() -> list[BaseTool]:
 
     except Exception as e:
         logger.error(f"Failed to load MCP tools: {e}", exc_info=True)
+        if isinstance(e, RequiredMCPConfigurationError):
+            raise
+        if interceptors_required:
+            raise RequiredMCPConfigurationError("Required MCP assembly failed") from e
         return []

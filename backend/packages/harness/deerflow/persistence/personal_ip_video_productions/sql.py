@@ -28,6 +28,7 @@ from deerflow.personal_ip.video_budget import (
     budget_limit,
     fold_video_budget,
     micros_to_amount,
+    provider_requires_paid_admission,
     public_budget_state,
 )
 from deerflow.personal_ip.video_contracts import normalize_production_mode, validate_compiled_video_contract
@@ -301,6 +302,12 @@ class PersonalIPVideoProductionRepository:
         delivery_snapshot = _json_snapshot(delivery_spec, field="delivery_spec", expected=dict)
         provider_snapshot = _json_snapshot(provider_policy, field="provider_policy", expected=dict)
         budget_snapshot = _json_snapshot(budget, field="budget", expected=dict)
+        caller_attempted_to_disable_approval = (
+            "paid_calls_require_explicit_approval" in budget_snapshot
+            and budget_snapshot["paid_calls_require_explicit_approval"] is not True
+        )
+        if budget_snapshot and not caller_attempted_to_disable_approval:
+            budget_snapshot["paid_calls_require_explicit_approval"] = True
         request_payload = {
             "budget": budget_snapshot,
             "delivery_spec": delivery_snapshot,
@@ -322,11 +329,19 @@ class PersonalIPVideoProductionRepository:
             existing = (await session.execute(statement)).scalar_one_or_none()
             if existing is not None:
                 if existing.request_digest != request_digest:
+                    if caller_attempted_to_disable_approval:
+                        raise ValueError(
+                            "video paid-call approval is server-controlled and cannot be disabled"
+                        )
                     raise ValueError("operation_key already records a different video production")
                 result = self._production_dict(existing)
                 result["events"] = await self._events(session, existing.id)
                 self._attach_budget_state(result, result["events"])
                 return result
+            if caller_attempted_to_disable_approval:
+                raise ValueError(
+                    "video paid-call approval is server-controlled and cannot be disabled"
+                )
             await self._validate_targets(
                 session,
                 owner_user_id=owner,
@@ -528,42 +543,32 @@ class PersonalIPVideoProductionRepository:
         return result
 
     @staticmethod
-    async def _validate_paid_approval(
-        session: AsyncSession,
+    def _validate_paid_approval(
         *,
-        production: PersonalIPVideoProductionRow,
+        events: list[dict[str, Any]],
         approval_event_key: str | None,
         expected_request: dict[str, Any],
     ) -> None:
-        if (production.budget_json or {}).get(
-            "paid_calls_require_explicit_approval",
-            True,
-        ) is not True:
-            return
         if not approval_event_key:
             raise ValueError("video budget reservation requires an approved paid-provider review")
-        approval = (
-            await session.execute(
-                select(PersonalIPVideoProductionEventRow).where(
-                    PersonalIPVideoProductionEventRow.production_id == production.id,
-                    PersonalIPVideoProductionEventRow.event_key == approval_event_key,
-                )
-            )
-        ).scalar_one_or_none()
-        approval_payload = approval.payload_json if approval is not None else {}
-        if approval is None or approval.event_type != "review_recorded" or approval.status != "approved" or approval_payload.get("review_kind") != "paid_provider_call":
+        approval = next(
+            (event for event in events if event.get("event_key") == approval_event_key),
+            None,
+        )
+        approval_payload = approval.get("payload") if isinstance(approval, dict) else {}
+        if not isinstance(approval_payload, dict):
+            approval_payload = {}
+        if approval is None or approval.get("event_type") != "review_recorded" or approval.get("status") != "approved" or approval_payload.get("review_kind") != "paid_provider_call":
             raise ValueError("video budget reservation requires an approved paid-provider review")
         request_event_key = str(approval_payload.get("request_event_key") or "").strip()
-        request = (
-            await session.execute(
-                select(PersonalIPVideoProductionEventRow).where(
-                    PersonalIPVideoProductionEventRow.production_id == production.id,
-                    PersonalIPVideoProductionEventRow.event_key == request_event_key,
-                )
-            )
-        ).scalar_one_or_none()
-        request_payload = request.payload_json if request is not None else {}
-        if request is None or request.event_type != "review_requested" or request_payload.get("review_kind") != "paid_provider_call" or request_payload.get("budget_request") != expected_request:
+        request = next(
+            (event for event in events if event.get("event_key") == request_event_key),
+            None,
+        )
+        request_payload = request.get("payload") if isinstance(request, dict) else {}
+        if not isinstance(request_payload, dict):
+            request_payload = {}
+        if request is None or request.get("event_type") != "review_requested" or request_payload.get("review_kind") != "paid_provider_call" or request_payload.get("budget_request") != expected_request:
             raise ValueError("approved paid-provider review does not match this budget reservation")
 
     @staticmethod
@@ -595,6 +600,10 @@ class PersonalIPVideoProductionRepository:
         cost_status = str(cost.get("status") or "").strip()
         cost_currency = str(cost.get("currency") or "").strip().upper()
         if billing_mode == "free":
+            if provider_requires_paid_admission(provider, capability):
+                raise ValueError(
+                    "server classifies this provider call as paid; a budget reservation is required"
+                )
             if (
                 cost_status != "known"
                 or amount_to_micros(
@@ -627,6 +636,13 @@ class PersonalIPVideoProductionRepository:
         request = (reservation.get("payload") or {}).get("request")
         if not isinstance(request, dict):
             raise ValueError("paid provider budget reservation is invalid")
+        PersonalIPVideoProductionRepository._validate_paid_approval(
+            events=events,
+            approval_event_key=(reservation.get("payload") or {}).get(
+                "approval_event_key"
+            ),
+            expected_request=request,
+        )
         if request.get("capability") != capability or request.get("provider") != provider or request.get("entity_type") != entity_type or request.get("entity_id") != entity_id:
             raise ValueError("paid provider request does not match its budget reservation")
         maximum_micros = amount_to_micros(
@@ -735,6 +751,11 @@ class PersonalIPVideoProductionRepository:
                 payload = existing.get("payload") or {}
                 if payload.get("request") != request:
                     raise ValueError("reservation_key already records a different budget request")
+                self._validate_paid_approval(
+                    events=events,
+                    approval_event_key=payload.get("approval_event_key"),
+                    expected_request=request,
+                )
                 operation = {
                     "contract_version": VIDEO_BUDGET_RESERVATION_CONTRACT_VERSION,
                     "operation": "reserved",
@@ -760,9 +781,8 @@ class PersonalIPVideoProductionRepository:
             budget_currency, _ = budget_limit(production.budget_json or {})
             if currency_value != budget_currency:
                 raise ValueError("budget reservation currency does not match the video budget")
-            await self._validate_paid_approval(
-                session,
-                production=production,
+            self._validate_paid_approval(
+                events=events,
                 approval_event_key=approval_key,
                 expected_request=request,
             )

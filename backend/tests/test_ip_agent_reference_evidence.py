@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 import os
 import sys
 from pathlib import Path
@@ -113,7 +115,57 @@ async def test_reference_video_inspection_isolates_source_failures(monkeypatch) 
                 "trust": "untrusted_source_data",
                 "public_metadata": {},
             },
-            "coverage": {"metadata": "completed"},
+            "media_metadata": {
+                "duration_seconds": 20.0,
+                "width": 1080,
+                "height": 1920,
+                "frame_rate": 30.0,
+                "video_codec": "h264",
+                "has_audio": True,
+                "container": "mp4",
+                "size_bytes": 1024,
+            },
+            "visual_samples": [
+                {
+                    "at_seconds": float(index),
+                    "artifact_ref": f"outputs/reference/frame-{index:02d}.jpg",
+                    "artifact_sha256": f"{index:064x}",
+                }
+                for index in range(1, 9)
+            ],
+            "contact_sheet_ref": "outputs/reference/contact-sheet.jpg",
+            "contact_sheet_sha256": "f" * 64,
+            "scene_boundaries_seconds": [],
+            "analysis_receipt": {
+                "pipeline_version": "test-v1",
+                "analysis_depth": "mechanical",
+                "requested_frames": 8,
+                "local_sampling_spec_sha256": "b" * 64,
+                "toolchain_sha256": {"ffmpeg": "c" * 64, "ffprobe": "d" * 64},
+                "local_cache_hit": False,
+                "artifact_manifest_sha256": "e" * 64,
+                "provider_stage_spec_sha256": {},
+            },
+            "coverage": {
+                key: {
+                    "collection_status": status,
+                    "observation_scope": key,
+                    "truncated": False,
+                    **({"requested_count": 8, "observed_count": 8} if key == "sampled_frames" else {"requested_count": 1, "observed_count": 1} if key == "contact_sheet" else {"observed_count": 0} if key == "local_scene_detection" else {}),
+                    "reason_codes": [] if status == "completed" else ["ANALYSIS_DEPTH_NOT_REQUESTED"],
+                }
+                for key, status in {
+                    "source_identity": "completed",
+                    "media_metadata": "completed",
+                    "sampled_frames": "completed",
+                    "contact_sheet": "completed",
+                    "local_scene_detection": "completed",
+                    "asr": "not_requested",
+                    "ocr": "not_requested",
+                    "provider_scene_segmentation": "not_requested",
+                    "storyline": "not_requested",
+                }.items()
+            },
         }
 
     monkeypatch.setattr(reference_evidence, "_inspect_one_video", inspect_one)
@@ -142,11 +194,30 @@ async def test_reference_video_inspection_caps_batch_at_three() -> None:
 async def test_douyin_video_resolution_retries_one_transient_media_miss(monkeypatch) -> None:
     attempts = 0
 
-    async def flaky_resolver(_reference: str):
+    async def flaky_resolver(_reference: str, **_kwargs: Any):
         nonlocal attempts
         attempts += 1
         if attempts == 1:
             raise ValueError(reference_evidence._DOUYIN_MEDIA_RETRY_MESSAGE)
+        return "https://media.example.com/video.mp4", {"id": "7531000000000000001"}, []
+
+    monkeypatch.setattr(reference_evidence, "resolve_douyin_video", flaky_resolver)
+
+    result = await reference_evidence._resolve_douyin_video_with_retry("https://www.douyin.com/video/7531000000000000001")
+
+    assert attempts == 2
+    assert result[1]["id"] == "7531000000000000001"
+
+
+@pytest.mark.asyncio
+async def test_douyin_video_resolution_retries_one_transient_identity_miss(monkeypatch) -> None:
+    attempts = 0
+
+    async def flaky_resolver(_reference: str, **_kwargs: Any):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise ValueError("Douyin page could not prove exact work identity")
         return "https://media.example.com/video.mp4", {"id": "7531000000000000001"}, []
 
     monkeypatch.setattr(reference_evidence, "resolve_douyin_video", flaky_resolver)
@@ -207,6 +278,8 @@ async def test_evidence_mcp_stdio_exposes_exactly_two_read_only_tools(tmp_path: 
             "IP_AGENT_EVIDENCE_USER_DATA_ROOT": str(tmp_path),
             "IP_AGENT_EVIDENCE_BROWSER_PROFILE_DIR": str(tmp_path / "profile"),
             "IP_AGENT_EVIDENCE_BROWSER_HEADLESS": "1",
+            "IP_AGENT_EVIDENCE_BINDING_ACTIVE_KID": "test-v1",
+            "IP_AGENT_EVIDENCE_BINDING_KEYS_JSON": json.dumps({"test-v1": base64.urlsafe_b64encode(b"a" * 32).decode("ascii").rstrip("=")}),
         }
     )
     params = StdioServerParameters(
@@ -225,9 +298,13 @@ async def test_evidence_mcp_stdio_exposes_exactly_two_read_only_tools(tmp_path: 
             ]
             for tool in listed.tools:
                 assert tool.annotations is not None
-                assert tool.annotations.readOnlyHint is True
                 assert tool.annotations.destructiveHint is False
                 assert tool.outputSchema is not None
+            by_name = {tool.name: tool for tool in listed.tools}
+            assert by_name["collect_douyin_benchmark_account"].annotations.readOnlyHint is True
+            assert by_name["collect_douyin_benchmark_account"].annotations.idempotentHint is True
+            assert by_name["inspect_reference_videos"].annotations.readOnlyHint is False
+            assert by_name["inspect_reference_videos"].annotations.idempotentHint is False
 
             result = await session.call_tool(
                 "collect_douyin_benchmark_account",

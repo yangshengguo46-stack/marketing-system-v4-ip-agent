@@ -1,0 +1,76 @@
+{
+  "schema_version": "ip-agent-m2-method-attribution-rubric-v1",
+  "content_dimensions": [
+    {
+      "id": "evidence_accuracy",
+      "label": "证据准确",
+      "max_score": 25,
+      "full_score_evidence": "账号名、作品归属、可见字段和覆盖缺口全部忠实；事实、推断和创作假设可区分"
+    },
+    {
+      "id": "benchmark_mechanism",
+      "label": "对标机制",
+      "max_score": 20,
+      "full_score_evidence": "只从多条已检查证据归纳重复机制；清楚说明可迁移与不可照搬，不复制具体表达"
+    },
+    {
+      "id": "ip_direction",
+      "label": "IP 方向",
+      "max_score": 20,
+      "full_score_evidence": "主体、表现形式、影响力与成交路径、长期冲突或内容引擎彼此一致并适合礼品命题"
+    },
+    {
+      "id": "story_strength",
+      "label": "剧情强度",
+      "max_score": 20,
+      "full_score_evidence": "欲望、目标、行动、反馈、策略变化、代价和状态变化形成完整因果；不是平铺广告"
+    },
+    {
+      "id": "shootability",
+      "label": "可拍性",
+      "max_score": 10,
+      "full_score_evidence": "单集完整，场景、动作、对白、节拍和拍摄提示可由普通团队执行"
+    }
+  ],
+  "objective_tool_efficiency": {
+    "max_score": 5,
+    "award_when": "实验仪器证明一次主 Agent 模型调用、零工具调用、零工具结果且无循环"
+  },
+  "direct_fail_rules": [
+    {
+      "id": "F1",
+      "rule": "编造或改写账号名、作品归属、台词、字幕、数据、时间戳或证据覆盖范围"
+    },
+    {
+      "id": "F2",
+      "rule": "没有相应证据却声称看过、听过、拆解或确认了具体内容"
+    },
+    {
+      "id": "F3",
+      "rule": "把只有画面采样与镜头变化的证据扩写成未经 ASR/OCR 支持的对白、人物关系或情节事实"
+    },
+    {
+      "id": "F5",
+      "rule": "只返回分析报告，没有完整 IP 方向和一条独立成立的可拍脚本"
+    },
+    {
+      "id": "F6",
+      "rule": "最终回答机械拼成多份方法报告，或出现互相矛盾的停止与继续要求"
+    },
+    {
+      "id": "F7",
+      "rule": "使用保证性结论，或把创作假设伪装成用户经营事实"
+    },
+    {
+      "id": "F8",
+      "rule": "向用户泄漏内部 Skill 名称、路径、激活过程或方法编排痕迹"
+    }
+  ],
+  "blind_review_output": {
+    "label": "X 或 Y",
+    "dimension_scores": "每项包含 score、理由和对应输出原文",
+    "direct_failures": "列出 rule_id 与触发原文；没有则为空数组",
+    "total_content_score": "0 到 95",
+    "notes": "不得根据篇幅、Token 或猜测的实验组别加分"
+  }
+}

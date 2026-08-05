@@ -20,14 +20,14 @@ config_version: 31
 # ============================================================================
 # MineContext — bundled local observation source (restart required)
 # ============================================================================
-# Installed with `make install`. New owners start automatically with screen
-# summaries enabled at the bounded interval below; folder monitoring remains
-# off until an exact directory is configured. Settings can disable or clear it.
+# Installed with `make install`, but collection stays off for new owners.
+# Screen summaries run only after an owner explicitly enables bounded
+# collection; folder monitoring remains off until an exact directory is configured.
 # The ordinary VOLCENGINE_API_KEY is reused by default. MINECONTEXT_* variables
 # remain optional overrides and are never copied into model evidence.
 minecontext:
   enabled: true
-  auto_enable_new_owners: true
+  auto_enable_new_owners: false
   source_path: third_party/volcengine/MineContext
   # runtime_python: .deer-flow/toolchains/minecontext/bin/python
   host: 127.0.0.1

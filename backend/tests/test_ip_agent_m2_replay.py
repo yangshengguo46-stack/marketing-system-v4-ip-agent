@@ -67,13 +67,16 @@ def _repo_fixture(tmp_path: Path) -> tuple[Path, Path, bytes]:
         json.dumps(
             {
                 "middlewares": [],
-                "mcpInterceptors": [],
+                "mcpInterceptors": [m2.EVIDENCE_PAID_CALL_INTERCEPTOR],
+                "mcpInterceptorsRequired": True,
                 "mcpServers": {
                     m2.EVIDENCE_MCP_SERVER_NAME: {
                         "enabled": True,
+                        "required": True,
                         "type": "stdio",
                         "tools": {
                             "collect_douyin_benchmark_account": {
+                                "required": True,
                                 "routing": {
                                     "mode": "prefer",
                                     "priority": 100,
@@ -81,6 +84,7 @@ def _repo_fixture(tmp_path: Path) -> tuple[Path, Path, bytes]:
                                 }
                             },
                             "inspect_reference_videos": {
+                                "required": True,
                                 "routing": {
                                     "mode": "prefer",
                                     "priority": 90,

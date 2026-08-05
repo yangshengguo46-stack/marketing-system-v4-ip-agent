@@ -814,6 +814,122 @@ class TestChannelManager:
 
         _run(go())
 
+    def test_bound_interactive_wait_marks_owner_im_product_entrypoint(self):
+        """A verified interactive IM owner reaches the product runtime classifier."""
+        from app.channels.manager import ChannelManager
+
+        async def go():
+            bus = MessageBus()
+            store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
+            manager = ChannelManager(bus=bus, store=store)
+            client = _make_mock_langgraph_client()
+            msg = InboundMessage(
+                channel_name="test",
+                chat_id="chat-1",
+                user_id="platform-user",
+                owner_user_id="owner-1",
+                connection_id="connection-1",
+                text="hi",
+            )
+
+            await manager._handle_chat_on_thread(
+                client,
+                msg,
+                "thread-wait",
+                storage_user_id="owner-1",
+            )
+
+            client.runs.wait.assert_awaited_once()
+            assert client.runs.wait.await_args.kwargs["context"]["product_entrypoint"] == "owner_im"
+
+        _run(go())
+
+    def test_bound_interactive_stream_marks_owner_im_product_entrypoint(
+        self,
+        monkeypatch,
+    ):
+        """Streaming and wait dispatch must classify the same trusted ingress."""
+        from app.channels.manager import ChannelManager
+
+        monkeypatch.setattr(
+            "app.channels.manager.STREAM_UPDATE_MIN_INTERVAL_SECONDS",
+            0.0,
+        )
+
+        async def go():
+            bus = MessageBus()
+            store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
+            manager = ChannelManager(bus=bus, store=store)
+            client = _make_mock_langgraph_client()
+            client.runs.stream = MagicMock(return_value=_make_async_iterator(_ok_stream_events()))
+            msg = InboundMessage(
+                channel_name="feishu",
+                chat_id="chat-1",
+                user_id="platform-user",
+                owner_user_id="owner-1",
+                connection_id="connection-1",
+                text="hi",
+            )
+
+            await manager._handle_chat_on_thread(
+                client,
+                msg,
+                "thread-stream",
+                storage_user_id="owner-1",
+            )
+
+            client.runs.stream.assert_called_once()
+            assert client.runs.stream.call_args.kwargs["context"]["product_entrypoint"] == "owner_im"
+
+        _run(go())
+
+    def test_noninteractive_webhook_does_not_claim_owner_im_entrypoint(
+        self,
+        monkeypatch,
+    ):
+        """A webhook owner is not equivalent to a synchronous owner IM turn."""
+        from app.channels.manager import ChannelManager
+        from app.channels.run_policy import ChannelRunPolicy
+
+        async def go():
+            bus = MessageBus()
+            store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
+            manager = ChannelManager(bus=bus, store=store)
+            client = _make_mock_langgraph_client()
+            client.runs.create = AsyncMock(return_value={"run_id": "run-1"})
+
+            async def _noninteractive_policy(msg, run_context):
+                run_context["disable_clarification"] = True
+                return ChannelRunPolicy(
+                    is_interactive=False,
+                    fire_and_forget=True,
+                )
+
+            monkeypatch.setattr(
+                manager,
+                "_apply_channel_policy",
+                _noninteractive_policy,
+            )
+            msg = InboundMessage(
+                channel_name="github",
+                chat_id="owner/repo",
+                user_id="sender",
+                owner_user_id="owner-1",
+                text="review",
+            )
+
+            await manager._handle_chat_on_thread(
+                client,
+                msg,
+                "thread-webhook",
+                storage_user_id="owner-1",
+            )
+
+            client.runs.create.assert_awaited_once()
+            assert "product_entrypoint" not in client.runs.create.await_args.kwargs["context"]
+
+        _run(go())
+
     def test_handle_chat_calls_channel_receive_file_for_inbound_files(self, monkeypatch):
         from app.channels.manager import ChannelManager
 
@@ -1706,13 +1822,13 @@ class TestChannelManager:
 
             mock_client.runs.wait.assert_called_once()
             call_args = mock_client.runs.wait.call_args
-            assert call_args[0][1] == "lead_agent"
+            assert call_args[0][1] == "mobile-agent"
             assert call_args[1]["config"]["recursion_limit"] == 55
             assert call_args[1]["config"]["configurable"]["checkpoint_ns"] == ""
             assert call_args[1]["config"]["configurable"]["thread_id"] == "test-thread-123"
             assert call_args[1]["context"]["thinking_enabled"] is False
             assert call_args[1]["context"]["subagent_enabled"] is True
-            assert call_args[1]["context"]["agent_name"] == "mobile-agent"
+            assert "agent_name" not in call_args[1]["context"]
 
         _run(go())
 
@@ -1890,11 +2006,11 @@ class TestChannelManager:
 
             mock_client.runs.wait.assert_called_once()
             call_args = mock_client.runs.wait.call_args
-            assert call_args[0][1] == "lead_agent"
+            assert call_args[0][1] == "vip-agent"
             assert call_args[1]["config"]["recursion_limit"] == 77
             assert call_args[1]["context"]["thinking_enabled"] is True
             assert call_args[1]["context"]["subagent_enabled"] is True
-            assert call_args[1]["context"]["agent_name"] == "vip-agent"
+            assert "agent_name" not in call_args[1]["context"]
             assert call_args[1]["context"]["is_plan_mode"] is True
 
         _run(go())

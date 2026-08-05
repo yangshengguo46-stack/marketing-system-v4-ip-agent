@@ -1,0 +1,105 @@
+{
+  "schema_version": "ip-director-minimal-canary-result-v1",
+  "scope": "research_direct_provider_only",
+  "product_capability": false,
+  "evaluation": {
+    "verdict": "failed",
+    "passed": [
+      "正确识别礼品为中心概念，黄金为材质与价值修饰",
+      "虚构内容明确标记为 creative 并列出 assumptions",
+      "输出包含反馈、策略变化、有代价选择和状态改变",
+      "返回合法 JSON"
+    ],
+    "failures": [
+      "把经营目标直接变成故事人物目标，主角成了账号主理人",
+      "一句话故事写的是账号、流量和咨询变化，不是赠与行为中的人物关系变化",
+      "没有建立送礼者与收礼者的不同欲望及相互反馈",
+      "商业外环吞掉了故事内环"
+    ],
+    "next_hypothesis": "先隔离故事世界与商业世界，商业目标只负责筛选与承接，不进入故事因果链"
+  },
+  "request": {
+    "model": "doubao-seed-evolving-latest-version",
+    "thinking": "enabled",
+    "max_tokens": 3000,
+    "system_path": "../product/research/ip-agent/director-core/ark-lab-causal-logline-system-v1.md",
+    "input_path": "../product/research/ip-agent/director-core/ark-lab-s1-logline-input-v1.txt"
+  },
+  "response": {
+    "id": "021785819886284cf2d23e4a199b9c4bf1f6d914b47619d4e14f5",
+    "actual_model": "doubao-seed-evolving-latest-version",
+    "elapsed_seconds": 57.173,
+    "finish_reason": "stop",
+    "usage": {
+      "completion_tokens": 2746,
+      "prompt_tokens": 611,
+      "total_tokens": 3357,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 1808
+      }
+    },
+    "json_parse_error": null,
+    "content": {
+      "epistemic_state": "creative",
+      "facts_used": [
+        "用户经营的产品类别是黄金礼品",
+        "用户希望通过内容账号获得咨询"
+      ],
+      "assumptions": [
+        "虚构了一位黄金礼品账号主理人",
+        "虚构了账号起初没有咨询的状态",
+        "虚构了主理人先展示黄金贵重质感的内容策略",
+        "虚构了观众只围观、羡慕或质疑而不咨询的反馈",
+        "虚构了主理人转而呈现礼物背后关系张力的策略变化",
+        "虚构了一条内容走红后出现攀比性询盘的情节",
+        "虚构了主理人拒绝该订单、损失流量的选择",
+        "虚构了账号最终成为关系难题咨询入口的结果",
+        "以上人物、事件、客户动机和经营结果均为创作，不代表真实客户案例或经营事实"
+      ],
+      "semantic": {
+        "head_concept": "礼品",
+        "modifiers": [
+          "黄金（材质与价值属性）"
+        ],
+        "semantic_action": "人通过赠送黄金礼品，把抽象心意转化为可触摸、可保存的郑重表达",
+        "relationship_at_stake": "送礼者与收礼者之间的关系是否被看见、被记住、被对等回应"
+      },
+      "association_sources": [
+        {
+          "id": "S1",
+          "social_domain": "外交/盟誓",
+          "relation_structure": "一方送出难以替代的信物，将模糊亲善转化为可检验的承诺；若信物被当作筹码轻慢，同盟就会转向猜忌。"
+        },
+        {
+          "id": "S2",
+          "social_domain": "学术/公开评审",
+          "relation_structure": "创作者把长期打磨的成果交给同行评判，使私人能力主张变成可公开引用的贡献；若评判只看标签而非问题，注意会增加，信任却不会发生。"
+        },
+        {
+          "id": "S3",
+          "social_domain": "邻里/熟人交易",
+          "relation_structure": "摊主把要紧物件托付给常客照看，使普通买卖变成互惠责任；一旦对方辜负这份托付，交易关系仍在，熟人信任却破裂。"
+        }
+      ],
+      "selected_source_ref": "S2",
+      "causal_bridge": {
+        "subject": "虚构的黄金礼品账号主理人",
+        "trigger": "账号长期没有咨询，主理人急于证明自己的礼品值得被看见",
+        "want": "获得有真实送礼意图的咨询",
+        "goal": "让观众从浏览内容转为主动说明自己的关系难题并询问礼品",
+        "initial_tactic": "集中展示黄金的贵重质感和成品外观",
+        "counterforce": "观众把内容当作财富展示，只留下羡慕、质疑或泛泛夸赞，不吐露自身需求",
+        "feedback": "热度上升但咨询为空，偶有留言也只问价格或真假",
+        "strategy_change": "从展示黄金本身，转向呈现每件礼物所承载的未说出口的关系张力与选择代价",
+        "costly_choice": "一条内容走红后，面对要求把礼品做成攀比符号的高意向询盘，选择接单还是拒绝",
+        "cost": "接单可得即时咨询和收入，但账号会被定义为炫富符号；拒单则损失流量与订单，还可能被嘲讽",
+        "state_change": "账号从被围观的黄金陈列位，变成少数人带着郑重关系难题主动敲门的咨询入口",
+        "viewer_desire": "观众想确认自己的心意能否被准确表达，而不只是被金钱价格衡量"
+      },
+      "logline": "一个无人咨询的黄金礼品账号主理人起初靠展示黄金贵重换来围观，却发现没人说出真正的送礼难题；当她改拍每份礼物背后未说出口的关系分量后，一条内容引来攀比性订单，她宁可拒绝流量、损失眼前询盘，也不把心意做成财富标签，最终让账号变成人们带着关系难题主动咨询的入口。"
+    }
+  }
+}

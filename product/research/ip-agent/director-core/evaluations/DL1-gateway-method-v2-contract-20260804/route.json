@@ -1,0 +1,415 @@
+{
+  "schema_version": "ip-director-loop-ab-result-v1",
+  "scope": "research_isolated_gateway_agent",
+  "product_capability": false,
+  "request": {
+    "transport": "gateway",
+    "stage": "route",
+    "arm": "method",
+    "case_id": "DL1-fruit-grower-longterm",
+    "model": "doubao-seed-evolving",
+    "thinking": "enabled",
+    "contract_path": "product/research/ip-agent/director-core/director-route-output-contract-v2.md",
+    "contract_sha256": "181219ef02df11d540ecf1353196b8775caa6b026c8e875e8b6d5a0d5dcb8c9f",
+    "arm_path": "product/research/ip-agent/director-core/director-route-method-v2.md",
+    "arm_sha256": "bfce539bd33bd28d19fd0b0a18ef611ef56a75baf9d1d2f1a054c6a83a8bb1e4",
+    "brief_path": "product/research/ip-agent/director-core/director-loop-scenarios-v1.json",
+    "brief_sha256": "7432b23ad5f80914bbea3204f7d70d57628eef270917ca409bb7a8f80b6d5795",
+    "system_bytes": 6003,
+    "user_bytes": 1313,
+    "gateway_run_controls": {
+      "thinking_enabled": true,
+      "recursion_limit": 20
+    }
+  },
+  "response": {
+    "id": "933cfed4-172a-4a88-b7dd-00039c6e52c6",
+    "actual_model": "doubao-seed-evolving-latest-version",
+    "elapsed_seconds": 140.074,
+    "finish_reason": null,
+    "usage": {
+      "thread_id": "20490cc5-ac7a-4bc2-8cbc-62b680cd8022",
+      "total_tokens": 7908,
+      "total_input_tokens": 2337,
+      "total_output_tokens": 5571,
+      "total_runs": 1,
+      "by_model": {
+        "doubao-seed-evolving-latest-version": {
+          "tokens": 7908,
+          "runs": 1
+        }
+      },
+      "by_caller": {
+        "lead_agent": 7908,
+        "subagent": 0,
+        "middleware": 0
+      }
+    },
+    "provider_response_sha256": "a047a58ae7c84c84fe38ab06143e5469bb3e30a57aee6eb8c826e8bebc3ce527",
+    "parse_normalization": null,
+    "json_parse_error": null,
+    "content": {
+      "schema_version": "ip-director-route-result-v2",
+      "epistemic_state": "creative_hypothesis",
+      "facts_used": [
+        {
+          "id": "f1",
+          "statement": "本人经营果园十五年"
+        },
+        {
+          "id": "f2",
+          "statement": "本人常在收工后和村里老人聊天"
+        },
+        {
+          "id": "f3",
+          "statement": "本人喜欢把农活观察讲成带方言的短段子"
+        },
+        {
+          "id": "f4",
+          "statement": "本人愿意正脸出镜"
+        },
+        {
+          "id": "f5",
+          "statement": "当前只能由本人用一部手机在果园持续拍摄"
+        }
+      ],
+      "semantic_kernel": {
+        "surface_terms": [
+          "果农",
+          "果园",
+          "水果"
+        ],
+        "head_concept_hypothesis": "把十五年扎根一地的劳动、收工后的村庄闲谈，转化为用方言讲给外人听的生活解释。",
+        "literal_action": {
+          "statement": "本人经营果园十五年，常在收工后和村里老人聊天，喜欢把农活观察讲成带方言的短段子，愿意正脸出镜，当前只能由本人用一部手机在果园持续拍摄。",
+          "fact_refs": [
+            "f1",
+            "f2",
+            "f3",
+            "f4",
+            "f5"
+          ]
+        },
+        "human_action_hypothesis": "把重复劳动中的观察和收工后的闲谈，整理成可对外讲述的方言短段子，并用正脸手机拍摄持续发布。",
+        "relationship_hypothesis": "从本地的劳动者和聊天者，逐渐变成连接村里老人经验、村庄日常生活与外部观众的讲述者；观众可能通过反复看见同一张脸、同一个地方而建立熟悉感。",
+        "social_rule_hypothesis": "公众更容易相信长期扎根一地、用本地语言说话的真实劳动者，但平台传播也可能把方言和乡村简化为猎奇符号；长期影响力需要人的可辨识度，而不只是产品供应。",
+        "desire_conflict_hypothesis": "想继续守住慢的、扎根的、熟人式的生活节奏，又想让个人劳动和表达被更多人看见并获得回报；想保持方言和闲谈的自然，又要让内容能被陌生人持续理解。"
+      },
+      "directions": [
+        {
+          "id": "near-orchard-labor-authority",
+          "semantic_distance": "near",
+          "industry_role": "subject",
+          "content_subject_hypothesis": "一人、一机、一园条件下，十五年果园劳动中的季节判断、农活细节和长期经营耐心。",
+          "association_path_hypothesis": [
+            "果园劳动",
+            "长期经营形成的反复观察",
+            "用第一人称把具体农活讲清楚",
+            "观众认识劳动者本人"
+          ],
+          "structure_mapping_hypothesis": [
+            {
+              "source_edge": "长期经营果园使其对季节、树况和农活有持续观察",
+              "target_edge": "观众据此把账号主体判断为懂产品、可追溯的生产者"
+            },
+            {
+              "source_edge": "只能本人用一部手机在果园拍摄",
+              "target_edge": "内容只能依靠现场真实劳动和口头表达，而非表演或包装"
+            }
+          ],
+          "audience_tension_hypothesis": "想买可信水果的人，既想看到真实种植过程，又担心短视频只是卖货表演；既希望劳动者获得合理回报，又习惯按价格选择水果。",
+          "expression_mode_hypothesis": "正脸手机拍摄的田管现场口述；把一次剪枝、套袋、采收或判断讲成有起承转合的小故事，而不是操作说明书。",
+          "subject_ownership": {
+            "fact_refs": [
+              "f1",
+              "f4",
+              "f5"
+            ],
+            "hypothesis": "十五年经营和持续果园现场拍摄构成专业可信来源，正脸出镜让专业判断绑定到本人。"
+          },
+          "business_attribution_hypothesis": "观众因持续看到本人在劳动现场做判断，未来把桃子等果品的品质、可靠与本人形象直接关联。",
+          "assumptions": [
+            "观众愿意通过长期劳动过程建立信任",
+            "农活现场能持续提供故事性",
+            "一人一机足以呈现专业判断"
+          ],
+          "far_deletion_test": null
+        },
+        {
+          "id": "mid-cultivation-as-life-patience",
+          "semantic_distance": "mid",
+          "industry_role": "metaphor",
+          "content_subject_hypothesis": "借农活和村庄闲谈，持续讲普通人如何在长期选择、等待、关系和不确定性中生活。",
+          "association_path_hypothesis": [
+            "果园劳动",
+            "长期等待与照管的结构",
+            "收工后和老人聊天获得的人生经验",
+            "方言短段子把这些处境讲给外人"
+          ],
+          "structure_mapping_hypothesis": [
+            {
+              "source_edge": "种果树需要多年投入、修剪和等待天气",
+              "target_edge": "人的选择也需要长期承担后果，不能立刻见效"
+            },
+            {
+              "source_edge": "收工后和村里老人聊天",
+              "target_edge": "代际之间关于过日子、忍耐和关系的经验传递"
+            },
+            {
+              "source_edge": "把农活观察讲成带方言的短段子",
+              "target_edge": "把具体劳动经验转译成陌生人能共鸣的生活解释"
+            }
+          ],
+          "audience_tension_hypothesis": "许多人既想要稳定、扎根和长期关系，又被流动、比较和短期效率推着走；既想说自己的真实生活，又怕说得土、没人听。",
+          "expression_mode_hypothesis": "收工后或农活间隙的正脸方言口述；以一个农活观察或老人的话开头，落到一个人人能懂的生活选择。",
+          "subject_ownership": {
+            "fact_refs": [
+              "f1",
+              "f2",
+              "f3",
+              "f4",
+              "f5"
+            ],
+            "hypothesis": "十五年固定场所提供长期观察，老人聊天提供代际生活入口，方言短段子能力与正脸出镜让这种讲述只能由本人持续完成。"
+          },
+          "business_attribution_hypothesis": "观众先记住这个会讲生活的本地人，再把可靠、耐心、实在等感受迁移到果园产品上。",
+          "assumptions": [
+            "方言表达能被跨地域观众理解而非只被猎奇",
+            "农活观察能稳定映射到普遍处境",
+            "观众愿意听非剧情化的口述故事"
+          ],
+          "far_deletion_test": null
+        },
+        {
+          "id": "far-rooted-person-speaking",
+          "semantic_distance": "far",
+          "industry_role": "stage",
+          "content_subject_hypothesis": "一个长期留在同一地方的人，如何在收工后听老人说话，再用自己的方言把普通人的选择和感受讲给远方的人听。",
+          "association_path_hypothesis": [
+            "经营果园十五年",
+            "长期留在一个地方、重复一种生活",
+            "收工后与老人聊天",
+            "把日常观察讲成方言短段子",
+            "正脸持续对外讲述普通人的处境"
+          ],
+          "structure_mapping_hypothesis": [
+            {
+              "source_edge": "十五年重复照管一个固定场所",
+              "target_edge": "长期盯住一种生活所积累的观察、忍耐和代价"
+            },
+            {
+              "source_edge": "收工后和村里老人聊天",
+              "target_edge": "在非正式时刻承接上一代人的经验、遗憾和过日子的规则"
+            },
+            {
+              "source_edge": "用方言短段子讲农活观察",
+              "target_edge": "用本地人自己的语言，把私人日常翻译成公共表达"
+            }
+          ],
+          "audience_tension_hypothesis": "人既渴望离开原地去更大世界，又对留下的地方、人和语言有责任；既想保护私人生活，又渴望被陌生人看见和理解。",
+          "expression_mode_hypothesis": "正脸近景口述故事，语言带方言；场景只作为生活舞台，重点是一句老人的话、一次收工后的感悟或一个长期选择的代价。",
+          "subject_ownership": {
+            "fact_refs": [
+              "f1",
+              "f2",
+              "f3",
+              "f4",
+              "f5"
+            ],
+            "hypothesis": "删除行业外壳后，仍属于本人的是十五年留在同一地方的经历、收工后和老人聊天的习惯、方言短段子的表达能力、正脸出镜和一人持续拍摄的条件。"
+          },
+          "business_attribution_hypothesis": "归因不只来自产品知识，而来自观众长期看见同一张脸、同一种方言和同一种生活态度；产品因此成为这个人可信生活的延伸。",
+          "assumptions": [
+            "去掉行业词后本人的经历和语言仍足够独特",
+            "观众会因讲述者的生活一致性而非产品关注内容",
+            "方言短段子可以承载普遍情感"
+          ],
+          "far_deletion_test": {
+            "removed_surface_terms": [
+              "果农",
+              "果园",
+              "水果"
+            ],
+            "remaining_human_subject_hypothesis": "一个在同一地方生活和劳动了十五年的人，收工后听村里老人说话，再用带方言的短段子把日常观察讲给外人听，并愿意正脸用手机持续出现。",
+            "ownership_fact_refs": [
+              "f1",
+              "f2",
+              "f3",
+              "f4",
+              "f5"
+            ]
+          }
+        }
+      ],
+      "recommendation": {
+        "selected_direction_ref": "mid-cultivation-as-life-patience",
+        "fact_refs": [
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5"
+        ],
+        "assumptions": [
+          "mid距离允许行业作为隐喻，又保留足够多的本人生产事实支撑未来产品归因",
+          "方言口述可由一人一机在现场完成",
+          "农活与老人聊天能持续提供故事母题",
+          "观众愿意把对人的信任迁移到产品上"
+        ],
+        "reason_hypothesis": "mid让f1的长期扎根、f2的老人聊天、f3的方言讲述成为内容引擎，而不只是背景；它既能触达想理解普通生活选择的观众，又没有切断与果园、果品的可见联系。",
+        "tradeoff_hypothesis": "放弃把专业种植技术、品种介绍和卖货信息作为主线，短期产品意图较弱；也放弃far更彻底的人生表达，以免行业事实被删得过多而削弱未来产品归因。",
+        "why_not_near_hypothesis": "近邻路线虽利于直接卖货，但会把内容主体收束为种植经验和产品信息，f2的村庄关系和f3的方言讲述难以成为核心；在给定只允许mid/far的选择策略下，它也不是本轮可选方向。"
+      }
+    },
+    "gateway": {
+      "thread_id": "20490cc5-ac7a-4bc2-8cbc-62b680cd8022",
+      "run_id": "933cfed4-172a-4a88-b7dd-00039c6e52c6",
+      "agent_name": "ip-director-loop-5932cb232115",
+      "surface": {
+        "config_sha256": "1a969f50b4d1eed4523b1046e167eb983ad4578e07fbc72446cfedac5a7beaa9",
+        "soul_sha256": "9c3a7f1a7ce99042a6e5e552741b5132b6a7706631872e04c75ebe9e8ab34495",
+        "skills": [],
+        "tool_allowlist": [],
+        "memory_enabled": false
+      },
+      "model_surface": {
+        "name": "doubao-seed-evolving",
+        "model": "doubao-seed-evolving",
+        "display_name": "Volcengine Doubao / doubao-seed-evolving",
+        "description": null,
+        "supports_thinking": true,
+        "supports_reasoning_effort": true,
+        "supports_vision": true,
+        "temperature": null,
+        "max_tokens": null,
+        "effective_config_sha256": "f0acabec81ee71ae9f5c8412e36805c91218f43c858194e250338526246dbfc7"
+      },
+      "thread_request_sha256": "b761d9ebd2c6345e0c396116feb44d1120583e77823ac62cd5a403057a983686",
+      "run_request_sha256": "0f13bfd416ca5722fb8c94c0b115c69a47d8f12a9b83a98e449bb64b5f294dc2",
+      "run_record": {
+        "run_id": "933cfed4-172a-4a88-b7dd-00039c6e52c6",
+        "thread_id": "20490cc5-ac7a-4bc2-8cbc-62b680cd8022",
+        "assistant_id": "ip-director-loop-5932cb232115",
+        "status": "success",
+        "metadata": {},
+        "kwargs": {
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "以下是冻结的隔离研究输入。只返回本阶段合同规定的 JSON。schema_version 必须逐字等于 ip-director-route-result-v2：\n{\"brief\":{\"audience_hypotheses\":[\"可能有人想从普通人的处境中获得对选择、关系和生活的解释\",\"可能有人愿意转发能替自己说出生活感受的内容\"],\"case_id\":\"DL1-fruit-grower-longterm\",\"commercial_object_terms\":[\"水果\",\"桃子\",\"果品\"],\"facts\":[{\"id\":\"f1\",\"statement\":\"本人经营果园十五年\"},{\"id\":\"f2\",\"statement\":\"本人常在收工后和村里老人聊天\"},{\"id\":\"f3\",\"statement\":\"本人喜欢把农活观察讲成带方言的短段子\"},{\"id\":\"f4\",\"statement\":\"本人愿意正脸出镜\"},{\"id\":\"f5\",\"statement\":\"当前只能由本人用一部手机在果园持续拍摄\"}],\"objective\":[\"长期建立属于本人的账号影响力\",\"未来可以让观众把果园产品归因给本人\"],\"production_constraints\":[\"一人一机\",\"主要在果园取景\",\"可以口头表达但没有演员团队\"],\"research_fixture\":true,\"runtime_status\":\"research_quarantined\",\"schema_version\":\"ip-director-loop-brief-v1\",\"selection_policy\":{\"allowed_distances\":[\"mid\",\"far\"],\"required_mode\":\"story\"},\"subject\":{\"description\":\"一名经营果园十五年的河南果农\",\"kind\":\"person\"},\"surface_terms\":[\"果农\",\"果园\",\"水果\"]}}"
+              }
+            ]
+          },
+          "config": {
+            "recursion_limit": 20
+          }
+        },
+        "multitask_strategy": "reject",
+        "created_at": "2026-08-04T08:44:39.722884+00:00",
+        "updated_at": "2026-08-04T08:46:59.717887+00:00",
+        "total_input_tokens": 2337,
+        "total_output_tokens": 5571,
+        "total_tokens": 7908,
+        "llm_call_count": 1,
+        "lead_agent_tokens": 7908,
+        "subagent_tokens": 0,
+        "middleware_tokens": 0,
+        "message_count": 2,
+        "stop_reason": null
+      },
+      "token_usage": {
+        "thread_id": "20490cc5-ac7a-4bc2-8cbc-62b680cd8022",
+        "total_tokens": 7908,
+        "total_input_tokens": 2337,
+        "total_output_tokens": 5571,
+        "total_runs": 1,
+        "by_model": {
+          "doubao-seed-evolving-latest-version": {
+            "tokens": 7908,
+            "runs": 1
+          }
+        },
+        "by_caller": {
+          "lead_agent": 7908,
+          "subagent": 0,
+          "middleware": 0
+        }
+      },
+      "events_sha256": "cbfbdc798e2bc32b5b948870c0fe2977c0cafa7885b1298467c39fe8ac9a01c3",
+      "events": [
+        {
+          "seq": 1,
+          "event_type": "run.start",
+          "category": "trace",
+          "caller": "lead_agent",
+          "llm_call_index": null
+        },
+        {
+          "seq": 2,
+          "event_type": "llm.human.input",
+          "category": "message",
+          "caller": "lead_agent",
+          "llm_call_index": null
+        },
+        {
+          "seq": 3,
+          "event_type": "llm.ai.response",
+          "category": "message",
+          "caller": "lead_agent",
+          "llm_call_index": 1
+        },
+        {
+          "seq": 4,
+          "event_type": "run.end",
+          "category": "outputs",
+          "caller": null,
+          "llm_call_index": null
+        }
+      ],
+      "runtime_metadata": {
+        "caller": "lead_agent",
+        "agent_name": "ip-director-loop-5932cb232115",
+        "model_name": "doubao-seed-evolving",
+        "thinking_enabled": true,
+        "reasoning_effort": null,
+        "is_plan_mode": false,
+        "subagent_enabled": false,
+        "tool_groups": null,
+        "available_skills": [],
+        "tool_allowlist": [],
+        "memory_enabled": false,
+        "assembled_tool_names": [],
+        "indexed_skill_names": [],
+        "thread_id": "20490cc5-ac7a-4bc2-8cbc-62b680cd8022",
+        "ls_integration": "langgraph"
+      },
+      "llm_calls": [
+        {
+          "call_index": 1,
+          "caller": "lead_agent",
+          "latency_ms": 139760,
+          "usage": {
+            "input_tokens": 2337,
+            "output_tokens": 5571,
+            "total_tokens": 7908,
+            "input_token_details": {
+              "cache_read": 0
+            },
+            "output_token_details": {
+              "reasoning": 3569
+            }
+          },
+          "actual_model": "doubao-seed-evolving-latest-version"
+        }
+      ],
+      "tool_calls": [],
+      "tool_results": []
+    }
+  },
+  "mechanical_validation": {
+    "passed": true,
+    "issues": []
+  },
+  "quality_verdict": "pending_blind_review"
+}

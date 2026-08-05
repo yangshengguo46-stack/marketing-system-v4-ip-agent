@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -241,6 +242,150 @@ def stamp_exception_meta(msg: ToolMessage, exc_info: str) -> ToolMessage:
     updated_kwargs[TOOL_META_KEY] = _make_meta(status="error", source="exception", **attrs)
     msg.additional_kwargs = updated_kwargs
     return msg
+
+
+def stamp_declared_result_outcome(
+    msg: ToolMessage,
+    policy: Mapping[str, object],
+) -> ToolMessage:
+    """Stamp a locally declared domain outcome from structured tool evidence.
+
+    MCP ``isError`` and ``ToolMessage.status`` describe transport/execution.
+    Evidence contracts have a separate domain outcome which must remain
+    partial or failed without discarding coverage and next-action fields. Only
+    the exact operator-owned policy supported by ``result_policy`` may enter
+    this function; arbitrary result JSON never opts itself into these rules.
+    """
+
+    def _declared_meta(
+        *,
+        status: str,
+        error_type: str | None,
+        recoverable_by_model: bool,
+        recommended_next_action: str,
+    ) -> dict[str, object]:
+        return _make_meta(
+            status=status,
+            source="tool_return",
+            error_type=error_type,
+            recoverable_by_model=recoverable_by_model,
+            recommended_next_action=recommended_next_action,
+        )
+
+    invalid = _declared_meta(
+        status="error",
+        error_type="invalid_evidence_contract",
+        recoverable_by_model=False,
+        recommended_next_action="stop",
+    )
+
+    def _is_complete_current_contract(
+        contract_version: object,
+        structured: Mapping[str, object],
+    ) -> bool:
+        from deerflow.ip_agent.evidence_contracts import (  # noqa: PLC0415
+            BenchmarkAccountEvidence,
+            ReferenceVideoEvidence,
+        )
+
+        model = (
+            BenchmarkAccountEvidence
+            if contract_version == "ip-benchmark-account-evidence-v2"
+            else ReferenceVideoEvidence
+        )
+        try:
+            model.model_validate(dict(structured))
+        except (TypeError, ValueError):
+            return False
+        return True
+
+    meta = invalid
+    if policy.get("outcome_contract") == "ip-evidence-operation-status-v1":
+        artifact = msg.artifact
+        structured = artifact.get("structured_content") if isinstance(artifact, Mapping) else None
+        if isinstance(structured, Mapping):
+            contract_version = structured.get("contract_version")
+            operation_status = structured.get("operation_status")
+            if contract_version in {
+                "ip-benchmark-account-evidence-v1",
+                "ip-reference-video-evidence-v1",
+            }:
+                meta = _declared_meta(
+                    status="error",
+                    error_type="legacy_evidence_contract",
+                    recoverable_by_model=False,
+                    recommended_next_action="stop",
+                )
+            elif contract_version == "ip-benchmark-account-evidence-v2":
+                benchmark_outcomes = {
+                    "ok": _declared_meta(
+                        status="success",
+                        error_type=None,
+                        recoverable_by_model=True,
+                        recommended_next_action="continue",
+                    ),
+                    "needs_user_input": _declared_meta(
+                        status="partial_success",
+                        error_type="needs_user_input",
+                        recoverable_by_model=False,
+                        recommended_next_action="stop",
+                    ),
+                    "failed": _declared_meta(
+                        status="error",
+                        error_type="evidence_unavailable",
+                        recoverable_by_model=False,
+                        recommended_next_action="stop",
+                    ),
+                }
+                meta = benchmark_outcomes.get(operation_status, invalid)
+                if operation_status == "ok" and not _is_complete_current_contract(
+                    contract_version,
+                    structured,
+                ):
+                    meta = invalid
+            elif contract_version == "ip-reference-video-evidence-v2":
+                reference_outcomes = {
+                    "ok": _declared_meta(
+                        status="success",
+                        error_type=None,
+                        recoverable_by_model=True,
+                        recommended_next_action="continue",
+                    ),
+                    "partial_or_failed": _declared_meta(
+                        status="partial_success",
+                        error_type="evidence_partial",
+                        recoverable_by_model=False,
+                        recommended_next_action="summarize",
+                    ),
+                    "failed": _declared_meta(
+                        status="error",
+                        error_type="evidence_unavailable",
+                        recoverable_by_model=False,
+                        recommended_next_action="stop",
+                    ),
+                }
+                meta = reference_outcomes.get(operation_status, invalid)
+                metadata = structured.get("metadata")
+                if (
+                    operation_status == "ok"
+                    and not (
+                        isinstance(metadata, Mapping)
+                        and metadata.get("truncated") is True
+                    )
+                    and not _is_complete_current_contract(contract_version, structured)
+                ):
+                    meta = invalid
+                if operation_status == "ok" and isinstance(metadata, Mapping) and metadata.get("truncated") is True:
+                    meta = _declared_meta(
+                        status="partial_success",
+                        error_type="evidence_truncated",
+                        recoverable_by_model=False,
+                        recommended_next_action="summarize",
+                    )
+
+    updated_kwargs = dict(msg.additional_kwargs or {})
+    updated_kwargs[TOOL_META_KEY] = meta
+    return msg.model_copy(update={"additional_kwargs": updated_kwargs})
 
 
 def normalize_tool_message(msg: ToolMessage) -> ToolMessage:

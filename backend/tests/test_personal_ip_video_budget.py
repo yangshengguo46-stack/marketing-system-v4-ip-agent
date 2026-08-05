@@ -1,24 +1,50 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
+from typing import Any
 
 import pytest
+from sqlalchemy import select
 
 from deerflow.config.database_config import DatabaseConfig
 from deerflow.persistence.engine import close_engine, get_session_factory, init_engine_from_config
 from deerflow.persistence.personal_ip_video_productions import PersonalIPVideoProductionRepository
+from deerflow.persistence.personal_ip_video_productions.model import (
+    PersonalIPVideoProductionEventRow,
+    PersonalIPVideoProductionRow,
+)
+
+_OMIT_APPROVAL_POLICY = object()
+
+
+def _digest(value: Any) -> str:
+    encoded = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 async def _production(
     tmp_path,
     *,
     hard_limit: float = 10,
-    approval_required: bool = True,
+    approval_required: Any = True,
 ) -> tuple[PersonalIPVideoProductionRepository, dict]:
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None
     repository = PersonalIPVideoProductionRepository(sf)
+    budget = {
+        "currency": "CNY",
+        "hard_limit": hard_limit,
+    }
+    if approval_required is not _OMIT_APPROVAL_POLICY:
+        budget["paid_calls_require_explicit_approval"] = approval_required
     production = await repository.begin(
         owner_user_id="user-1",
         operation_key="video:budget:test",
@@ -29,11 +55,7 @@ async def _production(
         source={"idea": "测试付费调用预算"},
         delivery_spec={},
         provider_policy={"video": ["seedance"]},
-        budget={
-            "currency": "CNY",
-            "hard_limit": hard_limit,
-            "paid_calls_require_explicit_approval": approval_required,
-        },
+        budget=budget,
         production_mode="generative_cinematic",
     )
     return repository, production
@@ -104,6 +126,31 @@ async def _approve(
         trusted_human_confirmation=True,
     )
     return approval_event_key
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("approval_required", [False, None, 0, "false"])
+async def test_video_budget_caller_cannot_disable_paid_call_approval(
+    tmp_path,
+    approval_required: Any,
+) -> None:
+    try:
+        with pytest.raises(ValueError, match="server-controlled"):
+            await _production(tmp_path, approval_required=approval_required)
+    finally:
+        await close_engine()
+
+
+@pytest.mark.asyncio
+async def test_video_budget_persists_server_approval_policy_when_omitted(tmp_path) -> None:
+    _repository, production = await _production(
+        tmp_path,
+        approval_required=_OMIT_APPROVAL_POLICY,
+    )
+    try:
+        assert production["budget"]["paid_calls_require_explicit_approval"] is True
+    finally:
+        await close_engine()
 
 
 @pytest.mark.asyncio
@@ -258,8 +305,17 @@ async def test_budget_reserve_settle_accumulates_retries_and_rejects_over_limit(
 async def test_budget_release_restores_capacity_and_terminal_receipts_are_idempotent(
     tmp_path,
 ) -> None:
-    repository, production = await _production(tmp_path, approval_required=False)
+    repository, production = await _production(tmp_path)
     try:
+        approval = await _approve(
+            repository,
+            production["id"],
+            reservation_key="voice:attempt-1",
+            maximum_amount=7,
+            capability="speech_generation",
+            entity_type="audio",
+            entity_id="voice-01",
+        )
         reserved = await repository.reserve_budget(
             production["id"],
             owner_user_id="user-1",
@@ -270,7 +326,7 @@ async def test_budget_release_restores_capacity_and_terminal_receipts_are_idempo
             entity_id="voice-01",
             maximum_amount=7,
             currency="CNY",
-            approval_event_key=None,
+            approval_event_key=approval,
             request_ref="voice://voice-01/attempt-1",
         )
         assert reserved is not None
@@ -383,8 +439,25 @@ async def test_budget_rejects_unapproved_currency_mismatch_and_actual_over_reser
 async def test_concurrent_budget_reservations_cannot_overbook_sqlite(
     tmp_path,
 ) -> None:
-    repository, production = await _production(tmp_path, approval_required=False)
+    repository, production = await _production(tmp_path)
     try:
+
+        approvals = {
+            "shot-01:attempt-1": await _approve(
+                repository,
+                production["id"],
+                reservation_key="shot-01:attempt-1",
+                maximum_amount=6,
+                entity_id="shot-01",
+            ),
+            "shot-02:attempt-1": await _approve(
+                repository,
+                production["id"],
+                reservation_key="shot-02:attempt-1",
+                maximum_amount=6,
+                entity_id="shot-02",
+            ),
+        }
 
         async def reserve(key: str, entity_id: str):
             return await repository.reserve_budget(
@@ -397,7 +470,7 @@ async def test_concurrent_budget_reservations_cannot_overbook_sqlite(
                 entity_id=entity_id,
                 maximum_amount=6,
                 currency="CNY",
-                approval_event_key=None,
+                approval_event_key=approvals[key],
                 request_ref=f"shot://{entity_id}/attempt-1",
             )
 
@@ -424,8 +497,26 @@ async def test_concurrent_budget_reservations_cannot_overbook_sqlite(
 async def test_paid_provider_request_requires_matching_active_reservation(
     tmp_path,
 ) -> None:
-    repository, production = await _production(tmp_path, approval_required=False)
+    repository, production = await _production(tmp_path)
     try:
+        with pytest.raises(ValueError, match="server classifies this provider call as paid"):
+            await repository.append_event(
+                production["id"],
+                owner_user_id="user-1",
+                event_key="shot-01:provider-request:false-free-claim",
+                event_type="shot_generation_requested",
+                status="running",
+                entity_type="shot",
+                entity_id="shot-01",
+                payload={"billing_mode": "free"},
+                input_refs=["shot://shot-01"],
+                output_refs=[],
+                provider="volcengine",
+                model="seedance-2.0",
+                provider_task_id=None,
+                cost={"status": "known", "amount": 0, "currency": "CNY"},
+            )
+
         with pytest.raises(ValueError, match="budget_reservation_id"):
             await repository.append_event(
                 production["id"],
@@ -448,6 +539,12 @@ async def test_paid_provider_request_requires_matching_active_reservation(
                 },
             )
 
+        approval = await _approve(
+            repository,
+            production["id"],
+            reservation_key="shot-01:attempt-1",
+            maximum_amount=6,
+        )
         reserved = await repository.reserve_budget(
             production["id"],
             owner_user_id="user-1",
@@ -458,7 +555,7 @@ async def test_paid_provider_request_requires_matching_active_reservation(
             entity_id="shot-01",
             maximum_amount=6,
             currency="CNY",
-            approval_event_key=None,
+            approval_event_key=approval,
             request_ref="shot://shot-01/attempt-1",
         )
         assert reserved is not None
@@ -539,6 +636,151 @@ async def test_paid_provider_request_requires_matching_active_reservation(
             cost={"status": "known", "amount": 0, "currency": "CNY"},
         )
         assert free is not None
+    finally:
+        await close_engine()
+
+
+@pytest.mark.asyncio
+async def test_legacy_unapproved_reservation_cannot_replay_or_admit_provider(
+    tmp_path,
+) -> None:
+    repository, production = await _production(tmp_path)
+    try:
+        approval = await _approve(
+            repository,
+            production["id"],
+            reservation_key="shot-01:attempt-1",
+            maximum_amount=6,
+        )
+        reserved = await repository.reserve_budget(
+            production["id"],
+            owner_user_id="user-1",
+            reservation_key="shot-01:attempt-1",
+            capability="video_generation",
+            provider="volcengine",
+            entity_type="shot",
+            entity_id="shot-01",
+            maximum_amount=6,
+            currency="CNY",
+            approval_event_key=approval,
+            request_ref="shot://shot-01/attempt-1",
+        )
+        assert reserved is not None
+        reservation_id = reserved["budget_operation"]["reservation_id"]
+
+        session_factory = get_session_factory()
+        assert session_factory is not None
+        async with session_factory() as session:
+            production_row = await session.get(
+                PersonalIPVideoProductionRow,
+                production["id"],
+            )
+            assert production_row is not None
+            production_row.budget_json = {
+                **(production_row.budget_json or {}),
+                "paid_calls_require_explicit_approval": False,
+            }
+            production_row.request_digest = _digest(
+                {
+                    "budget": production_row.budget_json,
+                    "delivery_spec": production_row.delivery_spec_json,
+                    "provider_policy": production_row.provider_policy_json,
+                    "source": production_row.source_json,
+                    "source_kind": production_row.source_kind,
+                    "subject_id": production_row.subject_id,
+                    "target_account_ids": production_row.target_account_ids_json,
+                    "thread_id": production_row.thread_id,
+                    "title": production_row.title,
+                }
+            )
+            rows = list(
+                (
+                    await session.execute(
+                        select(PersonalIPVideoProductionEventRow).where(
+                            PersonalIPVideoProductionEventRow.production_id
+                            == production["id"]
+                        )
+                    )
+                ).scalars()
+            )
+            for row in rows:
+                if row.event_type in {"review_requested", "review_recorded"}:
+                    await session.delete(row)
+                elif row.event_type == "budget_reserved":
+                    row.payload_json = {
+                        **(row.payload_json or {}),
+                        "approval_event_key": None,
+                    }
+            await session.commit()
+
+        replayed = await repository.begin(
+            owner_user_id="user-1",
+            operation_key="video:budget:test",
+            title="预算门禁",
+            subject_id=None,
+            target_account_ids=[],
+            source_kind="idea",
+            source={"idea": "测试付费调用预算"},
+            delivery_spec={},
+            provider_policy={"video": ["seedance"]},
+            budget={
+                "currency": "CNY",
+                "hard_limit": 10,
+                "paid_calls_require_explicit_approval": False,
+            },
+            production_mode="generative_cinematic",
+        )
+        assert replayed["id"] == production["id"]
+
+        with pytest.raises(ValueError, match="approved paid-provider review"):
+            await repository.reserve_budget(
+                production["id"],
+                owner_user_id="user-1",
+                reservation_key="shot-01:attempt-1",
+                capability="video_generation",
+                provider="volcengine",
+                entity_type="shot",
+                entity_id="shot-01",
+                maximum_amount=6,
+                currency="CNY",
+                approval_event_key=None,
+                request_ref="shot://shot-01/attempt-1",
+            )
+
+        with pytest.raises(ValueError, match="approved paid-provider review"):
+            await repository.append_event(
+                production["id"],
+                owner_user_id="user-1",
+                event_key="shot-01:provider-request:legacy-reservation",
+                event_type="shot_generation_requested",
+                status="running",
+                entity_type="shot",
+                entity_id="shot-01",
+                payload={
+                    "billing_mode": "paid",
+                    "budget_reservation_id": reservation_id,
+                },
+                input_refs=["shot://shot-01"],
+                output_refs=[],
+                provider="volcengine",
+                model="seedance-2.0",
+                provider_task_id="task-legacy",
+                cost={
+                    "status": "estimated",
+                    "amount": 5,
+                    "currency": "CNY",
+                },
+            )
+
+        released = await repository.release_budget(
+            production["id"],
+            owner_user_id="user-1",
+            reservation_id=reservation_id,
+            release_key="shot-01:attempt-1:legacy-release",
+            reason="legacy reservation never reached provider",
+        )
+        assert released is not None
+        assert released["budget_operation"]["operation"] == "released"
     finally:
         await close_engine()
 

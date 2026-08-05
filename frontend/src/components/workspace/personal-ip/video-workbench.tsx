@@ -1200,6 +1200,7 @@ function WorkbenchConversationProvider({
   const { thread, sendMessage } = useThreadStream({
     threadId: isNewThread ? undefined : threadId || undefined,
     displayThreadId: threadId || undefined,
+    assistantId: "ip-agent",
     context: { ...localSettings.context, agent_name: "ip-agent" },
     onStart: (createdThreadId) => {
       setThreadId(createdThreadId);

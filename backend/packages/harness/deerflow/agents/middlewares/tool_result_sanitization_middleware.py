@@ -11,14 +11,15 @@ have it reach the model as authoritative framework context.
 
 This middleware narrows that gap by applying the *same* structural
 neutralization (``neutralize_untrusted_tags``) to the results of the first-party
-network tools, so a fetched ``<system-reminder>`` is escaped to
+network tools and tools carrying an operator-owned untrusted-result policy, so
+a fetched ``<system-reminder>`` is escaped to
 ``&lt;system-reminder&gt;`` exactly like it would be in direct user input. It
 deliberately targets only the remote-content tools: local tool output (bash,
 file reads) is left untouched so legitimate code/log content is never mangled.
 
-Scope note: matching is a name-based allowlist, so MCP-provided remote-content
-tools registered under other names are not yet covered — see
-``_REMOTE_CONTENT_TOOL_NAMES``.
+Unclassified tools are intentionally untouched. A remote MCP server cannot
+self-assign the local policy: discovery clears the reserved metadata key before
+applying operator configuration.
 """
 
 from __future__ import annotations
@@ -33,6 +34,8 @@ from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
+
+from deerflow.tools.result_policy import get_tool_result_policy
 
 logger = logging.getLogger(__name__)
 
@@ -123,15 +126,16 @@ class ToolResultSanitizationMiddleware(AgentMiddleware[AgentState]):
     is returned unchanged. Mirrors the user-input guardrail so untrusted remote
     content and untrusted user input receive the same structural neutralization.
 
-    Scope is a name-based allowlist (``_REMOTE_CONTENT_TOOL_NAMES``): it reliably
-    covers the built-in web tools without false positives on local tools. It does
-    NOT cover MCP-provided remote-content tools registered under other names —
-    see the note on ``_REMOTE_CONTENT_TOOL_NAMES`` for why a name heuristic is
-    avoided and the metadata-tagging follow-up.
+    The built-in web tools retain their exact-name compatibility path. Other
+    tools are sanitized only when their local BaseTool metadata carries the
+    operator-owned ``untrusted_external`` result policy.
     """
 
     def _should_sanitize(self, request: ToolCallRequest) -> bool:
-        return request.tool_call.get("name") in _REMOTE_CONTENT_TOOL_NAMES
+        if request.tool_call.get("name") in _REMOTE_CONTENT_TOOL_NAMES:
+            return True
+        policy = get_tool_result_policy(getattr(request, "tool", None))
+        return policy is not None and policy["trust"] == "untrusted_external"
 
     @override
     def wrap_tool_call(

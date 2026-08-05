@@ -1,0 +1,23 @@
+{
+  "name": "AI MediaKit CLI",
+  "upstream": "https://github.com/volcengine/mediakit-cli",
+  "ref": "main",
+  "commit": "279e5bb97e97c6875ae2c6891c2c3fa9a43f39c0",
+  "upstream_tree": "e9b40b73ef691e7bbf5a38c9af4e06d699d62beb",
+  "package_version": "0.2.0",
+  "source_mode": "full-upstream-source-with-prebuilt-binary-excluded",
+  "upstream_tracked_file_count": 120,
+  "retained_source_file_count": 119,
+  "excluded_upstream_paths": [
+    "mediakit"
+  ],
+  "source_tree_sha256": "95c943f0c9cac9e6b747db5ab4cb8e716cf57bb057be0163eb7f48edea3fd234",
+  "capability_count": 40,
+  "capability_catalog_sha256": "331ea8363682de2ec3c65f20dede3f572de5e44fa6443d3571831d4cd86c19a2",
+  "declared_license": "MIT",
+  "notice_license_statement": "Apache-2.0",
+  "license_review_status": "upstream-conflict-open",
+  "license_sha256": "9d3c55f1e140e8cd9557cf9803225a37a30017fd5259bf8ee0fed105cb866a0f",
+  "package_json_sha256": "452c714d4b6df27ee9db6c002fb3c81b73cfd05354ad4d44d801c05decd7dbd1",
+  "open_source_notice_sha256": "f13964a913617d365b0f53630e13c685f066aa7f01f6bcad8afe978b91de4639"
+}

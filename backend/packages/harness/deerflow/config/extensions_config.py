@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any, Literal
 
@@ -49,6 +50,15 @@ class McpToolOverride(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class ToolResultPolicyConfig(BaseModel):
+    """Operator-owned interpretation policy for results from one MCP server."""
+
+    trust: Literal["untrusted_external"]
+    semantic_class: Literal["evidence"]
+    outcome_contract: Literal["ip-evidence-operation-status-v1"]
+    model_config = ConfigDict(extra="forbid")
+
+
 class McpOAuthConfig(BaseModel):
     """OAuth configuration for an MCP server (HTTP/SSE transports)."""
 
@@ -86,6 +96,10 @@ class McpServerConfig(BaseModel):
     description: str = Field(default="", description="Human-readable description of what this MCP server provides")
     routing: McpRoutingConfig = Field(default_factory=McpRoutingConfig, description="Soft routing hints for tools from this MCP server")
     tools: dict[str, McpToolOverride] = Field(default_factory=dict, description="Per-original-tool MCP configuration overrides")
+    result_policy: ToolResultPolicyConfig | None = Field(
+        default=None,
+        description="Operator-owned trust and domain-outcome policy for results from this server.",
+    )
     tool_call_timeout: float | None = Field(
         default=None,
         description="Timeout in seconds for individual stdio MCP tool calls. HTTP/SSE servers use transport-level timeouts. None means no timeout.",
@@ -272,6 +286,8 @@ class ExtensionsConfig(BaseModel):
                 return config
             env_value = os.getenv(config[1:])
             if env_value is None:
+                if config == "$DEER_FLOW_PYTHON_EXECUTABLE":
+                    return sys.executable
                 # Unresolved placeholder — store empty string so downstream
                 # consumers (e.g. MCP servers) don't receive the literal "$VAR"
                 # token as an actual environment value.

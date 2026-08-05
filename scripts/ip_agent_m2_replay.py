@@ -28,6 +28,9 @@ TEST_MARKER_NAME = ".ip-agent-test-mode.json"
 TEST_EXTENSIONS_CONFIG_NAME = "extensions_config.json"
 TEST_PROFILE_EVIDENCE = "evidence"
 EVIDENCE_MCP_SERVER_NAME = "ip_evidence"
+EVIDENCE_PAID_CALL_INTERCEPTOR = (
+    "app.gateway.evidence_paid_call_bridge:build_evidence_paid_call_interceptor"
+)
 M2_LOCK_NAME = ".ip-agent-m2-replay.lock"
 MODEL_NAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
 
@@ -221,8 +224,32 @@ def _validate_evidence_test_state(root: Path) -> Path:
         raise RuntimeError(
             "M2 requires the isolated extensions config with only the Evidence MCP server"
         )
-    if extensions.get("middlewares") != [] or extensions.get("mcpInterceptors") != []:
-        raise RuntimeError("M2 refuses extensions middleware or MCP interceptors")
+    evidence_server = servers[EVIDENCE_MCP_SERVER_NAME]
+    evidence_tools = (
+        evidence_server.get("tools")
+        if isinstance(evidence_server, dict)
+        else None
+    )
+    if (
+        not isinstance(evidence_server, dict)
+        or evidence_server.get("required") is not True
+        or not isinstance(evidence_tools, dict)
+        or any(
+            not isinstance(evidence_tools.get(tool_name), dict)
+            or evidence_tools[tool_name].get("required") is not True
+            for tool_name in (
+                "collect_douyin_benchmark_account",
+                "inspect_reference_videos",
+            )
+        )
+    ):
+        raise RuntimeError("M2 requires both Evidence MCP tools to fail closed")
+    if extensions.get("middlewares") != [] or extensions.get("mcpInterceptors") != [
+        EVIDENCE_PAID_CALL_INTERCEPTOR
+    ] or extensions.get("mcpInterceptorsRequired") is not True:
+        raise RuntimeError(
+            "M2 requires only the artifact-only Evidence paid-call proposal interceptor"
+        )
     return state_dir
 
 

@@ -64,6 +64,7 @@ IP_AGENT_REQUIRED_SOURCE_PATHS = (
     "third_party/volcengine/mediakit-cli/go.mod",
     "third_party/volcengine/mediakit-cli/cmd/mediakit/main.go",
     "third_party/volcengine/mediakit-cli/LICENSE",
+    "third_party/volcengine/mediakit-cli/VENDORED_VERSION.json",
     "third_party/bytedance/HLLM/VENDORED_VERSION.json",
     "third_party/bytedance/HLLM/HLLM_CREATOR_README.md",
     "third_party/bytedance/HLLM/LICENSE",
@@ -201,10 +202,15 @@ def resolve_runtime_profile(
 ) -> RuntimeProfile:
     profile = str(value or os.environ.get("DEERFLOW_RUNTIME_PROFILE") or "auto").strip()
     if profile not in RUNTIME_PROFILE_OPTIONS:
-        raise ValueError("runtime profile must be auto, local-direct, local-proxy, or production")
+        raise ValueError(
+            "runtime profile must be auto, local-direct, local-proxy, or production"
+        )
     if profile != "auto":
         return profile  # type: ignore[return-value]
-    if project_root is not None and check_local_direct_routing(project_root).status == "ok":
+    if (
+        project_root is not None
+        and check_local_direct_routing(project_root).status == "ok"
+    ):
         return "local-direct"
     if shutil.which("nginx"):
         return "local-proxy"
@@ -217,7 +223,11 @@ def _dotenv_values(path: Path) -> dict[str, str]:
     try:
         from dotenv import dotenv_values
 
-        return {str(key): str(value) for key, value in dotenv_values(path).items() if value is not None}
+        return {
+            str(key): str(value)
+            for key, value in dotenv_values(path).items()
+            if value is not None
+        }
     except ImportError:
         values: dict[str, str] = {}
         for line in path.read_text(encoding="utf-8").splitlines():
@@ -243,12 +253,25 @@ def check_local_direct_routing(project_root: Path) -> CheckResult:
 
     def _gateway_url(value: str, *, langgraph: bool = False) -> bool:
         parsed = urlsplit(value)
-        path_ok = parsed.path.rstrip("/") == "/api" if langgraph else parsed.path in {"", "/"}
-        return parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1"} and parsed.port == 8001 and path_ok
+        path_ok = (
+            parsed.path.rstrip("/") == "/api" if langgraph else parsed.path in {"", "/"}
+        )
+        return (
+            parsed.scheme == "http"
+            and parsed.hostname in {"localhost", "127.0.0.1"}
+            and parsed.port == 8001
+            and path_ok
+        )
 
-    cors_origins = {item.strip().rstrip("/") for item in cors_value.split(",") if item.strip()}
+    cors_origins = {
+        item.strip().rstrip("/") for item in cors_value.split(",") if item.strip()
+    }
     cors_ok = bool(cors_origins & {"http://localhost:3000", "http://127.0.0.1:3000"})
-    if _gateway_url(backend_url) and _gateway_url(langgraph_url, langgraph=True) and cors_ok:
+    if (
+        _gateway_url(backend_url)
+        and _gateway_url(langgraph_url, langgraph=True)
+        and cors_ok
+    ):
         return CheckResult(
             "runtime profile",
             "ok",
@@ -258,7 +281,9 @@ def check_local_direct_routing(project_root: Path) -> CheckResult:
         "runtime profile",
         "fail",
         "local-direct routing is incomplete",
-        fix=("Set frontend/.env backend and LangGraph URLs to http://localhost:8001 and allow http://localhost:3000 in GATEWAY_CORS_ORIGINS; or run 'make doctor PROFILE=local-proxy'."),
+        fix=(
+            "Set frontend/.env backend and LangGraph URLs to http://localhost:8001 and allow http://localhost:3000 in GATEWAY_CORS_ORIGINS; or run 'make doctor PROFILE=local-proxy'."
+        ),
     )
 
 
@@ -277,9 +302,13 @@ def check_runtime_profile(
     nginx_result = check_nginx()
     if nginx_result.status == "ok":
         nginx_result.label = "runtime profile"
-        nginx_result.detail = f"production: host nginx available ({nginx_result.detail})"
+        nginx_result.detail = (
+            f"production: host nginx available ({nginx_result.detail})"
+        )
         return nginx_result
-    if shutil.which("docker") and _run(["docker", "info", "--format", "{{.ServerVersion}}"]):
+    if shutil.which("docker") and _run(
+        ["docker", "info", "--format", "{{.ServerVersion}}"]
+    ):
         return CheckResult(
             "runtime profile",
             "ok",
@@ -380,7 +409,9 @@ def check_nginx() -> CheckResult:
     return CheckResult(
         "nginx",
         "fail",
-        fix=("macOS:   brew install nginx\nUbuntu:  sudo apt install nginx\nWindows: use WSL or Docker mode"),
+        fix=(
+            "macOS:   brew install nginx\nUbuntu:  sudo apt install nginx\nWindows: use WSL or Docker mode"
+        ),
     )
 
 
@@ -409,7 +440,9 @@ def check_config_version(config_path: Path, project_root: Path) -> CheckResult:
 
     example_path = project_root / "config.example.yaml"
     if not example_path.exists():
-        return CheckResult("config.yaml version", "skip", "config.example.yaml not found")
+        return CheckResult(
+            "config.yaml version", "skip", "config.example.yaml not found"
+        )
 
     try:
         import yaml
@@ -568,7 +601,9 @@ def check_llm_auth(config_path: Path) -> list[CheckResult]:
             model_name = model.get("name", "default")
 
             if use == "deerflow.models.openai_codex_provider:CodexChatModel":
-                auth_path = Path(os.environ.get("CODEX_AUTH_PATH", "~/.codex/auth.json")).expanduser()
+                auth_path = Path(
+                    os.environ.get("CODEX_AUTH_PATH", "~/.codex/auth.json")
+                ).expanduser()
                 if auth_path.exists():
                     results.append(
                         CheckResult(
@@ -588,8 +623,14 @@ def check_llm_auth(config_path: Path) -> list[CheckResult]:
                     )
 
             if use == "deerflow.models.claude_provider:ClaudeChatModel":
-                credential_paths = [Path(os.environ["CLAUDE_CODE_CREDENTIALS_PATH"]).expanduser() for env_name in ("CLAUDE_CODE_CREDENTIALS_PATH",) if os.environ.get(env_name)]
-                credential_paths.append(Path("~/.claude/.credentials.json").expanduser())
+                credential_paths = [
+                    Path(os.environ["CLAUDE_CODE_CREDENTIALS_PATH"]).expanduser()
+                    for env_name in ("CLAUDE_CODE_CREDENTIALS_PATH",)
+                    if os.environ.get(env_name)
+                ]
+                credential_paths.append(
+                    Path("~/.claude/.credentials.json").expanduser()
+                )
                 has_oauth_env = any(
                     os.environ.get(name)
                     for name in (
@@ -599,16 +640,24 @@ def check_llm_auth(config_path: Path) -> list[CheckResult]:
                         "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR",
                     )
                 )
-                existing_path = next((path for path in credential_paths if path.exists()), None)
+                existing_path = next(
+                    (path for path in credential_paths if path.exists()), None
+                )
                 if has_oauth_env or existing_path is not None:
                     detail = "env var set" if has_oauth_env else str(existing_path)
-                    results.append(CheckResult(f"Claude auth available (model: {model_name})", "ok", detail))
+                    results.append(
+                        CheckResult(
+                            f"Claude auth available (model: {model_name})", "ok", detail
+                        )
+                    )
                 else:
                     results.append(
                         CheckResult(
                             f"Claude auth available (model: {model_name})",
                             "fail",
-                            fix=("Set ANTHROPIC_API_KEY / CLAUDE_CODE_OAUTH_TOKEN, or place credentials at ~/.claude/.credentials.json"),
+                            fix=(
+                                "Set ANTHROPIC_API_KEY / CLAUDE_CODE_OAUTH_TOKEN, or place credentials at ~/.claude/.credentials.json"
+                            ),
                         )
                     )
     except Exception as exc:
@@ -617,7 +666,9 @@ def check_llm_auth(config_path: Path) -> list[CheckResult]:
 
 
 def check_web_search(config_path: Path) -> CheckResult:
-    return check_web_tool(config_path, tool_name="web_search", label="web search configured")
+    return check_web_tool(
+        config_path, tool_name="web_search", label="web search configured"
+    )
 
 
 def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckResult:
@@ -649,7 +700,9 @@ def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckRes
                 "jina_ai": "Jina AI Reader (no key needed)",
                 "crawl4ai": "Crawl4AI (self-hosted, no key needed)",
             },
-            "image_search": {"deerflow.community.image_search.tools": "DuckDuckGo Images (no key needed)"},
+            "image_search": {
+                "deerflow.community.image_search.tools": "DuckDuckGo Images (no key needed)"
+            },
         }
         key_providers = {
             "web_search": {
@@ -683,7 +736,9 @@ def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckRes
             },
         }
 
-        def _configured_key_detail(tool: dict, default_var: str, key_field: str = "api_key") -> tuple[Status, str] | None:
+        def _configured_key_detail(
+            tool: dict, default_var: str, key_field: str = "api_key"
+        ) -> tuple[Status, str] | None:
             configured_key = tool.get(key_field)
             if isinstance(configured_key, str) and configured_key.strip():
                 key = configured_key.strip()
@@ -726,10 +781,18 @@ def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckRes
                                 fix=f"Move the {key_field} to .env as {var}=<your-key> and reference it as ${var}",
                             )
                         if provider == "volcengine_web_search":
-                            detail = f"{detail}; service activation checked on first use"
+                            detail = (
+                                f"{detail}; service activation checked on first use"
+                            )
                         return CheckResult(label, "ok", f"{provider} ({detail})")
-                    if tool_name == "web_capture" and provider == "browserless" and _browserless_self_hosted(tool):
-                        return CheckResult(label, "ok", "browserless (self-hosted, token optional)")
+                    if (
+                        tool_name == "web_capture"
+                        and provider == "browserless"
+                        and _browserless_self_hosted(tool)
+                    ):
+                        return CheckResult(
+                            label, "ok", "browserless (self-hosted, token optional)"
+                        )
                     return CheckResult(
                         label,
                         "warn",
@@ -765,15 +828,21 @@ def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckRes
 
 
 def check_web_fetch(config_path: Path) -> CheckResult:
-    return check_web_tool(config_path, tool_name="web_fetch", label="web fetch configured")
+    return check_web_tool(
+        config_path, tool_name="web_fetch", label="web fetch configured"
+    )
 
 
 def check_web_capture(config_path: Path) -> CheckResult:
-    return check_web_tool(config_path, tool_name="web_capture", label="web capture configured")
+    return check_web_tool(
+        config_path, tool_name="web_capture", label="web capture configured"
+    )
 
 
 def check_image_search(config_path: Path) -> CheckResult:
-    return check_web_tool(config_path, tool_name="image_search", label="image search configured")
+    return check_web_tool(
+        config_path, tool_name="image_search", label="image search configured"
+    )
 
 
 def check_frontend_env(project_root: Path) -> CheckResult:
@@ -833,7 +902,9 @@ def check_sandbox(config_path: Path) -> list[CheckResult]:
                 )
         elif "AioSandboxProvider" in sandbox_use:
             results.append(CheckResult("sandbox configured", "ok", "Container sandbox"))
-            if not sandbox.get("provisioner_url") and not (shutil.which("docker") or shutil.which("container")):
+            if not sandbox.get("provisioner_url") and not (
+                shutil.which("docker") or shutil.which("container")
+            ):
                 results.append(
                     CheckResult(
                         "container runtime available",
@@ -870,7 +941,11 @@ def check_env_file(project_root: Path) -> CheckResult:
 
 
 def check_ip_agent_source_bundle(project_root: Path) -> CheckResult:
-    missing = [relative for relative in IP_AGENT_REQUIRED_SOURCE_PATHS if not (project_root / relative).is_file()]
+    missing = [
+        relative
+        for relative in IP_AGENT_REQUIRED_SOURCE_PATHS
+        if not (project_root / relative).is_file()
+    ]
     if missing:
         preview = ", ".join(missing[:3])
         if len(missing) > 3:
@@ -919,18 +994,36 @@ def check_minecontext(project_root: Path, config_path: Path) -> list[CheckResult
         data = _load_yaml_file(config_path) if config_path.is_file() else {}
     except Exception as exc:
         return [*results, CheckResult("MineContext configuration", "fail", str(exc))]
-    config = data.get("minecontext") if isinstance(data.get("minecontext"), dict) else {}
+    config = (
+        data.get("minecontext") if isinstance(data.get("minecontext"), dict) else {}
+    )
     enabled = bool(config.get("enabled", True))
     configured_runtime = str(config.get("runtime_python") or "").strip()
-    suffix = Path("Scripts/python.exe") if sys.platform.startswith("win") else Path("bin/python")
-    runtime = Path(configured_runtime).expanduser() if configured_runtime else project_root / ".deer-flow" / "toolchains" / "minecontext" / suffix
+    suffix = (
+        Path("Scripts/python.exe")
+        if sys.platform.startswith("win")
+        else Path("bin/python")
+    )
+    runtime = (
+        Path(configured_runtime).expanduser()
+        if configured_runtime
+        else project_root / ".deer-flow" / "toolchains" / "minecontext" / suffix
+    )
     if not runtime.is_absolute():
         runtime = project_root / runtime
     if not enabled:
-        results.append(CheckResult("MineContext local source", "ok", "disabled by operator configuration"))
+        results.append(
+            CheckResult(
+                "MineContext local source", "ok", "disabled by operator configuration"
+            )
+        )
         return results
     if runtime.is_file():
-        results.append(CheckResult("MineContext source runtime", "ok", "installed from vendored source"))
+        results.append(
+            CheckResult(
+                "MineContext source runtime", "ok", "installed from vendored source"
+            )
+        )
     else:
         results.append(
             CheckResult(
@@ -940,8 +1033,12 @@ def check_minecontext(project_root: Path, config_path: Path) -> list[CheckResult
                 fix="Run 'make minecontext-install'",
             )
         )
-    vlm_key = os.environ.get("MINECONTEXT_VLM_API_KEY") or os.environ.get("VOLCENGINE_API_KEY")
-    embedding_key = os.environ.get("MINECONTEXT_EMBEDDING_API_KEY") or os.environ.get("VOLCENGINE_API_KEY")
+    vlm_key = os.environ.get("MINECONTEXT_VLM_API_KEY") or os.environ.get(
+        "VOLCENGINE_API_KEY"
+    )
+    embedding_key = os.environ.get("MINECONTEXT_EMBEDDING_API_KEY") or os.environ.get(
+        "VOLCENGINE_API_KEY"
+    )
     if not vlm_key or not embedding_key:
         results.append(
             CheckResult(
@@ -965,10 +1062,16 @@ def check_minecontext(project_root: Path, config_path: Path) -> list[CheckResult
 def check_ip_agent_capability_manifest(project_root: Path) -> CheckResult:
     manifest_path = project_root / "product" / "volcengine" / "capabilities.yaml"
     if not manifest_path.is_file():
-        return CheckResult("eight-platform capability manifest", "fail", "manifest missing")
+        return CheckResult(
+            "eight-platform capability manifest", "fail", "manifest missing"
+        )
     try:
         manifest = _load_yaml_file(manifest_path)
-        configured = set(manifest.get("capabilities", {}).get("platform_operations", {}).get("platforms", []))
+        configured = set(
+            manifest.get("capabilities", {})
+            .get("platform_operations", {})
+            .get("platforms", [])
+        )
     except Exception as exc:
         return CheckResult("eight-platform capability manifest", "fail", str(exc))
     missing = sorted(IP_AGENT_PLATFORMS - configured)
@@ -981,13 +1084,17 @@ def check_ip_agent_capability_manifest(project_root: Path) -> CheckResult:
             detail,
             fix="Restore product/volcengine/capabilities.yaml from the source distribution",
         )
-    return CheckResult("eight-platform capability manifest", "ok", "8 browser-first platforms")
+    return CheckResult(
+        "eight-platform capability manifest", "ok", "8 browser-first platforms"
+    )
 
 
 def check_volcengine_product_credentials() -> list[CheckResult]:
     results: list[CheckResult] = []
     if os.environ.get("VOLCENGINE_API_KEY"):
-        results.append(CheckResult("Volcengine Ark generation", "ok", "VOLCENGINE_API_KEY set"))
+        results.append(
+            CheckResult("Volcengine Ark generation", "ok", "VOLCENGINE_API_KEY set")
+        )
     else:
         results.append(
             CheckResult(
@@ -1025,13 +1132,19 @@ def check_volcengine_product_credentials() -> list[CheckResult]:
         )
 
     if os.environ.get("MEDIAKIT_API_KEY"):
-        results.append(CheckResult("AI MediaKit cloud", "ok", "paid cloud capabilities enabled"))
+        results.append(
+            CheckResult(
+                "AI MediaKit cloud",
+                "ok",
+                "credential configured; default Evidence capabilities enabled directly for ASR, OCR, scene segmentation and storyline",
+            )
+        )
     else:
         results.append(
             CheckResult(
                 "AI MediaKit cloud",
                 "ok",
-                "optional paid key not set; deterministic local media operations remain available",
+                "optional paid key not set; cloud execution unavailable and verified local adapters are unaffected",
             )
         )
     return results
@@ -1039,8 +1152,22 @@ def check_volcengine_product_credentials() -> list[CheckResult]:
 
 def check_local_media_toolchain(project_root: Path) -> list[CheckResult]:
     suffix = ".exe" if sys.platform.startswith("win") else ""
-    ffmpeg = project_root / ".deer-flow" / "toolchains" / "ffmpeg" / "bin" / f"ffmpeg{suffix}"
-    ffprobe = project_root / ".deer-flow" / "toolchains" / "ffmpeg" / "bin" / f"ffprobe{suffix}"
+    ffmpeg = (
+        project_root
+        / ".deer-flow"
+        / "toolchains"
+        / "ffmpeg"
+        / "bin"
+        / f"ffmpeg{suffix}"
+    )
+    ffprobe = (
+        project_root
+        / ".deer-flow"
+        / "toolchains"
+        / "ffmpeg"
+        / "bin"
+        / f"ffprobe{suffix}"
+    )
     mediakit = project_root / ".deer-flow" / "bin" / f"mediakit-cli{suffix}"
     results: list[CheckResult] = []
 
@@ -1124,7 +1251,9 @@ def check_chromium_runtime() -> CheckResult:
             fix="cd backend && uv run playwright install chromium",
         )
     if executable.is_file():
-        return CheckResult("Chromium browser runtime", "ok", "Playwright Chromium installed")
+        return CheckResult(
+            "Chromium browser runtime", "ok", "Playwright Chromium installed"
+        )
     return CheckResult(
         "Chromium browser runtime",
         "warn",
@@ -1137,7 +1266,9 @@ def check_video_renderers(project_root: Path) -> list[CheckResult]:
     root = project_root / "product" / "video-renderers"
     node = shutil.which("node")
     if not node:
-        return [CheckResult("HyperFrames source renderer", "warn", "Node.js is unavailable")]
+        return [
+            CheckResult("HyperFrames source renderer", "warn", "Node.js is unavailable")
+        ]
     source_files = (
         root / "package.json",
         root / "package-lock.json",
@@ -1155,7 +1286,11 @@ def check_video_renderers(project_root: Path) -> list[CheckResult]:
                 "required renderer source is incomplete",
             )
         ]
-    installed = (root / "node_modules" / "hyperframes" / "dist" / "cli.js").is_file() and (root / "node_modules" / "gsap" / "dist" / "gsap.min.js").is_file() and (root / "node_modules" / "@remotion" / "cli" / "remotion-cli.js").is_file()
+    installed = (
+        (root / "node_modules" / "hyperframes" / "dist" / "cli.js").is_file()
+        and (root / "node_modules" / "gsap" / "dist" / "gsap.min.js").is_file()
+        and (root / "node_modules" / "@remotion" / "cli" / "remotion-cli.js").is_file()
+    )
     verification = _run([node, str(root / "verify-pins.mjs")])
     if verification is None:
         return [
@@ -1170,7 +1305,9 @@ def check_video_renderers(project_root: Path) -> list[CheckResult]:
         CheckResult(
             "HyperFrames source renderer",
             "ok" if installed else "warn",
-            "HyperFrames 0.7.57 exact pins installed" if installed else "source and lock verified; runtime dependencies are not installed",
+            "HyperFrames 0.7.57 exact pins installed"
+            if installed
+            else "source and lock verified; runtime dependencies are not installed",
             fix=None if installed else "Run 'make video-renderers-install'",
         ),
         CheckResult(
@@ -1188,7 +1325,9 @@ def check_ui_tars(project_root: Path, config_path: Path) -> list[CheckResult]:
 
     results: list[CheckResult] = []
     try:
-        manifest = verify_vendored_ui_tars(project_root / "third_party" / "bytedance" / "UI-TARS-desktop")
+        manifest = verify_vendored_ui_tars(
+            project_root / "third_party" / "bytedance" / "UI-TARS-desktop"
+        )
         results.append(
             CheckResult(
                 "UI-TARS pinned source",
@@ -1207,7 +1346,9 @@ def check_ui_tars(project_root: Path, config_path: Path) -> list[CheckResult]:
         )
 
     if not config_path.is_file():
-        results.append(CheckResult("UI-TARS optional organ", "skip", "config.yaml missing"))
+        results.append(
+            CheckResult("UI-TARS optional organ", "skip", "config.yaml missing")
+        )
         return results
     try:
         config = _load_yaml_file(config_path).get("ui_tars") or {}
@@ -1230,7 +1371,9 @@ def check_ui_tars(project_root: Path, config_path: Path) -> list[CheckResult]:
     model = str(config.get("model") or "").strip()
     api_base = str(config.get("api_base") or "").strip()
     key_env = str(config.get("api_key_env") or "UI_TARS_API_KEY").strip()
-    missing = [name for name, value in (("model", model), ("api_base", api_base)) if not value]
+    missing = [
+        name for name, value in (("model", model), ("api_base", api_base)) if not value
+    ]
     model_host = urlsplit(api_base).hostname
     model_is_loopback = model_host in {"127.0.0.1", "localhost", "::1"}
     key_is_required = bool(api_base) and not model_is_loopback
@@ -1251,18 +1394,33 @@ def check_ui_tars(project_root: Path, config_path: Path) -> list[CheckResult]:
             )
         )
     else:
-        authentication = f"{key_env} set" if key_is_configured else "loopback model; key optional"
-        results.append(CheckResult("UI-TARS model configuration", "ok", f"model={model}; {authentication}"))
+        authentication = (
+            f"{key_env} set" if key_is_configured else "loopback model; key optional"
+        )
+        results.append(
+            CheckResult(
+                "UI-TARS model configuration", "ok", f"model={model}; {authentication}"
+            )
+        )
 
     state_dir = _ip_agent_state_dir(project_root) / "ui-tars"
-    token_is_configured = len(os.environ.get("UI_TARS_OPERATOR_TOKEN", "").strip()) >= 32
+    token_is_configured = (
+        len(os.environ.get("UI_TARS_OPERATOR_TOKEN", "").strip()) >= 32
+    )
     if not token_is_configured:
         try:
-            token_is_configured = len((state_dir / "operator.token").read_text(encoding="utf-8").strip()) >= 32
+            token_is_configured = (
+                len((state_dir / "operator.token").read_text(encoding="utf-8").strip())
+                >= 32
+            )
         except OSError:
             token_is_configured = False
     if token_is_configured:
-        results.append(CheckResult("UI-TARS operator authentication", "ok", "local token configured"))
+        results.append(
+            CheckResult(
+                "UI-TARS operator authentication", "ok", "local token configured"
+            )
+        )
     else:
         results.append(
             CheckResult(
@@ -1275,7 +1433,9 @@ def check_ui_tars(project_root: Path, config_path: Path) -> list[CheckResult]:
 
     permissions = diagnose_desktop_permissions()
     permission_states = (permissions["screen_recording"], permissions["accessibility"])
-    if permissions["supported"] and all(state == "granted" for state in permission_states):
+    if permissions["supported"] and all(
+        state == "granted" for state in permission_states
+    ):
         results.append(
             CheckResult(
                 "UI-TARS desktop permissions",
@@ -1297,7 +1457,9 @@ def check_ui_tars(project_root: Path, config_path: Path) -> list[CheckResult]:
         from deerflow.community.ui_tars.client import UITarsOperatorClient
 
         endpoint = str(config.get("endpoint") or "http://127.0.0.1:9137")
-        client = UITarsOperatorClient(endpoint, timeout_seconds=2.0, state_dir=state_dir)
+        client = UITarsOperatorClient(
+            endpoint, timeout_seconds=2.0, state_dir=state_dir
+        )
         health = client._request("/health", payload=None, authenticated=False)  # noqa: SLF001 - doctor probe
         results.append(
             CheckResult(
@@ -1329,10 +1491,16 @@ def _ip_agent_state_dir(project_root: Path) -> Path:
 
 def check_ip_agent_local_state(project_root: Path) -> list[CheckResult]:
     state_dir = _ip_agent_state_dir(project_root)
-    installed_agents = list(state_dir.glob("users/*/agents/ip-agent/SOUL.md")) if state_dir.is_dir() else []
+    installed_agents = (
+        list(state_dir.glob("users/*/agents/ip-agent/SOUL.md"))
+        if state_dir.is_dir()
+        else []
+    )
     if installed_agents:
         product_agent = project_root / "product" / "defaults" / "agents" / "ip-agent"
-        expected_files = tuple(product_agent / name for name in ("SOUL.md", "config.yaml"))
+        expected_files = tuple(
+            product_agent / name for name in ("SOUL.md", "config.yaml")
+        )
         stale_count = 0
         if all(path.is_file() for path in expected_files):
             for installed_soul in installed_agents:
@@ -1364,8 +1532,12 @@ def check_ip_agent_local_state(project_root: Path) -> list[CheckResult]:
             fix="Run 'make ip-init' for the default user before first launch",
         )
 
-    profile_roots = list(state_dir.glob("users/*/browser-profiles")) if state_dir.is_dir() else []
-    profile_count = sum(1 for root in profile_roots for child in root.iterdir() if child.is_dir())
+    profile_roots = (
+        list(state_dir.glob("users/*/browser-profiles")) if state_dir.is_dir() else []
+    )
+    profile_count = sum(
+        1 for root in profile_roots for child in root.iterdir() if child.is_dir()
+    )
     profile_result = CheckResult(
         "account-isolated browser profiles",
         "ok",

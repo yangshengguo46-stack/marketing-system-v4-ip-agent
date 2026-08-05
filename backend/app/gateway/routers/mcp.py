@@ -10,7 +10,14 @@ from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.gateway.deps import require_admin_user
-from deerflow.config.extensions_config import ExtensionsConfig, McpRoutingConfig, McpToolOverride, get_extensions_config, reload_extensions_config
+from deerflow.config.extensions_config import (
+    ExtensionsConfig,
+    McpRoutingConfig,
+    McpToolOverride,
+    ToolResultPolicyConfig,
+    get_extensions_config,
+    reload_extensions_config,
+)
 from deerflow.mcp.cache import reset_mcp_tools_cache
 
 logger = logging.getLogger(__name__)
@@ -63,6 +70,10 @@ class McpServerConfigResponse(BaseModel):
     description: str = Field(default="", description="Human-readable description of what this MCP server provides")
     routing: McpRoutingConfig = Field(default_factory=McpRoutingConfig, description="Soft routing hints for tools from this MCP server")
     tools: dict[str, McpToolOverride] = Field(default_factory=dict, description="Per-original-tool MCP configuration overrides")
+    result_policy: ToolResultPolicyConfig | None = Field(
+        default=None,
+        description="Operator-owned trust and domain-outcome policy for MCP results.",
+    )
     tool_call_timeout: float | None = Field(default=None, description="Timeout in seconds for individual stdio MCP tool calls")
     model_config = ConfigDict(extra="allow")
 
@@ -287,6 +298,8 @@ def _merge_preserving_secrets(
         update["routing"] = existing.routing
     if "tools" not in incoming.model_fields_set:
         update["tools"] = existing.tools
+    if "result_policy" not in incoming.model_fields_set:
+        update["result_policy"] = existing.result_policy
     incoming_extra = incoming.model_extra or {}
     existing_extra = existing.model_extra or {}
     for key, value in incoming_extra.items():

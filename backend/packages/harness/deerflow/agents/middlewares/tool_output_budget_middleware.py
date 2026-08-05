@@ -27,6 +27,7 @@ from langgraph.types import Command
 from deerflow.agents.middlewares.tool_output_synopsis import render_tool_output_preview
 from deerflow.config.tool_output_config import ToolOutputConfig
 from deerflow.sandbox.sandbox_provider import get_sandbox_provider
+from deerflow.tools.result_policy import get_tool_result_policy
 
 if TYPE_CHECKING:
     from deerflow.sandbox.sandbox import Sandbox
@@ -49,11 +50,13 @@ def _default_config() -> ToolOutputConfig:
 # ---------------------------------------------------------------------------
 
 
-def _message_text(content: Any) -> str | None:
+def _message_text(content: Any, *, allow_mixed: bool = False) -> str | None:
     """Extract a plain-text representation from a ToolMessage content field.
 
-    Returns ``None`` for non-string / multimodal content so the caller
-    can skip budget enforcement (images, structured blocks, etc.).
+    By default, returns ``None`` for non-string / multimodal content so legacy
+    callers keep their existing behavior. For an operator-classified result,
+    ``allow_mixed`` extracts all text while ignoring image/file blocks; the
+    patcher then budgets only that text and preserves those non-text blocks.
     """
     if isinstance(content, str):
         return content
@@ -66,7 +69,7 @@ def _message_text(content: Any) -> str | None:
                 pieces.append(part)
             elif isinstance(part, dict) and isinstance(part.get("text"), str):
                 pieces.append(part["text"])
-            else:
+            elif not allow_mixed:
                 return None
         return "\n".join(pieces) if pieces else None
     return None
@@ -433,13 +436,15 @@ def _patch_tool_message(
     config: ToolOutputConfig,
     outputs_path: str | None,
     sandbox: Sandbox | None = None,
+    *,
+    allow_mixed: bool = False,
 ) -> ToolMessage:
     """Apply budget to a single ToolMessage. Returns the original if unchanged."""
     tool_name = msg.name or "unknown"
     if tool_name in config.exempt_tools:
         return msg
 
-    text = _message_text(msg.content)
+    text = _message_text(msg.content, allow_mixed=allow_mixed)
     if text is None:
         return msg
 
@@ -454,7 +459,27 @@ def _patch_tool_message(
     if replacement is None:
         return msg
 
-    update: dict[str, Any] = {"content": replacement}
+    replacement_content: Any = replacement
+    if allow_mixed and isinstance(msg.content, list):
+        has_non_text = any(not (isinstance(part, str) or (isinstance(part, dict) and isinstance(part.get("text"), str))) for part in msg.content)
+        if has_non_text:
+            rebuilt: list[Any] = []
+            replaced = False
+            for part in msg.content:
+                is_text = isinstance(part, str) or (isinstance(part, dict) and isinstance(part.get("text"), str))
+                if not is_text:
+                    rebuilt.append(part)
+                    continue
+                if replaced:
+                    continue
+                if isinstance(part, dict):
+                    rebuilt.append({**part, "text": replacement})
+                else:
+                    rebuilt.append(replacement)
+                replaced = True
+            replacement_content = rebuilt
+
+    update: dict[str, Any] = {"content": replacement_content}
     if getattr(msg, "response_metadata", None):
         update["response_metadata"] = dict(msg.response_metadata)
     if getattr(msg, "additional_kwargs", None):
@@ -478,25 +503,43 @@ def _effective_trigger(tool_name: str, config: ToolOutputConfig) -> int:
     return min(candidates) if candidates else -1
 
 
-def _tool_message_over_budget(msg: ToolMessage, config: ToolOutputConfig) -> bool:
+def _tool_message_over_budget(
+    msg: ToolMessage,
+    config: ToolOutputConfig,
+    *,
+    allow_mixed: bool = False,
+) -> bool:
     """Cheap, per-tool-aware check: is this ToolMessage non-exempt and over its trigger?"""
     if (msg.name or "") in config.exempt_tools:
         return False
     trigger = _effective_trigger(msg.name or "", config)
     if trigger < 0:
         return False
-    text = _message_text(msg.content)
+    text = _message_text(msg.content, allow_mixed=allow_mixed)
     return text is not None and len(text) > trigger
 
 
-def _needs_budget(result: ToolMessage | Command, config: ToolOutputConfig) -> bool:
+def _needs_budget(
+    result: ToolMessage | Command,
+    config: ToolOutputConfig,
+    *,
+    allow_mixed: bool = False,
+) -> bool:
     """Fast check whether *result* could need budgeting (avoids thread offload for small outputs)."""
     if isinstance(result, ToolMessage):
-        return _tool_message_over_budget(result, config)
+        return _tool_message_over_budget(
+            result,
+            config,
+            allow_mixed=allow_mixed,
+        )
     update = getattr(result, "update", None)
     if isinstance(update, dict):
         for msg in update.get("messages", []):
-            if isinstance(msg, ToolMessage) and _tool_message_over_budget(msg, config):
+            if isinstance(msg, ToolMessage) and _tool_message_over_budget(
+                msg,
+                config,
+                allow_mixed=allow_mixed,
+            ):
                 return True
     return False
 
@@ -506,10 +549,18 @@ def _patch_result(
     config: ToolOutputConfig,
     outputs_path: str | None,
     sandbox: Sandbox | None = None,
+    *,
+    allow_mixed: bool = False,
 ) -> ToolMessage | Command:
     """Apply budget to a tool call result (ToolMessage or Command)."""
     if isinstance(result, ToolMessage):
-        return _patch_tool_message(result, config, outputs_path, sandbox)
+        return _patch_tool_message(
+            result,
+            config,
+            outputs_path,
+            sandbox,
+            allow_mixed=allow_mixed,
+        )
 
     update = getattr(result, "update", None)
     if not isinstance(update, dict):
@@ -523,7 +574,13 @@ def _patch_result(
     changed = False
     for msg in messages:
         if isinstance(msg, ToolMessage):
-            patched = _patch_tool_message(msg, config, outputs_path, sandbox)
+            patched = _patch_tool_message(
+                msg,
+                config,
+                outputs_path,
+                sandbox,
+                allow_mixed=allow_mixed,
+            )
             if patched is not msg:
                 changed = True
             new_messages.append(patched)
@@ -565,6 +622,12 @@ def _patch_model_messages(messages: list[Any], config: ToolOutputConfig) -> list
     return updated if changed else None
 
 
+def _allows_mixed_text_budget(request: ToolCallRequest) -> bool:
+    """Whether local policy authorizes shape-aware budgeting for this result."""
+    policy = get_tool_result_policy(getattr(request, "tool", None))
+    return policy is not None and policy["semantic_class"] == "evidence"
+
+
 # ---------------------------------------------------------------------------
 # Middleware class
 # ---------------------------------------------------------------------------
@@ -595,11 +658,22 @@ class ToolOutputBudgetMiddleware(AgentMiddleware[AgentState]):
         result = handler(request)
         if not self._config.enabled:
             return result
-        if not _needs_budget(result, self._config):
+        allow_mixed = _allows_mixed_text_budget(request)
+        if not _needs_budget(
+            result,
+            self._config,
+            allow_mixed=allow_mixed,
+        ):
             return result
         outputs_path = _resolve_outputs_path(request)
         sandbox = _resolve_sandbox(request)
-        return _patch_result(result, self._config, outputs_path, sandbox)
+        return _patch_result(
+            result,
+            self._config,
+            outputs_path,
+            sandbox,
+            allow_mixed=allow_mixed,
+        )
 
     @override
     async def awrap_tool_call(
@@ -610,7 +684,12 @@ class ToolOutputBudgetMiddleware(AgentMiddleware[AgentState]):
         result = await handler(request)
         if not self._config.enabled:
             return result
-        if not _needs_budget(result, self._config):
+        allow_mixed = _allows_mixed_text_budget(request)
+        if not _needs_budget(
+            result,
+            self._config,
+            allow_mixed=allow_mixed,
+        ):
             return result
         outputs_path = _resolve_outputs_path(request)
         # _resolve_sandbox only touches runtime.state and the provider's
@@ -618,7 +697,14 @@ class ToolOutputBudgetMiddleware(AgentMiddleware[AgentState]):
         # loop. The actual sandbox I/O (mkdir/write/test) happens inside
         # _patch_result, which is offloaded to a worker thread below.
         sandbox = _resolve_sandbox(request)
-        return await asyncio.to_thread(_patch_result, result, self._config, outputs_path, sandbox)
+        return await asyncio.to_thread(
+            _patch_result,
+            result,
+            self._config,
+            outputs_path,
+            sandbox,
+            allow_mixed=allow_mixed,
+        )
 
     # -- model call hooks (historical message truncation) ------------------
 

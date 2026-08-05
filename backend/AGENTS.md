@@ -48,10 +48,12 @@ corresponding capability is unavailable.
 
 ## IP Agent
 
-Follow `../IP_AGENT.md`. The clean IP Agent has an empty Skill list, disabled
-memory and an exact eight-tool read-only allowlist. Because it has no
-Personal-IP tools, do not attach the Personal-IP context middleware or make
-startup ledger reads.
+Follow `../IP_AGENT.md`. The IP Agent has an empty Skill list, disabled memory,
+eight read-only baseline tools and two MediaKit-backed Evidence MCP tools.
+When `MEDIAKIT_API_KEY` is configured, video evidence runs directly without a
+per-call paid approval interceptor. Because it has no Personal-IP business
+tools, do not attach the Personal-IP context middleware or make startup ledger
+reads.
 
 The retired semantic layer includes strategy, differentiation, asset
 observation, preflight/HLLM-Lite prediction, retrospective, evidence promotion,

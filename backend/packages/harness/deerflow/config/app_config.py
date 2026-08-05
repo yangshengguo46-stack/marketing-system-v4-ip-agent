@@ -250,7 +250,7 @@ class AppConfig(BaseModel):
         default_factory=MineContextConfig,
         description=format_field_description(
             "minecontext",
-            field_doc="Bundled local observation source. New owners start with the safe Personal-IP defaults and may disable or clear it from Settings.",
+            field_doc="Bundled local observation source. Collection is off until each owner explicitly authorizes it in Settings.",
         ),
     )
     loop_detection: LoopDetectionConfig = Field(default_factory=LoopDetectionConfig, description="Loop detection middleware configuration")

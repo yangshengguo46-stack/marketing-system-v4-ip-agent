@@ -1,12 +1,14 @@
 # IP Agent：从“个人创作者”到“影响力资产系统”的第一性原理研究
 
-> 研究快照，不是现役产品合同。2026-08-01 已退役旧语义层；新的 IP
-> 第一性原理与总编排尚未开始。当前能力只看 `IP_AGENT.md`。
+> `research_quarantined`：2026-07-30 历史研究快照。旧语义运行层已经退役；
+> 正文中的“实施状态”“已激活 Skill”只按当时的研究或局部实现判断理解，
+> 不代表当前产品能力。当前产品状态只看 `docs/IP_AGENT_PRODUCT_LEDGER.md`，
+> 运行边界只看 `IP_AGENT.md`。
 
 审计日期：2026-07-30
 
-配套台账：
-[IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md](IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md)
+配套能力库存：
+[IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md](../../../docs/IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md)
 
 延伸研究：
 [IP_AGENT_DIFFERENTIATED_IP_MOAT_RESEARCH.md](IP_AGENT_DIFFERENTIATED_IP_MOAT_RESEARCH.md)

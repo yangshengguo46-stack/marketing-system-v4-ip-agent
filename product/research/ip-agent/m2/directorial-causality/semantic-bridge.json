@@ -1,0 +1,89 @@
+{
+  "schema_version": "ip-agent-m2-semantic-bridge-v1",
+  "purpose": "把封存证据转成可追溯的机制解释、语义桥接、远距离结构映射和创作产物。",
+  "contexts": {
+    "identity": "只拥有用户明示事实、IP 主体与目标。",
+    "benchmark": "只拥有来源观察、覆盖范围与可纠正的机制解释。",
+    "creative": "只拥有语义桥接、创作假设、IP 方向与成稿。"
+  },
+  "epistemic_roles": [
+    "observation",
+    "interpretation",
+    "creative_leap"
+  ],
+  "private_workset": {
+    "observations": {
+      "required_fields": [
+        "id",
+        "source_ref",
+        "source_unit_ref",
+        "modality",
+        "statement",
+        "coverage"
+      ]
+    },
+    "mechanism_interpretation": {
+      "required_fields": [
+        "statement",
+        "basis_refs",
+        "support_scope",
+        "limitations"
+      ],
+      "support_scope": [
+        "single_source",
+        "repeated_sources",
+        "outcome_correlation",
+        "controlled_evidence"
+      ]
+    },
+    "semantic_bridge": {
+      "minimum_steps": 3,
+      "maximum_steps": 7,
+      "step_fields": [
+        "from_concept",
+        "relation",
+        "to_concept",
+        "role",
+        "basis_refs"
+      ]
+    },
+    "structural_mapping": {
+      "required_fields": [
+        "source_roles",
+        "source_relations",
+        "target_roles",
+        "target_relations",
+        "preserved_structure",
+        "replaced_surface_elements"
+      ]
+    },
+    "creative_hypothesis": {
+      "required_fields": [
+        "premise",
+        "basis_refs",
+        "assumptions",
+        "selection_reason"
+      ]
+    },
+    "artifacts": {
+      "required_fields": [
+        "ip_subject",
+        "expression_form",
+        "long_term_engine",
+        "influence_path",
+        "conversion_path",
+        "first_episode"
+      ]
+    }
+  },
+  "invariants": [
+    "事实、解释和创作跳跃必须分层，下游不得把后两者改写成事实。",
+    "来源覆盖不足时保留缺口；未观察的模态不得产生确定性结论。",
+    "重复机制至少回指两个独立来源单元；单一来源只能形成作品级假设。",
+    "可观察结果不等于因果已被证明；未经控制验证时必须保留因果限制。",
+    "语义桥接必须先进入人的行动、关系、欲望、选择或代价，再进入故事。",
+    "远距离结构映射只保留角色功能和因果关系，必须替换具体人物、场景、台词、音乐、视觉身份与受保护表达。",
+    "目标产品或主体必须改变人物的行动、关系或结果；若替换为任意对象仍完全成立，则未通过不可替代性检查。",
+    "最终只向用户交付一份连贯方案，不展示私有工作集或方法报告。"
+  ]
+}

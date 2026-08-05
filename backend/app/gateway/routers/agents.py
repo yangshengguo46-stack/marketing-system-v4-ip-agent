@@ -9,6 +9,7 @@ import yaml
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.gateway.product_runtime import require_customer_mutable_agent_name
 from deerflow.config.agents_api_config import get_agents_api_config
 from deerflow.config.agents_config import AgentConfig, list_custom_agents, load_agent_config, load_agent_soul, preserve_non_managed_fields
 from deerflow.config.paths import get_paths
@@ -211,6 +212,7 @@ async def create_agent_endpoint(request: AgentCreateRequest) -> AgentResponse:
     _require_agents_api_enabled()
     _validate_agent_name(request.name)
     normalized_name = _normalize_agent_name(request.name)
+    await asyncio.to_thread(require_customer_mutable_agent_name, normalized_name)
     user_id = get_effective_user_id()
     paths = get_paths()
 
@@ -292,6 +294,7 @@ async def update_agent(name: str, request: AgentUpdateRequest) -> AgentResponse:
     _require_agents_api_enabled()
     _validate_agent_name(name)
     name = _normalize_agent_name(name)
+    await asyncio.to_thread(require_customer_mutable_agent_name, name)
     user_id = get_effective_user_id()
 
     try:
@@ -459,6 +462,7 @@ async def delete_agent(name: str) -> None:
     _require_agents_api_enabled()
     _validate_agent_name(name)
     name = _normalize_agent_name(name)
+    await asyncio.to_thread(require_customer_mutable_agent_name, name)
     user_id = get_effective_user_id()
     paths = get_paths()
 

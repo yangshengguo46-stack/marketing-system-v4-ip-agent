@@ -32,8 +32,11 @@ depend on generated console-script shebangs from another checkout.
 ## IP Agent boundary
 
 `IP_AGENT.md` is the only current product contract. The default IP Agent has no
-Skills or memory and exposes exactly eight read-only tools. It does not mount
-Personal-IP context orchestration. Do not reintroduce strategy,
+Skills or memory and exposes eight read-only baseline tools plus the two
+MediaKit-backed Evidence MCP tools. A configured `MEDIAKIT_API_KEY` authorizes
+those evidence tools to run ASR/OCR/scene/storyline analysis directly; do not
+restore the retired per-call approval gate. It does not mount Personal-IP
+context orchestration. Do not reintroduce strategy,
 differentiation, preflight, retrospective, evidence-promotion, startup-cockpit
 or narrative-interview semantics outside a new approved architecture.
 
@@ -43,8 +46,8 @@ production. The workspace dashboard is factual only; missing observations stay
 missing. Account ids select operation targets and never define conversation
 authority.
 
-Stable safety boundaries remain mandatory: Owner isolation, credential
-secrecy, OAuth state, rights and disclosure, paid-call admission, deletion,
+Stable execution boundaries remain mandatory: Owner isolation, credential
+secrecy, OAuth state, rights and disclosure, deletion,
 path/hash/candidate consistency, immutable receipts and idempotency. Never
 weaken one of these as “semantic cleanup.”
 
@@ -56,10 +59,14 @@ Migration `0021_personal_ip_semantic_layer_retirement` fails closed if a table
 scheduled for retirement is non-empty. Require a verified Owner backup rather
 than bypassing that guard. Downgrade restores empty schemas only.
 
-The two existing ledgers are the only status records:
+Current product status has one authority:
 
-- `docs/IP_AGENT_PRODUCT_LEDGER.md` — shipped product truth;
-- `docs/IP_AGENT_AUDIT_REMEDIATION_LEDGER.md` — executable audit gates.
+- `docs/IP_AGENT_PRODUCT_LEDGER.md` — the only current delivery truth, organized
+  around breakdown, writer brain and production;
+- `docs/IP_AGENT_AUDIT_REMEDIATION_LEDGER.md` — frozen historical audit closeout,
+  not a current delivery record;
+- `docs/IP_AGENT_SKILL_CAPABILITY_BOUNDARY_LEDGER.md` — generated capability
+  inventory, not a completion ledger.
 
 ## Commands
 

@@ -9,11 +9,21 @@ upstream MIT `LICENSE`. Their `permissions: [shell]` frontmatter is translated
 to DeerFlow's equivalent `allowed-tools: [bash]`; the skill bodies and command
 contracts are otherwise unchanged.
 
-The complete MediaKit Go source is vendored at
-`third_party/volcengine/mediakit-cli` from the same commit. Its upstream
-prebuilt macOS arm64 `mediakit` file is intentionally omitted. This product
-builds a platform-local executable into `.deer-flow/bin` with
-`scripts/mediakit_source.py`.
+The MediaKit Go source is vendored at `third_party/volcengine/mediakit-cli`
+from the same commit. All 119 non-prebuilt tracked files are retained; the
+upstream macOS arm64 `mediakit` executable is the sole omitted tracked file.
+`VENDORED_VERSION.json` fixes the upstream Git tree, retained-source digest,
+40-command catalog and relevant license-file digests. This product builds a
+platform-local executable into `.deer-flow/bin` with
+`scripts/mediakit_source.py`; validation fails on any unrecorded source or
+runtime-catalog drift.
+
+The upstream root `LICENSE`, `package.json`, and five bundled Skill licenses
+declare MIT. The upstream `Open Source Notice.txt` instead says that the
+product is distributed under Apache-2.0 and then says the notice does not
+modify the product license. The explicit license remains the operative MIT
+file for this copy, but the contradiction is recorded as an open upstream
+clarification required before customer distribution.
 
 For reproducible local builds, `scripts/install_go_toolchain.py` pins official
 Go `1.26.5` archives and SHA-256 values for macOS, Linux and Windows on amd64

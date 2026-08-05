@@ -1,0 +1,353 @@
+{
+  "schema_version": "ip-director-loop-ab-result-v1",
+  "scope": "research_isolated_gateway_agent",
+  "product_capability": false,
+  "request": {
+    "transport": "gateway",
+    "stage": "story",
+    "arm": "method",
+    "case_id": "DL1-fruit-grower-longterm",
+    "model": "doubao-seed-evolving",
+    "thinking": "enabled",
+    "contract_path": "product/research/ip-agent/director-core/director-story-output-contract-v2.md",
+    "contract_sha256": "84925ef79ee51ed5b1548bcf680fb46b588c6d2185a135cc9cd34b5f8c34e021",
+    "arm_path": "product/research/ip-agent/director-core/director-story-method-v2.md",
+    "arm_sha256": "688f1a933ed70a80946f359f8997814c388552caa4e176128e3fd9fc097fb56f",
+    "brief_path": "product/research/ip-agent/director-core/director-loop-scenarios-v1.json",
+    "brief_sha256": "7432b23ad5f80914bbea3204f7d70d57628eef270917ca409bb7a8f80b6d5795",
+    "system_bytes": 6651,
+    "user_bytes": 10959,
+    "gateway_run_controls": {
+      "thinking_enabled": true,
+      "recursion_limit": 20
+    },
+    "route_result_path": "product/research/ip-agent/director-core/evaluations/DL1-gateway-method-v3-causal-leap-20260804/route-result.json",
+    "route_result_sha256": "8a9a0c13f60b980a9f0ab7763bba0a29f261f2d95d6d9f7fcb671e5e0ea4ff06"
+  },
+  "response": {
+    "id": "54e08548-57f3-44e5-b963-00fc3c4ff0d6",
+    "actual_model": "doubao-seed-evolving-latest-version",
+    "elapsed_seconds": 118.82,
+    "finish_reason": null,
+    "usage": {
+      "thread_id": "27e22121-e9c4-4942-81d2-999c8f57e82b",
+      "total_tokens": 9534,
+      "total_input_tokens": 4814,
+      "total_output_tokens": 4720,
+      "total_runs": 1,
+      "by_model": {
+        "doubao-seed-evolving-latest-version": {
+          "tokens": 9534,
+          "runs": 1
+        }
+      },
+      "by_caller": {
+        "lead_agent": 9534,
+        "subagent": 0,
+        "middleware": 0
+      }
+    },
+    "provider_response_sha256": "f2e255445c5b8e3c03fd312cf54c68ea272dadb1a96bc38cdeb2f905a05642f1",
+    "parse_normalization": null,
+    "json_parse_error": null,
+    "content": {
+      "schema_version": "ip-director-story-result-v2",
+      "epistemic_state": "creative_hypothesis",
+      "source_route_sha256": "8a9a0c13f60b980a9f0ab7763bba0a29f261f2d95d6d9f7fcb671e5e0ea4ff06",
+      "selected_direction_ref": "d-mid",
+      "facts_used": [
+        {
+          "id": "f1",
+          "statement": "本人经营果园十五年"
+        },
+        {
+          "id": "f2",
+          "statement": "本人常在收工后和村里老人聊天"
+        },
+        {
+          "id": "f3",
+          "statement": "本人喜欢把农活观察讲成带方言的短段子"
+        },
+        {
+          "id": "f4",
+          "statement": "本人愿意正脸出镜"
+        },
+        {
+          "id": "f5",
+          "statement": "当前只能由本人用一部手机在果园持续拍摄"
+        }
+      ],
+      "creative_assumptions": [
+        "虚构疏果季这一具体农事节点和当天拍摄过程",
+        "虚构本家兄弟打来电话要求担保一笔周转借款，及其被回绝后的沉默与隔阂",
+        "虚构收工后从村里老人处听来东头老周因给亲戚担保背债的传闻",
+        "虚构那颗位置最好、看起来最能长大却被亲手摘下的幼果",
+        "虚构他先试拍成笑话、再改拍手部动作与真话的两次尝试",
+        "虚构方言不会造成普遍理解障碍，观众能从疏果联想到人的取舍"
+      ],
+      "commercial_object_mode": "causal",
+      "substitution_test_hypothesis": "若把疏果、摘幼果替换成与果树无关的动作，strategy_change 到 costly_choice 的因果边断裂：手的动作不再以不可逆的真实损失证明“舍不得也得舍”，主人公的回绝就失去可视的代价支撑，故事退回口头道理。",
+      "story_world": {
+        "actors": [
+          {
+            "id": "A",
+            "role": "subject_self",
+            "camera_presence": "on_camera",
+            "description": "种了十五年果园的河南果农，会用方言把农活观察讲成短段子，愿意正脸出镜"
+          },
+          {
+            "id": "B",
+            "role": "fictional_character",
+            "camera_presence": "off_camera",
+            "description": "本家兄弟，只在电话和口述中出现，请主人公为一笔周转借款作担保"
+          }
+        ],
+        "protagonist_ref": "A",
+        "trigger": "疏果那天，他想起前一晚收工后和村里老人聊天时听说东头老周给亲戚担保背了债，正好本家兄弟打来电话，要他这周也担保一笔周转，说这回稳赚。",
+        "want": "想既不伤情面地回绝兄弟，又让“舍不得疏就长不好”这个被十五年农活磨出来的理，被人认真听见而不是当成说教。",
+        "goal": "当天拍完一条能把疏果和人的取舍对上号、自己正脸也敢发出去的方言短视频。",
+        "initial_tactic": "先在镜头前讲“枝条太密争光照养分”的农活道理，再把兄弟要担保的事当包袱甩出来，用逗笑把难堪带过去。",
+        "feedback": "试讲时道理像说教，兄弟的难事又被他自己讲成了笑话，真正要回绝的话被笑声盖没；他发现越想逗，越把自己必须说的真话藏没了。",
+        "strategy_change": "他放下讲道理，让手机对着手和树，先疏果——连那颗位置好、看着最能长大的幼果也摘下来——再用方言讲兄弟那笔不能担的保，让手的动作替他说出“舍不得也得摘”。",
+        "costly_choice": {
+          "option_a": "答应担保，保住兄弟情面和“好人”名声，但今年果园的投入和自家周转被拖进不确定的风险",
+          "option_b": "当面回绝担保，接受被说忘本、狠心，保住果园和自家的底数",
+          "chosen": "option_b",
+          "why_incompatible_now": "担保这周就要回话，幼果这两天不疏就会抢肥；答应一边，就等于从这棵树、从自家账上挪走光照和养分，没有第二个位置留给另一边结果。"
+        },
+        "cost": {
+          "bearer_ref": "A",
+          "paid": "他亲口回绝兄弟，电话那头沉默后挂断；他把那颗最像样的幼果摘下丢在地上，手在半空停了一下。",
+          "persists_after_scene": "兄弟认定他忘本，情分生出没解开的疙瘩；地上那颗被摘掉的幼果当天还在，他也知道这家亲戚今年的酒桌难坐。"
+        },
+        "goal_outcome": {
+          "status": "transformed",
+          "result": "他原本想拍一条讲道理又好笑的视频，结果拍成了自己亲手摘掉好果子、亲口回绝兄弟的记录；道理没靠嘴讲清，取舍却被镜头接住，他得到一条自己敢正脸发出去的片子。"
+        },
+        "relationship_before": "他和本家兄弟维持着互相帮衬、谁也不开口拒绝的情面；对镜头另一端的人，他也习惯用逗笑换取喜欢。",
+        "relationship_after": "他和兄弟第一次有了明确的拒绝和没消化的隔阂；他对镜头不再只给笑话，也给出了一个自己付了代价的真话。",
+        "state_change": "他从“什么都想留住、什么都讲成笑话”变成接受“好果子也得摘、好人也得说不”；果园地上多了一堆疏下的幼果，手机里存着一条没甩包袱却敢正脸发的视频，和兄弟之间多了一道没马上解开的结。",
+        "viewer_question": "观众想确认，这个摘掉好果子、回绝了兄弟的人，下回再讲“舍不得”时，是不是还肯付同样的代价。",
+        "causal_edges": [
+          {
+            "from": "trigger",
+            "to": "initial_tactic",
+            "because": "担保的请求逼到眼前，他本能地想用熟悉的方言段子和农活道理把难堪包成笑话，既回绝对面又不伤情面。"
+          },
+          {
+            "from": "initial_tactic",
+            "to": "feedback",
+            "because": "他一边讲大道理一边甩包袱，结果说教味冲淡了真话，逗笑又盖住了拒绝，自己先看出这种讲法立不住。"
+          },
+          {
+            "from": "feedback",
+            "to": "strategy_change",
+            "because": "发现笑声会吃掉真话，他转而放弃用嘴讲理，让正在发生的疏果动作和兄弟那件事并置，用动作代替说教。"
+          },
+          {
+            "from": "strategy_change",
+            "to": "costly_choice",
+            "because": "镜头对着手时，他必须当场决定那颗好幼果留不留，正如这周必须决定担保签不签，两个“舍不得”在同一个动作里被逼到二选一。"
+          },
+          {
+            "from": "costly_choice",
+            "to": "cost",
+            "because": "选择回绝担保和摘掉好果子，他就得承担被兄弟当作忘本的冷场，以及亲手毁掉一个看起来很好的可能。"
+          },
+          {
+            "from": "cost",
+            "to": "goal_outcome",
+            "because": "正是这个他自己支付的代价，让片子从“讲道理的笑话”变成“有后果的真话”，他要的那条敢发的视频因此成立。"
+          },
+          {
+            "from": "goal_outcome",
+            "to": "state_change",
+            "because": "一条没甩包袱的视频、一地疏下的幼果和一通被挂断的电话，共同把他从“什么都想逗圆”的状态推到了“敢亲口拒绝”的状态。"
+          }
+        ]
+      },
+      "production_translation": {
+        "telling_mode": "一人一机，在果园现场用手机正脸口述加手部特写，方言短段子，无第二演员，兄弟只存在于电话和讲述中",
+        "on_camera_actor_refs": [
+          "A"
+        ],
+        "off_camera_actor_refs": [
+          "B"
+        ],
+        "required_visible_actions": [
+          "正脸对着手机用方言讲述",
+          "亲手疏果并摘下一颗位置好、看起来最能长大的幼果",
+          "把摘下的幼果放到地上可见处",
+          "做出回绝对方后挂断电话的动作和表情"
+        ],
+        "constraint_fit_hypothesis": "只有主人公一人出镜，一部手机即可完成正脸与手部拍摄，主要在果园取景；兄弟和老周都只在口述中出现，不需要任何演员出镜或对白配合，符合一人一机、无演员团队的限制。"
+      },
+      "business_bridge": {
+        "meaning_attributed_to_subject_hypothesis": "观众可能把“十五年种果的人懂得取舍、肯为真话付代价、不拿田园滤镜哄人”的意义归因到主体本人。",
+        "connection_to_objective_hypothesis": "长期看，这种“舍得下好果子”的判断力和正脸讲真话的稳定形象，会让观众未来看到他的桃子等果品时，把信任落到这个人身上，而不只是落到好看的果园画面上。"
+      },
+      "logline": "疏果季里，他先把给兄弟担保的难事讲成笑话却发现真话被逗没了，于是改让镜头拍下自己亲手摘掉那颗最像样的幼果、再亲口回绝担保，宁可被说忘本、情分打结，也要让“舍不得就长不好”从一句道理变成一次自己付了代价的取舍。"
+    },
+    "gateway": {
+      "thread_id": "27e22121-e9c4-4942-81d2-999c8f57e82b",
+      "run_id": "54e08548-57f3-44e5-b963-00fc3c4ff0d6",
+      "agent_name": "ip-director-loop-eab288e6f668",
+      "surface": {
+        "config_sha256": "0867ac0b58efe1fd9b4c499d3b4fa5c1fd7bd0b3f835193414fa211ac201e32b",
+        "soul_sha256": "f17c317bd5fbd856e22258120a20a75d2e972a5f579ac2e8f7f0e34a1d9dcd96",
+        "skills": [],
+        "tool_allowlist": [],
+        "memory_enabled": false
+      },
+      "model_surface": {
+        "name": "doubao-seed-evolving",
+        "model": "doubao-seed-evolving",
+        "display_name": "Volcengine Doubao / doubao-seed-evolving",
+        "description": null,
+        "supports_thinking": true,
+        "supports_reasoning_effort": true,
+        "supports_vision": true,
+        "temperature": null,
+        "max_tokens": null,
+        "effective_config_sha256": "f0acabec81ee71ae9f5c8412e36805c91218f43c858194e250338526246dbfc7"
+      },
+      "thread_request_sha256": "1fb00cc4cee4921392fa4f452f5d6a410ef83873da32764f71d10a12fb277318",
+      "run_request_sha256": "f0d40dd8b05ed292fd2c126a7b286cd81bda79e6622f3f117c9f6b6bbd900a85",
+      "run_record": {
+        "run_id": "54e08548-57f3-44e5-b963-00fc3c4ff0d6",
+        "thread_id": "27e22121-e9c4-4942-81d2-999c8f57e82b",
+        "assistant_id": "ip-director-loop-eab288e6f668",
+        "status": "success",
+        "metadata": {},
+        "kwargs": {
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "以下是冻结的隔离研究输入。只返回本阶段合同规定的 JSON。schema_version 必须逐字等于 ip-director-story-result-v2：\n{\"brief\":{\"audience_hypotheses\":[\"可能有人想从普通人的处境中获得对选择、关系和生活的解释\",\"可能有人愿意转发能替自己说出生活感受的内容\"],\"case_id\":\"DL1-fruit-grower-longterm\",\"commercial_object_terms\":[\"水果\",\"桃子\",\"果品\"],\"facts\":[{\"id\":\"f1\",\"statement\":\"本人经营果园十五年\"},{\"id\":\"f2\",\"statement\":\"本人常在收工后和村里老人聊天\"},{\"id\":\"f3\",\"statement\":\"本人喜欢把农活观察讲成带方言的短段子\"},{\"id\":\"f4\",\"statement\":\"本人愿意正脸出镜\"},{\"id\":\"f5\",\"statement\":\"当前只能由本人用一部手机在果园持续拍摄\"}],\"objective\":[\"长期建立属于本人的账号影响力\",\"未来可以让观众把果园产品归因给本人\"],\"production_constraints\":[\"一人一机\",\"主要在果园取景\",\"可以口头表达但没有演员团队\"],\"research_fixture\":true,\"runtime_status\":\"research_quarantined\",\"schema_version\":\"ip-director-loop-brief-v1\",\"selection_policy\":{\"allowed_distances\":[\"mid\",\"far\"],\"required_mode\":\"story\"},\"subject\":{\"description\":\"一名经营果园十五年的河南果农\",\"kind\":\"person\"},\"surface_terms\":[\"果农\",\"果园\",\"水果\"]},\"frozen_route\":{\"directions\":[{\"association_path_hypothesis\":[\"果农\",\"果园长期经营\",\"农活与节气观察\",\"方言短段子口述\",\"正脸一人一机记录\",\"观众把可信度归因到本人\"],\"assumptions\":[\"果园日常有足够可讲的农活节点\",\"方言不会造成普遍理解障碍\",\"观众愿意长期跟随农事节奏\"],\"audience_tension_hypothesis\":\"观众想为可信的水果买单，又怕被田园滤镜或营销话术欺骗；想看真实农事，又不愿意看枯燥说教。\",\"business_attribution_hypothesis\":\"内容直接展示果子、果园和本人判断，观众未来看到桃子等果品时，容易归因到这个长期种果、正脸讲述的人。\",\"content_subject_hypothesis\":\"一个种了十五年果园的人，持续讲清楚水果从开花、剪枝、疏果、天气应对到采摘的具体判断和代价，让观众看见“果子为什么值得信任”。\",\"expression_mode_hypothesis\":\"在果园现场用一部手机正脸拍摄，用带方言的短段子讲当下农活、天气和果树反应，不使用演员。\",\"far_deletion_test\":null,\"id\":\"d-near\",\"industry_role\":\"subject\",\"semantic_distance\":\"near\",\"structure_mapping_hypothesis\":[{\"source_edge\":\"果树要经过节气、天气和一轮轮人工管理，才结出可卖的果子\",\"target_edge\":\"账号要经过一次次真实出镜和具体农活讲述，才积累出可被信任的人设\"},{\"source_edge\":\"果园现场的果树状态和操作可以被直接看见\",\"target_edge\":\"观众对水果来源和种植者人品的判断获得直接确认\"}],\"subject_ownership\":{\"fact_refs\":[\"f1\",\"f3\",\"f4\",\"f5\"],\"hypothesis\":\"十五年经营提供真实的农活细节和时间感，方言短段子和正脸出镜让这些细节只能由他本人讲，一人一机在果园拍摄又强化了连续性。\"}},{\"association_path_hypothesis\":[\"果园农活中的剪枝、疏果、等待\",\"这些动作里“舍不得就长不好”的因果边\",\"迁移到人在关系、机会、责任中的取舍\",\"用方言段子讲成具体人的处境\",\"观众在自己的生活里认出同一条因果边\"],\"assumptions\":[\"农活因果和人际关系之间能建立自然对应\",\"他能把隐喻讲成段子而非鸡汤\",\"观众接受果园作为隐喻来源而不觉得生硬\"],\"audience_tension_hypothesis\":\"想做重情义、不拒绝的人，又发现精力和责任有限；想留住所有可能性，又必须舍弃一些才不把生活拖垮。\",\"business_attribution_hypothesis\":\"观众记住的是他从种果树里练出的取舍判断力和耐心，这种人格信任再回流到果园产品，形成“人种得好、讲得真、果子可信”的归因。\",\"content_subject_hypothesis\":\"普通人在关系、机会和责任面前因为舍不得剪、舍不得疏而把好事拖成消耗；每集用一个果园动作，对应一个“想全留却必须取舍”的人际决策。\",\"expression_mode_hypothesis\":\"在果园里边做手边活边用方言讲短段子；前半段是农活，后半段转到一个普通人的取舍瞬间，用包袱代替道理。\",\"far_deletion_test\":null,\"id\":\"d-mid\",\"industry_role\":\"metaphor\",\"semantic_distance\":\"mid\",\"structure_mapping_hypothesis\":[{\"source_edge\":\"果树枝条太密时不剪，会争抢光照和养分，最后果子反而长不大\",\"target_edge\":\"人在关系里什么都想抓住、不肯设边界，最后精力被分散，真正重要的人和事反而被拖累\"},{\"source_edge\":\"疏果时必须摘掉一些幼果，哪怕看起来可惜，才能让留下的果子长好\",\"target_edge\":\"人必须放弃一些看似不错的机会、情面或期待，才能守住少数真正重要的承诺\"},{\"source_edge\":\"遇到倒春寒或病虫害，管得再好也可能受损\",\"target_edge\":\"关系或计划遇到不可控变故时，人只能接受结果并重新修剪期待\"}],\"subject_ownership\":{\"fact_refs\":[\"f1\",\"f3\",\"f4\",\"f5\"],\"hypothesis\":\"十五年果园经验使隐喻有具体动作、节点和代价，而不是凭空感悟；方言讲述和正脸出镜让这种迁移带有他个人的节奏和可信度。\"}},{\"association_path_hypothesis\":[\"果园作为固定取景舞台\",\"一个人正脸讲方言短段子\",\"段子里的人在借钱、随礼、聚会、道歉等场景试探认真\",\"听众继续用玩笑框架接收\",\"讲述者暴露玩笑背后的真实处境\"],\"assumptions\":[\"他能在逗笑之外表现认真和脆弱\",\"观众愿意看无直接农事的普遍处境段子\",\"果园作为纯背景不会削弱人物辨识度\",\"长期积累后仍能完成产品归因\"],\"audience_tension_hypothesis\":\"想靠幽默和随和被喜欢，又渴望自己的真话被认真接住；怕一旦不搞笑就失去关注，又怕一直搞笑就永远不被理解。\",\"business_attribution_hypothesis\":\"内容短期不直接卖水果，而是先让观众记住这个正脸、方言、会讲段子的人；长期靠稳定人设和后续果园信息露出，把人格信任迁移到果品，归因链路更长但人物辨识度可能更强。\",\"content_subject_hypothesis\":\"一个擅长用玩笑把难堪说出口的人，发现自己越会逗大家笑，越没人相信他也有认真和脆弱的时刻；他每次想认真说出需要，都会被笑声、接梗和“你别逗了”挡回去。\",\"expression_mode_hypothesis\":\"一镜到底正脸口述，果园只是背景；用方言短段子和微型反转呈现不同社交场景，不依赖顾客、村民或家人出演。\",\"far_deletion_test\":{\"ownership_fact_refs\":[\"f3\",\"f4\"],\"remaining_human_subject_hypothesis\":\"一个习惯用方言段子化解难堪、却在自己认真时总被当成玩笑的人，如何在继续被喜欢和冒险说出真话之间反复选择。\",\"removed_surface_terms\":[\"果农\",\"果园\",\"水果\"]},\"id\":\"d-far\",\"industry_role\":\"stage\",\"semantic_distance\":\"far\",\"structure_mapping_hypothesis\":[{\"source_edge\":\"讲笑话的人抛出轻巧包袱，听众用笑声确认“这只是玩笑”\",\"target_edge\":\"当他夹带真实态度或求助时，听众仍按旧框架理解，使真实信号失效\"},{\"source_edge\":\"他越擅长替别人把难堪变成笑料，别人越习惯向他索要情绪释放\",\"target_edge\":\"轮到他流露难处时，别人反而期待他继续搞笑，使他的脆弱被当作表演失误\"},{\"source_edge\":\"他为了维持关系继续接梗圆场\",\"target_edge\":\"对方得到了轻松，他却失去了被认真对待的机会\"}],\"subject_ownership\":{\"fact_refs\":[\"f3\",\"f4\"],\"hypothesis\":\"他喜欢把观察讲成带方言短段子，且愿意正脸出镜，这让“玩笑与认真错位”可以通过他本人的语言节奏和表情持续验证，不需要职业身份提供情节。\"}}],\"epistemic_state\":\"creative_hypothesis\",\"facts_used\":[{\"id\":\"f1\",\"statement\":\"本人经营果园十五年\"},{\"id\":\"f2\",\"statement\":\"本人常在收工后和村里老人聊天\"},{\"id\":\"f3\",\"statement\":\"本人喜欢把农活观察讲成带方言的短段子\"},{\"id\":\"f4\",\"statement\":\"本人愿意正脸出镜\"},{\"id\":\"f5\",\"statement\":\"当前只能由本人用一部手机在果园持续拍摄\"}],\"recommendation\":{\"assumptions\":[\"他能把果园里的剪枝、疏果等因果边自然转成人的取舍段子\",\"观众能从农事隐喻联想到自己的关系和机会，而不觉得是说教\",\"中路线仍能稳定提供产品归因，不会变成脱离果园的空泛感悟\"],\"fact_refs\":[\"f1\",\"f3\",\"f4\",\"f5\"],\"reason_hypothesis\":\"中路线既有可重复生成的因果引擎——“舍不得剪、舍不得疏，就会被现实反噬”，又牢牢扎根在十五年果园经验和方言讲述中，一人一机即可生产，且与未来果品归因链路最短。\",\"selected_direction_ref\":\"d-mid\",\"tradeoff_hypothesis\":\"主动放弃远路更大的社会处境宽度和人设强情感反差，接受内容更容易被预期为“果农讲道理”；也放弃近路最直接的水果展示效率。\",\"why_not_near_hypothesis\":\"近路虽然安全，但容易停留在农事展示和水果信任，重复后可能只剩节气、果树和果子，缺少每集都能换人物、换事件的人类冲突引擎。\"},\"schema_version\":\"ip-director-route-result-v2\",\"semantic_kernel\":{\"desire_conflict_hypothesis\":\"他既想把生活讲得轻松好笑以便被传播，又想让十五年劳作的重量被认真看见；既想长期建立个人影响力，又不能脱离果园生产和一人一机的制作限制。\",\"head_concept_hypothesis\":\"一个长期在固定土地上劳作的人，通过农活观察、方言段子和正脸讲述，把普通人难以直说的取舍、难堪与生活重量讲成可被听懂的内容。\",\"human_action_hypothesis\":\"他通过观察、聊天和带方言的口头表达，把自己和身边人的处境加工成短段子，让难以明说的生活感受变得好笑、可辨认、可转发。\",\"literal_action\":{\"fact_refs\":[\"f1\",\"f2\",\"f3\",\"f4\",\"f5\"],\"statement\":\"本人经营果园十五年；常在收工后和村里老人聊天；喜欢把农活观察讲成带方言的短段子；愿意正脸出镜；当前只能由本人用一部手机在果园持续拍摄。\"},\"relationship_hypothesis\":\"关系可能从一个人独自种果、收工聊天，转向被镜头另一端的观众持续听见；观众先是觉得他讲得真、讲得逗，再逐渐把信任落到他这个人身上。\",\"social_rule_hypothesis\":\"普通人的感受如果不能被讲成具体、好笑、带地方口吻的故事，就很难被外人认真对待；但一旦被讲成段子，讲述者又可能被只当作“搞笑的人”。\",\"surface_terms\":[\"果农\",\"果园\",\"水果\"]}},\"source_route_sha256\":\"8a9a0c13f60b980a9f0ab7763bba0a29f261f2d95d6d9f7fcb671e5e0ea4ff06\"}"
+              }
+            ]
+          },
+          "config": {
+            "recursion_limit": 20
+          }
+        },
+        "multitask_strategy": "reject",
+        "created_at": "2026-08-04T09:13:55.299529+00:00",
+        "updated_at": "2026-08-04T09:15:53.627756+00:00",
+        "total_input_tokens": 4814,
+        "total_output_tokens": 4720,
+        "total_tokens": 9534,
+        "llm_call_count": 1,
+        "lead_agent_tokens": 9534,
+        "subagent_tokens": 0,
+        "middleware_tokens": 0,
+        "message_count": 2,
+        "stop_reason": null
+      },
+      "token_usage": {
+        "thread_id": "27e22121-e9c4-4942-81d2-999c8f57e82b",
+        "total_tokens": 9534,
+        "total_input_tokens": 4814,
+        "total_output_tokens": 4720,
+        "total_runs": 1,
+        "by_model": {
+          "doubao-seed-evolving-latest-version": {
+            "tokens": 9534,
+            "runs": 1
+          }
+        },
+        "by_caller": {
+          "lead_agent": 9534,
+          "subagent": 0,
+          "middleware": 0
+        }
+      },
+      "events_sha256": "de3bbaf0c7e687683bd54085657587220efc04c191dc0f2645625ccf4cb733bd",
+      "events": [
+        {
+          "seq": 1,
+          "event_type": "run.start",
+          "category": "trace",
+          "caller": "lead_agent",
+          "llm_call_index": null
+        },
+        {
+          "seq": 2,
+          "event_type": "llm.human.input",
+          "category": "message",
+          "caller": "lead_agent",
+          "llm_call_index": null
+        },
+        {
+          "seq": 3,
+          "event_type": "llm.ai.response",
+          "category": "message",
+          "caller": "lead_agent",
+          "llm_call_index": 1
+        },
+        {
+          "seq": 4,
+          "event_type": "run.end",
+          "category": "outputs",
+          "caller": null,
+          "llm_call_index": null
+        }
+      ],
+      "runtime_metadata": {
+        "caller": "lead_agent",
+        "agent_name": "ip-director-loop-eab288e6f668",
+        "model_name": "doubao-seed-evolving",
+        "thinking_enabled": true,
+        "reasoning_effort": null,
+        "is_plan_mode": false,
+        "subagent_enabled": false,
+        "tool_groups": null,
+        "available_skills": [],
+        "tool_allowlist": [],
+        "memory_enabled": false,
+        "assembled_tool_names": [],
+        "indexed_skill_names": [],
+        "thread_id": "27e22121-e9c4-4942-81d2-999c8f57e82b",
+        "ls_integration": "langgraph"
+      },
+      "llm_calls": [
+        {
+          "call_index": 1,
+          "caller": "lead_agent",
+          "latency_ms": 118091,
+          "usage": {
+            "input_tokens": 4814,
+            "output_tokens": 4720,
+            "total_tokens": 9534,
+            "input_token_details": {
+              "cache_read": 0
+            },
+            "output_token_details": {
+              "reasoning": 2811
+            }
+          },
+          "actual_model": "doubao-seed-evolving-latest-version"
+        }
+      ],
+      "tool_calls": [],
+      "tool_results": []
+    }
+  },
+  "mechanical_validation": {
+    "passed": false,
+    "issues": [
+      {
+        "code": "story_v2.counterforce",
+        "path": "story_world.counterforce",
+        "message": "counterforce is required"
+      },
+      {
+        "code": "story_v2.choice_resolution",
+        "path": "story_world.costly_choice.chosen",
+        "message": "chosen must exactly equal option_a or option_b"
+      }
+    ]
+  },
+  "quality_verdict": "pending_blind_review"
+}

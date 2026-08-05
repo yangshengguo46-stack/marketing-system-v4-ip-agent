@@ -1,5 +1,7 @@
 """Core behavior tests for MCP client server config building."""
 
+import sys
+
 import pytest
 
 from deerflow.config.extensions_config import ExtensionsConfig, McpServerConfig
@@ -42,6 +44,16 @@ def test_extensions_config_resolves_env_variables_inside_nested_collections(monk
     assert resolved["env"] == {"API_KEY": "secret"}
     assert resolved["enabled"] is True
     assert resolved["timeout"] == 30
+
+
+def test_extensions_config_resolves_current_python_for_bundled_stdio_server(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("DEER_FLOW_PYTHON_EXECUTABLE", raising=False)
+
+    resolved = ExtensionsConfig.resolve_env_variables({"command": "$DEER_FLOW_PYTHON_EXECUTABLE"})
+
+    assert resolved == {"command": sys.executable}
 
 
 def test_build_server_params_stdio_requires_command():

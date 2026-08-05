@@ -100,10 +100,11 @@ Owner-authenticated routes:
 - `DELETE /api/personal-ip/minecontext/data?scope=evidence|all`
 
 Every workspace mounts a lightweight status bootstrap. For a new owner it
-applies all Personal-IP scopes and purposes and starts the isolated sidecar.
-Settings exposes only status, retention, persistent disable/re-enable, evidence
-count and deletion semantics; internal scope and purpose identifiers are not
-customer controls.
+performs a read-only status request: it does not create consent, launch a
+sidecar or capture a screen. Settings requires an explicit owner confirmation
+before bounded screen collection can start, and exposes status, retention,
+persistent disable/re-enable, evidence count and deletion semantics. Internal
+scope and purpose identifiers are not customer controls.
 
 ## Packaging and verification
 
@@ -111,10 +112,11 @@ The source-package required-path contract includes the MineContext verifier,
 LICENSE, NOTICE, README, version manifest, packaging metadata, CLI and search
 boundary. Package smoke extraction runs `minecontext_source.py verify` without
 installing dependencies or accessing credentials. Clean install therefore
-contains the complete source, and normal `make install` builds the isolated
-runtime required by the default-on product. `make doctor` verifies the source pin; when operator-disabled it
-does not require a runtime or provider credentials, and when enabled it reports
-only missing variable names, never their values.
+contains the complete source, and normal `make install` builds the optional
+isolated runtime. Installation alone never authorizes collection. `make doctor`
+verifies the source pin; when operator-disabled it does not require a runtime or
+provider credentials, and when enabled it reports only missing variable names,
+never their values.
 
 All automated tests use local synthetic fixtures and temporary owner
 directories. They do not inspect host screenshots, documents, browser profiles

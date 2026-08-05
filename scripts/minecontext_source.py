@@ -182,7 +182,7 @@ def doctor(root: Path) -> None:
     print("MineContext source and runtime: verified")
     print(f"  commit: {manifest['commit']}")
     print("  license: Apache-2.0")
-    print("  capture: default-on per owner; Settings can persistently disable it")
+    print("  capture: default-off; each owner must explicitly enable it in Settings")
 
 
 def main() -> int:

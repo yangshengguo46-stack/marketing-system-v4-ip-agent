@@ -316,6 +316,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
         if sf is not None:
             from deerflow.persistence.personal_ip_accounts import PersonalIPAccountRepository
             from deerflow.persistence.personal_ip_metrics import PersonalIPMetricRepository
+            from deerflow.persistence.personal_ip_paid_calls import PersonalIPPaidCallRepository
             from deerflow.persistence.personal_ip_platform_connections import PersonalIPPlatformConnectionRepository
             from deerflow.persistence.personal_ip_platform_observations import PersonalIPPlatformObservationRepository
             from deerflow.persistence.personal_ip_publish_receipts import PersonalIPPublishReceiptRepository
@@ -339,13 +340,21 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
                 raise RuntimeError("PERSONAL_IP_CREDENTIAL_KEY must contain at least 32 characters")
             if not credential_key:
                 credential_key = f"personal-ip-platform-credentials:v1:{get_auth_config().jwt_secret}"
+            credential_cipher = ChannelCredentialCipher.from_key(credential_key)
+            app.state.personal_ip_paid_call_repo = PersonalIPPaidCallRepository(
+                sf,
+                provider_task_cipher=credential_cipher,
+            )
             app.state.personal_ip_platform_connection_repo = PersonalIPPlatformConnectionRepository(
                 sf,
-                cipher=ChannelCredentialCipher.from_key(credential_key),
+                cipher=credential_cipher,
             )
             app.state.personal_ip_publish_receipt_repo = PersonalIPPublishReceiptRepository(sf)
             app.state.personal_ip_subject_repo = PersonalIPSubjectRepository(sf)
             app.state.personal_ip_video_production_repo = PersonalIPVideoProductionRepository(sf)
+            from app.gateway.evidence_paid_calls import GatewayEvidencePaidCallService
+
+            app.state.evidence_paid_call_service = GatewayEvidencePaidCallService(app.state.personal_ip_paid_call_repo)
             from deerflow.personal_ip.data_lifecycle import PersonalIPDataLifecycleService
             from deerflow.personal_ip.runtime import PersonalIPRuntimeServices, configure_personal_ip_runtime
 
@@ -371,11 +380,13 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.scheduled_task_run_repo = None
             app.state.personal_ip_account_repo = None
             app.state.personal_ip_metric_repo = None
+            app.state.personal_ip_paid_call_repo = None
             app.state.personal_ip_platform_observation_repo = None
             app.state.personal_ip_platform_connection_repo = None
             app.state.personal_ip_publish_receipt_repo = None
             app.state.personal_ip_subject_repo = None
             app.state.personal_ip_video_production_repo = None
+            app.state.evidence_paid_call_service = None
             app.state.personal_ip_data_lifecycle_service = None
             from deerflow.personal_ip.runtime import configure_personal_ip_runtime
 

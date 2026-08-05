@@ -21,6 +21,7 @@ from app.gateway.routers import (
     channel_connections,
     channels,
     console,
+    evidence_paid_calls,
     features,
     feedback,
     github_webhooks,
@@ -507,6 +508,10 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
     app.include_router(personal_ip_platform_observations.router)
     app.include_router(personal_ip_publish_receipts.router)
     app.include_router(personal_ip_video_productions.router)
+
+    # Server-authoritative, one-time paid evidence-call decisions are mounted
+    # on the owning thread. The backing service is optional and fails closed.
+    app.include_router(evidence_paid_calls.router)
 
     # Features API is mounted at /api/features
     app.include_router(features.router)

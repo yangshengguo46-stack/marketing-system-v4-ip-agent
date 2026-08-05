@@ -12,6 +12,20 @@ from __future__ import annotations
 
 from typing import Any
 
+from deerflow.mcp.result_metadata import is_operator_private_mcp_meta_key
+
+
+def _strip_operator_private_metadata(value: Any) -> Any:
+    """Remove legacy server-only keys without changing unrelated value types."""
+
+    if isinstance(value, dict):
+        return {key: _strip_operator_private_metadata(item) for key, item in value.items() if not is_operator_private_mcp_meta_key(key)}
+    if isinstance(value, list):
+        return [_strip_operator_private_metadata(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_strip_operator_private_metadata(item) for item in value)
+    return value
+
 
 def serialize_lc_object(obj: Any) -> Any:
     """Recursively serialize a LangChain object to a JSON-serialisable dict."""
@@ -20,19 +34,19 @@ def serialize_lc_object(obj: Any) -> Any:
     if isinstance(obj, (str, int, float, bool)):
         return obj
     if isinstance(obj, dict):
-        return {k: serialize_lc_object(v) for k, v in obj.items()}
+        return {k: serialize_lc_object(v) for k, v in obj.items() if not is_operator_private_mcp_meta_key(k)}
     if isinstance(obj, (list, tuple)):
         return [serialize_lc_object(item) for item in obj]
     # Pydantic v2
     if hasattr(obj, "model_dump"):
         try:
-            return obj.model_dump()
+            return _strip_operator_private_metadata(obj.model_dump())
         except Exception:
             pass
     # Pydantic v1 / older objects
     if hasattr(obj, "dict"):
         try:
-            return obj.dict()
+            return _strip_operator_private_metadata(obj.dict())
         except Exception:
             pass
     # Interrupt is a __slots__ class — no model_dump/dict/__dict__, so it

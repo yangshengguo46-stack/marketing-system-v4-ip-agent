@@ -24,6 +24,7 @@ class MineContextSyncRequest(BaseModel):
 
 class MineContextEnableRequest(BaseModel):
     retention_days: int = Field(default=30, ge=1, le=3650)
+    continuous_screen_capture_confirmed: Literal[True]
 
 
 async def _owner_id(request: Request) -> str:
@@ -40,7 +41,7 @@ def _http_error(exc: Exception) -> HTTPException:
 
 @router.get("")
 async def minecontext_status(request: Request) -> dict[str, Any]:
-    return await asyncio.to_thread(get_minecontext_service(request).ensure_default, await _owner_id(request))
+    return await asyncio.to_thread(get_minecontext_service(request).status, await _owner_id(request))
 
 
 @router.post("/authorize")
@@ -61,6 +62,7 @@ async def enable_minecontext(
             get_minecontext_service(request).enable_default,
             await _owner_id(request),
             retention_days=body.retention_days,
+            continuous_screen_capture_confirmed=body.continuous_screen_capture_confirmed,
         )
     except (PermissionError, RuntimeError, ValueError) as exc:
         raise _http_error(exc) from exc
